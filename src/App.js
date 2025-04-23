@@ -12,7 +12,7 @@ import QualityCheck from './pages/QualityCheck';
 import SetServiceReminder from './pages/SetServiceReminder';
 import InsuranceManagement from './pages/InsuranceManagement';
 import InventoryManagement from './pages/InventoryManagement';
-import GarageLogin from './Login/LoginPage';
+import LoginPage from './Login/LoginPage'
 import SignUpPage from './Login/SignUpPage';
 import ProtectedRoute from './Login/ProtectedRoute';
 
@@ -23,7 +23,7 @@ function App() {
       <Router>
         <Routes>
           {/* Auth routes - accessible without login */}
-          <Route path="/login" element={<GarageLogin />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           
           {/* Protected routes - require authentication */}

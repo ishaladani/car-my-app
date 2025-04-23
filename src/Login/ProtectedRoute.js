@@ -2,8 +2,10 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 
 const ProtectedRoute = () => {
-  // Check if user is logged in by looking for the garage token
-  const isAuthenticated = localStorage.getItem('garageToken') !== null;
+  // Check multiple possible auth token storage locations
+  const isAuthenticated = 
+    document.cookie.includes('authToken=') || 
+    sessionStorage.getItem('authToken') !== null;
   
   // If not authenticated, redirect to login page
   if (!isAuthenticated) {
