@@ -20,7 +20,9 @@ import {
   InputLabel,
   FormControl,
   CssBaseline,
-  useTheme
+  useTheme,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +41,13 @@ const InventoryManagement = () => {
     pricePerUnit: '',
     taxType: '',
     taxAmount: ''
+  });
+
+  // State for notifications
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
   });
 
   // Sample data for the table
@@ -82,35 +91,86 @@ const InventoryManagement = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Calculate total price
-    const total = (parseFloat(formData.quantity) * parseFloat(formData.pricePerUnit)).toFixed(2);
-    
-    // Add new part to the table
-    const newPart = {
-      id: inventoryData.length + 1,
-      partNumber: formData.partNumber,
-      partName: formData.partName,
-      quantity: formData.quantity,
-      price: `$${formData.pricePerUnit}`,
-      tax: formData.taxType,
-      totalPrice: `$${total}`
-    };
-    
-    setInventoryData([...inventoryData, newPart]);
-    // Reset form
-    setFormData({
-      carName: '',
-      model: '',
-      partNumber: '',
-      partName: '',
-      quantity: '',
-      pricePerUnit: '',
-      taxType: '',
-      taxAmount: ''
-    });
+    try {
+      // Prepare the data for API call
+      const requestData = {
+        garageId: "67e0f80b5c8f6293f36e3506", // This should probably come from your auth context or config
+        carName: formData.carName,
+        model: formData.model,
+        partNumber: formData.partNumber,
+        partName: formData.partName,
+        quantity: parseInt(formData.quantity),
+        pricePerUnit: parseFloat(formData.pricePerUnit),
+        taxType: formData.taxType,
+        taxAmount: parseFloat(formData.taxAmount)
+      };
+
+      // Make the API call
+      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/inventory/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`,
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add part');
+      }
+
+      const data = await response.json();
+
+      // Calculate total price for local display
+      const total = (parseFloat(formData.quantity) * parseFloat(formData.pricePerUnit)).toFixed(2);
+      
+      // Add new part to the table
+      const newPart = {
+        id: inventoryData.length + 1,
+        partNumber: formData.partNumber,
+        partName: formData.partName,
+        quantity: formData.quantity,
+        price: `$${formData.pricePerUnit}`,
+        tax: formData.taxType,
+        totalPrice: `$${total}`
+      };
+      
+      setInventoryData([...inventoryData, newPart]);
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Part added successfully!',
+        severity: 'success'
+      });
+
+      // Reset form
+      setFormData({
+        carName: '',
+        model: '',
+        partNumber: '',
+        partName: '',
+        quantity: '',
+        pricePerUnit: '',
+        taxType: '',
+        taxAmount: ''
+      });
+
+    } catch (error) {
+      console.error('Error adding part:', error);
+      setNotification({
+        open: true,
+        message: 'Failed to add part. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, open: false }));
   };
 
   return (
@@ -164,6 +224,7 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.carName}
                 onChange={handleInputChange}
+                required
                 sx={{ flex: '1 1 200px' }}
               />
               <TextField
@@ -172,6 +233,7 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.model}
                 onChange={handleInputChange}
+                required
                 sx={{ flex: '1 1 200px' }}
               />
               <TextField
@@ -180,6 +242,7 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.partNumber}
                 onChange={handleInputChange}
+                required
                 sx={{ flex: '1 1 200px' }}
               />
               <TextField
@@ -188,6 +251,7 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.partName}
                 onChange={handleInputChange}
+                required
                 sx={{ flex: '1 1 200px' }}
               />
               <TextField
@@ -197,6 +261,8 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.quantity}
                 onChange={handleInputChange}
+                required
+                inputProps={{ min: 1 }}
                 sx={{ flex: '1 1 200px' }}
               />
               <TextField
@@ -206,6 +272,8 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.pricePerUnit}
                 onChange={handleInputChange}
+                required
+                inputProps={{ min: 0, step: "0.01" }}
                 sx={{ flex: '1 1 200px' }}
               />
               <FormControl sx={{ flex: '1 1 200px' }}>
@@ -215,6 +283,7 @@ const InventoryManagement = () => {
                   value={formData.taxType}
                   onChange={handleInputChange}
                   label="Tax"
+                  required
                 >
                   <MenuItem value="SGST">SGST</MenuItem>
                   <MenuItem value="CGST">CGST</MenuItem>
@@ -227,6 +296,8 @@ const InventoryManagement = () => {
                 variant="outlined"
                 value={formData.taxAmount}
                 onChange={handleInputChange}
+                required
+                inputProps={{ min: 0, step: "0.01" }}
                 sx={{ flex: '1 1 200px' }}
               />
             </Box>
@@ -308,6 +379,22 @@ const InventoryManagement = () => {
           </CardContent>
         </Card>
       </Container>
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseNotification} 
+          severity={notification.severity}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
