@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -50,36 +50,50 @@ const InventoryManagement = () => {
     severity: 'success'
   });
 
-  // Sample data for the table
-  const [inventoryData, setInventoryData] = useState([
-    { 
-      id: 1, 
-      partNumber: 'BP-1001', 
-      partName: 'Brake Pads', 
-      quantity: 24, 
-      price: '$25.99', 
-      tax: 'SGST', 
-      totalPrice: '$623.76' 
-    },
-    { 
-      id: 2, 
-      partNumber: 'OF-2002', 
-      partName: 'Oil Filter', 
-      quantity: 36, 
-      price: '$8.50', 
-      tax: 'CGST', 
-      totalPrice: '$306.00' 
-    },
-    { 
-      id: 3, 
-      partNumber: 'SP-4004', 
-      partName: 'Spark Plugs', 
-      quantity: 60, 
-      price: '$4.99', 
-      tax: 'SGST', 
-      totalPrice: '$299.40' 
-    },
-  ]);
+  // Inventory data from API
+  const [inventoryData, setInventoryData] = useState([]);
+  // State for selected part
+  const [selectedPart, setSelectedPart] = useState('');
+
+  // Function to fetch inventory data
+  const fetchInventory = async () => {
+    try {
+      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506', {
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      const data = await response.json();
+      setInventoryData(Array.isArray(data) ? data : data.data || []);
+    } catch (error) {
+      setNotification({
+        open: true,
+        message: error.message || 'Failed to fetch inventory',
+        severity: 'error'
+      });
+    }
+  };
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  // Add event listener for page refresh
+  useEffect(() => {
+    const handlePageRefresh = () => {
+      fetchInventory();
+    };
+
+    // Listen for page refresh events
+    window.addEventListener('load', handlePageRefresh);
+    
+    // Cleanup the event listener
+    return () => {
+      window.removeEventListener('load', handlePageRefresh);
+    };
+  }, []);
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -90,6 +104,31 @@ const InventoryManagement = () => {
     }));
   };
 
+  // Auto-populate fields when a part is selected from inventory
+  useEffect(() => {
+    if (selectedPart) {
+      const selectedPartData = inventoryData.find(part => 
+        (part.partNumber || part.id) === selectedPart
+      );
+      
+      if (selectedPartData) {
+        setFormData(prev => ({
+          ...prev,
+          partNumber: selectedPartData.partNumber || '',
+          partName: selectedPartData.partName || '',
+          quantity: selectedPartData.quantity || '',
+          pricePerUnit: selectedPartData.pricePerUnit || '',
+          // Extract numeric value from price string if needed
+          ...(selectedPartData.price && typeof selectedPartData.price === 'string' && !selectedPartData.pricePerUnit && {
+            pricePerUnit: selectedPartData.price.replace(/[^0-9.]/g, '')
+          }),
+          taxType: selectedPartData.tax || selectedPartData.taxType || '',
+          taxAmount: selectedPartData.taxAmount || ''
+        }));
+      }
+    }
+  }, [selectedPart, inventoryData]);
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,48 +136,30 @@ const InventoryManagement = () => {
     try {
       // Prepare the data for API call
       const requestData = {
-        garageId: "67e0f80b5c8f6293f36e3506", // This should probably come from your auth context or config
+        garageId: "67e0f80b5c8f6293f36e3506",
         carName: formData.carName,
         model: formData.model,
         partNumber: formData.partNumber,
         partName: formData.partName,
         quantity: parseInt(formData.quantity),
         pricePerUnit: parseFloat(formData.pricePerUnit),
-        taxType: formData.taxType,
         taxAmount: parseFloat(formData.taxAmount)
       };
 
-      // Make the API call
+      // Use the same token as AssignEngineer for consistency
       const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/inventory/add', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`,
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
         },
         body: JSON.stringify(requestData)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add part');
+        const errorResult = await response.json();
+        throw new Error(errorResult.message || 'Failed to add part.');
       }
-
-      const data = await response.json();
-
-      // Calculate total price for local display
-      const total = (parseFloat(formData.quantity) * parseFloat(formData.pricePerUnit)).toFixed(2);
-      
-      // Add new part to the table
-      const newPart = {
-        id: inventoryData.length + 1,
-        partNumber: formData.partNumber,
-        partName: formData.partName,
-        quantity: formData.quantity,
-        price: `$${formData.pricePerUnit}`,
-        tax: formData.taxType,
-        totalPrice: `$${total}`
-      };
-      
-      setInventoryData([...inventoryData, newPart]);
       
       // Show success notification
       setNotification({
@@ -158,12 +179,17 @@ const InventoryManagement = () => {
         taxType: '',
         taxAmount: ''
       });
+      
+      // Reset selected part
+      setSelectedPart('');
+      // Refresh inventory
+      fetchInventory();
 
     } catch (error) {
       console.error('Error adding part:', error);
       setNotification({
         open: true,
-        message: 'Failed to add part. Please try again.',
+        message: error.message || 'Failed to add part. Please try again.',
         severity: 'error'
       });
     }
@@ -208,6 +234,32 @@ const InventoryManagement = () => {
           boxShadow: theme.shadows[3]
         }}>
           <CardContent sx={{ p: 4 }}>
+            {/* Select Parts From Inventory */}
+            <Box sx={{ mb: 4 }}>
+              <FormControl fullWidth>
+                <InputLabel id="select-part-label">Select Parts From Inventory</InputLabel>
+                <Select
+                  labelId="select-part-label"
+                  id="select-part"
+                  value={selectedPart}
+                  label="Select Parts From Inventory"
+                  onChange={e => setSelectedPart(e.target.value)}
+                >
+                  {inventoryData.length > 0 ? (
+                    inventoryData.map((part, idx) => (
+                      <MenuItem key={part.id || idx} value={part.partNumber || part.id || idx}>
+                        {part.partName ? `${part.partName} (${part.partNumber})` : part.partNumber || part.id || idx}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled value="">
+                      No parts available
+                    </MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+            </Box>
+            
             <Box 
               component="form" 
               onSubmit={handleSubmit}
@@ -301,11 +353,12 @@ const InventoryManagement = () => {
                 sx={{ flex: '1 1 200px' }}
               />
             </Box>
-            
+
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
               <Button
                 type="submit"
                 variant="contained"
+                onClick={handleSubmit}
                 sx={{ 
                   px: 4, 
                   py: 1.5, 
@@ -339,22 +392,27 @@ const InventoryManagement = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {inventoryData.map((row) => (
+                  {inventoryData.map((row, index) => (
                     <TableRow
-                      key={row.id}
+                      key={row.id || `row-${index}`}
                       sx={{ '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover } }}
                     >
                       <TableCell>{row.partNumber}</TableCell>
                       <TableCell>{row.partName}</TableCell>
                       <TableCell>{row.quantity}</TableCell>
-                      <TableCell>{row.price}</TableCell>
-                      <TableCell>{row.tax}</TableCell>
-                      <TableCell>{row.totalPrice}</TableCell>
+                      <TableCell>{typeof row.pricePerUnit === 'number' ? `$${row.pricePerUnit.toFixed(2)}` : row.price}</TableCell>
+                      <TableCell>{row.taxType || row.tax}</TableCell>
+                      <TableCell>
+                        {row.totalPrice || (row.quantity && row.pricePerUnit ? 
+                          `$${(row.quantity * row.pricePerUnit).toFixed(2)}` : 
+                          '')}
+                      </TableCell>
                       <TableCell>
                         <Button 
                           variant="outlined" 
                           color="primary"
                           size="small"
+                          onClick={() => setSelectedPart(row.partNumber || row.id || `row-${index}`)}
                         >
                           Edit
                         </Button>
@@ -362,7 +420,7 @@ const InventoryManagement = () => {
                     </TableRow>
                   ))}
                   {/* Empty rows for better visual */}
-                  {Array.from({ length: 10 - inventoryData.length }).map((_, index) => (
+                  {Array.from({ length: Math.max(0, 10 - inventoryData.length) }).map((_, index) => (
                     <TableRow key={`empty-${index}`}>
                       <TableCell style={{ height: 53 }}></TableCell>
                       <TableCell></TableCell>
@@ -379,6 +437,22 @@ const InventoryManagement = () => {
           </CardContent>
         </Card>
       </Container>
+
+      {/* Refresh Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={fetchInventory}
+          sx={{ 
+            px: 3, 
+            py: 1,
+            borderRadius: 2,
+          }}
+        >
+          Refresh Inventory
+        </Button>
+      </Box>
 
       {/* Notification Snackbar */}
       <Snackbar

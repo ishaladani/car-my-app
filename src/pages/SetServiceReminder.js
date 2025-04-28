@@ -15,7 +15,10 @@ import {
   InputAdornment,
   CssBaseline,
   Paper,
-  useTheme
+  useTheme,
+  Alert,
+  CircularProgress,
+  Fade
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -27,11 +30,11 @@ import { useNavigate } from 'react-router-dom';
 
 // Sample customer data for autocomplete
 const customers = [
-  { id: 1, name: 'John Smith', vehicle: 'Toyota Camry' },
-  { id: 2, name: 'Sarah Johnson', vehicle: 'Honda Accord' },
-  { id: 3, name: 'Michael Brown', vehicle: 'Ford F-150' },
-  { id: 4, name: 'Jennifer Lee', vehicle: 'Tesla Model 3' },
-  { id: 5, name: 'Robert Wilson', vehicle: 'Chevrolet Silverado' },
+  { id: 1, name: 'John Smith', vehicle: 'Toyota Camry', carNumber: '0001' },
+  { id: 2, name: 'Sarah Johnson', vehicle: 'Honda Accord', carNumber: '0002' },
+  { id: 3, name: 'Michael Brown', vehicle: 'Ford F-150', carNumber: '0003' },
+  { id: 4, name: 'Jennifer Lee', vehicle: 'Tesla Model 3', carNumber: '0004' },
+  { id: 5, name: 'Robert Wilson', vehicle: 'Chevrolet Silverado', carNumber: '0007' },
 ];
 
 const SetServiceReminder = () => {
@@ -43,20 +46,120 @@ const SetServiceReminder = () => {
   const [reminderDate, setReminderDate] = useState('');
   const [reminderType, setReminderType] = useState('Status');
   const [customerMessage, setCustomerMessage] = useState('');
+  
+  // State for feedback and loading
+  const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // For search functionality
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+
+  // Handle search input changes
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    if (value.length > 0) {
+      const filtered = customers.filter(customer => 
+        customer.name.toLowerCase().includes(value.toLowerCase()) ||
+        customer.carNumber.includes(value)
+      );
+      setSearchResults(filtered);
+      setShowResults(true);
+    } else {
+      setSearchResults([]);
+      setShowResults(false);
+    }
+  };
+
+  // Handle selecting a customer from search results
+  const handleSelectCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setSearchTerm(customer.name);
+    setShowResults(false);
+  };
+
+  // Format date for API
+  const formatDateForAPI = (dateString) => {
+    // Assuming input is mm/dd/yyyy format
+    if (!dateString) return '';
+    
+    const parts = dateString.split('/');
+    if (parts.length !== 3) return dateString;
+    
+    return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+  };
+
+  // Clear messages
+  const clearMessages = () => {
+    setSuccessMessage('');
+    setErrorMessage('');
+  };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const reminderData = {
-      customer: selectedCustomer,
-      reminderDate,
-      reminderType,
-      customerMessage
-    };
+    if (!selectedCustomer || !reminderDate || !customerMessage) {
+      setErrorMessage('Please fill in all required fields');
+      return;
+    }
     
-    console.log('Reminder Data:', reminderData);
-    // Add your submission logic here
+    setLoading(true);
+    setErrorMessage(''); // Clear any previous error
+    setSuccessMessage(''); // Clear any previous success
+    
+    try {
+      // Format the date for API
+      const formattedDate = formatDateForAPI(reminderDate);
+      
+      // Prepare the message with the actual date included
+      const formattedMessage = customerMessage.replace("'reminderDate'", reminderDate);
+      
+      const reminderData = {
+        carNumber: selectedCustomer.carNumber,
+        reminderDate: formattedDate,
+        message: formattedMessage
+      };
+      
+      // API call
+      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/reminders/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(reminderData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        // Use the API's error message if available, otherwise fallback to generic message
+        throw new Error(result.message || 'Failed to send reminder');
+      }
+      
+      // Success feedback
+      setSuccessMessage('Reminder sent successfully!');
+      
+      // Reset form fields after a short delay
+      setTimeout(() => {
+        setSelectedCustomer(null);
+        setSearchTerm('');
+        setReminderDate('');
+        setReminderType('Status');
+        setCustomerMessage('');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      setErrorMessage(error.message); // This will show the API's message like "Reminder can only be sent after 45 days of service. (45 days left)"
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,7 +210,7 @@ const SetServiceReminder = () => {
               >
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {/* Customer Search */}
-                  <Box>
+                  <Box sx={{ position: 'relative' }}>
                     <Typography 
                       variant="subtitle1" 
                       fontWeight={600}
@@ -120,13 +223,10 @@ const SetServiceReminder = () => {
                     </Typography>
                     <TextField
                       fullWidth
-                      placeholder="Enter Customer Name"
+                      placeholder="Enter Customer Name or Car Number"
                       variant="outlined"
-                      value={selectedCustomer ? selectedCustomer.name : ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (!value) setSelectedCustomer(null);
-                      }}
+                      value={searchTerm}
+                      onChange={handleSearchChange}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -135,6 +235,68 @@ const SetServiceReminder = () => {
                         ),
                       }}
                     />
+                    
+                    {/* Search Results Dropdown */}
+                    {showResults && searchResults.length > 0 && (
+                      <Paper 
+                        elevation={3} 
+                        sx={{ 
+                          position: 'absolute', 
+                          width: '100%', 
+                          maxHeight: 200, 
+                          overflow: 'auto',
+                          zIndex: 1000,
+                          mt: 0.5,
+                          borderRadius: 1,
+                        }}
+                      >
+                        {searchResults.map((customer) => (
+                          <Box 
+                            key={customer.id}
+                            sx={{ 
+                              p: 2, 
+                              cursor: 'pointer',
+                              '&:hover': { 
+                                bgcolor: theme.palette.action.hover 
+                              },
+                              borderBottom: `1px solid ${theme.palette.divider}`
+                            }}
+                            onClick={() => handleSelectCustomer(customer)}
+                          >
+                            <Typography variant="body1" fontWeight={500}>
+                              {customer.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {customer.vehicle} (#{customer.carNumber})
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Paper>
+                    )}
+                    
+                    {/* Selected Customer Info */}
+                    {selectedCustomer && (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          mt: 2,
+                          p: 2,
+                          borderRadius: 1,
+                          border: `1px solid ${theme.palette.primary.light}`,
+                          bgcolor: theme.palette.primary.lightest || 'rgba(25, 118, 210, 0.08)',
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Selected Customer:
+                        </Typography>
+                        <Typography variant="body1" fontWeight={500}>
+                          {selectedCustomer.name} - {selectedCustomer.vehicle}
+                        </Typography>
+                        <Typography variant="body2" color="primary">
+                          Car #: {selectedCustomer.carNumber}
+                        </Typography>
+                      </Paper>
+                    )}
                   </Box>
                   
                   {/* Reminder Date */}
@@ -207,10 +369,11 @@ const SetServiceReminder = () => {
                       fullWidth
                       multiline
                       rows={4}
-                      placeholder="Type your message here..."
+                      placeholder="Type your message here... Use 'reminderDate' to include the date in your message."
                       variant="outlined"
                       value={customerMessage}
                       onChange={(e) => setCustomerMessage(e.target.value)}
+                      helperText="Use 'reminderDate' in single quotes to include the reminder date in your message"
                     />
                   </Box>
                 </Box>
@@ -222,7 +385,8 @@ const SetServiceReminder = () => {
                   type="submit"
                   variant="contained"
                   color="primary"
-                  startIcon={<SendIcon />}
+                  disabled={loading}
+                  startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                   sx={{ 
                     px: 4, 
                     py: 1.5, 
@@ -236,13 +400,76 @@ const SetServiceReminder = () => {
                     }
                   }}
                 >
-                  Send Reminder
+                  {loading ? 'Sending...' : 'Send Reminder'}
                 </Button>
               </Box>
             </Box>
           </CardContent>
         </Card>
       </Container>
+      
+      {/* Success Message */}
+      {successMessage && (
+        <Box 
+          sx={{ 
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            width: { xs: '90%', sm: 'auto', md: '400px' },
+            textAlign: 'center'
+          }}
+        >
+          <Alert 
+            severity="success" 
+            variant="filled"
+            icon
+            sx={{ 
+              width: '100%',
+              boxShadow: theme.shadows[6],
+              fontSize: '1rem',
+              '& .MuiAlert-icon': {
+                fontSize: '1.5rem'
+              }
+            }}
+          >
+            {successMessage}
+          </Alert>
+        </Box>
+      )}
+      
+      {/* Error Message */}
+      {errorMessage && (
+        <Box 
+          sx={{ 
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            width: { xs: '90%', sm: 'auto', md: '400px' },
+            textAlign: 'center'
+          }}
+        >
+          <Alert 
+            severity="error" 
+            variant="filled"
+            icon
+            onClose={clearMessages}
+            sx={{ 
+              width: '100%',
+              boxShadow: theme.shadows[6],
+              fontSize: '1rem',
+              '& .MuiAlert-icon': {
+                fontSize: '1.5rem'
+              }
+            }}
+          >
+            {errorMessage}
+          </Alert>
+        </Box>
+      )}
     </Box>
   );
 };

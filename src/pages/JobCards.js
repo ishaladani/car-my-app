@@ -140,6 +140,8 @@ const JobCards = () => {
       Object.entries(formData).forEach(([key, value]) => {
         if (value) formDataToSend.append(key, value);
       });
+      // Ensure garageId is included (hardcoded as in your curl)
+      formDataToSend.append('garageId', '67e0f80b5c8f6293f36e3506');
 
       // Append files
       Object.entries(carImages).forEach(([view, file]) => {
@@ -153,16 +155,13 @@ const JobCards = () => {
       // API configuration
       const config = {
         headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`,
-        },
-        withCredentials: true,
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+          // 'Content-Type' will be set automatically by Axios when sending FormData
+        }
       };
 
-      // Use a proxy URL for development
-const apiBaseUrl = process.env.NODE_ENV === 'development' 
-  ? 'https://cors-anywhere.herokuapp.com/https://garage-management-system-cr4w.onrender.com'
-  : 'https://garage-management-system-cr4w.onrender.com';
+      // Always use the real backend URL
+      const apiBaseUrl = 'https://garage-management-system-cr4w.onrender.com';
 
 // Then update your axios call
 const response = await axios.post(
@@ -227,7 +226,6 @@ const response = await axios.post(
               <Button
                 variant="contained"
                 startIcon={<SaveIcon />}
-                onClick={handleSubmit}
                 disabled={loading}
                 sx={{
                   borderRadius: 2,

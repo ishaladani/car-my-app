@@ -10,7 +10,10 @@ import {
   Container,
   IconButton,
   Autocomplete,
-  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Grid,
   CssBaseline,
   Paper,
@@ -18,14 +21,17 @@ import {
   InputAdornment,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Fab,
+  Tooltip
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Person as PersonIcon,
   Assignment as AssignmentIcon,
   Inventory as InventoryIcon,
-  Send as SendIcon
+  Send as SendIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -41,16 +47,6 @@ const tasks = [
   { id: 7, name: 'Transmission Service', duration: '4-5 hours' },
 ];
 
-const inventoryParts = [
-  { id: 1, name: 'Brake Pads', sku: 'BP-1001', quantity: 24 },
-  { id: 2, name: 'Oil Filter', sku: 'OF-2002', quantity: 36 },
-  { id: 3, name: 'Air Filter', sku: 'AF-3003', quantity: 18 },
-  { id: 4, name: 'Spark Plugs', sku: 'SP-4004', quantity: 60 },
-  { id: 5, name: 'Engine Oil', sku: 'EO-5005', quantity: 48 },
-  { id: 6, name: 'Coolant', sku: 'CO-6006', quantity: 30 },
-  { id: 7, name: 'Transmission Fluid', sku: 'TF-7007', quantity: 20 },
-];
-
 const AssignEngineer = () => {
   const theme = useTheme();
   const { darkMode } = useThemeContext();
@@ -61,10 +57,49 @@ const AssignEngineer = () => {
   const [selectedEngineer, setSelectedEngineer] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedParts, setSelectedParts] = useState([]);
+  const [inventoryParts, setInventoryParts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  
+  // State for Add Part Dialog
+  const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
+  const [newPart, setNewPart] = useState({
+    garageId: "67e0f80b5c8f6293f36e3506",
+    carName: "",
+    model: "",
+    partNumber: "",
+    partName: "",
+    quantity: 1,
+    pricePerUnit: 0,
+    taxAmount: 0
+  });
+  const [addingPart, setAddingPart] = useState(false);
+  const [partAddSuccess, setPartAddSuccess] = useState(false);
+  const [partAddError, setPartAddError] = useState(null);
+
+  // Fetch inventory parts from API on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const response = await axios.get(
+          'https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506',
+          {
+            headers: {
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+            }
+          }
+        );
+        // Accept both array or {data: array} response
+        const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+        setInventoryParts(data);
+      } catch (err) {
+        setError('Failed to load inventory parts');
+      }
+    };
+    fetchInventory();
+  }, [partAddSuccess]);
 
   // Fetch engineers from API
   useEffect(() => {
@@ -74,12 +109,11 @@ const AssignEngineer = () => {
         setError(null);
         
         const response = await axios.get(
-          'https://garage-management-system-cr4w.onrender.com/api/engineers/67e0f80b5c8f6293f36e3506',
+          'https://garage-management-system-cr4w.onrender.com/api/engineers/67f3a7f8ccb6f320da3a5117',
           {
             headers: {
               'Content-Type': 'application/json',
-              // Uncomment if authentication is required
-              // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTU1Njk0OSwiZXhwIjoxNzQ2MTYxNzQ5fQ.djYdc2q1eBqydjWbk6V9ZzIRDeBFAHvl9BgeVkhAgt8'
             }
           }
         );
@@ -112,71 +146,136 @@ const AssignEngineer = () => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate form
     if (!selectedEngineer) {
       setError('Please select an engineer');
       return;
     }
-    
-    if (!selectedTask) {
-      setError('Please select a task');
-      return;
-    }
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
-      // Prepare data to submit
-      const assignmentData = {
-        engineer: {
-          id: selectedEngineer.id,
-          name: selectedEngineer.name,
-          specialty: selectedEngineer.specialty || 'General'
+      // API call as per user instruction
+      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/680f20ab54c9b20411680d56', {
+        method: 'PUT',
+        headers: {
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+          'Content-Type': 'application/json',
         },
-        task: {
-          id: selectedTask.id,
-          name: selectedTask.name,
-          duration: selectedTask.duration
-        },
-        parts: selectedParts.map(part => ({
-          id: part.id,
-          name: part.name,
-          sku: part.sku,
-          quantity: 1
-        })),
-        jobId: '67e0f80b5c8f6293f36e3506'
-      };
-      
-      // Make API call
+        body: JSON.stringify({ engineerId: selectedEngineer._id })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to assign engineer');
+      }
+
+      setSuccess(true);
+      setTimeout(() => navigate('/Work-In-Progress'), 1500);
+    } catch (error) {
+      console.error('Assignment error:', error);
+      setError(error.message || 'Failed to assign engineer. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Add Part Dialog open/close
+  const handleOpenAddPartDialog = () => {
+    setOpenAddPartDialog(true);
+  };
+
+  const handleCloseAddPartDialog = () => {
+    setOpenAddPartDialog(false);
+    setPartAddError(null);
+    // Reset the form
+    setNewPart({
+      garageId: "67e0f80b5c8f6293f36e3506",
+      carName: "",
+      model: "",
+      partNumber: "",
+      partName: "",
+      quantity: 1,
+      pricePerUnit: 0,
+      taxAmount: 0
+    });
+  };
+
+  // Handle new part form input changes
+  const handlePartInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Convert numeric values
+    if (name === 'quantity' || name === 'pricePerUnit' || name === 'taxAmount') {
+      setNewPart({
+        ...newPart,
+        [name]: Number(value)
+      });
+    } else {
+      setNewPart({
+        ...newPart,
+        [name]: value
+      });
+    }
+  };
+
+  // Handle add part form submission
+  const handleAddPart = async () => {
+    // Validate form
+    if (!newPart.carName || !newPart.model || !newPart.partName) {
+      setPartAddError('Please fill all required fields');
+      return;
+    }
+
+    setAddingPart(true);
+    setPartAddError(null);
+
+    try {
       const response = await axios.post(
-        'https://garage-management-system-cr4w.onrender.com/api/engineers/add/67e0f80b5c8f6293f36e3506',
-        assignmentData,
+        'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+        newPart,
         {
           headers: {
-            'Content-Type': 'application/json',
-            // Uncomment if authentication is required
-            // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+            'Content-Type': 'application/json'
           }
         }
       );
-      
-      // Validate response
-      if (!response.data) {
-        throw new Error('No response data received');
-      }
-      
-      setSuccess(true);
-      setTimeout(() => navigate('/Work-In-Progress'), 1500);
-      
+
+      // Set success and close dialog
+      setPartAddSuccess(true);
+      setTimeout(() => {
+        setPartAddSuccess(false);
+        handleCloseAddPartDialog();
+        // Refresh inventory parts
+        fetchInventoryParts();
+      }, 1500);
     } catch (error) {
-      console.error('Assignment error:', error);
-      setError(error.response?.data?.message || 
-             error.message || 
-             'Failed to assign engineer. Please try again.');
+      console.error('Add part error:', error);
+      setPartAddError(error.response?.data?.message || error.message || 'Failed to add part. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setAddingPart(false);
+    }
+  };
+
+  // Fetch inventory parts separately (to refresh after adding a new part)
+  const fetchInventoryParts = async () => {
+    try {
+      const response = await axios.get(
+        'https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506',
+        {
+          headers: {
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+          }
+        }
+      );
+      // Handle the response data
+      const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+      setInventoryParts(data);
+    } catch (err) {
+      console.error('Error refreshing inventory:', err);
     }
   };
 
@@ -293,8 +392,8 @@ const AssignEngineer = () => {
                           </li>
                         )}
                         renderInput={(params) => (
-                          <TextField 
-                            {...params} 
+                          <TextField
+                            {...params}
                             placeholder="Search for engineer"
                             variant="outlined"
                             required
@@ -349,8 +448,8 @@ const AssignEngineer = () => {
                         </li>
                       )}
                       renderInput={(params) => (
-                        <TextField 
-                          {...params} 
+                        <TextField
+                          {...params}
                           placeholder="Select or type a task"
                           variant="outlined"
                           required
@@ -373,60 +472,54 @@ const AssignEngineer = () => {
                   
                   {/* Parts Selection */}
                   <Grid item xs={12}>
-                    <Typography 
-                      variant="subtitle1" 
-                      fontWeight={600}
-                      sx={{ 
-                        mb: 1,
-                        color: theme.palette.text.primary
-                      }}
-                    >
-                      Select Parts From Inventory
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        fontWeight={600}
+                        sx={{ color: theme.palette.text.primary }}
+                      >
+                        Select Parts
+                      </Typography>
+                      <Tooltip title="Add New Part">
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={handleOpenAddPartDialog}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          Add Part
+                        </Button>
+                      </Tooltip>
+                    </Box>
                     <Autocomplete
-                      multiple
                       fullWidth
+                      multiple
                       options={inventoryParts}
-                      getOptionLabel={(option) => option.name}
+                      getOptionLabel={(option) => `${option.partName} (${option.carName} - ${option.model})`}
                       value={selectedParts}
                       onChange={(event, newValue) => {
                         setSelectedParts(newValue);
                       }}
-                      renderTags={(value, getTagProps) =>
-                        value.map((option, index) => (
-                          <Chip
-                            key={option.id}
-                            label={`${option.name} (${option.sku})`}
-                            {...getTagProps({ index })}
-                            variant="outlined"
-                            color="primary"
-                            sx={{ fontWeight: 500 }}
-                          />
-                        ))
-                      }
                       renderOption={(props, option) => (
-                        <li {...props} key={option.id}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                              <Typography variant="body1" fontWeight={500}>
-                                {option.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                SKU: {option.sku}
-                              </Typography>
-                            </Box>
-                            <Chip 
-                              label={`Qty: ${option.quantity}`} 
-                              size="small" 
-                              color="info" 
-                              variant="outlined"
-                            />
+                        <li {...props}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {option.partName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.carName} - {option.model}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Qty: {option.quantity} | ₹{option.pricePerUnit}
+                            </Typography>
                           </Box>
                         </li>
                       )}
                       renderInput={(params) => (
-                        <TextField 
-                          {...params} 
+                        <TextField
+                          {...params}
                           placeholder="Select parts needed for this task"
                           variant="outlined"
                           InputProps={{
@@ -475,6 +568,138 @@ const AssignEngineer = () => {
           </CardContent>
         </Card>
       </Container>
+
+      {/* Add Part Dialog */}
+      <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ 
+          backgroundColor: theme.palette.primary.main, 
+          color: theme.palette.primary.contrastText,
+          display: 'flex',
+          alignItems: 'center',
+          py: 2
+        }}>
+          <InventoryIcon sx={{ mr: 1 }} />
+          Add New Part
+        </DialogTitle>
+        <DialogContent dividers>
+          {partAddSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Part added successfully!
+            </Alert>
+          )}
+          {partAddError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {partAddError}
+            </Alert>
+          )}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Car Name"
+                name="carName"
+                value={newPart.carName}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., Honda Civic"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Model"
+                name="model"
+                value={newPart.model}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., VX 2020"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Part Number"
+                name="partNumber"
+                value={newPart.partNumber}
+                onChange={handlePartInputChange}
+                variant="outlined"
+                placeholder="E.g., HON12345"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Part Name"
+                name="partName"
+                value={newPart.partName}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., Brake Pad"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Quantity"
+                name="quantity"
+                type="number"
+                value={newPart.quantity}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                InputProps={{ inputProps: { min: 1 } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Price Per Unit (₹)"
+                name="pricePerUnit"
+                type="number"
+                value={newPart.pricePerUnit}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Tax Amount (₹)"
+                name="taxAmount"
+                type="number"
+                value={newPart.taxAmount}
+                onChange={handlePartInputChange}
+                variant="outlined"
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={handleCloseAddPartDialog} 
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddPart} 
+            variant="contained" 
+            color="primary"
+            disabled={addingPart}
+            startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
+            sx={{ borderRadius: 2 }}
+          >
+            {addingPart ? 'Adding...' : 'Add Part'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
