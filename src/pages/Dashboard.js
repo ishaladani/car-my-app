@@ -266,11 +266,11 @@ const Dashboard = () => {
     
     // Update stats card
     const updatedStats = [...dashboardStats];
-    updatedStats[0].value = activeJobsCount;
+    // updatedStats[0].value = activeJobsCount;
     
     // For demo purposes, we'll keep the parts count and reminders as they are
-    updatedStats[1].value = 143; // Parts available
-    updatedStats[2].value = 8;   // Pending reminders
+    // updatedStats[1].value = 143; // Parts available
+    // updatedStats[2].value = 8;   // Pending reminders
     
     setDashboardStats(updatedStats);
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -18,7 +18,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Divider
+  Divider,
+  Snackbar,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -26,30 +29,160 @@ import {
   Build as BuildIcon,
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
+import { format } from 'date-fns';
 
 const QualityCheck = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { id: urlId } = useParams(); // Get jobCard ID from URL params
+  
+  // Set default jobCardId or use from URL
+  const jobCardId = urlId || "680f20ab54c9b20411680d56";
   
   // State for parts table and final inspection remarks
-  const [parts, setParts] = useState([
-    { id: 1, partName: '', qty: '', pricePerPiece: '', totalPrice: '' },
-    { id: 2, partName: '', qty: '', pricePerPiece: '', totalPrice: '' }
-  ]);
-  
+  const [parts, setParts] = useState([]);
   const [finalInspection, setFinalInspection] = useState('');
-
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Quality check approved');
-    // Add your submission logic here
+  const [jobCardData, setJobCardData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  
+  // Get current date and time for display
+  const currentDateTime = format(new Date(), "MM/dd/yyyy - hh:mm a");
+  
+  // Get token (hardcoded for this implementation)
+  const getToken = () => {
+    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
+  };
+  
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return format(date, "MM/dd/yyyy");
   };
 
-  // Engineer and timestamp details (would normally come from props or context)
-  const engineerName = "Michael Smith";
-  const dateTime = "05/03/2025 - 10:30 AM";
+  // Fetch job card data when component mounts
+  useEffect(() => {
+    const fetchJobCardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        const response = await axios.get(
+          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${jobCardId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${getToken()}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        const data = response.data;
+        setJobCardData(data);
+        
+        // Populate parts if available
+        if (data.partsUsed && data.partsUsed.length > 0) {
+          const existingParts = data.partsUsed.map((part, index) => ({
+            id: index + 1,
+            partName: part.partName || '',
+            qty: part.quantity?.toString() || '',
+            pricePerPiece: part.pricePerPiece?.toString() || '',
+            totalPrice: part.totalPrice?.toString() || ''
+          }));
+          
+          setParts(existingParts);
+        } else {
+          // Initialize with one empty row if no parts exist
+          setParts([{ 
+            id: 1, 
+            partName: '', 
+            qty: '', 
+            pricePerPiece: '', 
+            totalPrice: '' 
+          }]);
+        }
+        
+        // Set initial inspection notes if available
+        if (data.qualityCheck && data.qualityCheck.notes) {
+          setFinalInspection(data.qualityCheck.notes);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching job card data:', error);
+        setSnackbar({
+          open: true,
+          message: `Error: ${error.response?.data?.message || 'Failed to fetch job card data'}`,
+          severity: 'error'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchJobCardData();
+  }, [jobCardId]);
+
+  // Handle snackbar close
+  const handleSnackbarClose = () => {
+    setSnackbar({...snackbar, open: false});
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Format the data for API request
+      const requestData = {
+        qualityCheck: {
+          notes: finalInspection,
+          billApproved: true
+        }
+      };
+      
+      // Make API call to update quality check - using exact endpoint format provided
+      const response = await axios.put(
+        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${jobCardId}/qualitycheck`,
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${getToken()}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      setSnackbar({
+        open: true,
+        message: 'Quality check approved successfully!',
+        severity: 'success'
+      });
+      
+      // Navigate after successful submission (with delay)
+      setTimeout(() => {
+        navigate('/dashboard'); // Change to appropriate route
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error approving quality check:', error);
+      setSnackbar({
+        open: true,
+        message: `Error: ${error.response?.data?.message || 'Failed to approve quality check'}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Box sx={{ 
@@ -60,6 +193,25 @@ const QualityCheck = () => {
       pt: 3
     }}>
       <CssBaseline />
+      
+      {/* Loading overlay */}
+      {isLoading && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          zIndex: 9999
+        }}>
+          <CircularProgress />
+        </Box>
+      )}
+      
       <Container maxWidth="md">
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
           <IconButton 
@@ -108,7 +260,7 @@ const QualityCheck = () => {
                         fontWeight={600}
                         color={theme.palette.primary.main}
                       >
-                        {engineerName}
+                        {jobCardData?.engineerId?.name || 'N/A'}
                       </Typography>
                     </Typography>
                   </Paper>
@@ -133,7 +285,7 @@ const QualityCheck = () => {
                         fontWeight={600}
                         color={theme.palette.primary.main}
                       >
-                        {dateTime}
+                        {currentDateTime}
                       </Typography>
                     </Typography>
                   </Paper>
@@ -207,9 +359,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.company || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', mb: 2 }}>
                         <Typography variant="body1" sx={{ minWidth: '80px' }}>Model:</Typography>
@@ -218,9 +376,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.model || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', mb: { xs: 2, md: 0 } }}>
                         <Typography variant="body1" sx={{ minWidth: '80px' }}>Car No.:</Typography>
@@ -229,9 +393,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.carNumber || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
                   </Grid>
@@ -245,9 +415,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.customerName || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', mb: 2 }}>
                         <Typography variant="body1" sx={{ minWidth: '100px' }}>Contact No.:</Typography>
@@ -256,9 +432,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.contactNumber || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', mb: { xs: 2, md: 0 } }}>
                         <Typography variant="body1" sx={{ minWidth: '100px' }}>Email:</Typography>
@@ -267,9 +449,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.email || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
                   </Grid>
@@ -283,9 +471,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.insuranceProvider || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', mb: 2 }}>
                         <Typography variant="body1" sx={{ minWidth: '100px' }}>Number:</Typography>
@@ -294,9 +488,15 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.policyNumber || 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex' }}>
                         <Typography variant="body1" sx={{ minWidth: '100px' }}>Expiry Date:</Typography>
@@ -305,16 +505,22 @@ const QualityCheck = () => {
                             flexGrow: 1, 
                             borderBottom: `1px solid ${theme.palette.divider}`,
                             ml: 1,
-                            minHeight: '24px'
+                            minHeight: '24px',
+                            display: 'flex',
+                            alignItems: 'center'
                           }}
-                        />
+                        >
+                          <Typography variant="body1" fontWeight={500}>
+                            {jobCardData?.expiryDate ? formatDate(jobCardData.expiryDate) : 'N/A'}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
                   </Grid>
                 </Grid>
               </Paper>
 
-              {/* Parts Used */}
+              {/* Parts Used - Read Only */}
               <Box sx={{ mt: 4, mb: 3 }}>
                 <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
                   Parts Used
@@ -381,63 +587,16 @@ const QualityCheck = () => {
                           <TableRow key={part.id}>
                             <TableCell align="center">{part.id}</TableCell>
                             <TableCell align="center">
-                              <TextField 
-                                fullWidth 
-                                variant="outlined" 
-                                size="small"
-                                value={part.partName}
-                                onChange={(e) => {
-                                  const updatedParts = parts.map(p => 
-                                    p.id === part.id ? {...p, partName: e.target.value} : p
-                                  );
-                                  setParts(updatedParts);
-                                }}
-                              />
+                              {part.partName}
                             </TableCell>
                             <TableCell align="center">
-                              <TextField 
-                                fullWidth 
-                                variant="outlined" 
-                                size="small"
-                                type="number"
-                                value={part.qty}
-                                onChange={(e) => {
-                                  const updatedParts = parts.map(p => 
-                                    p.id === part.id ? {...p, qty: e.target.value} : p
-                                  );
-                                  setParts(updatedParts);
-                                }}
-                              />
+                              {part.qty}
                             </TableCell>
                             <TableCell align="center">
-                              <TextField 
-                                fullWidth 
-                                variant="outlined" 
-                                size="small"
-                                type="number"
-                                value={part.pricePerPiece}
-                                onChange={(e) => {
-                                  const updatedParts = parts.map(p => 
-                                    p.id === part.id ? {...p, pricePerPiece: e.target.value} : p
-                                  );
-                                  setParts(updatedParts);
-                                }}
-                              />
+                              {part.pricePerPiece}
                             </TableCell>
                             <TableCell align="center">
-                              <TextField 
-                                fullWidth 
-                                variant="outlined" 
-                                size="small"
-                                type="number"
-                                value={part.totalPrice}
-                                onChange={(e) => {
-                                  const updatedParts = parts.map(p => 
-                                    p.id === part.id ? {...p, totalPrice: e.target.value} : p
-                                  );
-                                  setParts(updatedParts);
-                                }}
-                              />
+                              {part.totalPrice}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -447,17 +606,45 @@ const QualityCheck = () => {
                 </Paper>
               </Box>
 
+              {/* Engineer Remarks */}
+              <Box sx={{ mt: 4, mb: 3 }}>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  Engineer Remarks
+                </Typography>
+                <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(0, 0, 0, 0.02)' }}>
+                  <Typography variant="body1">
+                    {jobCardData?.engineerRemarks || 'No remarks provided'}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {/* Labor Hours */}
+              <Box sx={{ mt: 4, mb: 3 }}>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  Labor Hours
+                </Typography>
+                <Paper sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(0, 0, 0, 0.02)' }}>
+                  <Typography variant="body1">
+                    {jobCardData?.laborHours || '0'} hours
+                  </Typography>
+                </Paper>
+              </Box>
+
               {/* Final Inspection */}
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                placeholder="Final Inspection......"
-                variant="outlined"
-                value={finalInspection}
-                onChange={(e) => setFinalInspection(e.target.value)}
-                sx={{ mb: 3 }}
-              />
+              <Box sx={{ mt: 4, mb: 3 }}>
+                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                  Quality Check Notes
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  placeholder="Final Inspection......"
+                  variant="outlined"
+                  value={finalInspection}
+                  onChange={(e) => setFinalInspection(e.target.value)}
+                />
+              </Box>
 
               {/* Submit Button */}
               <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -466,6 +653,7 @@ const QualityCheck = () => {
                   variant="contained"
                   color="primary"
                   startIcon={<CheckCircleIcon />}
+                  disabled={isSubmitting || isLoading}
                   sx={{ 
                     px: 4, 
                     py: 1.5, 
@@ -480,13 +668,29 @@ const QualityCheck = () => {
                     }
                   }}
                 >
-                  Approve Bill
+                  {isSubmitting ? 'Approving...' : 'Approve Bill'}
                 </Button>
               </Box>
             </Box>
           </CardContent>
         </Card>
       </Container>
+      
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

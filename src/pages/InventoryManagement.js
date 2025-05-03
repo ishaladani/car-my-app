@@ -22,10 +22,20 @@ import {
   CssBaseline,
   useTheme,
   Snackbar,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { 
+  ArrowBack as ArrowBackIcon,
+  Edit as EditIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const InventoryManagement = () => {
   const theme = useTheme();
@@ -54,24 +64,54 @@ const InventoryManagement = () => {
   const [inventoryData, setInventoryData] = useState([]);
   // State for selected part
   const [selectedPart, setSelectedPart] = useState('');
+  // Loading states
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // State for edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editItemData, setEditItemData] = useState({
+    id: '',
+    carName: '',
+    model: '',
+    partNumber: '',
+    partName: '',
+    quantity: '',
+    pricePerUnit: '',
+    taxType: '',
+    taxAmount: ''
+  });
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+
+  // Get token from storage or use hardcoded for testing
+  const getToken = () => {
+    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
+  };
 
   // Function to fetch inventory data
   const fetchInventory = async () => {
     try {
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506', {
-        headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+      setIsLoading(true);
+      const response = await axios.get(
+        'https://garage-management-system-cr4w.onrender.com/api/inventory/67f3a7f8ccb6f320da3a5117', 
+        {
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          }
         }
-      });
-      if (!response.ok) throw new Error('Failed to fetch inventory');
-      const data = await response.json();
+      );
+      
+      const data = response.data;
       setInventoryData(Array.isArray(data) ? data : data.data || []);
     } catch (error) {
+      console.error('Error fetching inventory:', error);
       setNotification({
         open: true,
         message: error.message || 'Failed to fetch inventory',
         severity: 'error'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,25 +120,26 @@ const InventoryManagement = () => {
     fetchInventory();
   }, []);
 
-  // Add event listener for page refresh
+  // For debugging to help identify item structure
   useEffect(() => {
-    const handlePageRefresh = () => {
-      fetchInventory();
-    };
-
-    // Listen for page refresh events
-    window.addEventListener('load', handlePageRefresh);
-    
-    // Cleanup the event listener
-    return () => {
-      window.removeEventListener('load', handlePageRefresh);
-    };
-  }, []);
+    if (inventoryData.length > 0) {
+      console.log('First inventory item structure:', inventoryData[0]);
+    }
+  }, [inventoryData]);
 
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Handle edit modal input changes
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditItemData(prev => ({
       ...prev,
       [name]: value
     }));
@@ -129,37 +170,144 @@ const InventoryManagement = () => {
     }
   }, [selectedPart, inventoryData]);
 
+  // Open edit modal with item data
+  const handleOpenEditModal = (item) => {
+    console.log("Opening edit modal for item:", item);
+    
+    // Ensure we have the item ID
+    if (!item._id && !item.id) {
+      setNotification({
+        open: true,
+        message: 'Item ID is missing. Cannot edit this item.',
+        severity: 'error'
+      });
+      return;
+    }
+    
+    // Use MongoDB _id field if available, otherwise fallback to id
+    const itemId = item._id || item.id;
+    
+    setEditItemData({
+      id: itemId,
+      carName: item.carName || '',
+      model: item.model || '',
+      partNumber: item.partNumber || '',
+      partName: item.partName || '',
+      quantity: item.quantity?.toString() || '',
+      pricePerUnit: item.pricePerUnit?.toString() || '',
+      taxType: item.taxType || item.tax || '',
+      taxAmount: item.taxAmount?.toString() || ''
+    });
+    setEditModalOpen(true);
+  };
+
+  // Close edit modal
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+  };
+
+  // Update inventory item
+  const handleUpdateItem = async () => {
+    try {
+      setIsEditSubmitting(true);
+      
+      // Check if we have a valid item ID
+      if (!editItemData.id) {
+        throw new Error('Item ID is missing. Cannot update this item.');
+      }
+      
+      // Prepare the data for API call
+      const requestData = {
+        carName: editItemData.carName,
+        model: editItemData.model,
+        partNumber: editItemData.partNumber,
+        partName: editItemData.partName,
+        quantity: parseInt(editItemData.quantity),
+        pricePerUnit: parseFloat(editItemData.pricePerUnit),
+        taxAmount: parseFloat(editItemData.taxAmount),
+        taxType: editItemData.taxType
+      };
+
+      console.log('Updating item with ID:', editItemData.id);
+      console.log('Request data:', requestData);
+      console.log('Full update URL:', `https://garage-management-system-cr4w.onrender.com/api/inventory/update/${editItemData.id}`);
+
+      // Make API call to update inventory item
+      const response = await axios.put(
+        `https://garage-management-system-cr4w.onrender.com/api/inventory/update/${editItemData.id}`,
+        requestData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+          }
+        }
+      );
+      
+      console.log('Update response:', response.data);
+      
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Item updated successfully!',
+        severity: 'success'
+      });
+
+      // Close the modal and refresh inventory
+      setEditModalOpen(false);
+      fetchInventory();
+      
+    } catch (error) {
+      console.error('Error updating item:', error);
+      
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        console.error('Error response headers:', error.response.headers);
+      }
+      
+      setNotification({
+        open: true,
+        message: error.response?.data?.message || error.message || 'Failed to update item. Please try again.',
+        severity: 'error'
+      });
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
+      setIsSubmitting(true);
+      
       // Prepare the data for API call
       const requestData = {
-        garageId: "67e0f80b5c8f6293f36e3506",
+        garageId: "67f3a7f8ccb6f320da3a5117",
         carName: formData.carName,
         model: formData.model,
         partNumber: formData.partNumber,
         partName: formData.partName,
         quantity: parseInt(formData.quantity),
         pricePerUnit: parseFloat(formData.pricePerUnit),
-        taxAmount: parseFloat(formData.taxAmount)
+        taxAmount: parseFloat(formData.taxAmount),
+        taxType: formData.taxType
       };
 
-      // Use the same token as AssignEngineer for consistency
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/inventory/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        const errorResult = await response.json();
-        throw new Error(errorResult.message || 'Failed to add part.');
-      }
+      // Make API call to add inventory item
+      const response = await axios.post(
+        'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+        requestData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+          }
+        }
+      );
       
       // Show success notification
       setNotification({
@@ -189,9 +337,11 @@ const InventoryManagement = () => {
       console.error('Error adding part:', error);
       setNotification({
         open: true,
-        message: error.message || 'Failed to add part. Please try again.',
+        message: error.response?.data?.message || error.message || 'Failed to add part. Please try again.',
         severity: 'error'
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -208,6 +358,25 @@ const InventoryManagement = () => {
       pt: 3
     }}>
       <CssBaseline />
+      
+      {/* Loading overlay */}
+      {isLoading && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          zIndex: 9999
+        }}>
+          <CircularProgress />
+        </Box>
+      )}
+      
       <Container maxWidth="lg">
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
           <IconButton 
@@ -359,6 +528,7 @@ const InventoryManagement = () => {
                 type="submit"
                 variant="contained"
                 onClick={handleSubmit}
+                disabled={isSubmitting}
                 sx={{ 
                   px: 4, 
                   py: 1.5, 
@@ -374,7 +544,7 @@ const InventoryManagement = () => {
                   }
                 }}
               >
-                Add Part
+                {isSubmitting ? 'Adding...' : 'Add Part'}
               </Button>
             </Box>
             
@@ -394,17 +564,17 @@ const InventoryManagement = () => {
                 <TableBody>
                   {inventoryData.map((row, index) => (
                     <TableRow
-                      key={row.id || `row-${index}`}
+                      key={row._id || row.id || `row-${index}`}
                       sx={{ '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover } }}
                     >
                       <TableCell>{row.partNumber}</TableCell>
                       <TableCell>{row.partName}</TableCell>
                       <TableCell>{row.quantity}</TableCell>
-                      <TableCell>{typeof row.pricePerUnit === 'number' ? `$${row.pricePerUnit.toFixed(2)}` : row.price}</TableCell>
+                      <TableCell>{typeof row.pricePerUnit === 'number' ? `${row.pricePerUnit.toFixed(2)}` : row.price}</TableCell>
                       <TableCell>{row.taxType || row.tax}</TableCell>
                       <TableCell>
                         {row.totalPrice || (row.quantity && row.pricePerUnit ? 
-                          `$${(row.quantity * row.pricePerUnit).toFixed(2)}` : 
+                          `${(row.quantity * row.pricePerUnit).toFixed(2)}` : 
                           '')}
                       </TableCell>
                       <TableCell>
@@ -412,7 +582,8 @@ const InventoryManagement = () => {
                           variant="outlined" 
                           color="primary"
                           size="small"
-                          onClick={() => setSelectedPart(row.partNumber || row.id || `row-${index}`)}
+                          startIcon={<EditIcon />}
+                          onClick={() => handleOpenEditModal(row)}
                         >
                           Edit
                         </Button>
@@ -444,15 +615,150 @@ const InventoryManagement = () => {
           variant="outlined"
           color="primary"
           onClick={fetchInventory}
+          disabled={isLoading}
           sx={{ 
             px: 3, 
             py: 1,
             borderRadius: 2,
           }}
         >
-          Refresh Inventory
+          {isLoading ? 'Loading...' : 'Refresh Inventory'}
         </Button>
       </Box>
+
+      {/* Edit Item Modal */}
+      <Dialog 
+        open={editModalOpen} 
+        onClose={handleCloseEditModal}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Edit Inventory Item</Typography>
+            <IconButton onClick={handleCloseEditModal}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box 
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 2,
+              mb: 2
+            }}
+          >
+            <TextField
+              name="carName"
+              label="Car Name"
+              variant="outlined"
+              value={editItemData.carName}
+              onChange={handleEditInputChange}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              name="model"
+              label="Model"
+              variant="outlined"
+              value={editItemData.model}
+              onChange={handleEditInputChange}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              name="partNumber"
+              label="Part Number"
+              variant="outlined"
+              value={editItemData.partNumber}
+              onChange={handleEditInputChange}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              name="partName"
+              label="Part Name"
+              variant="outlined"
+              value={editItemData.partName}
+              onChange={handleEditInputChange}
+              required
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              name="quantity"
+              label="Quantity"
+              type="number"
+              variant="outlined"
+              value={editItemData.quantity}
+              onChange={handleEditInputChange}
+              required
+              inputProps={{ min: 1 }}
+              fullWidth
+              margin="normal"
+            />
+            <TextField
+              name="pricePerUnit"
+              label="Price Per Unit"
+              type="number"
+              variant="outlined"
+              value={editItemData.pricePerUnit}
+              onChange={handleEditInputChange}
+              required
+              inputProps={{ min: 0, step: "0.01" }}
+              fullWidth
+              margin="normal"
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Tax</InputLabel>
+              <Select
+                name="taxType"
+                value={editItemData.taxType}
+                onChange={handleEditInputChange}
+                label="Tax"
+                required
+              >
+                <MenuItem value="SGST">SGST</MenuItem>
+                <MenuItem value="CGST">CGST</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              name="taxAmount"
+              label="Tax Amount"
+              type="number"
+              variant="outlined"
+              value={editItemData.taxAmount}
+              onChange={handleEditInputChange}
+              required
+              inputProps={{ min: 0, step: "0.01" }}
+              fullWidth
+              margin="normal"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleCloseEditModal} 
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdateItem} 
+            variant="contained" 
+            color="primary"
+            disabled={isEditSubmitting}
+            startIcon={isEditSubmitting ? <CircularProgress size={20} /> : null}
+          >
+            {isEditSubmitting ? 'Updating...' : 'Update Item'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Notification Snackbar */}
       <Snackbar

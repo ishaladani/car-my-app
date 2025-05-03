@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -21,7 +21,10 @@ import {
   TableHead,
   TableRow,
   InputAdornment,
-  Divider
+  Divider,
+  Snackbar,
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -29,9 +32,12 @@ import {
   Person as PersonIcon,
   Security as SecurityIcon,
   Engineering as EngineeringIcon,
-  Comment as CommentIcon
+  Comment as CommentIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 
 // This component would typically be integrated with your theme provider
 // Similar to how the AssignEngineer component uses useThemeContext
@@ -39,31 +45,289 @@ import { useNavigate } from 'react-router-dom';
 const WorkInProgress = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { id: urlId } = useParams(); // Assuming you're passing the jobCard ID in URL
   
-  // Table rows state management
-  const [parts, setParts] = useState([
-    { id: 1, partName: '', partNumber: '', qty: '', pricePerPiece: '', gstPercent: '', totalPrice: '' },
-    { id: 2, partName: '', partNumber: '', qty: '', pricePerPiece: '', gstPercent: '', totalPrice: '' },
-    { id: 3, partName: '', partNumber: '', qty: '', pricePerPiece: '', gstPercent: '', totalPrice: '' },
-    { id: 4, partName: '', partNumber: '', qty: '', pricePerPiece: '', gstPercent: '', totalPrice: '' }
-  ]);
+  // Set default jobCardId or use from URL
+  const jobCardId = urlId || "680f20ab54c9b20411680d56";
+  
+  // Table rows state management (now an empty array to start with)
+  const [parts, setParts] = useState([]);
+  
+  // Car details state
+  const [carDetails, setCarDetails] = useState({
+    company: '',
+    model: '',
+    carNo: ''
+  });
+  
+  // Customer details state
+  const [customerDetails, setCustomerDetails] = useState({
+    name: '',
+    contactNo: '',
+    email: ''
+  });
+  
+  // Insurance details state
+  const [insuranceDetails, setInsuranceDetails] = useState({
+    company: '',
+    number: '',
+    type: '',
+    expiry: '',
+    regNo: '',
+    amount: ''
+  });
+  
+  // Engineer details state
+  const [engineerDetails, setEngineerDetails] = useState({
+    fullName: '',
+    speciality: '',
+    assignedDateTime: ''
+  });
   
   const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [laborHours, setLaborHours] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // Handle snackbar close
+  const handleSnackbarClose = () => {
+    setSnackbar({...snackbar, open: false});
+  };
+
+  // Get token from localStorage (assuming you store it there)
+  const getToken = () => {
+    // For this implementation, we're using the hardcoded token
+    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
+    // In production, you would use:
+    // return localStorage.getItem('token');
+  };
+  
+  // Fetch job card data when component mounts
+  useEffect(() => {
+    const fetchJobCardData = async () => {
+      try {
+        setFetchLoading(true);
+        
+        const response = await axios.get(
+          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${jobCardId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${getToken()}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        const data = response.data;
+        
+        // Populate car details
+        setCarDetails({
+          company: data.company || '',
+          model: data.model || '',
+          carNo: data.carNumber || ''
+        });
+        
+        // Populate customer details
+        setCustomerDetails({
+          name: data.customerName || '',
+          contactNo: data.contactNumber || '',
+          email: data.email || ''
+        });
+        
+        // Populate insurance details
+        setInsuranceDetails({
+          company: data.insuranceProvider || '',
+          number: data.policyNumber || '',
+          type: data.type || '',
+          expiry: data.expiryDate ? data.expiryDate.split('T')[0] : '',
+          regNo: data.registrationNumber || '',
+          amount: data.excessAmount?.toString() || ''
+        });
+        
+        // Populate engineer details
+        setEngineerDetails({
+          fullName: data.engineerId?.name || '',
+          speciality: '', // Not available in the response
+          assignedDateTime: data.createdAt ? 
+            new Date(data.createdAt).toISOString().slice(0, 16) : ''
+        });
+        
+        // Populate parts if available
+        if (data.partsUsed && data.partsUsed.length > 0) {
+          const existingParts = data.partsUsed.map((part, index) => ({
+            id: index + 1,
+            partName: part.partName || '',
+            partNumber: '',  // Not available in the response
+            qty: part.quantity?.toString() || '',
+            pricePerPiece: part.pricePerPiece?.toString() || '',
+            gstPercent: '', // Not available in the response
+            totalPrice: part.totalPrice?.toString() || ''
+          }));
+          
+          setParts(existingParts);
+        } else {
+          // Initialize with one empty row if no parts exist
+          setParts([{ 
+            id: 1, 
+            partName: '', 
+            partNumber: '', 
+            qty: '', 
+            pricePerPiece: '', 
+            gstPercent: '', 
+            totalPrice: '' 
+          }]);
+        }
+        
+        // Populate status, remarks, and labor hours
+        if (data.status) {
+          setStatus(data.status);
+        }
+        
+        if (data.engineerRemarks) {
+          setRemarks(data.engineerRemarks);
+        }
+        
+        if (data.laborHours !== undefined) {
+          setLaborHours(data.laborHours.toString());
+        }
+        
+      } catch (error) {
+        console.error('Error fetching job card data:', error);
+        setSnackbar({
+          open: true,
+          message: `Error: ${error.response?.data?.message || 'Failed to fetch job card data'}`,
+          severity: 'error'
+        });
+      } finally {
+        setFetchLoading(false);
+      }
+    };
+    
+    fetchJobCardData();
+  }, [jobCardId]);
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted');
-    // Add your submission logic here
+    
+    try {
+      setIsLoading(true);
+      
+      // Filter out empty parts
+      const validParts = parts.filter(part => 
+        part.partName && part.qty && part.pricePerPiece && part.totalPrice
+      );
+      
+      // Format the data according to API requirements
+      const formattedParts = validParts.map(part => ({
+        partName: part.partName,
+        quantity: parseInt(part.qty),
+        pricePerPiece: parseFloat(part.pricePerPiece),
+        totalPrice: parseFloat(part.totalPrice)
+      }));
+      
+      // Prepare request data
+      const requestData = {
+        partsUsed: formattedParts,
+        laborHours: parseInt(laborHours) || 0,
+        engineerRemarks: remarks,
+        status: status
+      };
+      
+      // Use the jobCardId defined at the component level
+      
+      // Make API call
+      const response = await axios.put(
+        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${jobCardId}/workprogress`,
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${getToken()}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      setSnackbar({
+        open: true,
+        message: 'Work progress updated successfully!',
+        severity: 'success'
+      });
+      
+      // Navigate to Quality Check page after successful submission
+      setTimeout(() => {
+        navigate('/Quality-Check');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error updating work progress:', error);
+      setSnackbar({
+        open: true,
+        message: `Error: ${error.response?.data?.message || 'Failed to update work progress'}`,
+        severity: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add a new empty row to the parts table
+  const handleAddRow = () => {
+    const newId = parts.length > 0 ? Math.max(...parts.map(part => part.id)) + 1 : 1;
+    setParts([...parts, {
+      id: newId,
+      partName: '',
+      partNumber: '',
+      qty: '',
+      pricePerPiece: '',
+      gstPercent: '',
+      totalPrice: ''
+    }]);
+  };
+  
+  // Delete a row from the parts table
+  const handleDeleteRow = (id) => {
+    if (parts.length > 1) {
+      setParts(parts.filter(part => part.id !== id));
+    } else {
+      // If it's the last row, just clear it instead of removing
+      setParts([{
+        id: 1,
+        partName: '',
+        partNumber: '',
+        qty: '',
+        pricePerPiece: '',
+        gstPercent: '',
+        totalPrice: ''
+      }]);
+    }
   };
 
   // Update part data in the table
   const handlePartChange = (id, field, value) => {
     const updatedParts = parts.map(part => {
       if (part.id === id) {
-        return { ...part, [field]: value };
+        const updatedPart = { ...part, [field]: value };
+        
+        // Auto-calculate total price if qty and pricePerPiece are filled
+        if ((field === 'qty' || field === 'pricePerPiece') && updatedPart.qty && updatedPart.pricePerPiece) {
+          const qty = parseFloat(updatedPart.qty);
+          const price = parseFloat(updatedPart.pricePerPiece);
+          const gst = updatedPart.gstPercent ? parseFloat(updatedPart.gstPercent) : 0;
+          
+          // Calculate total price with GST
+          const priceWithoutGst = qty * price;
+          const gstAmount = priceWithoutGst * (gst / 100);
+          updatedPart.totalPrice = (priceWithoutGst + gstAmount).toFixed(2);
+        }
+        
+        return updatedPart;
       }
       return part;
     });
@@ -79,6 +343,25 @@ const WorkInProgress = () => {
       pt: 3
     }}>
       <CssBaseline />
+      
+      {/* Loading overlay */}
+      {fetchLoading && (
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          bgcolor: 'rgba(255, 255, 255, 0.7)',
+          zIndex: 9999
+        }}>
+          <CircularProgress />
+        </Box>
+      )}
+      
       <Container maxWidth="md">
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
           <IconButton 
@@ -131,12 +414,15 @@ const WorkInProgress = () => {
                     placeholder="Company" 
                     margin="normal"
                     variant="outlined"
+                    value={carDetails.company}
+                    onChange={(e) => setCarDetails({...carDetails, company: e.target.value})}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
                           <CarIcon color="action" />
                         </InputAdornment>
                       ),
+                      readOnly: true
                     }}
                   />
                   <TextField 
@@ -144,12 +430,22 @@ const WorkInProgress = () => {
                     placeholder="Model" 
                     margin="normal"
                     variant="outlined"
+                    value={carDetails.model}
+                    onChange={(e) => setCarDetails({...carDetails, model: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
                     placeholder="Car No." 
                     margin="normal"
                     variant="outlined"
+                    value={carDetails.carNo}
+                    onChange={(e) => setCarDetails({...carDetails, carNo: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -179,12 +475,15 @@ const WorkInProgress = () => {
                     placeholder="Name" 
                     margin="normal"
                     variant="outlined"
+                    value={customerDetails.name}
+                    onChange={(e) => setCustomerDetails({...customerDetails, name: e.target.value})}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
                           <PersonIcon color="action" />
                         </InputAdornment>
                       ),
+                      readOnly: true
                     }}
                   />
                   <TextField 
@@ -192,6 +491,11 @@ const WorkInProgress = () => {
                     placeholder="Contact No." 
                     margin="normal"
                     variant="outlined"
+                    value={customerDetails.contactNo}
+                    onChange={(e) => setCustomerDetails({...customerDetails, contactNo: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
@@ -199,6 +503,11 @@ const WorkInProgress = () => {
                     margin="normal"
                     variant="outlined"
                     type="email"
+                    value={customerDetails.email}
+                    onChange={(e) => setCustomerDetails({...customerDetails, email: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -228,12 +537,15 @@ const WorkInProgress = () => {
                     placeholder="Company" 
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.company}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, company: e.target.value})}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
                           <SecurityIcon color="action" />
                         </InputAdornment>
                       ),
+                      readOnly: true
                     }}
                   />
                   <TextField 
@@ -241,12 +553,22 @@ const WorkInProgress = () => {
                     placeholder="Number" 
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.number}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, number: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
                     placeholder="Type" 
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.type}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, type: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
@@ -254,8 +576,13 @@ const WorkInProgress = () => {
                     label="Expiry"
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.expiry}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, expiry: e.target.value})}
                     InputLabelProps={{
                       shrink: true,
+                    }}
+                    InputProps={{
+                      readOnly: true
                     }}
                   />
                   <TextField 
@@ -263,12 +590,22 @@ const WorkInProgress = () => {
                     placeholder="Reg. No." 
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.regNo}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, regNo: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
                     placeholder="Amount" 
                     margin="normal"
                     variant="outlined"
+                    value={insuranceDetails.amount}
+                    onChange={(e) => setInsuranceDetails({...insuranceDetails, amount: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -298,12 +635,15 @@ const WorkInProgress = () => {
                     placeholder="Full Name" 
                     margin="normal"
                     variant="outlined"
+                    value={engineerDetails.fullName}
+                    onChange={(e) => setEngineerDetails({...engineerDetails, fullName: e.target.value})}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
                           <EngineeringIcon color="action" />
                         </InputAdornment>
                       ),
+                      readOnly: true
                     }}
                   />
                   <TextField 
@@ -311,6 +651,11 @@ const WorkInProgress = () => {
                     placeholder="Speciality" 
                     margin="normal"
                     variant="outlined"
+                    value={engineerDetails.speciality}
+                    onChange={(e) => setEngineerDetails({...engineerDetails, speciality: e.target.value})}
+                    InputProps={{
+                      readOnly: true
+                    }}
                   />
                   <TextField 
                     fullWidth 
@@ -318,8 +663,13 @@ const WorkInProgress = () => {
                     label="Date & Time Assigned"
                     margin="normal"
                     variant="outlined"
+                    value={engineerDetails.assignedDateTime}
+                    onChange={(e) => setEngineerDetails({...engineerDetails, assignedDateTime: e.target.value})}
                     InputLabelProps={{
                       shrink: true,
+                    }}
+                    InputProps={{
+                      readOnly: true
                     }}
                   />
                 </CardContent>
@@ -407,6 +757,16 @@ const WorkInProgress = () => {
                       >
                         Total Price
                       </TableCell>
+                      <TableCell 
+                        align="center" 
+                        sx={{ 
+                          bgcolor: 'rgb(9, 141, 97)',
+                          color: 'white',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Actions
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -471,13 +831,35 @@ const WorkInProgress = () => {
                             type="number"
                             value={part.totalPrice}
                             onChange={(e) => handlePartChange(part.id, 'totalPrice', e.target.value)}
+                            InputProps={{ readOnly: true }}
                           />
+                        </TableCell>
+                        <TableCell align="center">
+                          <IconButton 
+                            color="error" 
+                            size="small"
+                            onClick={() => handleDeleteRow(part.id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </TableContainer>
+              
+              {/* Add Row Button */}
+              <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={handleAddRow}
+                  startIcon={<AddIcon />}
+                >
+                  Add Part
+                </Button>
+              </Box>
             </Paper>
           </Box>
 
@@ -488,8 +870,10 @@ const WorkInProgress = () => {
                 fullWidth 
                 label="Labour Hours"
                 variant="outlined" 
+                type="number"
                 value={laborHours}
                 onChange={(e) => setLaborHours(e.target.value)}
+                required
               />
             </Grid>
             <Grid item xs={12} md={4}>
@@ -500,10 +884,11 @@ const WorkInProgress = () => {
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 variant="outlined"
+                required
               >
-                <MenuItem value="">Status</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
+                <MenuItem value="">Select Status</MenuItem>
+                <MenuItem value="Pending">Pending</MenuItem>
+                <MenuItem value="Completed">Completed</MenuItem>
               </TextField>
             </Grid>
           </Grid>
@@ -518,6 +903,7 @@ const WorkInProgress = () => {
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             sx={{ mt: 3 }}
+            required
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1 }}>
@@ -528,12 +914,12 @@ const WorkInProgress = () => {
           />
 
           {/* Submit Button */}
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
             <Button
               type="submit"
               variant="contained"
               color="primary"
-              onClick={() => navigate('/Quality-Check')}
+              disabled={isLoading || fetchLoading}
               sx={{ 
                 px: 4, 
                 py: 1.5, 
@@ -548,13 +934,29 @@ const WorkInProgress = () => {
                 }
               }}
             >
-              SUBMIT REMARKS
+              {fetchLoading ? 'LOADING...' : isLoading ? 'SUBMITTING...' : 'SUBMIT REMARKS'}
             </Button>
           </Box>
             </Box>
           </CardContent>
         </Card>
       </Container>
+      
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -132,7 +132,7 @@ const JobCards = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
       const formDataToSend = new FormData();
       
@@ -140,9 +140,8 @@ const JobCards = () => {
       Object.entries(formData).forEach(([key, value]) => {
         if (value) formDataToSend.append(key, value);
       });
-      // Ensure garageId is included (hardcoded as in your curl)
       formDataToSend.append('garageId', '67e0f80b5c8f6293f36e3506');
-
+  
       // Append files
       Object.entries(carImages).forEach(([view, file]) => {
         if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
@@ -151,32 +150,28 @@ const JobCards = () => {
       if (videoFile) {
         formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
       }
-
-      // API configuration
+  
       const config = {
         headers: {
           'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
-          // 'Content-Type' will be set automatically by Axios when sending FormData
         }
       };
-
-      // Always use the real backend URL
+  
       const apiBaseUrl = 'https://garage-management-system-cr4w.onrender.com';
-
-// Then update your axios call
-const response = await axios.post(
-  `${apiBaseUrl}/api/jobCards/add`,
-  formDataToSend,
-  config
-);
-
+      const response = await axios.post(
+        `${apiBaseUrl}/api/jobCards/add`,
+        formDataToSend,
+        config
+      );
+  
       setSnackbar({
         open: true,
         message: 'Job card created successfully!',
         severity: 'success'
       });
-
-      setTimeout(() => navigate('/Assign-Engineer'), 1500);
+  
+      // Navigate to Assign-Engineer with the job card ID
+      setTimeout(() => navigate('/Assign-Engineer', { state: { jobCardId: response.data.jobCard._id } }), 1500);
       
     } catch (error) {
       console.error('API Error:', error);
@@ -187,17 +182,16 @@ const response = await axios.post(
       } else if (error.request) {
         errorMessage = 'Network error - please check your connection';
       }
-
+  
       setSnackbar({
         open: true,
         message: errorMessage,
         severity: 'error'
       });
       
-      // Development fallback
       if (process.env.NODE_ENV === 'development') {
         console.warn('Development mode: Proceeding with mock data');
-        setTimeout(() => navigate('/Assign-Engineer'), 1500);
+        setTimeout(() => navigate('/Assign-Engineer', { state: { jobCardId: 'mock-id' } }), 1500);
       }
     } finally {
       setLoading(false);

@@ -35,6 +35,7 @@ import {
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
 // Sample data for tasks and parts (can be moved to API calls if needed)
 const tasks = [
@@ -51,7 +52,8 @@ const AssignEngineer = () => {
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const navigate = useNavigate();
-  
+  const location = useLocation();
+const jobCardId = location.state?.jobCardId;
   // State management
   const [engineers, setEngineers] = useState([]);
   const [selectedEngineer, setSelectedEngineer] = useState(null);
@@ -62,11 +64,13 @@ const AssignEngineer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const garageId ="67e0f80b5c8f6293f36e3506";
+  const token = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
   
   // State for Add Part Dialog
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
   const [newPart, setNewPart] = useState({
-    garageId: "67e0f80b5c8f6293f36e3506",
+    garageId: garageId,
     carName: "",
     model: "",
     partNumber: "",
@@ -84,10 +88,10 @@ const AssignEngineer = () => {
     const fetchInventory = async () => {
       try {
         const response = await axios.get(
-          'https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506',
+          `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
           {
             headers: {
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+              'Authorization': token,
             }
           }
         );
@@ -109,11 +113,11 @@ const AssignEngineer = () => {
         setError(null);
         
         const response = await axios.get(
-          'https://garage-management-system-cr4w.onrender.com/api/engineers/67f3a7f8ccb6f320da3a5117',
+          `https://garage-management-system-cr4w.onrender.com/api/engineers/${garageId}`,
           {
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTU1Njk0OSwiZXhwIjoxNzQ2MTYxNzQ5fQ.djYdc2q1eBqydjWbk6V9ZzIRDeBFAHvl9BgeVkhAgt8'
+              'Authorization': token,
             }
           }
         );
@@ -158,10 +162,10 @@ const AssignEngineer = () => {
 
     try {
       // API call as per user instruction
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/680f20ab54c9b20411680d56', {
+      const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/6811fe35093ba2205b0eab55`, {
         method: 'PUT',
         headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+          'Authorization': token,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ engineerId: selectedEngineer._id })
@@ -192,7 +196,7 @@ const AssignEngineer = () => {
     setPartAddError(null);
     // Reset the form
     setNewPart({
-      garageId: "67e0f80b5c8f6293f36e3506",
+      garageId: garageId,
       carName: "",
       model: "",
       partNumber: "",
@@ -238,7 +242,7 @@ const AssignEngineer = () => {
         newPart,
         {
           headers: {
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+            'Authorization': token,
             'Content-Type': 'application/json'
           }
         }
@@ -264,10 +268,10 @@ const AssignEngineer = () => {
   const fetchInventoryParts = async () => {
     try {
       const response = await axios.get(
-        'https://garage-management-system-cr4w.onrender.com/api/inventory/67e0f80b5c8f6293f36e3506',
+        `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
         {
           headers: {
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+            'Authorization': token,
           }
         }
       );
