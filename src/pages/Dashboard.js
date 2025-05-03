@@ -84,11 +84,6 @@ const statsCards = [
   },
 ];
 
-// Inventory data will be fetched from API and separated into low/high stock
-const [lowStockItems, setLowStockItems] = useState([]);
-const [highStockItems, setHighStockItems] = useState([]);
-const [inventoryLoading, setInventoryLoading] = useState(true);
-const [inventoryError, setInventoryError] = useState(null);
 
 const Dashboard = () => {
   const theme = useTheme();
