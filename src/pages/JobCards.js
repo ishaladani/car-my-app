@@ -82,7 +82,8 @@ const JobCards = () => {
     message: '',
     severity: 'success'
   });
-
+ const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  const garageId = localStorage.getItem('garageId');
   // Form state
   const [formData, setFormData] = useState({
     customerNumber: '',
@@ -140,7 +141,7 @@ const JobCards = () => {
       Object.entries(formData).forEach(([key, value]) => {
         if (value) formDataToSend.append(key, value);
       });
-      formDataToSend.append('garageId', '67e0f80b5c8f6293f36e3506');
+      formDataToSend.append('garageId', garageId);
   
       // Append files
       Object.entries(carImages).forEach(([view, file]) => {
@@ -153,8 +154,7 @@ const JobCards = () => {
   
       const config = {
         headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
-        }
+          'Authorization': token,}
       };
   
       const apiBaseUrl = 'https://garage-management-system-cr4w.onrender.com';
@@ -171,7 +171,7 @@ const JobCards = () => {
       });
   
       // Navigate to Assign-Engineer with the job card ID
-      setTimeout(() => navigate('/Assign-Engineer', { state: { jobCardId: response.data.jobCard._id } }), 1500);
+      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard._id}`, { state: { jobCardId: response.data.jobCard._id } }), 1500);
       
     } catch (error) {
       console.error('API Error:', error);

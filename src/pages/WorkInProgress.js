@@ -45,10 +45,9 @@ import axios from 'axios';
 const WorkInProgress = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { id: urlId } = useParams(); // Assuming you're passing the jobCard ID in URL
+  const { id } = useParams(); // Assuming you're passing the jobCard ID in URL
   
-  // Set default jobCardId or use from URL
-  const jobCardId = urlId || "680f20ab54c9b20411680d56";
+
   
   // Table rows state management (now an empty array to start with)
   const [parts, setParts] = useState([]);
@@ -94,18 +93,12 @@ const WorkInProgress = () => {
     message: '',
     severity: 'success'
   });
+   const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  
 
   // Handle snackbar close
   const handleSnackbarClose = () => {
     setSnackbar({...snackbar, open: false});
-  };
-
-  // Get token from localStorage (assuming you store it there)
-  const getToken = () => {
-    // For this implementation, we're using the hardcoded token
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
-    // In production, you would use:
-    // return localStorage.getItem('token');
   };
   
   // Fetch job card data when component mounts
@@ -115,10 +108,10 @@ const WorkInProgress = () => {
         setFetchLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${jobCardId}`,
+          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}`,
           {
             headers: {
-              'Authorization': `Bearer ${getToken()}`,
+              'Authorization':token,
               'Content-Type': 'application/json'
             }
           }
@@ -210,7 +203,7 @@ const WorkInProgress = () => {
     };
     
     fetchJobCardData();
-  }, [jobCardId]);
+  }, [id]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -240,15 +233,15 @@ const WorkInProgress = () => {
         status: status
       };
       
-      // Use the jobCardId defined at the component level
+      // Use the id defined at the component level
       
       // Make API call
       const response = await axios.put(
-        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${jobCardId}/workprogress`,
+        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${id}/workprogress`,
         requestData,
         {
           headers: {
-            'Authorization': `Bearer ${getToken()}`,
+            'Authorization':token,
             'Content-Type': 'application/json'
           }
         }
@@ -262,7 +255,7 @@ const WorkInProgress = () => {
       
       // Navigate to Quality Check page after successful submission
       setTimeout(() => {
-        navigate('/Quality-Check');
+        navigate(`/Quality-Check/${id}`);
       }, 1500);
       
     } catch (error) {

@@ -18,7 +18,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Divider,
   Snackbar,
   Alert,
   CircularProgress
@@ -36,11 +35,9 @@ import { format } from 'date-fns';
 const QualityCheck = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { id: urlId } = useParams(); // Get jobCard ID from URL params
-  
-  // Set default jobCardId or use from URL
-  const jobCardId = urlId || "680f20ab54c9b20411680d56";
-  
+  const { id } = useParams(); // Get jobCard ID from URL params
+  const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+
   // State for parts table and final inspection remarks
   const [parts, setParts] = useState([]);
   const [finalInspection, setFinalInspection] = useState('');
@@ -52,15 +49,10 @@ const QualityCheck = () => {
     message: '',
     severity: 'success'
   });
-  
+
   // Get current date and time for display
   const currentDateTime = format(new Date(), "MM/dd/yyyy - hh:mm a");
-  
-  // Get token (hardcoded for this implementation)
-  const getToken = () => {
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
-  };
-  
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -75,10 +67,10 @@ const QualityCheck = () => {
         setIsLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${jobCardId}`,
+          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}`,
           {
             headers: {
-              'Authorization': `Bearer ${getToken()}`,
+              'Authorization': token,
               'Content-Type': 'application/json'
             }
           }
@@ -125,58 +117,43 @@ const QualityCheck = () => {
         setIsLoading(false);
       }
     };
-    
+
     fetchJobCardData();
-  }, [jobCardId]);
+  }, [id]);
 
   // Handle snackbar close
   const handleSnackbarClose = () => {
     setSnackbar({...snackbar, open: false});
   };
 
-  // Handle form submission
+  // Handle form submission and navigation to billing page
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     try {
-      setIsSubmitting(true);
-      
-      // Format the data for API request
-      const requestData = {
-        qualityCheck: {
-          notes: finalInspection,
-          billApproved: true
-        }
-      };
-      
-      // Make API call to update quality check - using exact endpoint format provided
-      const response = await axios.put(
-        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${jobCardId}/qualitycheck`,
-        requestData,
-        {
-          headers: {
-            'Authorization': `Bearer ${getToken()}`,
-            'Content-Type': 'application/json'
+      // First, save the quality check notes if needed
+      if (finalInspection) {
+        await axios.put(
+          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}/quality-check`,
+          { notes: finalInspection },
+          {
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+      }
       
-      setSnackbar({
-        open: true,
-        message: 'Quality check approved successfully!',
-        severity: 'success'
-      });
-      
-      // Navigate after successful submission (with delay)
-      setTimeout(() => {
-        navigate('/dashboard'); // Change to appropriate route
-      }, 1500);
+      // Navigate to billing page with the job card ID
+      navigate(`/billing/${id}`);
       
     } catch (error) {
-      console.error('Error approving quality check:', error);
+      console.error('Error saving quality check:', error);
       setSnackbar({
         open: true,
-        message: `Error: ${error.response?.data?.message || 'Failed to approve quality check'}`,
+        message: `Error: ${error.response?.data?.message || 'Failed to save quality check'}`,
         severity: 'error'
       });
     } finally {
@@ -185,7 +162,7 @@ const QualityCheck = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       flexGrow: 1,
       mb: 4,
       ml: {xs: 0, sm: 35},
@@ -193,7 +170,7 @@ const QualityCheck = () => {
       pt: 3
     }}>
       <CssBaseline />
-      
+
       {/* Loading overlay */}
       {isLoading && (
         <Box sx={{ 

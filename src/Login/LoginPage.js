@@ -22,8 +22,8 @@ const LoginPage = () => {
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',  // Pre-filled for testing
-    password: ''       // Pre-filled for testing
+    email: '',
+    password: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,17 +39,6 @@ const LoginPage = () => {
     }));
   };
 
-  // Function to set a cookie with expiration
-  const setCookie = (name, value, days) => {
-    let expires = '';
-    if (days) {
-      const date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = '; expires=' + date.toUTCString();
-    }
-    document.cookie = name + '=' + value + expires + '; path=/; SameSite=Strict';
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -63,8 +52,8 @@ const LoginPage = () => {
     }
 
     try {
-      // Make the API call to the login endpoint
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/admin/login', {
+      // Make the API call to the garage login endpoint
+      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/garage/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -83,15 +72,17 @@ const LoginPage = () => {
       
       console.log('Login successful:', data);
 
-      // Store the token in cookies (expires in 1 day)
+      // Store the token and garage ID in localStorage
       if (data.token) {
-        // Use the dynamic token from the response
-        setCookie('authToken', data.token, 1);
+        localStorage.setItem('authToken', data.token);
         
-        // Also store in sessionStorage as a backup
-        sessionStorage.setItem('authToken', data.token);
+        // Store the garage ID from the response
+        if (data.garage && data.garage._id) {
+          localStorage.setItem('garageId', data.garage._id);
+          console.log('Garage ID stored in localStorage:', data.garage._id);
+        }
         
-        console.log('Token stored in cookies and sessionStorage');
+        console.log('Token stored in localStorage');
       }
       
       // Navigate to the intended destination or dashboard
@@ -99,25 +90,6 @@ const LoginPage = () => {
       
     } catch (err) {
       console.error('Login error:', err);
-      
-      // Fallback to the static approach if the API call fails due to CORS
-      if (formData.email === 'admin@garage.com' && formData.password === 'admin1234') {
-        console.log('API call failed, using fallback authentication');
-        
-        // Use the token you provided in your message
-        const staticToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjM1ZjY5NzFmODAyZDA3YzM2YjA0MyIsImlhdCI6MTc0NTM5ODIxMSwiZXhwIjoxNzQ1NDg0NjExfQ.iA49Jq4IWIB0d9MOarnTfDVvZvIB0tOHn52TNc-3eBQ";
-        
-        // Store token in cookies and sessionStorage
-        setCookie('authToken', staticToken, 1);
-        sessionStorage.setItem('authToken', staticToken);
-        
-        console.log('Static token stored in cookies and sessionStorage');
-        
-        // Navigate to the intended destination or dashboard
-        navigate(from, { replace: true });
-        return;
-      }
-      
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);

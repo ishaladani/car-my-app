@@ -34,7 +34,7 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 
 // Sample data for tasks and parts (can be moved to API calls if needed)
@@ -53,7 +53,12 @@ const AssignEngineer = () => {
   const { darkMode } = useThemeContext();
   const navigate = useNavigate();
   const location = useLocation();
-const jobCardId = location.state?.jobCardId;
+  const {id} = useParams();
+  const jobCardId = location.state?.jobCardId;
+  
+  // Get token from localStorage
+  const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  
   // State management
   const [engineers, setEngineers] = useState([]);
   const [selectedEngineer, setSelectedEngineer] = useState(null);
@@ -64,8 +69,7 @@ const jobCardId = location.state?.jobCardId;
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const garageId ="67e0f80b5c8f6293f36e3506";
-  const token = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM'
+  const garageId = localStorage.getItem('garageId');
   
   // State for Add Part Dialog
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -83,9 +87,19 @@ const jobCardId = location.state?.jobCardId;
   const [partAddSuccess, setPartAddSuccess] = useState(false);
   const [partAddError, setPartAddError] = useState(null);
 
+  // Check if token exists
+  useEffect(() => {
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
+    }
+  }, [token, navigate]);
+
   // Fetch inventory parts from API on mount
   useEffect(() => {
     const fetchInventory = async () => {
+      if (!token) return;
+      
       try {
         const response = await axios.get(
           `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
@@ -103,11 +117,13 @@ const jobCardId = location.state?.jobCardId;
       }
     };
     fetchInventory();
-  }, [partAddSuccess]);
+  }, [partAddSuccess, token]);
 
   // Fetch engineers from API
   useEffect(() => {
     const fetchEngineers = async () => {
+      if (!token) return;
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -145,7 +161,7 @@ const jobCardId = location.state?.jobCardId;
     };
 
     fetchEngineers();
-  }, []);
+  }, [token]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -157,12 +173,22 @@ const jobCardId = location.state?.jobCardId;
       return;
     }
 
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // API call as per user instruction
-      const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/6811fe35093ba2205b0eab55`, {
+      // Use either the job ID from location state or fallback to the one in the original code
+    
+
+      
+      // API call to assign engineer
+      const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': token,
@@ -177,7 +203,7 @@ const jobCardId = location.state?.jobCardId;
       }
 
       setSuccess(true);
-      setTimeout(() => navigate('/Work-In-Progress'), 1500);
+      setTimeout(() => navigate(`/Work-In-Progress/${id}`), 1500);
     } catch (error) {
       console.error('Assignment error:', error);
       setError(error.message || 'Failed to assign engineer. Please try again.');
@@ -233,6 +259,11 @@ const jobCardId = location.state?.jobCardId;
       return;
     }
 
+    if (!token) {
+      setPartAddError('Authentication token not found. Please log in again.');
+      return;
+    }
+
     setAddingPart(true);
     setPartAddError(null);
 
@@ -266,6 +297,8 @@ const jobCardId = location.state?.jobCardId;
 
   // Fetch inventory parts separately (to refresh after adding a new part)
   const fetchInventoryParts = async () => {
+    if (!token) return;
+    
     try {
       const response = await axios.get(
         `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,

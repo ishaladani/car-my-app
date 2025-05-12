@@ -84,19 +84,18 @@ const InventoryManagement = () => {
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Get token from storage or use hardcoded for testing
-  const getToken = () => {
-    return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTk4OTc2MCwiZXhwIjoxNzQ2NTk0NTYwfQ.ZfCPHzcqFslhxG4QRPjW1DcY5kwcwFcniJegbc37n8U";
-  };
+  const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  const garageId = localStorage.getItem('garageId') || "682194f72e0d12e864695009"; // Use stored ID or fallback to default
 
   // Function to fetch inventory data
   const fetchInventory = async () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        'https://garage-management-system-cr4w.onrender.com/api/inventory/67f3a7f8ccb6f320da3a5117', 
+        `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`, 
         {
           headers: {
-            'Authorization': `Bearer ${getToken()}`
+            'Authorization': token,
           }
         }
       );
@@ -239,7 +238,7 @@ const InventoryManagement = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
+            'Authorization': token,
           }
         }
       );
@@ -277,25 +276,25 @@ const InventoryManagement = () => {
     }
   };
 
-  // Handle form submission
+  // Handle form submission - UPDATED to match API requirements
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
       setIsSubmitting(true);
       
-      // Prepare the data for API call
+      // Prepare the data for API call according to the specified format
       const requestData = {
-        garageId: "67f3a7f8ccb6f320da3a5117",
-        carName: formData.carName,
-        model: formData.model,
-        partNumber: formData.partNumber,
-        partName: formData.partName,
+        name: formData.carName, // Using carName as the name field
+        garageId: garageId, // Using the stored garageId or default
         quantity: parseInt(formData.quantity),
         pricePerUnit: parseFloat(formData.pricePerUnit),
-        taxAmount: parseFloat(formData.taxAmount),
-        taxType: formData.taxType
+        partNumber: parseInt(formData.partNumber) || formData.partNumber, // Try to parse as int if possible
+        partName: formData.partName
+        // Note: tax fields are not included as they're not in the example API request
       };
+
+      console.log('Adding inventory item with data:', requestData);
 
       // Make API call to add inventory item
       const response = await axios.post(
@@ -304,10 +303,12 @@ const InventoryManagement = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
+            'Authorization': token,
           }
         }
       );
+      
+      console.log('Add response:', response.data);
       
       // Show success notification
       setNotification({
@@ -335,6 +336,14 @@ const InventoryManagement = () => {
 
     } catch (error) {
       console.error('Error adding part:', error);
+      
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error response status:', error.response.status);
+        console.error('Error response headers:', error.response.headers);
+      }
+      
       setNotification({
         open: true,
         message: error.response?.data?.message || error.message || 'Failed to add part. Please try again.',
@@ -503,8 +512,8 @@ const InventoryManagement = () => {
                   name="taxType"
                   value={formData.taxType}
                   onChange={handleInputChange}
-                  label="Tax"
                   required
+                  label="Tax"
                 >
                   <MenuItem value="SGST">SGST</MenuItem>
                   <MenuItem value="CGST">CGST</MenuItem>

@@ -40,6 +40,8 @@ const customers = [
 const SetServiceReminder = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+   const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  
   
   // State for form fields
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -129,7 +131,7 @@ const SetServiceReminder = () => {
       const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/reminders/send', {
         method: 'POST',
         headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY3ZjNhN2Y4Y2NiNmYzMjBkYTNhNTExNyIsImlhdCI6MTc0NTgxNjY5NCwiZXhwIjoxNzQ2NDIxNDk0fQ.eFBVfYMr5ys2xe485aP1i_UlV1Z_P_8H4uiKk-VdAWM',
+          'Authorization':token,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(reminderData)

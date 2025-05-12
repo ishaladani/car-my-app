@@ -15,6 +15,7 @@ import InventoryManagement from './pages/InventoryManagement';
 import LoginPage from './Login/LoginPage'
 import SignUpPage from './Login/SignUpPage';
 import ProtectedRoute from './Login/ProtectedRoute';
+import BillingPage from './pages/BillingPage';
 
 function App() {
   return (
@@ -22,12 +23,25 @@ function App() {
       <CssBaseline />
       <Router>
         <Routes>
-          {/* Auth routes - accessible without login */}
+      
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
-          
-          {/* Protected routes - require authentication */}
-          <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="jobs" element={<JobCards />} />
+              <Route path="inventory" element={<InventoryManagement />} />
+              <Route path="reports" element={<RecordReport />} />
+              <Route path="assign-engineer/:id" element={<AssignEngineer />} />
+              <Route path="work-in-progress/:id" element={<WorkInProgress />} />
+              <Route path="quality-check/:id" element={<QualityCheck />} />
+              <Route path="reminders" element={<SetServiceReminder />} />
+              <Route path="insurance" element={<InsuranceManagement />} />
+              <Route path="billing/:id" element={<BillingPage />} />
+              
+     
+            </Route>
+
+          {/* <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="jobs" element={<JobCards />} />
@@ -39,7 +53,7 @@ function App() {
               <Route path="reminders" element={<SetServiceReminder />} />
               <Route path="insurance" element={<InsuranceManagement />} />
             </Route>
-          </Route>
+          </Route> */}
           
           {/* Redirect any unknown routes to login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
@@ -50,7 +64,7 @@ function App() {
 }
 
 export default App;
-// src/App.js
+
 // import React from 'react';
 // import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 // // import GarageLogin from './components/GarageLogin';
