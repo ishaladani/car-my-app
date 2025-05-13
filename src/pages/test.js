@@ -1,894 +1,968 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
-  Container,
   Box,
   Typography,
-  Button,
+  Card,
+  CardContent,
   TextField,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Button,
+  Container,
   IconButton,
+  Autocomplete,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  LinearProgress,
-  Chip,
-  Card,
-  CardContent,
-  Divider,
+  Grid,
+  CssBaseline,
+  Paper,
+  useTheme,
   InputAdornment,
   Snackbar,
   Alert,
-  useMediaQuery,
-  useTheme,
-  Stack,
-  Avatar
+  CircularProgress,
+  Fab,
+  Tooltip
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Print as PrintIcon,
-  Receipt as ReceiptIcon,
-  CreditCard as CreditCardIcon,
-  AccountBalance as AccountBalanceIcon,
-  Check as CheckIcon,
-  DirectionsCar as CarIcon,
+  ArrowBack as ArrowBackIcon,
   Person as PersonIcon,
-  MonetizationOn as MoneyIcon,
-  Settings as SettingsIcon,
-  Home as HomeIcon,
-  Speed as SpeedIcon
+  Assignment as AssignmentIcon,
+  Inventory as InventoryIcon,
+  Send as SendIcon,
+  Add as AddIcon,
+  Engineering as EngineeringIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon
 } from '@mui/icons-material';
+import { useThemeContext } from '../Layout/ThemeContext';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 
-const AutoServeBilling = () => {
+// Sample data for tasks and parts (can be moved to API calls if needed)
+const tasks = [
+  { id: 1, name: 'Engine Repair', duration: '4-6 hours' },
+  { id: 2, name: 'Brake Replacement', duration: '2-3 hours' },
+  { id: 3, name: 'Oil Change', duration: '1 hour' },
+  { id: 4, name: 'Tire Rotation', duration: '1 hour' },
+  { id: 5, name: 'A/C Repair', duration: '3-4 hours' },
+  { id: 6, name: 'Battery Replacement', duration: '1 hour' },
+  { id: 7, name: 'Transmission Service', duration: '4-5 hours' },
+];
+
+const AssignEngineer = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const { darkMode } = useThemeContext();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {id} = useParams();
+  const jobCardId = location.state?.jobCardId;
   
-  const today = new Date().toISOString().split('T')[0];
+  // Get token from localStorage
   const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
   
   // State management
-  const [carDetails, setCarDetails] = useState({
-    carNumber: 'ABO-123',
-    company: 'Toyota',
-    model: 'Corolla',
-    customerName: 'John Smith',
-    contact: '9876543210',
-    email: 'john@example.com',
-    billingDate: today,
-    invoiceNo: 'INV-2023-001'
-  });
-
-  const [parts, setParts] = useState([
-    { id: 1, name: 'Oil Filter', quantity: 2, pricePerUnit: 150, total: 300 },
-    { id: 2, name: 'Air Filter', quantity: 1, pricePerUnit: 250, total: 250 },
-    { id: 3, name: 'Brake Pads', quantity: 4, pricePerUnit: 400, total: 1600 }
-  ]);
-
-  const [services, setServices] = useState([
-    { 
-      id: 1, 
-      name: 'Engine Repair', 
-      engineer: 'Alex Johnson', 
-      progress: 65, 
-      status: 'In Progress', 
-      laborCost: 1200 
-    },
-    { 
-      id: 2, 
-      name: 'Brake Replacement', 
-      engineer: 'Sarah Williams', 
-      progress: 100, 
-      status: 'Completed', 
-      laborCost: 800 
-    }
-  ]);
-
-  const [summary, setSummary] = useState({
-    totalPartsCost: 2150,
-    totalLaborCost: 2000,
-    subtotal: 4150,
-    gstAmount: 747,
-    discount: 200,
-    totalAmount: 4697
-  });
-
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showProcessModal, setShowProcessModal] = useState(false);
-  const [showThankYou, setShowThankYou] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [apiResponseMessage, setApiResponseMessage] = useState(null);
-  const [showApiResponse, setShowApiResponse] = useState(false);
+  const [engineers, setEngineers] = useState([]);
+  const [selectedEngineer, setSelectedEngineer] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedParts, setSelectedParts] = useState([]);
+  const [inventoryParts, setInventoryParts] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const garageId = localStorage.getItem('garageId');
   
-  // New part/service dialog states
-  const [showNewPartDialog, setShowNewPartDialog] = useState(false);
-  const [newPart, setNewPart] = useState({ name: '', quantity: 1, pricePerUnit: 0 });
-  
-  const [showNewServiceDialog, setShowNewServiceDialog] = useState(false);
-  const [newService, setNewService] = useState({ name: '', engineer: '', laborCost: 0 });
+  // State for Add Part Dialog
+  const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
+  const [newPart, setNewPart] = useState({
+    garageId: garageId,
+    carName: "",
+    model: "",
+    partNumber: "",
+    partName: "",
+    quantity: 1,
+    pricePerUnit: 0,
+    taxAmount: 0
+  });
+  const [addingPart, setAddingPart] = useState(false);
+  const [partAddSuccess, setPartAddSuccess] = useState(false);
+  const [partAddError, setPartAddError] = useState(null);
 
-  // Edit price dialog states
-  const [showEditPriceDialog, setShowEditPriceDialog] = useState(false);
-  const [editItem, setEditItem] = useState({ id: null, type: '', field: '', value: 0 });
+  // State for Add Engineer Dialog
+  const [openAddEngineerDialog, setOpenAddEngineerDialog] = useState(false);
+  const [newEngineer, setNewEngineer] = useState({
+    name: "",
+    garageId: garageId,
+    email: "",
+    phone: "",
+    specialty: "" // optional field
+  });
+  const [addingEngineer, setAddingEngineer] = useState(false);
+  const [engineerAddSuccess, setEngineerAddSuccess] = useState(false);
+  const [engineerAddError, setEngineerAddError] = useState(null);
 
-  // Calculate totals whenever parts, services, or discount changes
+  // Check if token exists
   useEffect(() => {
-    calculateTotals();
-  }, [parts, services, summary.discount]);
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
+    }
+  }, [token, navigate]);
 
-  const calculateTotals = () => {
-    // Calculate total parts cost
-    const totalPartsCost = parts.reduce((sum, part) => sum + part.total, 0);
-    
-    // Calculate total labor cost
-    const totalLaborCost = services.reduce((sum, service) => sum + service.laborCost, 0);
-    
-    // Calculate subtotal
-    const subtotal = totalPartsCost + totalLaborCost;
-    
-    // Calculate GST (18%)
-    const gstAmount = Math.round(subtotal * 0.18);
-    
-    // Get current discount
-    const discount = summary.discount || 0;
-    
-    // Calculate total
-    const totalAmount = subtotal + gstAmount - discount;
-    
-    // Update summary
-    setSummary({
-      totalPartsCost,
-      totalLaborCost,
-      subtotal,
-      gstAmount,
-      discount,
-      totalAmount
-    });
-  };
-
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
-    setCarDetails({
-      ...carDetails,
-      [id]: value
-    });
-  };
-
-  const handleDiscountChange = (e) => {
-    const discount = parseFloat(e.target.value) || 0;
-    setSummary({ ...summary, discount });
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  // Add new part
-  const addNewPart = () => {
-    const { name, quantity, pricePerUnit } = newPart;
-    if (name && quantity > 0 && pricePerUnit > 0) {
-      const newPartObj = {
-        id: Date.now(),
-        name,
-        quantity: parseInt(quantity),
-        pricePerUnit: parseFloat(pricePerUnit),
-        total: parseInt(quantity) * parseFloat(pricePerUnit)
-      };
+  // Fetch inventory parts from API on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!token) return;
       
-      setParts([...parts, newPartObj]);
-      setNewPart({ name: '', quantity: 1, pricePerUnit: 0 });
-      setShowNewPartDialog(false);
-    }
-  };
+      try {
+        const response = await axios.get(
+          `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+          {
+            headers: {
+              'Authorization': token,
+            }
+          }
+        );
+        // Accept both array or {data: array} response
+        const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+        setInventoryParts(data);
+      } catch (err) {
+        setError('Failed to load inventory parts');
+      }
+    };
+    fetchInventory();
+  }, [partAddSuccess, token]);
 
-  // Add new service
-  const addNewService = () => {
-    const { name, engineer, laborCost } = newService;
-    if (name && engineer && laborCost > 0) {
-      const newServiceObj = {
-        id: Date.now(),
-        name,
-        engineer,
-        progress: 0,
-        status: 'Pending',
-        laborCost: parseFloat(laborCost)
-      };
+  // Fetch engineers from API
+  useEffect(() => {
+    const fetchEngineers = async () => {
+      if (!token) return;
       
-      setServices([...services, newServiceObj]);
-      setNewService({ name: '', engineer: '', laborCost: 0 });
-      setShowNewServiceDialog(false);
-    }
-  };
-
-  // Remove part
-  const removePart = (id) => {
-    setParts(parts.filter(part => part.id !== id));
-  };
-
-  // Remove service
-  const removeService = (id) => {
-    setServices(services.filter(service => service.id !== id));
-  };
-
-  // Open edit price dialog
-  const openEditPrice = (id, type, field, value) => {
-    setEditItem({ id, type, field, value });
-    setShowEditPriceDialog(true);
-  };
-
-  // Save edited price
-  const saveEditedPrice = () => {
-    const { id, type, field, value } = editItem;
-    const newValue = parseFloat(value);
-    
-    if (type === 'part') {
-      const updatedParts = parts.map(part => {
-        if (part.id === id) {
-          const updatedPart = { ...part, [field]: newValue };
-          updatedPart.total = updatedPart.quantity * updatedPart.pricePerUnit;
-          return updatedPart;
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await axios.get(
+          `https://garage-management-system-cr4w.onrender.com/api/engineers/${garageId}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token,
+            }
+          }
+        );
+        
+        // Handle different response structures
+        const data = response.data;
+        if (!data) {
+          throw new Error('No data received from server');
         }
-        return part;
-      });
-      setParts(updatedParts);
-    } else if (type === 'service') {
-      const updatedServices = services.map(service => {
-        if (service.id === id) {
-          return { ...service, [field]: newValue };
-        }
-        return service;
-      });
-      setServices(updatedServices);
-    }
-    
-    setShowEditPriceDialog(false);
-  };
-
-  // Generate bill via API
-  const generateBill = async () => {
-    // First show payment modal
-    setShowPaymentModal(true);
-  };
-
-  const selectPaymentMethod = (method) => {
-    setPaymentMethod(method);
-    setShowPaymentModal(false);
-    setShowProcessModal(true);
-  };
-
-  const processPayment = async () => {
-    // Format the data for the API
-    const apiData = {
-      parts: parts.map(part => ({
-        name: part.name,
-        quantity: part.quantity,
-        pricePerUnit: part.pricePerUnit
-      })),
-      services: services.map(service => ({
-        name: service.name,
-        engineer: service.engineer,
-        laborCost: service.laborCost,
-        status: service.status
-      })),
-      discount: summary.discount,
-      gstPercentage: 18
+        
+        // Check if data is an array or needs to be extracted
+        const engineersData = Array.isArray(data) ? data : 
+                            data.engineers ? data.engineers : 
+                            data.data ? data.data : [];
+        
+        setEngineers(engineersData);
+      } catch (error) {
+        console.error('Error fetching engineers:', error);
+        setError(error.response?.data?.message || 
+               error.message || 
+               'Failed to load engineers. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    // Close process modal
-    setShowProcessModal(false);
+    fetchEngineers();
+  }, [token, engineerAddSuccess]); // Refetch when a new engineer is added
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validate form
+    if (!selectedEngineer) {
+      setError('Please select an engineer');
+      return;
+    }
+
+    if (!token) {
+      setError('Authentication token not found. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
 
     try {
-      const response = await fetch(
-        'https://garage-management-system-cr4w.onrender.com/api/billing/generate/680f20ab54c9b20411680d56',
+      // API call to assign engineer
+      const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ engineerId: selectedEngineer._id })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to assign engineer');
+      }
+
+      setSuccess(true);
+      setTimeout(() => navigate(`/Work-In-Progress/${id}`), 1500);
+    } catch (error) {
+      console.error('Assignment error:', error);
+      setError(error.message || 'Failed to assign engineer. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Add Part Dialog open/close
+  const handleOpenAddPartDialog = () => {
+    setOpenAddPartDialog(true);
+  };
+
+  const handleCloseAddPartDialog = () => {
+    setOpenAddPartDialog(false);
+    setPartAddError(null);
+    // Reset the form
+    setNewPart({
+      garageId: garageId,
+      carName: "",
+      model: "",
+      partNumber: "",
+      partName: "",
+      quantity: 1,
+      pricePerUnit: 0,
+      taxAmount: 0
+    });
+  };
+
+  // Handle Add Engineer Dialog open/close
+  const handleOpenAddEngineerDialog = () => {
+    setOpenAddEngineerDialog(true);
+  };
+
+  const handleCloseAddEngineerDialog = () => {
+    setOpenAddEngineerDialog(false);
+    setEngineerAddError(null);
+    // Reset the form
+    setNewEngineer({
+      name: "",
+      garageId: garageId,
+      email: "",
+      phone: "",
+      specialty: ""
+    });
+  };
+
+  // Handle new engineer form input changes
+  const handleEngineerInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewEngineer({
+      ...newEngineer,
+      [name]: value
+    });
+  };
+
+  // Handle add engineer form submission
+  const handleAddEngineer = async () => {
+    // Validate form
+    if (!newEngineer.name || !newEngineer.email || !newEngineer.phone) {
+      setEngineerAddError('Please fill all required fields');
+      return;
+    }
+
+    if (!token) {
+      setEngineerAddError('Authentication token not found. Please log in again.');
+      return;
+    }
+
+    setAddingEngineer(true);
+    setEngineerAddError(null);
+
+    try {
+      // Format phone number as a number if it's not already
+      const formattedEngineer = {
+        ...newEngineer,
+        phone: Number(newEngineer.phone)
+      };
+
+      const response = await axios.post(
+        'https://garage-management-system-cr4w.onrender.com/api/engineers/add',
+        formattedEngineer,
         {
-          method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': token,
-          },
-          body: JSON.stringify(apiData)
+            'Content-Type': 'application/json'
+          }
         }
       );
 
-      const data = await response.json();
-      
-      if (response.ok) {
-        setApiResponseMessage({
-          type: 'success',
-          message: 'Bill generated and payment processed successfully!'
-        });
-        // Show thank you message
-        setShowThankYou(true);
-      } else {
-        setApiResponseMessage({
-          type: 'error',
-          message: data.message || 'Failed to generate bill'
-        });
-      }
+      // Set success and close dialog
+      setEngineerAddSuccess(true);
+      setTimeout(() => {
+        setEngineerAddSuccess(false);
+        handleCloseAddEngineerDialog();
+        // Engineers will be refreshed automatically due to the useEffect dependency
+      }, 1500);
     } catch (error) {
-      setApiResponseMessage({
-        type: 'error',
-        message: 'Network error: ' + error.message
+      console.error('Add engineer error:', error);
+      setEngineerAddError(error.response?.data?.message || error.message || 'Failed to add engineer. Please try again.');
+    } finally {
+      setAddingEngineer(false);
+    }
+  };
+
+  // Handle new part form input changes
+  const handlePartInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Convert numeric values
+    if (name === 'quantity' || name === 'pricePerUnit' || name === 'taxAmount') {
+      setNewPart({
+        ...newPart,
+        [name]: Number(value)
+      });
+    } else {
+      setNewPart({
+        ...newPart,
+        [name]: value
       });
     }
-    
-    setShowApiResponse(true);
   };
 
-  const printBill = () => {
-    window.print();
-  };
-
-  // Status color mapping
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed':
-        return 'success';
-      case 'In Progress':
-        return 'warning';
-      default:
-        return 'error';
+  // Handle add part form submission
+  const handleAddPart = async () => {
+    // Validate form
+    if (!newPart.carName || !newPart.model || !newPart.partName) {
+      setPartAddError('Please fill all required fields');
+      return;
     }
-  };
 
-  // Section Title Component
-  const SectionTitle = ({ icon, title }) => (
-    <Box sx={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      mb: 2,
-      borderBottom: `2px solid ${theme.palette.primary.main}`,
-      pb: 1
-    }}>
-      {icon}
-      <Typography 
-        variant="h6" 
-        color="primary.dark" 
-        fontWeight="600" 
-        sx={{ ml: 1 }}
-      >
-        {title}
-      </Typography>
-    </Box>
-  );
+    if (!token) {
+      setPartAddError('Authentication token not found. Please log in again.');
+      return;
+    }
 
-  // Responsive Table Component
-  const ResponsiveTable = ({ headers, data, renderRow }) => {
-    if (isMobile) {
-      return (
-        <Stack spacing={2}>
-          {data.map((item, index) => (
-            <Card key={item.id} variant="outlined" sx={{ position: 'relative' }}>
-              <CardContent sx={{ pb: 1 }}>
-                {renderRow(item, index, true)}
-              </CardContent>
-            </Card>
-          ))}
-        </Stack>
+    setAddingPart(true);
+    setPartAddError(null);
+
+    try {
+      const response = await axios.post(
+        'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+        newPart,
+        {
+          headers: {
+            'Authorization': token,
+            'Content-Type': 'application/json'
+          }
+        }
       );
-    }
 
-    return (
-      <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
-        <Table size={isTablet ? "small" : "medium"}>
-          <TableHead>
-            <TableRow sx={{ 
-              backgroundColor: theme.palette.primary.main,
-            }}>
-              {headers.map((header, index) => (
-                <TableCell key={index} sx={{ color: 'white', fontWeight: 'bold' }}>
-                  {header}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.map((item, index) => (
-              <TableRow key={item.id} hover sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}>
-                {renderRow(item, index, false)}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
+      // Set success and close dialog
+      setPartAddSuccess(true);
+      setTimeout(() => {
+        setPartAddSuccess(false);
+        handleCloseAddPartDialog();
+        // Refresh inventory parts
+        fetchInventoryParts();
+      }, 1500);
+    } catch (error) {
+      console.error('Add part error:', error);
+      setPartAddError(error.response?.data?.message || error.message || 'Failed to add part. Please try again.');
+    } finally {
+      setAddingPart(false);
+    }
   };
 
-  // Navigation Sidebar (for desktop)
-  const Sidebar = () => (
-    <Box 
-      sx={{ 
-        display: { xs: 'none', md: 'flex' },
-        flexDirection: 'column',
-        width: 80,
-        backgroundColor: theme.palette.primary.dark,
-        color: 'white',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        bottom: 0,
-        alignItems: 'center',
-        pt: 4
-      }}
-    >
-      <Avatar sx={{ 
-        bgcolor: 'white', 
-        color: theme.palette.primary.dark,
-        width: 50,
-        height: 50,
-        mb: 4
-      }}>
-        <SpeedIcon />
-      </Avatar>
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-        <IconButton sx={{ color: 'white' }}>
-          <HomeIcon />
-        </IconButton>
-        <IconButton sx={{ color: 'white' }}>
-          <CarIcon />
-        </IconButton>
-        <IconButton sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.2)' }}>
-          <ReceiptIcon />
-        </IconButton>
-        <IconButton sx={{ color: 'white' }}>
-          <SettingsIcon />
-        </IconButton>
-        <IconButton sx={{ color: 'white' }}>
-          <PersonIcon />
-        </IconButton>
-      </Box>
-    </Box>
-  );
+  // Fetch inventory parts separately (to refresh after adding a new part)
+  const fetchInventoryParts = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await axios.get(
+        `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+        {
+          headers: {
+            'Authorization': token,
+          }
+        }
+      );
+      // Handle the response data
+      const data = Array.isArray(response.data) ? response.data : response.data.data || [];
+      setInventoryParts(data);
+    } catch (err) {
+      console.error('Error refreshing inventory:', err);
+    }
+  };
+
+  const handleCloseAlert = () => {
+    setError(null);
+    setSuccess(false);
+  };
 
   return (
-    <>
-      <Sidebar />
-      <Container 
-        maxWidth="xl" 
-        sx={{ 
-          py: { xs: 2, md: 4 }, 
-          px: { xs: 2, md: 4 },
-          ml: { md: '80px' },
-          width: { md: 'calc(100% - 80px)' }
-        }}
-      >
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            mb: 4, 
-            p: { xs: 2, md: 3 }, 
-            borderRadius: 3,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            overflow: 'hidden',
-            border: `1px solid ${theme.palette.grey[200]}`
-          }}
-        >
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: isMobile ? 'column' : 'row',
-            justifyContent: 'space-between', 
-            alignItems: isMobile ? 'flex-start' : 'center', 
-            mb: 3 
-          }}>
-            <Typography 
-              variant={isMobile ? "h5" : "h4"} 
-              color="primary.dark" 
-              fontWeight="bold"
-              sx={{ mb: isMobile ? 2 : 0 }}
-            >
-              <ReceiptIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Billing Dashboard
-            </Typography>
-            <Button 
-              variant="contained" 
-              color="primary"
-              startIcon={<ReceiptIcon />}
-              onClick={generateBill}
-              disabled={showThankYou}
-              size={isMobile ? "medium" : "large"}
+    <Box sx={{ 
+      flexGrow: 1,
+      mb: 4,
+      ml: {xs: 0, sm: 35},
+      overflow: 'auto',
+      pt: 3
+    }}>
+      <CssBaseline />
+      <Container maxWidth="md">
+        {/* Success/Error Alerts */}
+        <Snackbar open={!!error} autoHideDuration={6000} onClose={handleCloseAlert}>
+          <Alert onClose={handleCloseAlert} severity="error" sx={{ width: '100%' }}>
+            {error}
+          </Alert>
+        </Snackbar>
+        
+        <Snackbar open={success} autoHideDuration={3000} onClose={handleCloseAlert}>
+          <Alert onClose={handleCloseAlert} severity="success" sx={{ width: '100%' }}>
+            Engineer assigned successfully!
+          </Alert>
+        </Snackbar>
+
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton 
+              onClick={() => navigate('/jobs')} 
               sx={{ 
-                borderRadius: 2, 
-                px: 3, 
-                py: isMobile ? 1 : 1.5,
-                boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                width: isMobile ? '100%' : 'auto'
+                mr: 2, 
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                }
               }}
             >
-              Generate Bill
-            </Button>
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant="h5" component="h1" fontWeight={600}>
+              Assign Engineer
+            </Typography>
           </Box>
-
-          {/* Car & Customer Details */}
-          {!showThankYou && (
-            <>
-              <Card sx={{ 
-                mb: 4, 
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                border: `1px solid ${theme.palette.grey[200]}`}`
-              }}>
-                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                  <SectionTitle 
-                    icon={<CarIcon color="primary" />} 
-                    title="Car & Customer Details" 
-                  />
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="carNumber"
-                        label="Car Number"
-                        variant="outlined"
+          
+          {/* Add Engineer Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={handleOpenAddEngineerDialog}
+            sx={{ 
+              borderRadius: 2,
+              boxShadow: theme.shadows[2],
+              '&:hover': {
+                boxShadow: theme.shadows[4],
+              }
+            }}
+          >
+            Add Engineer
+          </Button>
+        </Box>
+        
+        <Card sx={{ 
+          mb: 4, 
+          overflow: 'visible', 
+          borderRadius: 2,
+          boxShadow: theme.shadows[3]
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box component="form" onSubmit={handleSubmit}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  mb: 4,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 2,
+                  bgcolor: theme.palette.background.paper,
+                }}
+              >
+                <Grid container spacing={3}>
+                  {/* Engineer Selection */}
+                  <Grid item xs={12}>
+                    <Typography 
+                      variant="subtitle1" 
+                      fontWeight={600}
+                      sx={{ 
+                        mb: 1,
+                        color: theme.palette.text.primary
+                      }}
+                    >
+                      Select Engineer
+                    </Typography>
+                    {isLoading ? (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                        <CircularProgress />
+                        <Typography sx={{ ml: 2 }}>Loading engineers...</Typography>
+                      </Box>
+                    ) : error ? (
+                      <Alert severity="error">
+                        {error}
+                        <Button onClick={() => window.location.reload()} sx={{ ml: 2 }} size="small">
+                          Retry
+                        </Button>
+                      </Alert>
+                    ) : (
+                      <Autocomplete
                         fullWidth
-                        margin="dense"
-                        value={carDetails.carNumber}
-                        onChange={handleInputChange}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <CarIcon color="primary" fontSize="small" />
-                            </InputAdornment>
-                          ),
+                        options={engineers}
+                        getOptionLabel={(option) => option.name || 'Unknown'}
+                        value={selectedEngineer}
+                        onChange={(event, newValue) => {
+                          setSelectedEngineer(newValue);
                         }}
+                        renderOption={(props, option) => (
+                          <li {...props}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                              <Typography variant="body1" fontWeight={500}>
+                                {option.name}
+                              </Typography>
+                              {option.specialty && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {option.specialty}
+                                </Typography>
+                              )}
+                            </Box>
+                          </li>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Search for engineer"
+                            variant="outlined"
+                            required
+                            error={!selectedEngineer && !!error}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <InputAdornment position="start">
+                                    <PersonIcon color="action" />
+                                  </InputAdornment>
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
                       />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="company"
-                        label="Company"
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.company}
-                        onChange={handleInputChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="model"
-                        label="Model"
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.model}
-                        onChange={handleInputChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="customerName"
-                        label="Customer Name"
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.customerName}
-                        onChange={handleInputChange}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <PersonIcon color="primary" fontSize="small" />
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="contact"
-                        label="Contact"
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.contact}
-                        onChange={handleInputChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="email"
-                        label="Email"
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.email}
-                        onChange={handleInputChange}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="billingDate"
-                        label="Date of Billing"
-                        variant="outlined"
-                        type="date"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.billingDate}
-                        onChange={handleInputChange}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <TextField
-                        id="invoiceNo"
-                        label="Invoice No."
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                        value={carDetails.invoiceNo}
-                        onChange={handleInputChange}
-                      />
-                    </Grid>
+                    )}
                   </Grid>
-                </CardContent>
-              </Card>
+                  
+                  {/* Task Assignment */}
+                  <Grid item xs={12}>
+                    <Typography 
+                      variant="subtitle1" 
+                      fontWeight={600}
+                      sx={{ 
+                        mb: 1,
+                        color: theme.palette.text.primary
+                      }}
+                    >
+                      Assign Task
+                    </Typography>
+                    <Autocomplete
+                      fullWidth
+                      options={tasks}
+                      getOptionLabel={(option) => option.name}
+                      value={selectedTask}
+                      onChange={(event, newValue) => {
+                        setSelectedTask(newValue);
+                      }}
+                      renderOption={(props, option) => (
+                        <li {...props}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {option.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Est. Duration: {option.duration}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Select or type a task"
+                          variant="outlined"
+                          required
+                          error={!selectedTask && !!error}
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: (
+                              <>
+                                <InputAdornment position="start">
+                                  <AssignmentIcon color="action" />
+                                </InputAdornment>
+                                {params.InputProps.startAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+                  
+                  {/* Parts Selection */}
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        fontWeight={600}
+                        sx={{ color: theme.palette.text.primary }}
+                      >
+                        Select Parts
+                      </Typography>
+                      <Tooltip title="Add New Part">
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={handleOpenAddPartDialog}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          Add Part
+                        </Button>
+                      </Tooltip>
+                    </Box>
+                    <Autocomplete
+                      fullWidth
+                      multiple
+                      options={inventoryParts}
+                      getOptionLabel={(option) => `${option.partName} (${option.carName} - ${option.model})`}
+                      value={selectedParts}
+                      onChange={(event, newValue) => {
+                        setSelectedParts(newValue);
+                      }}
+                      renderOption={(props, option) => (
+                        <li {...props}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {option.partName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {option.carName} - {option.model}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Qty: {option.quantity} | ₹{option.pricePerUnit}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Select parts needed for this task"
+                          variant="outlined"
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: (
+                              <>
+                                <InputAdornment position="start">
+                                  <InventoryIcon color="action" />
+                                </InputAdornment>
+                                {params.InputProps.startAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+              
+              {/* Submit Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SendIcon />}
+                  disabled={isSubmitting || isLoading || !!error}
+                  sx={{ 
+                    px: 4, 
+                    py: 1.5, 
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    textTransform: 'uppercase',
+                    borderRadius: 2,
+                    boxShadow: theme.shadows[2],
+                    '&:hover': {
+                      boxShadow: theme.shadows[4],
+                    }
+                  }}
+                >
+                  {isSubmitting ? 'Assigning...' : 'Assign'}
+                </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
 
-              {/* Parts Used */}
-              <Card sx={{ 
-                mb: 4, 
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                border: `1px solid ${theme.palette.grey[200]}`
-              }}>
-                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                  <SectionTitle 
-                    icon={<SettingsIcon color="primary" />} 
-                    title="Parts Used" 
-                  />
-                  
-                  <ResponsiveTable
-                    headers={['Sr.No', 'Part Name', 'Qty', 'Price/Piece', 'Total Price', 'Action']}
-                    data={parts}
-                    renderRow={(part, index, isMobileView) => {
-                      if (isMobileView) {
-                        return (
-                          <>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                              <Typography variant="subtitle1" fontWeight="bold">{part.name}</Typography>
-                              <IconButton 
-                                size="small" 
-                                color="error"
-                                onClick={() => removePart(part.id)}
-                                sx={{ position: 'absolute', top: 8, right: 8 }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                            <Divider sx={{ my: 1 }} />
-                            <Grid container spacing={1}>
-                              <Grid item xs={6}>
-                                <Typography variant="body2" color="text.secondary">Quantity</Typography>
-                                <Typography variant="body1">{part.quantity}</Typography>
-                              </Grid>
-                              <Grid item xs={6}>
-                                <Typography variant="body2" color="text.secondary">Price/Unit</Typography>
-                                <Typography variant="body1">
-                                  {formatCurrency(part.pricePerUnit).replace('₹', '')}
-                                  <IconButton 
-                                    size="small" 
-                                    color="primary"
-                                    onClick={() => openEditPrice(part.id, 'part', 'pricePerUnit', part.pricePerUnit)}
-                                  >
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
-                                </Typography>
-                              </Grid>
-                              <Grid item xs={12}>
-                                <Typography variant="body2" color="text.secondary">Total</Typography>
-                                <Typography variant="body1" fontWeight="bold" color="primary.dark">
-                                  {formatCurrency(part.total)}
-                                </Typography>
-                              </Grid>
-                            </Grid>
-                          </>
-                        );
-                      }
-                      
-                      return (
-                        <>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell>{part.name}</TableCell>
-                          <TableCell>{part.quantity}</TableCell>
-                          <TableCell>
-                            {formatCurrency(part.pricePerUnit).replace('₹', '')}
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => openEditPrice(part.id, 'part', 'pricePerUnit', part.pricePerUnit)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                          <TableCell>{formatCurrency(part.total)}</TableCell>
-                          <TableCell>
-                            <IconButton 
-                              size="small" 
-                              color="error"
-                              onClick={() => removePart(part.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        </>
-                      );
-                    }}
-                  />
-                  
-                  <Button 
-                    variant="contained" 
-                    color="secondary"
-                    startIcon={<AddIcon />}
-                    onClick={() => setShowNewPartDialog(true)}
-                    sx={{ 
-                      borderRadius: 2, 
-                      width: isMobile ? '100%' : 'auto'
-                    }}
-                  >
-                    Add Part
-                  </Button>
-                </CardContent>
-              </Card>
+      {/* Add Part Dialog */}
+      <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ 
+          backgroundColor: theme.palette.primary.main, 
+          color: theme.palette.primary.contrastText,
+          display: 'flex',
+          alignItems: 'center',
+          py: 2
+        }}>
+          <InventoryIcon sx={{ mr: 1 }} />
+          Add New Part
+        </DialogTitle>
+        <DialogContent dividers>
+          {partAddSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Part added successfully!
+            </Alert>
+          )}
+          {partAddError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {partAddError}
+            </Alert>
+          )}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Car Name"
+                name="carName"
+                value={newPart.carName}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., Honda Civic"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Model"
+                name="model"
+                value={newPart.model}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., VX 2020"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Part Number"
+                name="partNumber"
+                value={newPart.partNumber}
+                onChange={handlePartInputChange}
+                variant="outlined"
+                placeholder="E.g., HON12345"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Part Name"
+                name="partName"
+                value={newPart.partName}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                placeholder="E.g., Brake Pad"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Quantity"
+                name="quantity"
+                type="number"
+                value={newPart.quantity}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                InputProps={{ inputProps: { min: 1 } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Price Per Unit (₹)"
+                name="pricePerUnit"
+                type="number"
+                value={newPart.pricePerUnit}
+                onChange={handlePartInputChange}
+                required
+                variant="outlined"
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Tax Amount (₹)"
+                name="taxAmount"
+                type="number"
+                value={newPart.taxAmount}
+                onChange={handlePartInputChange}
+                variant="outlined"
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={handleCloseAddPartDialog} 
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddPart} 
+            variant="contained" 
+            color="primary"
+            disabled={addingPart}
+            startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
+            sx={{ borderRadius: 2 }}
+          >
+            {addingPart ? 'Adding...' : 'Add Part'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-              {/* Service Details */}
-              <Card sx={{ 
-                mb: 4, 
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                border: `1px solid ${theme.palette.grey[200]}`
-              }}>
-                <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-                  <SectionTitle 
-                    icon={<SettingsIcon color="primary" />} 
-                    title="Service Details" 
-                  />
-                  
-                  <ResponsiveTable
-                    headers={['Service', 'Engineer', 'Progress', 'Status', 'Labour Cost', 'Action']}
-                    data={services}
-                    renderRow={(service, index, isMobileView) => {
-                      if (isMobileView) {
-                        return (
-                          <>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                              <Typography variant="subtitle1" fontWeight="bold">{service.name}</Typography>
-                              <Chip 
-                                label={service.status} 
-                                color={getStatusColor(service.status)}
-                                size="small"
-                                sx={{ position: 'absolute', top: 12, right: 8 }}
-                              />
-                            </Box>
-                            <Divider sx={{ my: 1 }} />
-                            <Grid container spacing={1}>
-                              <Grid item xs={12}>
-                                <Typography variant="body2" color="text.secondary">Engineer</Typography>
-                                <Typography variant="body1">{service.engineer}</Typography>
-                              </Grid>
-                              <Grid item xs={12} sx={{ mt: 1 }}>
-                                <Typography variant="body2" color="text.secondary">Progress</Typography>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                                  <LinearProgress 
-                                    variant="determinate" 
-                                    value={service.progress} 
-                                    sx={{ 
-                                      height: 8, 
-                                      borderRadius: 4,
-                                      flexGrow: 1,
-                                      mr: 1
-                                    }}
-                                  />
-                                  <Typography variant="body2">{service.progress}%</Typography>
-                                </Box>
-                              </Grid>
-                              <Grid item xs={12} sx={{ mt: 1 }}>
-                                <Typography variant="body2" color="text.secondary">Labour Cost</Typography>
-                                <Typography variant="body1">
-                                  {formatCurrency(service.laborCost)}
-                                  <IconButton 
-                                    size="small" 
-                                    color="primary"
-                                    onClick={() => openEditPrice(service.id, 'service', 'laborCost', service.laborCost)}
-                                  >
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
-                                </Typography>
-                              </Grid>
-                            </Grid>
-                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                              <IconButton 
-                                size="small" 
-                                color="error"
-                                onClick={() => removeService(service.id)}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </>
-                        );
-                      }
-                      
-                      return (
-                        <>
-                          <TableCell>{service.name}</TableCell>
-                          <TableCell>{service.engineer}</TableCell>
-                          <TableCell sx={{ width: '15%' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={service.progress} 
-                                sx={{ 
-                                  height: 8, 
-                                  borderRadius: 4,
-                                  flexGrow: 1,
-                                  mr: 1
-                                }}
-                              />
-                              <Typography variant="body2">{service.progress}%</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={service.status} 
-                              color={getStatusColor(service.status)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {formatCurrency(service.laborCost).replace('₹', '')}
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => openEditPrice(service.id, 'service', 'laborCost', service.laborCost)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                          <TableCell>
-                            <IconButton 
-                              size="small" 
-                              color="error"
-                              onClick={() => removeService(service.id)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        </>
-                      );
-                    }}
-                  />
-                  
-                  <Button 
-                    variant="contained" 
-                    color="secondary"
-                    startIcon={<AddIcon />}
-                    onClick={() => setShowNewServiceDialog(true)}
-                    sx={{ 
-                      borderRadius: 2, 
-                      width: isMobile ? '100%' : 'auto'
-                    }}
-                  >
-                    Add Service
-                  </Button>
-                </CardContent>
-              </Card>
+      {/* Add Engineer Dialog */}
+      <Dialog open={openAddEngineerDialog} onClose={handleCloseAddEngineerDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ 
+          backgroundColor: theme.palette.primary.main, 
+          color: theme.palette.primary.contrastText,
+          display: 'flex',
+          alignItems: 'center',
+          py: 2
+        }}>
+          <EngineeringIcon sx={{ mr: 1 }} />
+          Add New Engineer
+        </DialogTitle>
+        <DialogContent dividers>
+          {engineerAddSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              Engineer added successfully!
+            </Alert>
+          )}
+          {engineerAddError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {engineerAddError}
+            </Alert>
+          )}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Engineer Name"
+                name="name"
+                value={newEngineer.name}
+                onChange={handleEngineerInputChange}
+                required
+                variant="outlined"
+                placeholder="Enter full name"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Email Address"
+                name="email"
+                type="email"
+                value={newEngineer.email}
+                onChange={handleEngineerInputChange}
+                required
+                variant="outlined"
+                placeholder="example@domain.com"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Phone Number"
+                name="phone"
+                type="tel"
+                value={newEngineer.phone}
+                onChange={handleEngineerInputChange}
+                required
+                variant="outlined"
+                placeholder="Enter 10-digit number"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PhoneIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Specialty (Optional)"
+                name="specialty"
+                value={newEngineer.specialty}
+                onChange={handleEngineerInputChange}
+                variant="outlined"
+                placeholder="E.g., Engine Specialist, Transmission Expert"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={handleCloseAddEngineerDialog} 
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddEngineer} 
+            variant="contained" 
+            color="primary"
+            disabled={addingEngineer}
+            startIcon={addingEngineer ? <CircularProgress size={20} /> : <AddIcon />}
+            sx={{ borderRadius: 2 }}
+          >
+            {addingEngineer ? 'Adding...' : 'Add Engineer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
 
-              {/* Bill Summary */}
-              <Card sx={{ 
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                border: `1px solid ${theme.palette.grey[200]
+export default AssignEngineer;

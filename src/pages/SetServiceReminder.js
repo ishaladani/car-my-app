@@ -17,8 +17,7 @@ import {
   Paper,
   useTheme,
   Alert,
-  CircularProgress,
-  Fade
+  CircularProgress
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -30,18 +29,16 @@ import { useNavigate } from 'react-router-dom';
 
 // Sample customer data for autocomplete
 const customers = [
-  { id: 1, name: 'John Smith', vehicle: 'Toyota Camry', carNumber: '0001' },
-  { id: 2, name: 'Sarah Johnson', vehicle: 'Honda Accord', carNumber: '0002' },
-  { id: 3, name: 'Michael Brown', vehicle: 'Ford F-150', carNumber: '0003' },
-  { id: 4, name: 'Jennifer Lee', vehicle: 'Tesla Model 3', carNumber: '0004' },
-  { id: 5, name: 'Robert Wilson', vehicle: 'Chevrolet Silverado', carNumber: '0007' },
+  { id: 1, name: 'John Smith', vehicle: 'Toyota Camry', carNumber: '1234567890' },
+  { id: 2, name: 'Sarah Johnson', vehicle: 'Honda Accord', carNumber: '1234567891' },
+  { id: 3, name: 'Michael Brown', vehicle: 'Ford F-150', carNumber: '1234567892' },
+  { id: 4, name: 'Jennifer Lee', vehicle: 'Tesla Model 3', carNumber: '1234567893' },
+  { id: 5, name: 'Robert Wilson', vehicle: 'Chevrolet Silverado', carNumber: '1234567894' },
 ];
 
 const SetServiceReminder = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-   const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
-  
   
   // State for form fields
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -84,9 +81,8 @@ const SetServiceReminder = () => {
     setShowResults(false);
   };
 
-  // Format date for API
+  // Format date for API (from mm/dd/yyyy to yyyy-mm-dd)
   const formatDateForAPI = (dateString) => {
-    // Assuming input is mm/dd/yyyy format
     if (!dateString) return '';
     
     const parts = dateString.split('/');
@@ -111,27 +107,28 @@ const SetServiceReminder = () => {
     }
     
     setLoading(true);
-    setErrorMessage(''); // Clear any previous error
-    setSuccessMessage(''); // Clear any previous success
+    setErrorMessage('');
+    setSuccessMessage('');
     
     try {
-      // Format the date for API
-      const formattedDate = formatDateForAPI(reminderDate);
+      // Get token from localStorage
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
       
-      // Prepare the message with the actual date included
-      const formattedMessage = customerMessage.replace("'reminderDate'", reminderDate);
-      
+      // Prepare the request data
       const reminderData = {
         carNumber: selectedCustomer.carNumber,
-        reminderDate: formattedDate,
-        message: formattedMessage
+        reminderDate: formatDateForAPI(reminderDate),
+        message: customerMessage
       };
       
       // API call
       const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/reminders/send', {
         method: 'POST',
         headers: {
-          'Authorization':token,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(reminderData)
@@ -140,7 +137,6 @@ const SetServiceReminder = () => {
       const result = await response.json();
       
       if (!response.ok) {
-        // Use the API's error message if available, otherwise fallback to generic message
         throw new Error(result.message || 'Failed to send reminder');
       }
       
@@ -158,7 +154,7 @@ const SetServiceReminder = () => {
       
     } catch (error) {
       console.error('Error sending reminder:', error);
-      setErrorMessage(error.message); // This will show the API's message like "Reminder can only be sent after 45 days of service. (45 days left)"
+      setErrorMessage(error.message);
     } finally {
       setLoading(false);
     }
@@ -371,11 +367,10 @@ const SetServiceReminder = () => {
                       fullWidth
                       multiline
                       rows={4}
-                      placeholder="Type your message here... Use 'reminderDate' to include the date in your message."
+                      placeholder="Type your message here..."
                       variant="outlined"
                       value={customerMessage}
                       onChange={(e) => setCustomerMessage(e.target.value)}
-                      helperText="Use 'reminderDate' in single quotes to include the reminder date in your message"
                     />
                   </Box>
                 </Box>

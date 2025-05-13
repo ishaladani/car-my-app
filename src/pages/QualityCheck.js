@@ -127,39 +127,34 @@ const QualityCheck = () => {
   };
 
   // Handle form submission and navigation to billing page
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsSubmitting(true);
+  
+  try {
+    if (finalInspection) {
+      await axios.put(
+        `https://garage-management-system-cr4w.onrender.com/api/jobcards/jobcard/${id}/qualitycheck`,
+        { notes: finalInspection },
+        { headers: { 'Authorization': token, 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (error) {
+    console.error('Error saving quality check:', error);
     
-    try {
-      // First, save the quality check notes if needed
-      if (finalInspection) {
-        await axios.put(
-          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}/quality-check`,
-          { notes: finalInspection },
-          {
-            headers: {
-              'Authorization': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-      }
-      
-      // Navigate to billing page with the job card ID
-      navigate(`/billing/${id}`);
-      
-    } catch (error) {
-      console.error('Error saving quality check:', error);
+    // Show snackbar only if it's NOT the "already completed" error
+    if (error.response?.data?.message !== 'Quality Check already completed') {
       setSnackbar({
         open: true,
         message: `Error: ${error.response?.data?.message || 'Failed to save quality check'}`,
-        severity: 'error'
+        severity: 'error',
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } finally {
+    setIsSubmitting(false);
+    navigate(`/billing/${id}`); // Navigate in finally to ensure it always happens
+  }
+};
 
   return (
     <Box sx={{
