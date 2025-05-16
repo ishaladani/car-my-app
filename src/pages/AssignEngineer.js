@@ -838,7 +838,7 @@ const AssignEngineer = () => {
   const [openAddEngineerDialog, setOpenAddEngineerDialog] = useState(false);
   const [newEngineer, setNewEngineer] = useState({
     name: "",
-    garageId: id,
+    garageId: garageId,
     email: "",
     phone: "",
     specialty: "" // optional field

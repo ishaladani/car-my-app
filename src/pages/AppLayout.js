@@ -52,17 +52,17 @@
 //   // Notification count
 //   const [notificationCount] = useState(3);
 //     const navigate = useNavigate();
-  
+
 //   const handleLogout = () => {
 //     // Clear all items from localStorage
 //     localStorage.clear();
-    
+
 //     // Alternatively, if you only want to clear specific items:
 //     // localStorage.removeItem('authToken');
 //     // localStorage.removeItem('garageId');
-    
+
 //     console.log('User logged out, localStorage cleared');
-    
+
 //     // Navigate to login page
 //     navigate('/login');
 //   };
@@ -76,7 +76,6 @@
 //     { text: 'Service Reminders', icon: <NotificationsIcon />, path: '/reminders' },
 //     // { text: 'Engineers', icon: <BuildIcon />, path: '/Assign-Engineer' },
 //   ];
-
 
 //   // Handlers
 //   const handleDrawerToggle = () => {
@@ -261,7 +260,6 @@
 //         <Outlet />
 //       </Box>
 
-
 //     </Box>
 //   );
 // };
@@ -313,40 +311,40 @@ const AppLayout = () => {
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const location = useLocation();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  // CHANGE THIS LINE
+  const isMobile = useMediaQuery("(max-width:599px)");
   const [profileData, setProfileData] = useState({
     name: "",
     image: "",
   });
 
   useEffect(() => {
-  const loadProfile = () => {
-    const savedName = localStorage.getItem("garageName");
-    const savedImage = localStorage.getItem("garageLogo");
-    setProfileData({
-      name: savedName || "Garage",
-      image: savedImage || "",
-    });
-  };
+    const loadProfile = () => {
+      const savedName = localStorage.getItem("garageName");
+      const savedImage = localStorage.getItem("garageLogo");
+      setProfileData({
+        name: savedName || "Garage",
+        image: savedImage || "",
+      });
+    };
 
-  // Load initially
-  loadProfile();
+    // Load initially
+    loadProfile();
 
-  // Also listen for storage changes
-  const handleStorageChange = () => {
-    if (localStorage.getItem("profileUpdated") === "true") {
-      loadProfile();
-      localStorage.removeItem("profileUpdated"); // reset flag
-    }
-  };
+    // Also listen for storage changes
+    const handleStorageChange = () => {
+      if (localStorage.getItem("profileUpdated") === "true") {
+        loadProfile();
+        localStorage.removeItem("profileUpdated"); // reset flag
+      }
+    };
 
-  window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
 
-  return () => {
-    window.removeEventListener("storage", handleStorageChange);
-  };
-}, []);
-
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
 
   // State for drawer and menus
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -382,7 +380,9 @@ const AppLayout = () => {
       icon: <NotificationsIcon />,
       path: "/reminders",
     },
-    { text: 'Insurance', icon: <BuildIcon />, path: '/insurance' },
+    { text: "Insurance", icon: <BuildIcon />, path: "/insurance" },
+    { text: "User List", icon: <BuildIcon />, path: "/UserManagemt" },
+    { text: "Menu Management", icon: <BuildIcon />, path: "/MenuManagement" },
   ];
 
   // Handlers
@@ -513,8 +513,9 @@ const AppLayout = () => {
         position="fixed"
         color="default"
         sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
+          width: isMobile ? "100%" : `calc(100% - ${drawerWidth}px)`,
+          ml: isMobile ? 0 : `${drawerWidth}px`,
+
           boxShadow: 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid",
@@ -523,14 +524,16 @@ const AppLayout = () => {
       >
         <Toolbar>
           {/* Mobile menu toggle */}
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: "none" } }}
-          >
-            <MenuIcon />
-          </IconButton>
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
 
           {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
@@ -556,7 +559,7 @@ const AppLayout = () => {
         onClose={handleDrawerToggle}
         ModalProps={{ keepMounted: true }}
         sx={{
-          display: { xs: "block", md: "none" },
+          display: isMobile ? "none" : "block",
           "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" },
         }}
       >
@@ -567,7 +570,7 @@ const AppLayout = () => {
       <Drawer
         variant="permanent"
         sx={{
-          display: { xs: "none", md: "block" },
+          display: isMobile ? "none" : "block",
           "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" },
         }}
         open
@@ -580,8 +583,11 @@ const AppLayout = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          px: { xs: 2, sm: 3 },
+          py: { xs: 2, sm: 3 },
+
+          width: isMobile ? "100%" : `calc(100% - ${drawerWidth}px)`,
+
           minHeight: "100vh",
           backgroundColor: "background.default",
           marginTop: "64px", // Height of AppBar

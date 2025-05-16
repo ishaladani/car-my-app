@@ -158,26 +158,26 @@ const UserManagement = () => {
                 flex: 1,
                 hide: isMobile && isTablet
             },
-            {
-                field: 'enabled',
-                headerName: 'Status',
-                width: 120,
-                flex: 0.8,
-                renderCell: (params) => (
-                    <Box
-                        sx={{
-                            backgroundColor: params.value ? green[100] : red[100],
-                            color: params.value ? green[800] : red[800],
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 'bold',
-                            fontSize: isMobile ? '0.75rem' : '0.875rem'
-                        }}
-                    >
-                        {params.value ? 'Active' : 'Inactive'}
-                    </Box>
-                ),
-            },
+            // {
+            //     field: 'enabled',
+            //     headerName: 'Status',
+            //     width: 120,
+            //     flex: 0.8,
+            //     renderCell: (params) => (
+            //         <Box
+            //             sx={{
+            //                 backgroundColor: params.value ? green[100] : red[100],
+            //                 color: params.value ? green[800] : red[800],
+            //                 padding: '4px 8px',
+            //                 borderRadius: '4px',
+            //                 fontWeight: 'bold',
+            //                 fontSize: isMobile ? '0.75rem' : '0.875rem'
+            //             }}
+            //         >
+            //             {params.value ? 'Active' : 'Inactive'}
+            //         </Box>
+            //     ),
+            // },
             {
                 field: 'actions',
                 headerName: 'Actions',
@@ -238,41 +238,7 @@ const UserManagement = () => {
                                 >
                                     <DeleteIcon />
                                 </IconButton>
-                                {params.row.enabled ? (
-                                    <IconButton
-                                        color="error"
-                                        onClick={() => handleDeactivate(params.row.id)}
-                                        size="small"
-                                        sx={{ mr: 0.5 }}
-                                    >
-                                        <CloseIcon />
-                                    </IconButton>
-                                ) : (
-                                    <IconButton
-                                        color="success"
-                                        onClick={() => handleActivate(params.row.id)}
-                                        size="small"
-                                        sx={{ mr: 0.5 }}
-                                    >
-                                        <CheckIcon />
-                                    </IconButton>
-                                )}
-                                <IconButton
-                                    color="info"
-                                    onClick={() => handleAssignSiteOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <BusinessIcon />
-                                </IconButton>
-                                <IconButton
-                                    color="info"
-                                    onClick={() => handleAssignDeviceOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <DevicesIcon />
-                                </IconButton>
+                               
                                 <IconButton
                                     color="warning"
                                     onClick={() => handlePasswordOpen(params.row)}
@@ -595,7 +561,7 @@ const UserManagement = () => {
 
     return (
         <>
-            <Box
+            {/* <Box
                 component="main"
                 sx={{
                     flexGrow: 1,
@@ -605,7 +571,14 @@ const UserManagement = () => {
                     width: '100%', // Ensure full width
                     maxWidth: '100%' // Prevent overflow
                 }}
-            >
+            > */}
+             <Box sx={{ 
+      flexGrow: 1,
+      mb: 4,
+      ml: {xs: 0, sm: 35},
+      overflow: 'auto',
+      pt: 3
+    }}>
                 <Card elevation={3} sx={{ borderRadius: 1 }}>
                     <CardContent sx={{ p: { xs: 1, sm: 2 } }}> {/* Responsive padding */}
                         <Box
@@ -801,7 +774,7 @@ const UserManagement = () => {
                                             size={isMobile ? "small" : "medium"}
                                         />
                                     </Grid>
-                                    <Grid item xs={12}>
+                                    {/* <Grid item xs={12}>
                                         <FormControlLabel
                                             control={
                                                 <Checkbox
@@ -815,7 +788,7 @@ const UserManagement = () => {
                                             }
                                             label="Active User"
                                         />
-                                    </Grid>
+                                    </Grid> */}
                                 </Grid>
                             </DialogContent>
                             <DialogActions sx={{ p: 2, gap: 1 }}>

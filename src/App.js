@@ -16,6 +16,8 @@ import LoginPage from './Login/LoginPage'
 import SignUpPage from './Login/SignUpPage';
 import ProtectedRoute from './Login/ProtectedRoute';
 import BillingPage from './pages/BillingPage';
+import UserManagement from './pages/UserList';
+import MenuManagement from './pages/MenuManagement';
 
 function App() {
   return (
@@ -37,6 +39,8 @@ function App() {
               <Route path="reminders" element={<SetServiceReminder />} />
               <Route path="insurance" element={<InsuranceManagement />} />
               <Route path="billing/:id" element={<BillingPage />} />
+              <Route path='UserManagemt' element={<UserManagement/>}/>
+              <Route path='MenuManagement' element={<MenuManagement/>}/>
               
      
             </Route>
