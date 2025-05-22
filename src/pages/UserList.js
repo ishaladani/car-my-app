@@ -23,7 +23,9 @@ import {
     useTheme,
     Container,
     alpha,
-    useMediaQuery
+    useMediaQuery,
+    Chip,
+    ListItemText
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -98,15 +100,31 @@ const UserManagement = () => {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+        const token = localStorage.getItem("authToken")
+        ? `Bearer ${localStorage.getItem("authToken")}`
+        : "";
 
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        contact: '',
-        username: '',
-        password: '',
-        enabled: true
-    });
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'manager', // default role
+    permissions: []
+});
+
+const availableRoles = [
+    { value: 'admin', label: 'Administrator' },
+    { value: 'manager', label: 'Manager' },
+    { value: 'staff', label: 'Staff' }
+];
+
+const availablePermissions = [
+    { value: 'billing:generate', label: 'Generate Billing' },
+    { value: 'billing:invoice', label: 'Create Invoice' },
+    { value: 'users:manage', label: 'Manage Users' },
+    { value: 'devices:manage', label: 'Manage Devices' },
+    // Add more permissions as needed
+];
 
     const [editFormData, setEditFormData] = useState({
         name: '',
@@ -158,26 +176,6 @@ const UserManagement = () => {
                 flex: 1,
                 hide: isMobile && isTablet
             },
-            // {
-            //     field: 'enabled',
-            //     headerName: 'Status',
-            //     width: 120,
-            //     flex: 0.8,
-            //     renderCell: (params) => (
-            //         <Box
-            //             sx={{
-            //                 backgroundColor: params.value ? green[100] : red[100],
-            //                 color: params.value ? green[800] : red[800],
-            //                 padding: '4px 8px',
-            //                 borderRadius: '4px',
-            //                 fontWeight: 'bold',
-            //                 fontSize: isMobile ? '0.75rem' : '0.875rem'
-            //             }}
-            //         >
-            //             {params.value ? 'Active' : 'Inactive'}
-            //         </Box>
-            //     ),
-            // },
             {
                 field: 'actions',
                 headerName: 'Actions',
@@ -346,14 +344,26 @@ const UserManagement = () => {
     }, []);
 
     const fetchUsers = async () => {
-        // Implement API call here
-        // For now, using mock data
-        setUsers([
-            { id: 1, username: 'johndoe', name: 'John Doe', email: 'john@example.com', contact: '1234567890', enabled: true },
-            { id: 2, username: 'janedoe', name: 'Jane Doe', email: 'jane@example.com', contact: '0987654321', enabled: false },
-            { id: 3, username: 'samsmith', name: 'Sam Smith', email: 'sam@example.com', contact: '5555555555', enabled: true },
-        ]);
-    };
+    try {
+        const response = await fetch('https://garage-management-backend-3vsh.onrender.com/api/superadmin/users', {
+            method: 'GET',
+            headers: {
+                'Authorization': token,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setUsers(data); // Assuming the API returns an array of user objects in the expected format
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        // You might want to set some error state here or show a notification
+    }
+};
 
     const fetchSites = async (userId) => {
         // Implement API call here
@@ -393,17 +403,18 @@ const UserManagement = () => {
         });
     };
 
-    const handleEditOpen = (user) => {
-        setSelectedUser(user);
-        setEditFormData({
-            name: user.name,
-            email: user.email,
-            contact: user.contact,
-            username: user.username,
-            enabled: user.enabled
-        });
-        setOpenEditDialog(true);
-    };
+   const handleEditOpen = (user) => {
+    setSelectedUser(user);
+    setEditFormData({
+        name: user.name,
+        email: user.email,
+        contact: user.contact,
+        username: user.username,
+        enabled: user.enabled,
+        permissions: user.permissions || [] // Make sure to include permissions from the user object
+    });
+    setOpenEditDialog(true);
+};
 
     const handleEditClose = () => {
         setOpenEditDialog(false);
@@ -491,20 +502,81 @@ const UserManagement = () => {
     };
 
     const handleSubmit = async () => {
-        // Implement submit logic here
-        console.log('Submitting form:', formData);
-        // Mock successful submission
+    try {
+        const response = await fetch('https://garage-management-backend-3vsh.onrender.com/api/superadmin/create-user', {
+            method: 'POST',
+            headers: {
+                'Authorization': token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+  "name": formData.name,
+  "email": formData.email,
+  "password": formData.password,
+  "role": formData.role,
+  "permissions": formData.permissions
+})
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create user');
+        }
+
+        const data = await response.json();
+        console.log('User created successfully:', data);
+        
+        // Refresh the users list
         fetchUsers();
         handleAddClose();
-    };
+        
+        // Optionally show success message
+        // setSuccessMessage('User created successfully!');
+        
+    } catch (error) {
+        console.error('Error creating user:', error);
+        // Optionally show error message to user
+        // setErrorMessage(error.message || 'Failed to create user');
+    }
+};
 
-    const handleUpdate = async () => {
-        // Implement update logic here
-        console.log('Updating user:', editFormData);
-        // Mock successful update
+const handleUpdate = async () => {
+    try {
+        if (!selectedUser?.id) {
+            throw new Error('No user selected');
+        }
+
+        const response = await fetch(`https://garage-management-backend-3vsh.onrender.com/api/superadmin/update-permissions/${selectedUser.id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                permissions: editFormData.permissions
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to update user permissions');
+        }
+
+        const data = await response.json();
+        console.log('User permissions updated successfully:', data);
+        
+        // Refresh the users list
         fetchUsers();
         handleEditClose();
-    };
+        
+        // Optionally show success message
+        // setSuccessMessage('User permissions updated successfully!');
+    } catch (error) {
+        console.error('Error updating user permissions:', error);
+        // Optionally show error message to user
+        // setErrorMessage(error.message || 'Failed to update user permissions');
+    }
+};
 
     const handlePasswordUpdate = async () => {
         // Implement password update logic here
@@ -654,258 +726,224 @@ const UserManagement = () => {
                         {renderMobileActionMenu()}
 
                         {/* Add User Dialog */}
-                        <Dialog
-                            open={openAddDialog}
-                            onClose={handleAddClose}
-                            maxWidth="sm"
-                            fullWidth
-                            fullScreen={isMobile}
-                        >
-                            <DialogTitle>New User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Name"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email"
-                                            name="email"
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <EmailIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Contact"
-                                            name="contact"
-                                            value={formData.contact}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PhoneIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            inputProps={{ maxLength: 10 }}
-                                            required
-                                            error={formData.contact.length > 0 && formData.contact.length !== 10}
-                                            helperText={
-                                                formData.contact.length > 0 && formData.contact.length !== 10
-                                                    ? 'Contact must be 10 digits'
-                                                    : ''
-                                            }
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Username"
-                                            name="username"
-                                            value={formData.username}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Password"
-                                            name="password"
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={formData.password}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <LockIcon />
-                                                    </InputAdornment>
-                                                ),
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            onClick={() => setShowPassword(!showPassword)}
-                                                            edge="end"
-                                                            size={isMobile ? "small" : "medium"}
-                                                        >
-                                                            {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    {/* <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={formData.enabled}
-                                                    onChange={(e) =>
-                                                        setFormData({ ...formData, enabled: e.target.checked })
-                                                    }
-                                                    color="primary"
-                                                    size={isMobile ? "small" : "medium"}
-                                                />
-                                            }
-                                            label="Active User"
-                                        />
-                                    </Grid> */}
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions sx={{ p: 2, gap: 1 }}>
-                                <Button onClick={handleAddClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
-                                <Button
-                                    onClick={handleSubmit}
-                                    color="primary"
-                                    variant="contained"
-                                    size={isMobile ? "small" : "medium"}
+                      {/* Add User Dialog */}
+<Dialog
+    open={openAddDialog}
+    onClose={handleAddClose}
+    maxWidth="sm"
+    fullWidth
+    fullScreen={isMobile}
+>
+    <DialogTitle>New User</DialogTitle>
+    <DialogContent>
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+                <TextField
+                    fullWidth
+                    label="Name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    size={isMobile ? "small" : "medium"}
+                />
+            </Grid>
+            <Grid item xs={12}>
+                <TextField
+                    fullWidth
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    size={isMobile ? "small" : "medium"}
+                />
+            </Grid>
+            <Grid item xs={12}>
+                <TextField
+                    fullWidth
+                    label="Password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    edge="end"
                                 >
-                                    Save User
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </IconButton>
+                            </InputAdornment>
+                        ),
+                    }}
+                    required
+                    size={isMobile ? "small" : "medium"}
+                />
+            </Grid>
+            <Grid item xs={12}>
+                <FormControl fullWidth>
+                    <InputLabel>Role</InputLabel>
+                    <Select
+                        value={formData.role}
+                        onChange={(e) => setFormData({...formData, role: e.target.value})}
+                        label="Role"
+                        size={isMobile ? "small" : "medium"}
+                    >
+                        {availableRoles.map((role) => (
+                            <MenuItem key={role.value} value={role.value}>
+                                {role.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+                <FormControl fullWidth>
+                    <InputLabel>Permissions</InputLabel>
+                    <Select
+                        multiple
+                        value={formData.permissions}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setFormData({
+                                ...formData,
+                                permissions: typeof value === 'string' ? value.split(',') : value,
+                            });
+                        }}
+                        renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {selected.map((value) => {
+                                    const perm = availablePermissions.find(p => p.value === value);
+                                    return <Chip key={value} label={perm?.label || value} size="small" />;
+                                })}
+                            </Box>
+                        )}
+                        size={isMobile ? "small" : "medium"}
+                    >
+                        {availablePermissions.map((permission) => (
+                            <MenuItem key={permission.value} value={permission.value}>
+                                <Checkbox checked={formData.permissions.indexOf(permission.value) > -1} />
+                                <ListItemText primary={permission.label} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Grid>
+        </Grid>
+    </DialogContent>
+    <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button onClick={handleAddClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
+        <Button
+            onClick={handleSubmit}
+            color="primary"
+            variant="contained"
+            size={isMobile ? "small" : "medium"}
+            disabled={!formData.name || !formData.email || !formData.password}
+        >
+            Save User
+        </Button>
+    </DialogActions>
+</Dialog>
 
                         {/* Edit User Dialog */}
-                        <Dialog
-                            open={openEditDialog}
-                            onClose={handleEditClose}
-                            maxWidth="sm"
-                            fullWidth
-                            fullScreen={isMobile}
-                        >
-                            <DialogTitle>Modify User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Name"
-                                            name="name"
-                                            value={editFormData.name}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Contact"
-                                            name="contact"
-                                            value={editFormData.contact}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PhoneIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            inputProps={{ maxLength: 10 }}
-                                            required
-                                            error={editFormData.contact.length > 0 && editFormData.contact.length !== 10}
-                                            helperText={
-                                                editFormData.contact.length > 0 && editFormData.contact.length !== 10
-                                                    ? 'Contact must be 10 digits'
-                                                    : ''
-                                            }
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email"
-                                            name="email"
-                                            type="email"
-                                            value={editFormData.email}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <EmailIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={editFormData.enabled}
-                                                    onChange={(e) =>
-                                                        setEditFormData({ ...editFormData, enabled: e.target.checked })
-                                                    }
-                                                    color="primary"
-                                                    size={isMobile ? "small" : "medium"}
-                                                />
-                                            }
-                                            label="Active User"
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions sx={{ p: 2, gap: 1 }}>
-                                <Button onClick={handleEditClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
-                                <Button
-                                    onClick={handleUpdate}
-                                    color="primary"
-                                    variant="contained"
-                                    size={isMobile ? "small" : "medium"}
-                                >
-                                    Save Changes
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                        {/* Edit User Dialog */}
+<Dialog
+    open={openEditDialog}
+    onClose={handleEditClose}
+    maxWidth="sm"
+    fullWidth
+    fullScreen={isMobile}
+>
+    <DialogTitle>Modify User Permissions</DialogTitle>
+    <DialogContent>
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+                <TextField
+                    fullWidth
+                    label="Name"
+                    name="name"
+                    value={editFormData.name}
+                    onChange={handleEditInputChange}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <PersonIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                    disabled
+                    size={isMobile ? "small" : "medium"}
+                />
+            </Grid>
+            <Grid item xs={12}>
+                <TextField
+                    fullWidth
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={editFormData.email}
+                    onChange={handleEditInputChange}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <EmailIcon />
+                            </InputAdornment>
+                        ),
+                    }}
+                    disabled
+                    size={isMobile ? "small" : "medium"}
+                />
+            </Grid>
+            <Grid item xs={12}>
+                <FormControl fullWidth>
+                    <InputLabel>Permissions</InputLabel>
+                    <Select
+                        multiple
+                        value={editFormData.permissions || []}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setEditFormData({
+                                ...editFormData,
+                                permissions: typeof value === 'string' ? value.split(',') : value,
+                            });
+                        }}
+                        renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {selected.map((value) => {
+                                    const perm = availablePermissions.find(p => p.value === value);
+                                    return <Chip key={value} label={perm?.label || value} size="small" />;
+                                })}
+                            </Box>
+                        )}
+                        size={isMobile ? "small" : "medium"}
+                    >
+                        {availablePermissions.map((permission) => (
+                            <MenuItem key={permission.value} value={permission.value}>
+                                <Checkbox checked={editFormData.permissions?.includes(permission.value) || false} />
+                                <ListItemText primary={permission.label} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Grid>
+        </Grid>
+    </DialogContent>
+    <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button onClick={handleEditClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
+        <Button
+            onClick={handleUpdate}
+            color="primary"
+            variant="contained"
+            size={isMobile ? "small" : "medium"}
+        >
+            Save Changes
+        </Button>
+    </DialogActions>
+</Dialog>
 
                         {/* Change Password Dialog */}
                         <Dialog

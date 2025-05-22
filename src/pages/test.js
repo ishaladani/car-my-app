@@ -1,1159 +1,1938 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import { useParams, useLocation } from "react-router-dom";
 import {
+    Container,
     Box,
+    Typography,
     Button,
+    TextField,
+    Grid,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
+    IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    LinearProgress,
+    Chip,
     Card,
     CardContent,
-    Checkbox,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    FormControlLabel,
-    Grid,
-    IconButton,
+    Divider,
     InputAdornment,
-    InputLabel,
-    MenuItem,
-    Select,
-    TextField,
-    Typography,
+    Snackbar,
+    Alert,
+    useMediaQuery,
     useTheme,
-    Container,
-    alpha,
-    useMediaQuery
-} from '@mui/material';
+} from "@mui/material";
 import {
     Add as AddIcon,
     Edit as EditIcon,
     Delete as DeleteIcon,
+    Print as PrintIcon,
+    Receipt as ReceiptIcon,
+    CreditCard as CreditCardIcon,
+    AccountBalance as AccountBalanceIcon,
     Check as CheckIcon,
-    Close as CloseIcon,
-    Lock as LockIcon,
-    Person as PersonIcon,
+    WhatsApp as WhatsAppIcon,
     Email as EmailIcon,
-    Phone as PhoneIcon,
-    Business as BusinessIcon,
-    Devices as DevicesIcon,
-    Visibility as VisibilityIcon,
-    VisibilityOff as VisibilityOffIcon,
-    Search as SearchIcon,
-    MoreVert as MoreVertIcon
-} from '@mui/icons-material';
-import { DataGrid } from '@mui/x-data-grid';
-import { styled } from '@mui/material/styles';
-import { green, red, orange } from '@mui/material/colors';
-// import Swal from 'sweetalert2';
+    PictureAsPdf as PdfIcon,
+} from "@mui/icons-material";
+import axios from "axios";
+import { jsPDF } from 'jspdf';
 
-import { useThemeContext } from "../Layout/ThemeContext";
+const AutoServeBilling = () => {
+    // Get jobCardId from URL parameters
+    const { jobCardId } = useParams();
+    const location = useLocation();
+    
+    // Alternative method to get jobCardId if not using react-router params
+    const getJobCardIdFromUrl = () => {
+        const pathSegments = location.pathname.split('/');
+        const idIndex = pathSegments.findIndex(segment => segment === 'billing') + 1;
+        return pathSegments[idIndex] || '';
+    };
 
-const StyledCard = styled(Card)(({ theme }) => ({
-    margin: theme.spacing(2),
-    borderRadius: theme.shape.borderRadius,
-    boxShadow: theme.shadows[3],
-}));
-
-const HeaderCard = styled(Card)(({ theme }) => ({
-    marginBottom: theme.spacing(3),
-    borderRadius: theme.shape.borderRadius,
-    boxShadow: theme.shadows[2],
-    background: theme.palette.mode === 'dark'
-        ? `linear-gradient(45deg, ${alpha(theme.palette.primary.dark, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.6)} 100%)`
-        : `linear-gradient(45deg, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.light, 0.8)} 100%)`,
-    padding: theme.spacing(2),
-}));
-
-// Action button for mobile view
-const ActionButton = styled(Button)(({ theme }) => ({
-    marginRight: theme.spacing(1),
-    marginBottom: theme.spacing(1),
-    [theme.breakpoints.down('sm')]: {
-        fontSize: '0.75rem',
-        padding: '4px 8px',
-    },
-}));
-
-const UserManagement = () => {
-    const { darkMode } = useThemeContext();
+    const jobCardIdFromUrl = jobCardId || getJobCardIdFromUrl();
+    const today = new Date().toISOString().split("T")[0];
+    const token = localStorage.getItem("authToken")
+        ? `Bearer ${localStorage.getItem("authToken")}`
+        : "";
     const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-    const [users, setUsers] = useState([]);
-    const [openAddDialog, setOpenAddDialog] = useState(false);
-    const [openEditDialog, setOpenEditDialog] = useState(false);
-    const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
-    const [openSiteDialog, setOpenSiteDialog] = useState(false);
-    const [openDeviceDialog, setOpenDeviceDialog] = useState(false);
-    const [openActionMenu, setOpenActionMenu] = useState(false);
-    const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
-    const [selectedUserId, setSelectedUserId] = useState(null);
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [sites, setSites] = useState([]);
-    const [devices, setDevices] = useState([]);
-    const [selectedSites, setSelectedSites] = useState([]);
-    const [selectedDevices, setSelectedDevices] = useState([]);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        contact: '',
-        username: '',
-        password: '',
-        enabled: true
+    // Loading and error states
+    const [isLoading, setIsLoading] = useState(true);
+    const [jobCardData, setJobCardData] = useState(null);
+    const [finalInspection, setFinalInspection] = useState('');
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success'
     });
 
-    const [editFormData, setEditFormData] = useState({
-        name: '',
-        email: '',
-        contact: '',
-        username: '',
-        enabled: true
+    // Email functionality states
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [showEmailDialog, setShowEmailDialog] = useState(false);
+    const [emailRecipient, setEmailRecipient] = useState('');
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailMessage, setEmailMessage] = useState('');
+
+    // Car and customer details - initialized empty, populated from API
+    const [carDetails, setCarDetails] = useState({
+        carNumber: "",
+        company: "",
+        model: "",
+        customerName: "",
+        contact: "",
+        email: "",
+        billingDate: today,
+        invoiceNo: "",
     });
 
-    const [passwordForm, setPasswordForm] = useState({
-        editadmin: '',
-        newpass: '',
-        repass: ''
+    // Parts and services - initialized empty, populated from API
+    const [parts, setParts] = useState([]);
+    const [services, setServices] = useState([]);
+
+    // Bill summary
+    const [summary, setSummary] = useState({
+        totalPartsCost: 0,
+        totalLaborCost: 0,
+        subtotal: 0,
+        gstAmount: 0,
+        discount: 0,
+        totalAmount: 0,
     });
 
-    // Responsive columns for DataGrid
-    const getColumns = () => {
-        const baseColumns = [
-            {
-                field: 'id',
-                headerName: 'ID',
-                width: isMobile ? 60 : 100,
-                flex: isMobile ? 0 : 0.5
-            },
-            {
-                field: 'username',
-                headerName: 'Username',
-                width: 150,
-                flex: 1
-            },
-            {
-                field: 'name',
-                headerName: 'Name',
-                width: 150,
-                flex: 1,
-                hide: isMobile
-            },
-            {
-                field: 'email',
-                headerName: 'Email',
-                width: 200,
-                flex: 1.5,
-                hide: isMobile
-            },
-            {
-                field: 'contact',
-                headerName: 'Contact',
-                width: 150,
-                flex: 1,
-                hide: isMobile && isTablet
-            },
-            {
-                field: 'enabled',
-                headerName: 'Status',
-                width: 120,
-                flex: 0.8,
-                renderCell: (params) => (
-                    <Box
-                        sx={{
-                            backgroundColor: params.value ? green[100] : red[100],
-                            color: params.value ? green[800] : red[800],
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 'bold',
-                            fontSize: isMobile ? '0.75rem' : '0.875rem'
-                        }}
-                    >
-                        {params.value ? 'Active' : 'Inactive'}
-                    </Box>
-                ),
-            },
-            {
-                field: 'actions',
-                headerName: 'Actions',
-                width: isMobile ? 100 : 400,
-                flex: isMobile ? 0.8 : 2,
-                sortable: false,
-                renderCell: (params) => (
-                    <Box sx={{
-                        display: 'flex',
-                        flexWrap: isMobile ? 'wrap' : 'nowrap',
-                        gap: 0.5
-                    }}>
-                        {isMobile ? (
-                            // Compact mobile layout
-                            <>
-                                <IconButton
-                                    color="primary"
-                                    onClick={() => handleEditOpen(params.row)}
-                                    size="small"
-                                >
-                                    <EditIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton
-                                    color="error"
-                                    onClick={() => handleDelete(params.row.id)}
-                                    size="small"
-                                >
-                                    <DeleteIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton
-                                    color="info"
-                                    onClick={(e) => {
-                                        setSelectedUser(params.row);
-                                        setActionMenuAnchor(e.currentTarget);
-                                        setOpenActionMenu(true);
-                                    }}
-                                    size="small"
-                                >
-                                    <MoreVertIcon fontSize="small" />
-                                </IconButton>
-                            </>
-                        ) : (
-                            // Full desktop layout
-                            <>
-                                <IconButton
-                                    color="primary"
-                                    onClick={() => handleEditOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <EditIcon />
-                                </IconButton>
-                                <IconButton
-                                    color="error"
-                                    onClick={() => handleDelete(params.row.id)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <DeleteIcon />
-                                </IconButton>
-                                {params.row.enabled ? (
-                                    <IconButton
-                                        color="error"
-                                        onClick={() => handleDeactivate(params.row.id)}
-                                        size="small"
-                                        sx={{ mr: 0.5 }}
-                                    >
-                                        <CloseIcon />
-                                    </IconButton>
-                                ) : (
-                                    <IconButton
-                                        color="success"
-                                        onClick={() => handleActivate(params.row.id)}
-                                        size="small"
-                                        sx={{ mr: 0.5 }}
-                                    >
-                                        <CheckIcon />
-                                    </IconButton>
-                                )}
-                                <IconButton
-                                    color="info"
-                                    onClick={() => handleAssignSiteOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <BusinessIcon />
-                                </IconButton>
-                                <IconButton
-                                    color="info"
-                                    onClick={() => handleAssignDeviceOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <DevicesIcon />
-                                </IconButton>
-                                <IconButton
-                                    color="warning"
-                                    onClick={() => handlePasswordOpen(params.row)}
-                                    size="small"
-                                    sx={{ mr: 0.5 }}
-                                >
-                                    <LockIcon />
-                                </IconButton>
-                            </>
-                        )}
-                    </Box>
-                ),
-            },
-        ];
+    // Modal states
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showProcessModal, setShowProcessModal] = useState(false);
+    const [showThankYou, setShowThankYou] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState("");
+    const [apiResponseMessage, setApiResponseMessage] = useState(null);
+    const [showApiResponse, setShowApiResponse] = useState(false);
+    const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
-        return baseColumns;
-    };
+    // Dialog states for adding/editing
+    const [showNewPartDialog, setShowNewPartDialog] = useState(false);
+    const [newPart, setNewPart] = useState({
+        name: "",
+        quantity: 1,
+        pricePerUnit: 0,
+    });
 
-    // Function to render mobile action menu
-    const renderMobileActionMenu = () => {
-        // This would be implemented using MUI Menu if importing it
-        // For now, we'll use a Dialog as a replacement
-        return (
-            <Dialog
-                open={openActionMenu}
-                onClose={() => setOpenActionMenu(false)}
-                PaperProps={{
-                    sx: { width: '80%', maxWidth: '300px', p: 1 }
-                }}
-            >
-                <DialogTitle sx={{ p: 2 }}>Actions</DialogTitle>
-                <DialogContent sx={{ p: 1 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {selectedUser?.enabled ? (
-                            <ActionButton
-                                color="error"
-                                onClick={() => {
-                                    handleDeactivate(selectedUser.id);
-                                    setOpenActionMenu(false);
-                                }}
-                                variant="outlined"
-                                startIcon={<CloseIcon />}
-                                fullWidth
-                            >
-                                Deactivate
-                            </ActionButton>
-                        ) : (
-                            <ActionButton
-                                color="success"
-                                onClick={() => {
-                                    handleActivate(selectedUser.id);
-                                    setOpenActionMenu(false);
-                                }}
-                                variant="outlined"
-                                startIcon={<CheckIcon />}
-                                fullWidth
-                            >
-                                Activate
-                            </ActionButton>
-                        )}
-                        <ActionButton
-                            color="info"
-                            onClick={() => {
-                                handleAssignSiteOpen(selectedUser);
-                                setOpenActionMenu(false);
-                            }}
-                            variant="outlined"
-                            startIcon={<BusinessIcon />}
-                            fullWidth
-                        >
-                            Assign Sites
-                        </ActionButton>
-                        <ActionButton
-                            color="info"
-                            onClick={() => {
-                                handleAssignDeviceOpen(selectedUser);
-                                setOpenActionMenu(false);
-                            }}
-                            variant="outlined"
-                            startIcon={<DevicesIcon />}
-                            fullWidth
-                        >
-                            Assign Devices
-                        </ActionButton>
-                        <ActionButton
-                            color="warning"
-                            onClick={() => {
-                                handlePasswordOpen(selectedUser);
-                                setOpenActionMenu(false);
-                            }}
-                            variant="outlined"
-                            startIcon={<LockIcon />}
-                            fullWidth
-                        >
-                            Change Password
-                        </ActionButton>
-                    </Box>
-                </DialogContent>
-            </Dialog>
-        );
-    };
+    const [showNewServiceDialog, setShowNewServiceDialog] = useState(false);
+    const [newService, setNewService] = useState({
+        name: "",
+        engineer: "",
+        laborCost: 0,
+    });
 
+    const [showEditPriceDialog, setShowEditPriceDialog] = useState(false);
+    const [editItem, setEditItem] = useState({
+        id: null,
+        type: "",
+        field: "",
+        value: 0,
+    });
+
+    // Fetch job card data from API
     useEffect(() => {
-        fetchUsers();
-    }, []);
+        const fetchJobCardData = async () => {
+            if (!jobCardIdFromUrl) {
+                setSnackbar({
+                    open: true,
+                    message: 'No job card ID found in URL',
+                    severity: 'error'
+                });
+                setIsLoading(false);
+                return;
+            }
 
-    const fetchUsers = async () => {
-        // Implement API call here
-        // For now, using mock data
-        setUsers([
-            { id: 1, username: 'johndoe', name: 'John Doe', email: 'john@example.com', contact: '1234567890', enabled: true },
-            { id: 2, username: 'janedoe', name: 'Jane Doe', email: 'jane@example.com', contact: '0987654321', enabled: false },
-            { id: 3, username: 'samsmith', name: 'Sam Smith', email: 'sam@example.com', contact: '5555555555', enabled: true },
-        ]);
-    };
+            try {
+                setIsLoading(true);
 
-    const fetchSites = async (userId) => {
-        // Implement API call here
-        // For now, using mock data
-        setSites([
-            { siteId: 1, siteName: 'Main Office' },
-            { siteId: 2, siteName: 'Branch A' },
-            { siteId: 3, siteName: 'Branch B' },
-        ]);
-        setSelectedSites([1]); // Mocked assigned sites
-    };
+                const response = await axios.get(
+                    `https://garage-management-system-cr4w.onrender.com/api/jobCards/${jobCardIdFromUrl}`,
+                    {
+                        headers: {
+                            'Authorization': token,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
 
-    const fetchDevices = async (userId) => {
-        // Implement API call here
-        // For now, using mock data
-        setDevices([
-            { id: 1, devicename: 'Device A' },
-            { id: 2, devicename: 'Device B' },
-            { id: 3, devicename: 'Device C' },
-        ]);
-        setSelectedDevices([1]); // Mocked assigned devices
-    };
+                const data = response.data;
+                setJobCardData(data);
 
-    const handleAddOpen = () => {
-        setOpenAddDialog(true);
-    };
+                // Generate invoice number if not provided
+                const invoiceNo = data.invoiceNumber || `INV-${Date.now()}`;
 
-    const handleAddClose = () => {
-        setOpenAddDialog(false);
-        setFormData({
-            name: '',
-            email: '',
-            contact: '',
-            username: '',
-            password: '',
-            enabled: true
+                // Update car details with fetched data
+                setCarDetails({
+                    carNumber: data.carNumber || data.registrationNumber || "",
+                    company: data.company || data.carBrand || "",
+                    model: data.model || data.carModel || "",
+                    customerName: data.customerName || data.customer?.name || "",
+                    contact: data.contactNumber || data.customer?.contact || "",
+                    email: data.email || data.customer?.email || "",
+                    billingDate: today,
+                    invoiceNo: invoiceNo,
+                });
+
+                // Process parts data from API
+                if (data.partsUsed && data.partsUsed.length > 0) {
+                    const apiParts = data.partsUsed.map((part, index) => ({
+                        id: index + 1,
+                        name: part.partName || part.name || '',
+                        quantity: parseInt(part.quantity) || 1,
+                        pricePerUnit: parseFloat(part.pricePerPiece || part.pricePerUnit) || 0,
+                        total: parseFloat(part.totalPrice) || (parseInt(part.quantity) * parseFloat(part.pricePerPiece)) || 0
+                    }));
+                    setParts(apiParts);
+                } else {
+                    // Initialize with empty array if no parts
+                    setParts([]);
+                }
+
+                // Process services data from API
+                let apiServices = [];
+                
+                // Check if services exist in the response
+                if (data.services && data.services.length > 0) {
+                    apiServices = data.services.map((service, index) => ({
+                        id: index + 1,
+                        name: service.serviceName || service.name || '',
+                        engineer: service.engineer || service.engineerName || data.engineerId?.name || 'Assigned Engineer',
+                        progress: service.progress || 100,
+                        status: service.status || 'Completed',
+                        laborCost: parseFloat(service.laborCost) || 0
+                    }));
+                }
+                
+                // If no services array, create from labor hours if available
+                if (apiServices.length === 0 && data.laborHours) {
+                    apiServices = [{
+                        id: 1,
+                        name: 'General Service',
+                        engineer: data.engineerId?.name || 'Assigned Engineer',
+                        progress: 100,
+                        status: 'Completed',
+                        laborCost: parseFloat(data.laborHours) * 500 || 0 // Assuming 500 per hour
+                    }];
+                }
+
+                setServices(apiServices);
+
+                // Set final inspection notes
+                if (data.qualityCheck && data.qualityCheck.notes) {
+                    setFinalInspection(data.qualityCheck.notes);
+                } else if (data.engineerRemarks) {
+                    setFinalInspection(data.engineerRemarks);
+                } else if (data.remarks) {
+                    setFinalInspection(data.remarks);
+                }
+
+                // Set email recipient
+                if (data.email || data.customer?.email) {
+                    setEmailRecipient(data.email || data.customer?.email);
+                }
+
+                console.log('Fetched job card data:', data);
+
+            } catch (error) {
+                console.error('Error fetching job card data:', error);
+                setSnackbar({
+                    open: true,
+                    message: `Error: ${error.response?.data?.message || 'Failed to fetch job card data'}`,
+                    severity: 'error'
+                });
+
+                // Set default empty state on error
+                setCarDetails({
+                    carNumber: "",
+                    company: "",
+                    model: "",
+                    customerName: "",
+                    contact: "",
+                    email: "",
+                    billingDate: today,
+                    invoiceNo: `INV-${Date.now()}`,
+                });
+                setParts([]);
+                setServices([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchJobCardData();
+    }, [jobCardIdFromUrl, token, today]);
+
+    // Calculate totals whenever parts, services, or discount changes
+    useEffect(() => {
+        calculateTotals();
+    }, [parts, services, summary.discount]);
+
+    // Set default email values when car details change
+    useEffect(() => {
+        if (carDetails.email) {
+            setEmailRecipient(carDetails.email);
+        }
+        setEmailSubject(`Invoice #${carDetails.invoiceNo} - ${carDetails.customerName}`);
+        setEmailMessage(`Dear ${carDetails.customerName},
+
+Please find attached the invoice for services rendered on your vehicle ${carDetails.company} ${carDetails.model} (${carDetails.carNumber}).
+
+Invoice Details:
+- Invoice Number: ${carDetails.invoiceNo}
+- Total Amount: ₹${summary.totalAmount}
+- Date: ${carDetails.billingDate}
+
+Thank you for choosing SHIVAM MOTORS for your vehicle service needs.
+
+Best regards,
+SHIVAM MOTORS
+Contact: 9909047943`);
+    }, [carDetails, summary.totalAmount]);
+
+    const calculateTotals = () => {
+        const totalPartsCost = parts.reduce((sum, part) => sum + (part.total || 0), 0);
+        const totalLaborCost = services.reduce(
+            (sum, service) => sum + (service.laborCost || 0),
+            0
+        );
+        const subtotal = totalPartsCost + totalLaborCost;
+        const gstAmount = Math.round(subtotal * 0.18);
+        const discount = summary.discount || 0;
+        const totalAmount = subtotal + gstAmount - discount;
+
+        setSummary({
+            totalPartsCost,
+            totalLaborCost,
+            subtotal,
+            gstAmount,
+            discount,
+            totalAmount,
         });
-    };
-
-    const handleEditOpen = (user) => {
-        setSelectedUser(user);
-        setEditFormData({
-            name: user.name,
-            email: user.email,
-            contact: user.contact,
-            username: user.username,
-            enabled: user.enabled
-        });
-        setOpenEditDialog(true);
-    };
-
-    const handleEditClose = () => {
-        setOpenEditDialog(false);
-        setSelectedUser(null);
-    };
-
-    const handlePasswordOpen = (user) => {
-        setSelectedUserId(user.id);
-        setSelectedUser(user);
-        setOpenPasswordDialog(true);
-    };
-
-    const handlePasswordClose = () => {
-        setOpenPasswordDialog(false);
-        setPasswordForm({
-            editadmin: '',
-            newpass: '',
-            repass: ''
-        });
-        setSelectedUserId(null);
-    };
-
-    const handleAssignSiteOpen = (user) => {
-        setSelectedUserId(user.id);
-        setSelectedUser(user);
-        fetchSites(user.id);
-        setOpenSiteDialog(true);
-    };
-
-    const handleAssignSiteClose = () => {
-        setOpenSiteDialog(false);
-        setSelectedSites([]);
-        setSelectedUserId(null);
-    };
-
-    const handleAssignDeviceOpen = (user) => {
-        setSelectedUserId(user.id);
-        setSelectedUser(user);
-        fetchDevices(user.id);
-        setOpenDeviceDialog(true);
-    };
-
-    const handleAssignDeviceClose = () => {
-        setOpenDeviceDialog(false);
-        setSelectedDevices([]);
-        setSelectedUserId(null);
     };
 
     const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({
-            ...formData,
-            [name]: value
+        const { id, value } = e.target;
+        setCarDetails({
+            ...carDetails,
+            [id]: value,
         });
     };
 
-    const handleEditInputChange = (e) => {
-        const { name, value } = e.target;
-        setEditFormData({
-            ...editFormData,
-            [name]: value
-        });
+    const handleDiscountChange = (e) => {
+        const discount = parseFloat(e.target.value) || 0;
+        setSummary({ ...summary, discount });
     };
 
-    const handlePasswordChange = (e) => {
-        const { name, value } = e.target;
-        setPasswordForm({
-            ...passwordForm,
-            [name]: value
-        });
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0,
+        }).format(amount);
     };
 
-    const handleSiteChange = (event) => {
-        const {
-            target: { value },
-        } = event;
-        setSelectedSites(typeof value === 'string' ? value.split(',') : value);
+    // Enhanced PDF generation function
+    const generatePdfInvoice = () => {
+        try {
+            const doc = new jsPDF();
+
+            // Set properties
+            const pageWidth = doc.internal.pageSize.width;
+            const pageHeight = doc.internal.pageSize.height;
+            const centerX = pageWidth / 2;
+            let currentY = 15;
+
+            // Add company header
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text('SHIVAM MOTORS', centerX, currentY, { align: 'center' });
+            currentY += 7;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text('PLOT NO:5, PHASE-1 NARODA GIDC, OPP.BSNL TELEPHONE EXCHANGE,NARODA', centerX, currentY, { align: 'center' });
+            currentY += 5;
+            doc.text('GST: 24ADPFS3849B1ZY', centerX, currentY, { align: 'center' });
+            currentY += 5;
+            doc.text('Contact: 9909047943', centerX, currentY, { align: 'center' });
+            currentY += 8;
+
+            // Add line separator
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.5);
+            doc.line(10, currentY, pageWidth - 10, currentY);
+            currentY += 10;
+
+            // Add invoice number and date
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`INVOICE #${carDetails.invoiceNo}`, 10, currentY);
+
+            const today = new Date();
+            const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Date: ${formattedDate}`, pageWidth - 10, currentY, { align: 'right' });
+            currentY += 15;
+
+            // Customer details
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Customer Details:', 10, currentY);
+            currentY += 7;
+
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Name: ${carDetails.customerName}`, 10, currentY);
+            currentY += 7;
+            doc.text(`Vehicle: ${carDetails.company} ${carDetails.model} (${carDetails.carNumber})`, 10, currentY);
+            currentY += 7;
+            doc.text(`Contact: ${carDetails.contact}`, 10, currentY);
+            currentY += 7;
+            doc.text(`Email: ${carDetails.email}`, 10, currentY);
+            currentY += 15;
+
+            // Parts section if available
+            if (parts.length > 0) {
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Parts Used:', 10, currentY);
+                currentY += 10;
+
+                // Parts table header
+                const colWidths = [60, 25, 35, 35];
+                const colX = [10, 70, 95, 130];
+
+                // Draw table header
+                doc.setFillColor(66, 139, 202);
+                doc.rect(10, currentY - 5, 155, 8, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Part Name', colX[0] + 2, currentY);
+                doc.text('Qty', colX[1] + 2, currentY);
+                doc.text('Price/Piece', colX[2] + 2, currentY);
+                doc.text('Total', colX[3] + 2, currentY);
+                currentY += 8;
+
+                // Draw parts data
+                doc.setTextColor(0, 0, 0);
+                doc.setFont('helvetica', 'normal');
+                parts.forEach((part, index) => {
+                    const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
+                    doc.setFillColor(...bgColor);
+                    doc.rect(10, currentY - 5, 155, 8, 'F');
+
+                    doc.text(String(part.name || ''), colX[0] + 2, currentY);
+                    doc.text(String(part.quantity || ''), colX[1] + 2, currentY);
+                    doc.text(`₹${part.pricePerUnit || ''}`, colX[2] + 2, currentY);
+                    doc.text(`₹${part.total || ''}`, colX[3] + 2, currentY);
+                    currentY += 8;
+                });
+
+                currentY += 10;
+            }
+
+            // Services section if available
+            if (services.length > 0) {
+                doc.setFont('helvetica', 'bold');
+                doc.text('Services:', 10, currentY);
+                currentY += 10;
+
+                // Services table header
+                const colX = [10, 70, 95, 130];
+                doc.setFillColor(66, 139, 202);
+                doc.rect(10, currentY - 5, 155, 8, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Service Name', colX[0] + 2, currentY);
+                doc.text('Engineer', colX[1] + 2, currentY);
+                doc.text('Status', colX[2] + 2, currentY);
+                doc.text('Labor Cost', colX[3] + 2, currentY);
+                currentY += 8;
+
+                // Draw services data
+                doc.setTextColor(0, 0, 0);
+                doc.setFont('helvetica', 'normal');
+                services.forEach((service, index) => {
+                    const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
+                    doc.setFillColor(...bgColor);
+                    doc.rect(10, currentY - 5, 155, 8, 'F');
+
+                    doc.text(String(service.name || ''), colX[0] + 2, currentY);
+                    doc.text(String(service.engineer || '-'), colX[1] + 2, currentY);
+                    doc.text(String(service.status || 'Completed'), colX[2] + 2, currentY);
+                    doc.text(`₹${service.laborCost || ''}`, colX[3] + 2, currentY);
+                    currentY += 8;
+                });
+
+                currentY += 15;
+            }
+
+            // Tax and total summary
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Bill Summary:', 10, currentY);
+            currentY += 10;
+
+            const halfGst = Math.round(summary.gstAmount / 2);
+            const summaryData = [
+                ['Parts Total:', `₹${summary.totalPartsCost}`],
+                ['Labor Total:', `₹${summary.totalLaborCost}`],
+                ['Subtotal:', `₹${summary.subtotal}`],
+                ['CGST (9%):', `₹${halfGst}`],
+                ['SGST (9%):', `₹${halfGst}`],
+                ['Discount:', `₹${summary.discount}`],
+                ['Total Amount:', `₹${summary.totalAmount}`]
+            ];
+
+            const summaryStartX = pageWidth / 2 + 10;
+            summaryData.forEach((item, index) => {
+                const isTotal = index === summaryData.length - 1;
+                doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
+                doc.text(item[0], summaryStartX, currentY);
+                doc.text(item[1], pageWidth - 20, currentY, { align: 'right' });
+                currentY += 7;
+            });
+
+            currentY += 10;
+
+            // Notes section
+            if (finalInspection && finalInspection.trim() !== '') {
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Notes:', 10, currentY);
+                currentY += 7;
+                doc.setFont('helvetica', 'normal');
+
+                // Split text if too long
+                const lines = doc.splitTextToSize(finalInspection, pageWidth - 20);
+                lines.forEach(line => {
+                    if (currentY > pageHeight - 20) {
+                        doc.addPage();
+                        currentY = 20;
+                    }
+                    doc.text(line, 10, currentY);
+                    currentY += 7;
+                });
+                currentY += 5;
+            }
+
+            // Payment info and footer
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Payment Method: ${paymentMethod || 'DELIVERY AGAINST CASH ONLY'}`, 10, currentY);
+            currentY += 10;
+
+            doc.setFont('helvetica', 'italic');
+            doc.text('Thank you for choosing our service!', centerX, currentY, { align: 'center' });
+
+            return doc;
+        } catch (error) {
+            console.error('PDF Generation Error:', error);
+            throw new Error('Failed to generate PDF document');
+        }
     };
 
-    const handleDeviceChange = (event) => {
-        const {
-            target: { value },
-        } = event;
-        setSelectedDevices(typeof value === 'string' ? value.split(',') : value);
+    // Download PDF function
+    const downloadPdfBill = () => {
+        try {
+            const doc = generatePdfInvoice();
+            const fileName = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber}.pdf`;
+            doc.save(fileName);
+
+            setApiResponseMessage({
+                type: "success",
+                message: `PDF invoice '${fileName}' has been generated and downloaded successfully.`,
+            });
+            setShowApiResponse(true);
+        } catch (error) {
+            console.error("PDF generation error:", error);
+            setApiResponseMessage({
+                type: "error",
+                message: "Failed to generate PDF. Please try again.",
+            });
+            setShowApiResponse(true);
+        }
     };
 
-    const handleSubmit = async () => {
-        // Implement submit logic here
-        console.log('Submitting form:', formData);
-        // Mock successful submission
-        fetchUsers();
-        handleAddClose();
+    // Email functions
+    const openEmailDialog = () => {
+        setShowEmailDialog(true);
     };
 
-    const handleUpdate = async () => {
-        // Implement update logic here
-        console.log('Updating user:', editFormData);
-        // Mock successful update
-        fetchUsers();
-        handleEditClose();
-    };
+    const sendBillViaEmail = async () => {
+        setSendingEmail(true);
 
-    const handlePasswordUpdate = async () => {
-        // Implement password update logic here
-        console.log('Updating password:', passwordForm);
-        // Mock successful password update
-        handlePasswordClose();
-    };
+        try {
+            if (!emailRecipient || !emailRecipient.includes('@')) {
+                throw new Error("Valid email address is required");
+            }
 
-    const handleAssignSites = async () => {
-        // Implement site assignment logic here
-        console.log('Assigning sites:', selectedSites);
-        // Mock successful site assignment
-        handleAssignSiteClose();
-    };
+            // Generate PDF as base64
+            const doc = generatePdfInvoice();
+            const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-    const handleAssignDevices = async () => {
-        // Implement device assignment logic here
-        console.log('Assigning devices:', selectedDevices);
-        // Mock successful device assignment
-        handleAssignDeviceClose();
-    };
+            // Prepare email data
+            const emailData = {
+                to: emailRecipient,
+                subject: emailSubject,
+                message: emailMessage,
+                attachments: [{
+                    filename: `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber}.pdf`,
+                    content: pdfBase64,
+                    contentType: 'application/pdf'
+                }],
+                billDetails: {
+                    invoiceNo: carDetails.invoiceNo,
+                    customerName: carDetails.customerName,
+                    carNumber: carDetails.carNumber,
+                    totalAmount: summary.totalAmount,
+                    date: carDetails.billingDate
+                }
+            };
 
-    const handleDelete = (userId) => {
-        // Implement delete logic here
-        console.log('Deleting user:', userId);
-        // Mock successful deletion
-        fetchUsers();
-    };
-
-    const handleActivate = (userId) => {
-        // Implement activate logic here
-        console.log('Activating user:', userId);
-        // Mock successful activation
-        fetchUsers();
-    };
-
-    const handleDeactivate = (userId) => {
-        // Implement deactivate logic here
-        console.log('Deactivating user:', userId);
-        // Mock successful deactivation
-        fetchUsers();
-    };
-
-    const filteredUsers = Array.isArray(users)
-        ? users.filter(user => {
-            const searchLower = searchTerm.toLowerCase();
-            return (
-                user.name?.toLowerCase().includes(searchLower) ||
-                user.username?.toLowerCase().includes(searchLower) ||
-                user.email?.toLowerCase().includes(searchLower)
+            // Send email via API
+            const response = await axios.post(
+                `https://garage-management-system-cr4w.onrender.com/api/billing/send-email/${jobCardIdFromUrl}`,
+                emailData,
+                {
+                    headers: {
+                        'Authorization': token,
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
-        })
-        : [];
+
+            if (response.status === 200) {
+                setApiResponseMessage({
+                    type: "success",
+                    message: `Invoice sent successfully to ${emailRecipient}!`,
+                });
+                setShowEmailDialog(false);
+            } else {
+                throw new Error("Failed to send email");
+            }
+
+        } catch (error) {
+            console.error("Email send error:", error);
+            setApiResponseMessage({
+                type: "error",
+                message: error.response?.data?.message || error.message || "Failed to send email. Please try again.",
+            });
+        } finally {
+            setSendingEmail(false);
+            setShowApiResponse(true);
+        }
+    };
+
+    // Add new part
+    const addNewPart = () => {
+        const { name, quantity, pricePerUnit } = newPart;
+        if (name && quantity > 0 && pricePerUnit > 0) {
+            const newPartObj = {
+                id: Date.now(),
+                name,
+                quantity: parseInt(quantity),
+                pricePerUnit: parseFloat(pricePerUnit),
+                total: parseInt(quantity) * parseFloat(pricePerUnit),
+            };
+
+            setParts([...parts, newPartObj]);
+            setNewPart({ name: "", quantity: 1, pricePerUnit: 0 });
+            setShowNewPartDialog(false);
+        }
+    };
+
+    // Add new service
+    const addNewService = () => {
+        const { name, engineer, laborCost } = newService;
+        if (name && engineer && laborCost > 0) {
+            const newServiceObj = {
+                id: Date.now(),
+                name,
+                engineer,
+                progress: 0,
+                status: "Pending",
+                laborCost: parseFloat(laborCost),
+            };
+
+            setServices([...services, newServiceObj]);
+            setNewService({ name: "", engineer: "", laborCost: 0 });
+            setShowNewServiceDialog(false);
+        }
+    };
+
+    // Remove part
+    const removePart = (id) => {
+        setParts(parts.filter((part) => part.id !== id));
+    };
+
+    // Remove service
+    const removeService = (id) => {
+        setServices(services.filter((service) => service.id !== id));
+    };
+
+    // Open edit price dialog
+    const openEditPrice = (id, type, field, value) => {
+        setEditItem({ id, type, field, value });
+        setShowEditPriceDialog(true);
+    };
+
+    // Save edited price
+    const saveEditedPrice = () => {
+        const { id, type, field, value } = editItem;
+        const newValue = parseFloat(value);
+
+        if (type === "part") {
+            const updatedParts = parts.map((part) => {
+                if (part.id === id) {
+                    const updatedPart = { ...part, [field]: newValue };
+                    updatedPart.total = updatedPart.quantity * updatedPart.pricePerUnit;
+                    return updatedPart;
+                }
+                return part;
+            });
+            setParts(updatedParts);
+        } else if (type === "service") {
+            const updatedServices = services.map((service) => {
+                if (service.id === id) {
+                    return { ...service, [field]: newValue };
+                }
+                return service;
+            });
+            setServices(updatedServices);
+        }
+
+        setShowEditPriceDialog(false);
+    };
+
+    // Generate bill via API
+    const generateBill = async () => {
+        setShowPaymentModal(true);
+    };
+
+    const selectPaymentMethod = (method) => {
+        setPaymentMethod(method);
+        setShowPaymentModal(false);
+        setShowProcessModal(true);
+    };
+
+    const processPayment = async () => {
+        if (!jobCardIdFromUrl) {
+            setApiResponseMessage({
+                type: "error",
+                message: "No job card ID found in URL. Cannot process payment.",
+            });
+            setShowApiResponse(true);
+            setShowProcessModal(false);
+            return;
+        }
+
+        const apiData = {
+            parts: parts.map((part) => ({
+                name: part.name,
+                quantity: part.quantity,
+                pricePerUnit: part.pricePerUnit,
+            })),
+            services: services.map((service) => ({
+                name: service.name,
+                engineer: service.engineer,
+                laborCost: service.laborCost,
+                status: service.status,
+            })),
+            discount: summary.discount,
+            gstPercentage: 18,
+        };
+
+        setShowProcessModal(false);
+
+        try {
+            const response = await fetch(
+                `https://garage-management-system-cr4w.onrender.com/api/billing/generate/${jobCardIdFromUrl}`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: token,
+                    },
+                    body: JSON.stringify(apiData),
+                }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+                setApiResponseMessage({
+                    type: "success",
+                    message: "Bill generated and payment processed successfully!",
+                });
+                setShowThankYou(true);
+            } else {
+                setApiResponseMessage({
+                    type: "error",
+                    message: data.message || "Failed to generate bill",
+                });
+            }
+        } catch (error) {
+            setApiResponseMessage({
+                type: "error",
+                message: "Network error: " + error.message,
+            });
+        }
+
+        setShowApiResponse(true);
+    };
+
+    const printBill = () => {
+        window.print();
+    };
+
+    // WhatsApp function
+    const sendBillViaWhatsApp = async () => {
+        setSendingWhatsApp(true);
+
+        try {
+            if (!carDetails.contact || carDetails.contact.length < 10) {
+                throw new Error("Valid contact number is required to send WhatsApp message");
+            }
+
+            const today = new Date();
+            const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+
+            const billMessage = `*INVOICE #${carDetails.invoiceNo}*
+
+*SHIVAM MOTORS*
+PLOT NO:5, PHASE-1 NARODA GIDC, OPP.BSNL TELEPHONE EXCHANGE,NARODA
+GST: 24ADPFS3849B1ZY
+Contact: 9909047943
+
+*Customer:* ${carDetails.customerName}
+*Vehicle:* ${carDetails.company} ${carDetails.model} (${carDetails.carNumber})
+*Date:* ${formattedDate}
+
+${parts.length > 0 ? `*Parts:*
+${parts.map(part => `- ${part.name}: ₹${part.total}`).join('\n')}` : ''}
+
+${services.length > 0 ? `*Services:*
+${services.map(service => `- ${service.name}: ₹${service.laborCost}`).join('\n')}` : ''}
+*Taxes:*
+- CGST (9%): ₹${Math.round(summary.gstAmount / 2)}
+- SGST (9%): ₹${Math.round(summary.gstAmount / 2)}
+
+*Total Amount: ₹${summary.totalAmount}*
+
+${finalInspection ? finalInspection : ''}
+
+*Payment Method: ${paymentMethod || 'DELIVERY AGAINST CASH ONLY'}*
+
+Thank you for choosing our service!`;
+
+            let phoneNumber = carDetails.contact.replace(/\D/g, '');
+            if (phoneNumber.length === 10) {
+                phoneNumber = `91${phoneNumber}`;
+            }
+
+            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(billMessage)}`;
+            window.open(whatsappUrl, '_blank');
+
+            setApiResponseMessage({
+                type: "success",
+                message: `WhatsApp invoice prepared for ${carDetails.customerName}. Please send the message in the opened WhatsApp tab.`,
+            });
+        } catch (error) {
+            console.error("WhatsApp send error:", error);
+            setApiResponseMessage({
+                type: "warning",
+                message: error.message || "Couldn't send WhatsApp message. Please try again.",
+            });
+        } finally {
+            setSendingWhatsApp(false);
+            setShowApiResponse(true);
+        }
+    };
+
+    // Status color mapping
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "Completed":
+                return "success";
+            case "In Progress":
+                return "warning";
+            default:
+                return "error";
+        }
+    };
+
+    // Responsive table cell styling
+    const tableCellStyle = {
+        py: isMobile ? 1 : 2,
+        px: isMobile ? 1 : 3,
+        fontSize: isMobile ? "0.75rem" : "0.875rem",
+    };
+
+    if (isLoading) {
+        return (
+            <Box sx={{ ml: { xs: 0, md: "280px" }, px: { xs: 2, md: 3 }, py: 4 }}>
+                <Paper elevation={3} sx={{ mb: 4, p: 3, borderRadius: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
+                        <LinearProgress sx={{ width: '50%' }} />
+                    </Box>
+                    <Typography variant="h6" align="center" sx={{ mt: 2 }}>
+                        Loading job card data...
+                    </Typography>
+                </Paper>
+            </Box>
+        );
+    }
 
     return (
-        <>
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    mb: 4,
-                    overflow: 'auto',
-                    px: { xs: 1, sm: 2, md: 3 }, // Responsive padding
-                    width: '100%', // Ensure full width
-                    maxWidth: '100%' // Prevent overflow
-                }}
-            >
-                <Card elevation={3} sx={{ borderRadius: 1 }}>
-                    <CardContent sx={{ p: { xs: 1, sm: 2 } }}> {/* Responsive padding */}
-                        <Box
-                            display="flex"
-                            flexDirection={{ xs: 'column', sm: 'row' }}
-                            justifyContent="space-between"
-                            alignItems={{ xs: 'flex-start', sm: 'center' }}
-                            mb={2}
-                            gap={1}
+        <Box sx={{ ml: { xs: 0, md: "280px" }, px: { xs: 2, md: 3 }, py: 4 }}>
+            <Paper elevation={3} sx={{ mb: 4, p: isMobile ? 2 : 3, borderRadius: 2 }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: isMobile ? "column" : "row",
+                        justifyContent: "space-between",
+                        alignItems: isMobile ? "flex-start" : "center",
+                        mb: 3,
+                        gap: isMobile ? 2 : 0,
+                    }}
+                >
+                    <Typography variant="h4" color="primary" fontWeight="bold">
+                        Billing {jobCardIdFromUrl ? `- Job #${jobCardIdFromUrl}` : ''}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<ReceiptIcon />}
+                        onClick={generateBill}
+                        disabled={showThankYou}
+                        fullWidth={isMobile}
+                        size={isMobile ? "small" : "medium"}
+                    >
+                        Generate Bill
+                    </Button>
+                </Box>
+
+                {/* Car & Customer Details */}
+                {!showThankYou && (
+                    <>
+                        <Card sx={{ mb: 4 }}>
+                            <CardContent>
+                                <Typography
+                                    variant="h6"
+                                    color="primary"
+                                    gutterBottom
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        "&::before": {
+                                            content: '""',
+                                            display: "inline-block",
+                                            width: 4,
+                                            height: 20,
+                                            backgroundColor: "primary.main",
+                                            marginRight: 1,
+                                            borderRadius: 1,
+                                        },
+                                    }}
+                                >
+                                    Car & Customer Details
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    {[
+                                        {
+                                            id: "carNumber",
+                                            label: "Car Number",
+                                            xs: 12,
+                                            sm: 6,
+                                            md: 3,
+                                        },
+                                        { id: "company", label: "Company", xs: 12, sm: 6, md: 3 },
+                                        { id: "model", label: "Model", xs: 12, sm: 6, md: 3 },
+                                        {
+                                            id: "customerName",
+                                            label: "Customer Name",
+                                            xs: 12,
+                                            sm: 6,
+                                            md: 3,
+                                        },
+                                        { id: "contact", label: "Contact", xs: 12, sm: 6, md: 3 },
+                                        { id: "email", label: "Email", xs: 12, sm: 6, md: 3 },
+                                        {
+                                            id: "billingDate",
+                                            label: "Date of Billing",
+                                            type: "date",
+                                            xs: 12,
+                                            sm: 6,
+                                            md: 3,
+                                        },
+                                        {
+                                            id: "invoiceNo",
+                                            label: "Invoice No.",
+                                            xs: 12,
+                                            sm: 6,
+                                            md: 3,
+                                        },
+                                    ].map((field) => (
+                                        <Grid
+                                            item
+                                            xs={field.xs}
+                                            sm={field.sm}
+                                            md={field.md}
+                                            key={field.id}
+                                        >
+                                            <TextField
+                                                id={field.id}
+                                                label={field.label}
+                                                variant="outlined"
+                                                fullWidth
+                                                margin="dense"
+                                                value={carDetails[field.id]}
+                                                onChange={handleInputChange}
+                                                type={field.type || "text"}
+                                                InputLabelProps={
+                                                    field.type === "date" ? { shrink: true } : {}
+                                                }
+                                                size={isMobile ? "small" : "medium"}
+                                            />
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </CardContent>
+                        </Card>
+
+                        {/* Parts Used */}
+                        <Card sx={{ mb: 4 }}>
+                            <CardContent>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: isMobile ? "column" : "row",
+                                        justifyContent: "space-between",
+                                        alignItems: isMobile ? "flex-start" : "center",
+                                        mb: 2,
+                                        gap: isMobile ? 2 : 0,
+                                    }}
+                                >
+                                    <Typography
+                                        variant="h6"
+                                        color="primary"
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            "&::before": {
+                                                content: '""',
+                                                display: "inline-block",
+                                                width: 4,
+                                                height: 20,
+                                                backgroundColor: "primary.main",
+                                                marginRight: 1,
+                                                borderRadius: 1,
+                                            },
+                                        }}
+                                    >
+                                        Parts Used ({parts.length})
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        color="secondary"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setShowNewPartDialog(true)}
+                                        size={isMobile ? "small" : "medium"}
+                                        fullWidth={isMobile}
+                                    >
+                                        Add Part
+                                    </Button>
+                                </Box>
+                                {parts.length > 0 ? (
+                                    <TableContainer
+                                        component={Paper}
+                                        variant="outlined"
+                                        sx={{ mb: 2, overflowX: "auto" }}
+                                    >
+                                        <Table size={isMobile ? "small" : "medium"}>
+                                            <TableHead>
+                                                <TableRow sx={{ backgroundColor: "primary.main" }}>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Sr.No
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Part Name
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Qty
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Price/Piece
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Total Price
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Action
+                                                    </TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {parts.map((part, index) => (
+                                                    <TableRow key={part.id} hover>
+                                                        <TableCell sx={tableCellStyle}>{index + 1}</TableCell>
+                                                        <TableCell sx={tableCellStyle}>{part.name}</TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            {part.quantity}
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                                                                {formatCurrency(part.pricePerUnit).replace(
+                                                                    "₹",
+                                                                    ""
+                                                                )}
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="primary"
+                                                                    onClick={() =>
+                                                                        openEditPrice(
+                                                                            part.id,
+                                                                            "part",
+                                                                            "pricePerUnit",
+                                                                            part.pricePerUnit
+                                                                        )
+                                                                    }
+                                                                    sx={{ ml: 1 }}
+                                                                >
+                                                                    <EditIcon
+                                                                        fontSize={isMobile ? "small" : "medium"}
+                                                                    />
+                                                                </IconButton>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            {formatCurrency(part.total)}
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => removePart(part.id)}
+                                                            >
+                                                                <DeleteIcon
+                                                                    fontSize={isMobile ? "small" : "medium"}
+                                                                />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Typography 
+                                        variant="body2" 
+                                        color="text.secondary" 
+                                        sx={{ textAlign: 'center', py: 2 }}
+                                    >
+                                        No parts data available from API. Click "Add Part" to add manually.
+                                    </Typography>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Service Details */}
+                        <Card sx={{ mb: 4 }}>
+                            <CardContent>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: isMobile ? "column" : "row",
+                                        justifyContent: "space-between",
+                                        alignItems: isMobile ? "flex-start" : "center",
+                                        mb: 2,
+                                        gap: isMobile ? 2 : 0,
+                                    }}
+                                >
+                                    <Typography
+                                        variant="h6"
+                                        color="primary"
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            "&::before": {
+                                                content: '""',
+                                                display: "inline-block",
+                                                width: 4,
+                                                height: 20,
+                                                backgroundColor: "primary.main",
+                                                marginRight: 1,
+                                                borderRadius: 1,
+                                            },
+                                        }}
+                                    >
+                                        Service Details ({services.length})
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        color="secondary"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setShowNewServiceDialog(true)}
+                                        size={isMobile ? "small" : "medium"}
+                                        fullWidth={isMobile}
+                                    >
+                                        Add Service
+                                    </Button>
+                                </Box>
+                                {services.length > 0 ? (
+                                    <TableContainer
+                                        component={Paper}
+                                        variant="outlined"
+                                        sx={{ mb: 2, overflowX: "auto" }}
+                                    >
+                                        <Table size={isMobile ? "small" : "medium"}>
+                                            <TableHead>
+                                                <TableRow sx={{ backgroundColor: "primary.main" }}>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Service
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Engineer
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Progress
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Status
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Labour Cost
+                                                    </TableCell>
+                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
+                                                        Action
+                                                    </TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {services.map((service) => (
+                                                    <TableRow key={service.id} hover>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            {service.name}
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            {service.engineer}
+                                                        </TableCell>
+                                                        <TableCell sx={{ ...tableCellStyle, width: "15%" }}>
+                                                            <LinearProgress
+                                                                variant="determinate"
+                                                                value={service.progress}
+                                                                sx={{ height: 8, borderRadius: 4 }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            <Chip
+                                                                label={service.status}
+                                                                color={getStatusColor(service.status)}
+                                                                size={isMobile ? "small" : "medium"}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                                                                {formatCurrency(service.laborCost).replace(
+                                                                    "₹",
+                                                                    ""
+                                                                )}
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="primary"
+                                                                    onClick={() =>
+                                                                        openEditPrice(
+                                                                            service.id,
+                                                                            "service",
+                                                                            "laborCost",
+                                                                            service.laborCost
+                                                                        )
+                                                                    }
+                                                                    sx={{ ml: 1 }}
+                                                                >
+                                                                    <EditIcon
+                                                                        fontSize={isMobile ? "small" : "medium"}
+                                                                    />
+                                                                </IconButton>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell sx={tableCellStyle}>
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => removeService(service.id)}
+                                                            >
+                                                                <DeleteIcon
+                                                                    fontSize={isMobile ? "small" : "medium"}
+                                                                />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Typography 
+                                        variant="body2" 
+                                        color="text.secondary" 
+                                        sx={{ textAlign: 'center', py: 2 }}
+                                    >
+                                        No services data available from API. Click "Add Service" to add manually.
+                                    </Typography>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Final Inspection Notes */}
+                        <Card sx={{ mb: 4 }}>
+                            <CardContent>
+                                <Typography
+                                    variant="h6"
+                                    color="primary"
+                                    gutterBottom
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        "&::before": {
+                                            content: '""',
+                                            display: "inline-block",
+                                            width: 4,
+                                            height: 20,
+                                            backgroundColor: "primary.main",
+                                            marginRight: 1,
+                                            borderRadius: 1,
+                                        },
+                                    }}
+                                >
+                                    Final Inspection Notes
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={4}
+                                    variant="outlined"
+                                    placeholder="Enter final inspection notes or additional comments..."
+                                    value={finalInspection}
+                                    onChange={(e) => setFinalInspection(e.target.value)}
+                                    sx={{ mt: 1 }}
+                                />
+                            </CardContent>
+                        </Card>
+
+                        {/* Bill Summary */}
+                        <Card>
+                            <CardContent>
+                                <Typography
+                                    variant="h6"
+                                    color="primary"
+                                    gutterBottom
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        "&::before": {
+                                            content: '""',
+                                            display: "inline-block",
+                                            width: 4,
+                                            height: 20,
+                                            backgroundColor: "primary.main",
+                                            marginRight: 1,
+                                            borderRadius: 1,
+                                        },
+                                    }}
+                                >
+                                    Bill Summary
+                                </Typography>
+                                <Paper
+                                    variant="outlined"
+                                    sx={{ p: isMobile ? 2 : 3, backgroundColor: "grey.50" }}
+                                >
+                                    {[
+                                        {
+                                            label: "Total Parts Cost:",
+                                            value: formatCurrency(summary.totalPartsCost),
+                                        },
+                                        {
+                                            label: "Total Labour Cost:",
+                                            value: formatCurrency(summary.totalLaborCost),
+                                        },
+                                        {
+                                            label: "Subtotal:",
+                                            value: formatCurrency(summary.subtotal),
+                                        },
+                                        {
+                                            label: "GST (18%):",
+                                            value: formatCurrency(summary.gstAmount),
+                                        },
+                                        {
+                                            label: "Discount:",
+                                            value: (
+                                                <Box sx={{ display: "flex", alignItems: "center" }}>
+                                                    <TextField
+                                                        size="small"
+                                                        type="number"
+                                                        value={summary.discount}
+                                                        onChange={handleDiscountChange}
+                                                        sx={{ width: isMobile ? 80 : 100, mr: 1 }}
+                                                        InputProps={{
+                                                            startAdornment: (
+                                                                <InputAdornment position="start">
+                                                                    ₹
+                                                                </InputAdornment>
+                                                            ),
+                                                        }}
+                                                    />
+                                                    <Typography>
+                                                        ({formatCurrency(summary.discount)})
+                                                    </Typography>
+                                                </Box>
+                                            ),
+                                            custom: true,
+                                        },
+                                    ].map((item, index) => (
+                                        <Box
+                                            key={index}
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: isMobile ? "column" : "row",
+                                                justifyContent: "space-between",
+                                                mb: 1,
+                                                py: 1,
+                                                borderBottom: "1px dashed grey.300",
+                                                gap: isMobile ? 1 : 0,
+                                            }}
+                                        >
+                                            <Typography>{item.label}</Typography>
+                                            {item.custom ? (
+                                                item.value
+                                            ) : (
+                                                <Typography>{item.value}</Typography>
+                                            )}
+                                        </Box>
+                                    ))}
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            flexDirection: isMobile ? "column" : "row",
+                                            justifyContent: "space-between",
+                                            py: 1,
+                                            fontWeight: "bold",
+                                            gap: isMobile ? 1 : 0,
+                                        }}
+                                    >
+                                        <Typography
+                                            fontWeight="bold"
+                                            color="primary.dark"
+                                            fontSize={isMobile ? "16px" : "18px"}
+                                        >
+                                            Total Amount:
+                                        </Typography>
+                                        <Typography
+                                            fontWeight="bold"
+                                            color="primary.dark"
+                                            fontSize={isMobile ? "16px" : "18px"}
+                                        >
+                                            {formatCurrency(summary.totalAmount)}
+                                        </Typography>
+                                    </Box>
+                                </Paper>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
+
+                {/* Thank You Message (shown after payment) */}
+                {showThankYou && (
+                    <Box
+                        sx={{
+                            textAlign: "center",
+                            py: isMobile ? 3 : 5,
+                            px: isMobile ? 2 : 4,
+                            backgroundColor: "grey.50",
+                            borderRadius: 2,
+                        }}
+                    >
+                        <CheckIcon
+                            sx={{
+                                fontSize: isMobile ? 40 : 60,
+                                color: "primary.main",
+                                mb: 2,
+                            }}
+                        />
+                        <Typography
+                            variant={isMobile ? "h5" : "h4"}
+                            color="primary.dark"
+                            gutterBottom
                         >
-                            <Typography variant="h5" fontWeight={500} sx={{ mb: { xs: 1, sm: 0 } }}>
-                                User List
-                            </Typography>
+                            Thank You!
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary" gutterBottom>
+                            Your payment has been processed successfully and the receipt has
+                            been sent to the customer.
+                        </Typography>
+                        <Typography variant="body1" gutterBottom>
+                            Invoice #{carDetails.invoiceNo} | Amount:{" "}
+                            {formatCurrency(summary.totalAmount)}
+                        </Typography>
+
+                        {/* Enhanced Button Container with all sharing options */}
+                        <Box sx={{
+                            display: 'flex',
+                            flexDirection: isMobile ? 'column' : 'row',
+                            justifyContent: 'center',
+                            gap: 2,
+                            mt: 3
+                        }}>
                             <Button
                                 variant="contained"
                                 color="primary"
-                                startIcon={<AddIcon />}
-                                onClick={handleAddOpen}
+                                startIcon={<PrintIcon />}
+                                onClick={printBill}
                                 size={isMobile ? "small" : "medium"}
+                                fullWidth={isMobile}
+                            >
+                                Print Bill
+                            </Button>
+
+                            <Button
+                                variant="contained"
+                                color="error"
+                                startIcon={<PdfIcon />}
+                                onClick={downloadPdfBill}
+                                size={isMobile ? "small" : "medium"}
+                                fullWidth={isMobile}
                                 sx={{
-                                    alignSelf: { xs: 'flex-end', sm: 'auto' },
-                                    whiteSpace: 'nowrap'
+                                    backgroundColor: '#d32f2f',
+                                    '&:hover': {
+                                        backgroundColor: '#b71c1c',
+                                    }
                                 }}
                             >
-                                New User
+                                Download PDF
                             </Button>
-                        </Box>
 
-                        <TextField
-                            fullWidth
-                            variant="outlined"
-                            placeholder="Search users by name, username or email"
-                            margin="normal"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon />
-                                    </InputAdornment>
-                                ),
-                            }}
-                            sx={{ mb: 2 }}
-                            size={isMobile ? "small" : "medium"}
-                        />
-
-                        <Box sx={{ height: { xs: 400, sm: 500, md: 600 }, width: '100%' }}>
-                            <DataGrid
-                                rows={filteredUsers}
-                                columns={getColumns()}
-                                pageSize={isMobile ? 5 : 10}
-                                rowsPerPageOptions={[5, 10, 25, 50]}
-                                disableSelectionOnClick
-                                density={isMobile ? "compact" : "standard"}
+                            <Button
+                                variant="contained"
+                                color="success"
+                                startIcon={<WhatsAppIcon />}
+                                onClick={sendBillViaWhatsApp}
+                                disabled={sendingWhatsApp}
+                                size={isMobile ? "small" : "medium"}
+                                fullWidth={isMobile}
                                 sx={{
-                                    '& .MuiDataGrid-columnHeaders': {
-                                        backgroundColor: theme.palette.primary.main,
-                                        color: 'white',
-                                    },
-                                    '& .MuiDataGrid-cell': {
-                                        fontSize: isMobile ? '0.75rem' : '0.875rem',
-                                    },
-                                    width: '100%',
-                                    border: 'none',
-                                    '& .MuiDataGrid-virtualScroller': {
-                                        overflowX: 'auto',
+                                    backgroundColor: '#25d366',
+                                    '&:hover': {
+                                        backgroundColor: '#128C7E',
                                     }
                                 }}
-                            />
-                        </Box>
+                            >
+                                {sendingWhatsApp ? "Sending..." : "Send via WhatsApp"}
+                            </Button>
 
-                        {/* Mobile Action Menu */}
-                        {renderMobileActionMenu()}
-
-                        {/* Add User Dialog */}
-                        <Dialog
-                            open={openAddDialog}
-                            onClose={handleAddClose}
-                            maxWidth="sm"
-                            fullWidth
-                            fullScreen={isMobile}
-                        >
-                            <DialogTitle>New User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Name"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email"
-                                            name="email"
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <EmailIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Contact"
-                                            name="contact"
-                                            value={formData.contact}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PhoneIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            inputProps={{ maxLength: 10 }}
-                                            required
-                                            error={formData.contact.length > 0 && formData.contact.length !== 10}
-                                            helperText={
-                                                formData.contact.length > 0 && formData.contact.length !== 10
-                                                    ? 'Contact must be 10 digits'
-                                                    : ''
-                                            }
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Username"
-                                            name="username"
-                                            value={formData.username}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Password"
-                                            name="password"
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={formData.password}
-                                            onChange={handleInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <LockIcon />
-                                                    </InputAdornment>
-                                                ),
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            onClick={() => setShowPassword(!showPassword)}
-                                                            edge="end"
-                                                            size={isMobile ? "small" : "medium"}
-                                                        >
-                                                            {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={formData.enabled}
-                                                    onChange={(e) =>
-                                                        setFormData({ ...formData, enabled: e.target.checked })
-                                                    }
-                                                    color="primary"
-                                                    size={isMobile ? "small" : "medium"}
-                                                />
-                                            }
-                                            label="Active User"
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions sx={{ p: 2, gap: 1 }}>
-                                <Button onClick={handleAddClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
-                                <Button
-                                    onClick={handleSubmit}
-                                    color="primary"
-                                    variant="contained"
-                                    size={isMobile ? "small" : "medium"}
-                                >
-                                    Save User
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
-
-                        {/* Edit User Dialog */}
-                        <Dialog
-                            open={openEditDialog}
-                            onClose={handleEditClose}
-                            maxWidth="sm"
-                            fullWidth
-                            fullScreen={isMobile}
-                        >
-                            <DialogTitle>Modify User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Name"
-                                            name="name"
-                                            value={editFormData.name}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Contact"
-                                            name="contact"
-                                            value={editFormData.contact}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PhoneIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            inputProps={{ maxLength: 10 }}
-                                            required
-                                            error={editFormData.contact.length > 0 && editFormData.contact.length !== 10}
-                                            helperText={
-                                                editFormData.contact.length > 0 && editFormData.contact.length !== 10
-                                                    ? 'Contact must be 10 digits'
-                                                    : ''
-                                            }
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Email"
-                                            name="email"
-                                            type="email"
-                                            value={editFormData.email}
-                                            onChange={handleEditInputChange}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <EmailIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={editFormData.enabled}
-                                                    onChange={(e) =>
-                                                        setEditFormData({ ...editFormData, enabled: e.target.checked })
-                                                    }
-                                                    color="primary"
-                                                    size={isMobile ? "small" : "medium"}
-                                                />
-                                            }
-                                            label="Active User"
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions sx={{ p: 2, gap: 1 }}>
-                                <Button onClick={handleEditClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
-                                <Button
-                                    onClick={handleUpdate}
-                                    color="primary"
-                                    variant="contained"
-                                    size={isMobile ? "small" : "medium"}
-                                >
-                                    Save Changes
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
-
-                        {/* Change Password Dialog */}
-                        <Dialog
-                            open={openPasswordDialog}
-                            onClose={handlePasswordClose}
-                            maxWidth="sm"
-                            fullWidth
-                            fullScreen={isMobile}
-                        >
-                            <DialogTitle>Modify Password</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Master Password"
-                                            name="editadmin"
-                                            type={showPassword ? 'text' : 'password'}
-                                            value={passwordForm.editadmin}
-                                            onChange={handlePasswordChange}
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            onClick={() => setShowPassword(!showPassword)}
-                                                            edge="end"
-                                                            size={isMobile ? "small" : "medium"}
-                                                        >
-                                                            {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            size={isMobile ? "small" : "medium"}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="New Password"
-                                            name="newpass"
-                                            type={showNewPassword ? 'text' : 'password'}
-                                            value={passwordForm.newpass}
-                                            onChange={handlePasswordChange}
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            onClick={() => setShowNewPassword(!showNewPassword)}
-                                                            edge="end"
-                                                        >
-                                                            {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Re-enter Password"
-                                            name="repass"
-                                            type={showConfirmPassword ? 'text' : 'password'}
-                                            value={passwordForm.repass}
-                                            onChange={handlePasswordChange}
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        <IconButton
-                                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                            edge="end"
-                                                        >
-                                                            {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                                        </IconButton>
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            required
-                                            error={passwordForm.newpass !== passwordForm.repass && passwordForm.repass !== ''}
-                                            helperText={
-                                                passwordForm.newpass !== passwordForm.repass && passwordForm.repass !== ''
-                                                    ? 'Passwords do not match'
-                                                    : ''
-                                            }
-                                        />
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button onClick={handlePasswordClose}>Cancel</Button>
-                                <Button
-                                    onClick={handlePasswordUpdate}
-                                    color="primary"
-                                    variant="contained"
-                                    disabled={
-                                        !passwordForm.editadmin ||
-                                        !passwordForm.newpass ||
-                                        !passwordForm.repass ||
-                                        passwordForm.newpass !== passwordForm.repass
+                            <Button
+                                variant="contained"
+                                color="info"
+                                startIcon={<EmailIcon />}
+                                onClick={openEmailDialog}
+                                disabled={sendingEmail}
+                                size={isMobile ? "small" : "medium"}
+                                fullWidth={isMobile}
+                                sx={{
+                                    backgroundColor: '#1976d2',
+                                    '&:hover': {
+                                        backgroundColor: '#1565c0',
                                     }
-                                >
-                                    Change Password
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                                }}
+                            >
+                                {sendingEmail ? "Sending..." : "Send via Email"}
+                            </Button>
+                        </Box>
+                    </Box>
+                )}
+            </Paper>
 
-                        {/* Assign Sites Dialog */}
-                        <Dialog open={openSiteDialog} onClose={handleAssignSiteClose} maxWidth="sm" fullWidth>
-                            <DialogTitle>Assign Site To User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Username"
-                                            value={selectedUser?.username || ''}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            disabled
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Select Site</InputLabel>
-                                            <Select
-                                                multiple
-                                                value={selectedSites}
-                                                onChange={handleSiteChange}
-                                                renderValue={(selected) => (
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                                        {selected.map((value) => {
-                                                            const site = sites.find((s) => s.siteId === value);
-                                                            return <Typography key={value}>{site?.siteName || value}</Typography>;
-                                                        })}
-                                                    </Box>
-                                                )}
-                                            >
-                                                {sites.map((site) => (
-                                                    <MenuItem key={site.siteId} value={site.siteId}>
-                                                        {site.siteName}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button onClick={handleAssignSiteClose}>Cancel</Button>
-                                <Button onClick={handleAssignSites} color="primary" variant="contained">
-                                    Assign
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+            {/* Payment Method Dialog */}
+            <Dialog
+                open={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                fullScreen={isMobile}
+            >
+                <DialogTitle>Select Payment Method</DialogTitle>
+                <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="success"
+                                sx={{ py: isMobile ? 1 : 1.5 }}
+                                startIcon={<AccountBalanceIcon />}
+                                onClick={() => selectPaymentMethod("Cash")}
+                            >
+                                Cash Payment
+                            </Button>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="primary"
+                                sx={{ py: isMobile ? 1 : 1.5 }}
+                                startIcon={<CreditCardIcon />}
+                                onClick={() => selectPaymentMethod("Card")}
+                            >
+                                Credit/Debit Card
+                            </Button>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="secondary"
+                                sx={{ py: isMobile ? 1 : 1.5 }}
+                                startIcon={<AccountBalanceIcon />}
+                                onClick={() => selectPaymentMethod("Online")}
+                            >
+                                Online Payment
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setShowPaymentModal(false)}
+                        sx={{ width: isMobile ? "100%" : "auto" }}
+                    >
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
-                        {/* Assign Devices Dialog */}
-                        <Dialog open={openDeviceDialog} onClose={handleAssignDeviceClose} maxWidth="sm" fullWidth>
-                            <DialogTitle>Assign Device To User</DialogTitle>
-                            <DialogContent>
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            fullWidth
-                                            label="Username"
-                                            value={selectedUser?.username || ''}
-                                            InputProps={{
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <PersonIcon />
-                                                    </InputAdornment>
-                                                ),
-                                            }}
-                                            disabled
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Select Device</InputLabel>
-                                            <Select
-                                                multiple
-                                                value={selectedDevices}
-                                                onChange={handleDeviceChange}
-                                                renderValue={(selected) => (
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                                        {selected.map((value) => {
-                                                            const device = devices.find((d) => d.id === value);
-                                                            return <Typography key={value}>{device?.devicename || value}</Typography>;
-                                                        })}
-                                                    </Box>
-                                                )}
-                                            >
-                                                {devices.map((device) => (
-                                                    <MenuItem key={device.id} value={device.id}>
-                                                        {device.devicename}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                </Grid>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button onClick={handleAssignDeviceClose}>Cancel</Button>
-                                <Button onClick={handleAssignDevices} color="primary" variant="contained">
-                                    Assign
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
-                    </CardContent>
-                </Card>
-            </Box>
-        </>
-    );
-};
+               {/* Processing Payment Dialog */}
+                      <Dialog
+                          open={showProcessModal}
+                          onClose={() => setShowProcessModal(false)}
+                          fullScreen={isMobile}
+                      >
+                          <DialogTitle>Processing {paymentMethod} Payment</DialogTitle>
+                          <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                              <Box sx={{ textAlign: "center", py: 4 }}>
+                                  <LinearProgress sx={{ mb: 3 }} />
+                                  <Typography>
+                                      Processing your payment via {paymentMethod}...
+                                  </Typography>
+                              </Box>
+                          </DialogContent>
+                          <DialogActions>
+                              <Button
+                                  onClick={() => setShowProcessModal(false)}
+                                  color="error"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Cancel
+                              </Button>
+                              <Button
+                                  onClick={processPayment}
+                                  variant="contained"
+                                  color="primary"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Confirm Payment
+                              </Button>
+                          </DialogActions>
+                      </Dialog>
+          
+                      {/* Email Dialog */}
+                      <Dialog
+                          open={showEmailDialog}
+                          onClose={() => setShowEmailDialog(false)}
+                          fullScreen={isMobile}
+                          maxWidth="md"
+                      >
+                          <DialogTitle>Send Invoice via Email</DialogTitle>
+                          <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                              <Grid container spacing={2}>
+                                  <Grid item xs={12}>
+                                      <TextField
+                                          fullWidth
+                                          label="Recipient Email"
+                                          type="email"
+                                          variant="outlined"
+                                          value={emailRecipient}
+                                          onChange={(e) => setEmailRecipient(e.target.value)}
+                                          required
+                                          helperText="Enter the customer's email address"
+                                      />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                      <TextField
+                                          fullWidth
+                                          label="Subject"
+                                          variant="outlined"
+                                          value={emailSubject}
+                                          onChange={(e) => setEmailSubject(e.target.value)}
+                                          required
+                                      />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                      <TextField
+                                          fullWidth
+                                          label="Message"
+                                          multiline
+                                          rows={6}
+                                          variant="outlined"
+                                          value={emailMessage}
+                                          onChange={(e) => setEmailMessage(e.target.value)}
+                                          helperText="This message will be sent along with the PDF invoice attachment"
+                                      />
+                                  </Grid>
+                                  <Grid item xs={12}>
+                                      <Box sx={{
+                                          p: 2,
+                                          backgroundColor: 'info.light',
+                                          borderRadius: 1,
+                                          color: 'info.contrastText'
+                                      }}>
+                                          <Typography variant="body2">
+                                              📎 The PDF invoice will be automatically attached to this email.
+                                          </Typography>
+                                      </Box>
+                                  </Grid>
+                              </Grid>
+                          </DialogContent>
+                          <DialogActions>
+                              <Button
+                                  onClick={() => setShowEmailDialog(false)}
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                                  disabled={sendingEmail}
+                              >
+                                  Cancel
+                              </Button>
+                              <Button
+                                  onClick={sendBillViaEmail}
+                                  variant="contained"
+                                  color="primary"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                                  disabled={sendingEmail || !emailRecipient.includes('@')}
+                                  startIcon={sendingEmail ? null : <EmailIcon />}
+                              >
+                                  {sendingEmail ? "Sending..." : "Send Email"}
+                              </Button>
+                          </DialogActions>
+                      </Dialog>
+          
+                      {/* Edit Price Dialog */}
+                      <Dialog
+                          open={showEditPriceDialog}
+                          onClose={() => setShowEditPriceDialog(false)}
+                          fullScreen={isMobile}
+                      >
+                          <DialogTitle>
+                              Edit {editItem.field === "pricePerUnit" ? "Part Price" : "Labor Cost"}
+                          </DialogTitle>
+                          <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                              <TextField
+                                  autoFocus
+                                  margin="dense"
+                                  label={
+                                      editItem.field === "pricePerUnit"
+                                          ? "New Price per Unit"
+                                          : "New Labor Cost"
+                                  }
+                                  type="number"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={editItem.value}
+                                  onChange={(e) =>
+                                      setEditItem({ ...editItem, value: e.target.value })
+                                  }
+                                  InputProps={{
+                                      startAdornment: (
+                                          <InputAdornment position="start">₹</InputAdornment>
+                                      ),
+                                  }}
+                              />
+                          </DialogContent>
+                          <DialogActions>
+                              <Button
+                                  onClick={() => setShowEditPriceDialog(false)}
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Cancel
+                              </Button>
+                              <Button
+                                  onClick={saveEditedPrice}
+                                  variant="contained"
+                                  color="primary"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Save
+                              </Button>
+                          </DialogActions>
+                      </Dialog>
+          
+                      {/* New Part Dialog */}
+                      <Dialog
+                          open={showNewPartDialog}
+                          onClose={() => setShowNewPartDialog(false)}
+                          fullScreen={isMobile}
+                      >
+                          <DialogTitle>Add New Part</DialogTitle>
+                          <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                              <TextField
+                                  autoFocus
+                                  margin="dense"
+                                  label="Part Name"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newPart.name}
+                                  onChange={(e) =>
+                                      setNewPart({ ...newPart, name: e.target.value })
+                                  }
+                              />
+                              <TextField
+                                  margin="dense"
+                                  label="Quantity"
+                                  type="number"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newPart.quantity}
+                                  onChange={(e) =>
+                                      setNewPart({ ...newPart, quantity: e.target.value })
+                                  }
+                              />
+                              <TextField
+                                  margin="dense"
+                                  label="Price per Unit"
+                                  type="number"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newPart.pricePerUnit}
+                                  onChange={(e) =>
+                                      setNewPart({ ...newPart, pricePerUnit: e.target.value })
+                                  }
+                                  InputProps={{
+                                      startAdornment: (
+                                          <InputAdornment position="start">₹</InputAdornment>
+                                      ),
+                                  }}
+                              />
+                          </DialogContent>
+                          <DialogActions>
+                              <Button
+                                  onClick={() => setShowNewPartDialog(false)}
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Cancel
+                              </Button>
+                              <Button
+                                  onClick={addNewPart}
+                                  variant="contained"
+                                  color="primary"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Add Part
+                              </Button>
+                          </DialogActions>
+                      </Dialog>
+          
+                      {/* New Service Dialog */}
+                      <Dialog
+                          open={showNewServiceDialog}
+                          onClose={() => setShowNewServiceDialog(false)}
+                          fullScreen={isMobile}
+                      >
+                          <DialogTitle>Add New Service</DialogTitle>
+                          <DialogContent sx={{ p: isMobile ? 2 : 3 }}>
+                              <TextField
+                                  autoFocus
+                                  margin="dense"
+                                  label="Service Name"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newService.name}
+                                  onChange={(e) =>
+                                      setNewService({ ...newService, name: e.target.value })
+                                  }
+                              />
+                              <TextField
+                                  margin="dense"
+                                  label="Engineer Name"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newService.engineer}
+                                  onChange={(e) =>
+                                      setNewService({ ...newService, engineer: e.target.value })
+                                  }
+                              />
+                              <TextField
+                                  margin="dense"
+                                  label="Labor Cost"
+                                  type="number"
+                                  fullWidth
+                                  variant="outlined"
+                                  value={newService.laborCost}
+                                  onChange={(e) =>
+                                      setNewService({ ...newService, laborCost: e.target.value })
+                                  }
+                                  InputProps={{
+                                      startAdornment: (
+                                          <InputAdornment position="start">₹</InputAdornment>
+                                      ),
+                                  }}
+                              />
+                          </DialogContent>
+                          <DialogActions>
+                              <Button
+                                  onClick={() => setShowNewServiceDialog(false)}
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Cancel
+                              </Button>
+                              <Button
+                                  onClick={addNewService}
+                                  variant="contained"
+                                  color="primary"
+                                  sx={{ width: isMobile ? "100%" : "auto" }}
+                              >
+                                  Add Service
+                              </Button>
+                          </DialogActions>
+                      </Dialog>
+          
+                      {/* API Response Snackbar */}
+                      <Snackbar
+                          open={showApiResponse}
+                          autoHideDuration={6000}
+                          onClose={() => setShowApiResponse(false)}
+                          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+                      >
+                          <Alert
+                              onClose={() => setShowApiResponse(false)}
+                              severity={apiResponseMessage?.type || "info"}
+                              sx={{ width: "100%" }}
+                          >
+                              {apiResponseMessage?.message}
+                          </Alert>
+                      </Snackbar>
+                  </Box>
+              );
+          };
+          
+          export default AutoServeBilling;
 
-export default UserManagement;
+
+

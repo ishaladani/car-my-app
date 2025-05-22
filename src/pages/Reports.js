@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -24,7 +24,12 @@ import {
   InputLabel,
   Select,
   useTheme,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import { 
   Search as SearchIcon,
@@ -33,54 +38,90 @@ import {
   Visibility as VisibilityIcon,
   FileDownload as FileDownloadIcon,
   Assessment as AssessmentIcon,
-  DateRange as DateRangeIcon
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
-
-// Sample service history data
-const serviceHistoryData = [
-  { id: 1, date: '2025-03-15', carNumber: 'ABC-123', owner: 'John Smith', details: 'Engine Repair' },
-  { id: 2, date: '2025-03-10', carNumber: 'XYZ-456', owner: 'Sarah Williams', details: 'Brake Replacement' },
-  { id: 3, date: '2025-03-05', carNumber: 'DEF-789', owner: 'Michael Brown', details: 'Oil Change' },
-  { id: 4, date: '2025-02-28', carNumber: 'GHI-101', owner: 'Jessica Davis', details: 'Tire Rotation' },
-  { id: 5, date: '2025-02-22', carNumber: 'JKL-234', owner: 'Robert Taylor', details: 'A/C Repair' },
-];
+import axios from 'axios';
 
 const RecordReport = () => {
+  const token = localStorage.getItem("authToken")
+    ? `Bearer ${localStorage.getItem("authToken")}`
+    : "";
+  const garageId = localStorage.getItem("garageId");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reportType, setReportType] = useState('financial');
-  const [filteredData, setFilteredData] = useState(serviceHistoryData);
+  const [inventoryData, setInventoryData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
 
-  // Filter service history based on search term
-  const handleSearch = (e) => {
-    const searchTerm = e.target.value.toLowerCase();
-    setSearch(searchTerm);
-    
-    if (searchTerm.trim() === '') {
-      setFilteredData(serviceHistoryData);
-    } else {
-      const filtered = serviceHistoryData.filter(
-        item => 
-          item.carNumber.toLowerCase().includes(searchTerm) || 
-          item.owner.toLowerCase().includes(searchTerm)
-      );
-      setFilteredData(filtered);
-    }
-  };
+  // Fetch inventory data
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!token || !garageId) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await axios.get(
+          `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+          {
+            headers: {
+              Authorization: token,
+            },
+          }
+        );
+
+        // Process the response
+        const data = Array.isArray(response.data)
+          ? response.data
+          : response.data.inventory
+          ? response.data.inventory
+          : response.data.data
+          ? response.data.data
+          : [];
+
+        setInventoryData(data);
+        setFilteredData(data);
+      } catch (error) {
+        console.error("Error fetching inventory:", error);
+        setError("Failed to load inventory data. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, [token, garageId]);
+
+const handleSearch = (e) => {
+  const searchTerm = e.target.value.toLowerCase();
+  setSearch(searchTerm);
+  
+  if (searchTerm.trim() === '') {
+    setFilteredData(inventoryData);
+  } else {
+    const filtered = inventoryData.filter(
+      item => 
+        (item.partName && item.partName.toLowerCase().includes(searchTerm)) || 
+        (item.partNumber && item.partNumber.toLowerCase().includes(searchTerm)) || 
+        (item.carName && item.carName.toLowerCase().includes(searchTerm)) || 
+        (item.model && item.model.toLowerCase().includes(searchTerm))
+    );
+    setFilteredData(filtered);
+  }
+};
 
   // Handle report type change
   const handleReportTypeChange = (e) => {
     setReportType(e.target.value);
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
   // Handle date changes
@@ -90,6 +131,44 @@ const RecordReport = () => {
 
   const handleEndDateChange = (e) => {
     setEndDate(e.target.value);
+  };
+
+  // Handle view button click
+  const handleViewClick = (item) => {
+    setSelectedItem(item);
+    setOpenDialog(true);
+  };
+
+  // Close dialog
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedItem(null);
+  };
+
+  // Generate report
+  const handleGenerateReport = () => {
+    // Filter data based on date range if provided
+    let reportData = [...inventoryData];
+    
+    if (startDate && endDate) {
+      reportData = reportData.filter(item => {
+        const itemDate = new Date(item.createdAt);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return itemDate >= start && itemDate <= end;
+      });
+    }
+    
+    // In a real app, you would generate the report based on the type
+    console.log(`Generating ${reportType} report for ${reportData.length} items`);
+    alert(`Report generated for ${reportData.length} items (${reportType})`);
+  };
+
+  // Download report
+  const handleDownloadReport = () => {
+    // In a real app, you would download the report
+    console.log(`Downloading ${reportType} report`);
+    alert(`Downloading ${reportType} report`);
   };
 
   return (
@@ -116,7 +195,7 @@ const RecordReport = () => {
               </Box>
               <Chip 
                 icon={<AssessmentIcon />} 
-                label="Service Reports" 
+                label="Inventory Reports" 
                 color="primary" 
                 variant="outlined"
                 sx={{ fontWeight: 500 }}
@@ -128,13 +207,13 @@ const RecordReport = () => {
             {/* Search Section */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
-                Search By Car Number Or Owner Name
+                Search By Part Name, Number, Car Name or Model
               </Typography>
               <TextField
                 fullWidth
                 value={search}
                 onChange={handleSearch}
-                placeholder="Enter Car Number Or Owner Name"
+                placeholder="Enter search term..."
                 variant="outlined"
                 InputProps={{
                   endAdornment: (
@@ -148,10 +227,10 @@ const RecordReport = () => {
               />
             </Box>
 
-            {/* Service History Table */}
+            {/* Inventory Table */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Service History
+                Inventory Records
               </Typography>
               <TableContainer component={Paper} elevation={0} sx={{ 
                 border: `1px solid ${theme.palette.divider}`,
@@ -161,48 +240,53 @@ const RecordReport = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell 
-                        sx={{ 
-                          backgroundColor: theme.palette.primary.main,
-                          color: '#fff',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Date
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Part Name
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          backgroundColor: theme.palette.primary.main,
-                          color: '#fff',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Car Number
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Part Number
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          backgroundColor: theme.palette.primary.main,
-                          color: '#fff',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Owner
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Car Name
                       </TableCell>
-                      {/* <TableCell 
-                        sx={{ 
-                          backgroundColor: theme.palette.primary.main,
-                          color: '#fff',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        Details
-                      </TableCell> */}
-                      <TableCell 
-                        sx={{ 
-                          backgroundColor: theme.palette.primary.main,
-                          color: '#fff',
-                          fontWeight: 'bold'
-                        }}
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Model
+                      </TableCell>
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Quantity
+                      </TableCell>
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}>
+                        Price
+                      </TableCell>
+                      <TableCell sx={{ 
+                        backgroundColor: theme.palette.primary.main,
+                        color: '#fff',
+                        fontWeight: 'bold'
+                      }}
                         align="center"
                       >
                         Action
@@ -210,10 +294,22 @@ const RecordReport = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {filteredData.length > 0 ? (
-                      filteredData.map((row) => (
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3 }}>
+                          Loading inventory data...
+                        </TableCell>
+                      </TableRow>
+                    ) : error ? (
+                      <TableRow>
+                        <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3 }}>
+                          {error}
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredData.length > 0 ? (
+                      filteredData.map((item) => (
                         <TableRow 
-                          key={row.id}
+                          key={item._id}
                           sx={{ 
                             backgroundColor: theme.palette.mode === 'dark' 
                               ? 'rgba(255, 255, 255, 0.05)' 
@@ -230,15 +326,18 @@ const RecordReport = () => {
                             },
                           }}
                         >
-                          <TableCell>{formatDate(row.date)}</TableCell>
-                          <TableCell sx={{ fontWeight: 500 }}>{row.carNumber}</TableCell>
-                          <TableCell>{row.owner}</TableCell>
-                          {/* <TableCell>{row.details}</TableCell> */}
+                          <TableCell>{item.partName || 'N/A'}</TableCell>
+                          <TableCell>{item.partNumber || 'N/A'}</TableCell>
+                          <TableCell>{item.carName || 'N/A'}</TableCell>
+                          <TableCell>{item.model || 'N/A'}</TableCell>
+                          <TableCell>{item.quantity || 0}</TableCell>
+                          <TableCell>${item.pricePerUnit?.toFixed(2) || '0.00'}</TableCell>
                           <TableCell align="center">
                             <Button
                               variant="contained"
                               startIcon={<VisibilityIcon />}
                               size="small"
+                              onClick={() => handleViewClick(item)}
                               sx={{ 
                                 backgroundColor: theme.palette.primary.main,
                                 '&:hover': {
@@ -255,8 +354,8 @@ const RecordReport = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} sx={{ textAlign: 'center', py: 3 }}>
-                          No records found
+                        <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3 }}>
+                          No inventory records found
                         </TableCell>
                       </TableRow>
                     )}
@@ -266,7 +365,7 @@ const RecordReport = () => {
             </Box>
 
             {/* Generate Reports Section */}
-            <Box sx={{ mb: 4 }}>
+            {/* <Box sx={{ mb: 4 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Generate Reports
               </Typography>
@@ -332,8 +431,6 @@ const RecordReport = () => {
                       >
                         <MenuItem value="financial">Financial Report</MenuItem>
                         <MenuItem value="inventory">Inventory Report</MenuItem>
-                        {/* <MenuItem value="service">Service Report</MenuItem>
-                        <MenuItem value="customer">Customer Report</MenuItem> */}
                       </Select>
                     </FormControl>
                   </Grid>
@@ -346,6 +443,7 @@ const RecordReport = () => {
                     fullWidth
                     variant="contained"
                     startIcon={<AssessmentIcon />}
+                    onClick={handleGenerateReport}
                     sx={{ 
                       py: 1.5, 
                       backgroundColor: theme.palette.primary.main,
@@ -366,6 +464,7 @@ const RecordReport = () => {
                     variant="contained"
                     color="success"
                     startIcon={<FileDownloadIcon />}
+                    onClick={handleDownloadReport}
                     sx={{ 
                       py: 1.5, 
                       textTransform: 'none',
@@ -377,10 +476,54 @@ const RecordReport = () => {
                   </Button>
                 </Grid>
               </Grid>
-            </Box>
+            </Box> */}
           </CardContent>
         </Card>
       </Container>
+
+      {/* Item Detail Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Inventory Item Details</Typography>
+            <IconButton onClick={handleCloseDialog}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {selectedItem && (
+            <>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Part Name:</strong> {selectedItem.partName || 'N/A'}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Part Number:</strong> {selectedItem.partNumber || 'N/A'}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Car Name:</strong> {selectedItem.carName || 'N/A'}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Model:</strong> {selectedItem.model || 'N/A'}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Quantity:</strong> {selectedItem.quantity || 0}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Price per Unit:</strong> ${selectedItem.pricePerUnit?.toFixed(2) || '0.00'}
+              </DialogContentText>
+              <DialogContentText sx={{ mb: 2 }}>
+                <strong>Added On:</strong> {new Date(selectedItem.createdAt).toLocaleDateString()}
+              </DialogContentText>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

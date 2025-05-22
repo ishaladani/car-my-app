@@ -382,7 +382,7 @@ const AppLayout = () => {
     },
     { text: "Insurance", icon: <BuildIcon />, path: "/insurance" },
     { text: "User List", icon: <BuildIcon />, path: "/UserManagemt" },
-    { text: "Menu Management", icon: <BuildIcon />, path: "/MenuManagement" },
+    // { text: "Menu Management", icon: <BuildIcon />, path: "/MenuManagement" },
   ];
 
   // Handlers

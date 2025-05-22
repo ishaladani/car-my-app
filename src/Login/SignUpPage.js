@@ -115,10 +115,111 @@ const SignUpPage = () => {
     setSnackbar({...snackbar, open: false});
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleRazorpayPayment = async () => {
+  try {
+    // Load Razorpay script
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+
+    // Create order on your backend (you'll need to implement this endpoint)
+    const orderResponse = await fetch('https://garage-management-system-cr4w.onrender.com/payment/create-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: selectedPlan.price === 'Free' ? 0 : parseInt(selectedPlan.price.replace(/\D/g, '')) * 100, // Convert to paise
+        currency: 'INR',
+        receipt: `garage_signup_${Date.now()}`
+      }),
+    });
+
+    const orderData = await orderResponse.json();
+
+    if (!orderResponse.ok) {
+      throw new Error(orderData.message || 'Failed to create payment order');
+    }
+
+    const options = {
+      key: 'YOUR_RAZORPAY_KEY_ID', // Replace with your Razorpay key
+      amount: orderData.amount,
+      currency: orderData.currency,
+      name: 'Garage Management System',
+      description: `Payment for ${selectedPlan.plan} plan`,
+      order_id: orderData.id,
+      handler: async function(response) {
+        // Verify payment on your backend
+        const verificationResponse = await fetch('https://your-backend-api/verify-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+            plan: selectedPlan.plan,
+            price: selectedPlan.price,
+            ...formData
+          }),
+        });
+
+        const verificationData = await verificationResponse.json();
+
+        if (verificationResponse.ok) {
+          setSnackbar({
+            open: true,
+            message: 'Payment successful! Account created.',
+            severity: 'success'
+          });
+          // Proceed with form submission
+          handleSubmit(new Event('submit'));
+        } else {
+          throw new Error(verificationData.message || 'Payment verification failed');
+        }
+      },
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone
+      },
+      notes: {
+        address: formData.address,
+        plan: selectedPlan.plan
+      },
+      theme: {
+        color: '#3399cc'
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
     
+    rzp.on('payment.failed', function(response) {
+      setSnackbar({
+        open: true,
+        message: `Payment failed: ${response.error.description}`,
+        severity: 'error'
+      });
+    });
+
+  } catch (error) {
+    setSnackbar({
+      open: true,
+      message: error.message || 'Payment processing error',
+      severity: 'error'
+    });
+  }
+};
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // If free plan, submit directly
+  if (selectedPlan?.price === 'Free') {
+    setLoading(true);
     try {
       const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/garage/create', {
         method: 'POST',
@@ -131,7 +232,8 @@ const SignUpPage = () => {
           location: formData.location,
           address: formData.address,
           phone: formData.phone,
-          email: formData.email
+          email: formData.email,
+          plan: selectedPlan?.plan || 'Free'
         }),
       });
       
@@ -143,32 +245,44 @@ const SignUpPage = () => {
           message: 'Garage created successfully!',
           severity: 'success'
         });
-        console.log('API response:', data);
       } else {
-        setSnackbar({
-          open: true,
-          message: data.message || 'Failed to create garage',
-          severity: 'error'
-        });
-        console.error('API error:', data);
+        throw new Error(data.message || 'Failed to create garage');
       }
     } catch (error) {
       setSnackbar({
         open: true,
-        message: 'Network error, please try again',
+        message: error.message,
         severity: 'error'
       });
-      console.error('Fetch error:', error);
     } finally {
       setLoading(false);
     }
-  };
+  } else {
+    // For paid plans, initiate payment
+    handleRazorpayPayment();
+  }
+};
 
   const plans = [
-    { name: 'Basic', price: 'Free', features: ['Limited access', 'Basic support', '1 project'] },
-    { name: 'Standard', price: '$9.99/mo', features: ['Full access', 'Priority support', '5 projects'] },
-    { name: 'Premium', price: '$19.99/mo', features: ['Premium features', '24/7 support', 'Unlimited projects'] }
-  ];
+  { 
+    name: 'Basic', 
+    price: 'Free', 
+    features: ['Limited access', 'Basic support', '1 project'],
+    amount: 0
+  },
+  { 
+    name: 'Standard', 
+    price: '₹999/mo', 
+    features: ['Full access', 'Priority support', '5 projects'],
+    amount: 99900 // in paise
+  },
+  { 
+    name: 'Premium', 
+    price: '₹1999/mo', 
+    features: ['Premium features', '24/7 support', 'Unlimited projects'],
+    amount: 199900 // in paise
+  }
+];
 
   return (
     <ThemeProvider theme={theme}>
@@ -372,20 +486,22 @@ const SignUpPage = () => {
               </Button>
 
               <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                color="primary"
-                disabled={loading}
-                sx={{ 
-                  mt: 1, 
-                  mb: 2, 
-                  py: 1.5,
-                  position: 'relative'
-                }}
-              >
-                {loading ? 'Creating Account...' : 'Sign Up'}
-              </Button>
+  type="submit"
+  fullWidth
+  variant="contained"
+  color="primary"
+  disabled={loading || !selectedPlan}
+  sx={{ 
+    mt: 1, 
+    mb: 2, 
+    py: 1.5,
+    position: 'relative'
+  }}
+>
+  {selectedPlan?.price === 'Free' 
+    ? (loading ? 'Creating Account...' : 'Sign Up') 
+    : (loading ? 'Processing...' : `Pay ${selectedPlan?.price} & Sign Up`)}
+</Button>
 
               <Box sx={{ textAlign: 'center', mt: 2 }}>
                 <Typography variant="body2">

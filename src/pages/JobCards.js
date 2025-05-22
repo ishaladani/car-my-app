@@ -217,19 +217,7 @@ const JobCards = () => {
                   Create Job Card
                 </Typography>
               </Box>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                disabled={loading}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 3
-                }}
-              >
-                {loading ? 'Saving...' : 'Save Job Card'}
-              </Button>
+             
             </Box>
             
             <Divider sx={{ my: 3 }} />
