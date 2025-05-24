@@ -1,620 +1,523 @@
-import React,{ useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Container, 
-  Paper, 
-  InputAdornment, 
-  IconButton,
-  Switch, 
-  Card, 
-  CardContent,
+import React, { useState } from 'react';
+import {
+  Container,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Grid,
   FormControlLabel,
-  Dialog,
-  AppBar,
-  Toolbar,
-  Slide,
-  useTheme,
-  createTheme,
-  ThemeProvider,
-  CssBaseline,
-  Link,
+  Checkbox,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
+  IconButton,
+  InputAdornment,
+  Chip,
   Snackbar,
-  Alert
+  Alert,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
+import { Visibility, VisibilityOff, AddCircleOutline, CheckCircleOutline } from '@mui/icons-material';
 
-// Import Material UI icons
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+// Fixed Razorpay key configuration
+const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_qjd934YSnvGxQZ';
 
-// Transition for the subscription dialog
-const Transition = React.forwardRef(function Transition(props, ref) {
-  return <Slide direction="up" ref={ref} {...props} />;
-});
+const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFA500', '#800080'];
 
-const SignUpPage = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [openSubscriptionDialog, setOpenSubscriptionDialog] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
-  
-  // Updated form fields to match API requirements
+export default function SignUpPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    location: '',
     address: '',
     phone: ''
   });
 
-  // Create a theme based on dark mode preference
-  const theme = createTheme({
-    palette: {
-      mode: isDarkMode ? 'dark' : 'light',
-      primary: {
-        main: '#3f51b5',
-      },
-      secondary: {
-        main: '#f50057',
-      },
-      background: {
-        default: isDarkMode ? '#121212' : '#f5f5f5',
-        paper: isDarkMode ? '#1e1e1e' : '#ffffff',
-      },
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [openPlanDialog, setOpenPlanDialog] = useState(false);
+
+  const plans = [
+    {
+      name: 'Free',
+      price: 'Free',
+      features: ['Basic garage management', 'Up to 5 vehicles', 'Basic reporting'],
+      amount: 0,
+      subscriptionType: 'free',
+      popular: false
     },
-  });
+    {
+      name: '1 Month',
+      price: '₹999',
+      features: ['Full garage management', 'Unlimited vehicles', 'Advanced reporting'],
+      amount: 999,
+      subscriptionType: '1_month',
+      popular: true
+    },
+    {
+      name: '3 Months',
+      price: '₹1999',
+      features: ['All Free features', 'Inventory management', 'Priority support'],
+      amount: 1999,
+      subscriptionType: '3_months',
+      popular: false
+    }
+  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.name.trim()) newErrors.name = 'Garage Name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6)
+      newErrors.password = 'Password must be at least 6 characters';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, '')))
+      newErrors.phone = 'Phone number must be 10 digits';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-  };
-
-  const handleOpenSubscriptionDialog = () => {
-    setOpenSubscriptionDialog(true);
-  };
-
-  const handleCloseSubscriptionDialog = () => {
-    setOpenSubscriptionDialog(false);
-  };
-
-  const selectPlan = (plan, price) => {
-    setSelectedPlan({ plan, price });
-    handleCloseSubscriptionDialog();
-  };
-
-  const cancelPlan = () => {
-    setSelectedPlan(null);
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setOpenSnackbar(true);
   };
 
   const handleCloseSnackbar = () => {
-    setSnackbar({...snackbar, open: false});
+    setOpenSnackbar(false);
+  };
+
+  const handleSelectPlan = (plan) => {
+    setSelectedPlan(plan);
+    setOpenPlanDialog(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      showSnackbar('Please fix the errors in the form.', 'error');
+      return;
+    }
+
+    if (!selectedPlan) {
+      showSnackbar('Please select a plan before submitting.', 'warning');
+      return;
+    }
+
+    if (selectedPlan.amount === 0) {
+      await handleGarageSignup();
+    } else {
+      await handleRazorpayPayment();
+    }
   };
 
   const handleRazorpayPayment = async () => {
-  try {
-    // Load Razorpay script
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    // Create order on your backend (you'll need to implement this endpoint)
-    const orderResponse = await fetch('https://garage-management-system-cr4w.onrender.com/payment/create-order', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: selectedPlan.price === 'Free' ? 0 : parseInt(selectedPlan.price.replace(/\D/g, '')) * 100, // Convert to paise
-        currency: 'INR',
-        receipt: `garage_signup_${Date.now()}`
-      }),
-    });
-
-    const orderData = await orderResponse.json();
-
-    if (!orderResponse.ok) {
-      throw new Error(orderData.message || 'Failed to create payment order');
-    }
-
-    const options = {
-      key: 'YOUR_RAZORPAY_KEY_ID', // Replace with your Razorpay key
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: 'Garage Management System',
-      description: `Payment for ${selectedPlan.plan} plan`,
-      order_id: orderData.id,
-      handler: async function(response) {
-        // Verify payment on your backend
-        const verificationResponse = await fetch('https://your-backend-api/verify-payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
-            plan: selectedPlan.plan,
-            price: selectedPlan.price,
-            ...formData
-          }),
-        });
-
-        const verificationData = await verificationResponse.json();
-
-        if (verificationResponse.ok) {
-          setSnackbar({
-            open: true,
-            message: 'Payment successful! Account created.',
-            severity: 'success'
-          });
-          // Proceed with form submission
-          handleSubmit(new Event('submit'));
-        } else {
-          throw new Error(verificationData.message || 'Payment verification failed');
-        }
-      },
-      prefill: {
-        name: formData.name,
-        email: formData.email,
-        contact: formData.phone
-      },
-      notes: {
-        address: formData.address,
-        plan: selectedPlan.plan
-      },
-      theme: {
-        color: '#3399cc'
-      }
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-    
-    rzp.on('payment.failed', function(response) {
-      setSnackbar({
-        open: true,
-        message: `Payment failed: ${response.error.description}`,
-        severity: 'error'
-      });
-    });
-
-  } catch (error) {
-    setSnackbar({
-      open: true,
-      message: error.message || 'Payment processing error',
-      severity: 'error'
-    });
-  }
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // If free plan, submit directly
-  if (selectedPlan?.price === 'Free') {
-    setLoading(true);
     try {
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/garage/create', {
+      setLoading(true);
+      
+      // Check if Razorpay is loaded
+      if (!window.Razorpay) {
+        throw new Error('Razorpay SDK not loaded. Please refresh the page and try again.');
+      }
+
+      // Validate Razorpay key - fixed validation logic
+      if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID === '' || RAZORPAY_KEY_ID.includes('your_actual_key_here')) {
+        throw new Error('Razorpay key not configured. Please contact support.');
+      }
+
+      console.log('Using Razorpay Key:', RAZORPAY_KEY_ID); // For debugging
+      
+      // 1. Create Razorpay order
+      const orderResponse = await fetch('https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: formData.name,
-          password: formData.password,
-          location: formData.location,
-          address: formData.address,
-          phone: formData.phone,
-          email: formData.email,
-          plan: selectedPlan?.plan || 'Free'
-        }),
+          amount: selectedPlan.amount,
+          subscriptionType: selectedPlan.subscriptionType
+        })
       });
+
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error: ${orderResponse.status} - ${orderResponse.statusText}`);
+      }
+
+      const orderData = await orderResponse.json();
       
+      // Debug log to see what we're getting from the server
+      console.log('Order response from server:', orderData);
+      
+      // Check for different possible response formats
+      const orderId = orderData.id || orderData.order_id || orderData.orderId || orderData.razorpayOrderId;
+      const orderAmount = orderData.amount || orderData.amount_due || selectedPlan.amount * 100; // Razorpay expects amount in paise
+      
+      if (!orderId) {
+        console.error('Full order response:', JSON.stringify(orderData, null, 2));
+        throw new Error(`Invalid order response from server. Expected 'id' field but got: ${Object.keys(orderData).join(', ')}`);
+      }
+
+      // 2. Open Razorpay payment dialog
+      const options = {
+        key: RAZORPAY_KEY_ID,
+        amount: orderAmount,
+        currency: 'INR',
+        name: 'Garage Management',
+        description: `${selectedPlan.name} Plan Subscription`,
+        order_id: orderId,
+        handler: async (response) => {
+          // 3. Verify payment and create account
+          await handleGarageSignup({
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature
+          });
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone
+        },
+        theme: {
+          color: '#1976d2'
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            showSnackbar('Payment cancelled', 'info');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      
+      rzp.on('payment.failed', (response) => {
+        setLoading(false);
+        showSnackbar(
+          response.error?.description || 'Payment failed. Please try again.',
+          'error'
+        );
+      });
+
+      rzp.open();
+      
+    } catch (err) {
+      console.error('Payment error:', err);
+      showSnackbar(err.message || 'Payment processing failed', 'error');
+      setLoading(false);
+    }
+  };
+
+  const handleGarageSignup = async (paymentDetails = {}) => {
+    try {
+      setLoading(true);
+
+      const requestBody = {
+        name: formData.name,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        password: formData.password,
+        subscriptionType: selectedPlan.subscriptionType,
+        amount: selectedPlan.amount,
+        ...paymentDetails
+      };
+
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server error: ${response.status}`);
+      }
+
       const data = await response.json();
       
-      if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: 'Garage created successfully!',
-          severity: 'success'
-        });
-      } else {
-        throw new Error(data.message || 'Failed to create garage');
-      }
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message,
-        severity: 'error'
-      });
+      showSnackbar(
+        selectedPlan.amount === 0 
+          ? 'Free garage account created successfully!' 
+          : 'Payment successful! Garage account created successfully!', 
+        'success'
+      );
+      
+      resetForm();
+
+    } catch (err) {
+      console.error('Signup error:', err);
+      showSnackbar(err.message || 'Something went wrong', 'error');
     } finally {
       setLoading(false);
     }
-  } else {
-    // For paid plans, initiate payment
-    handleRazorpayPayment();
-  }
-};
+  };
 
-  const plans = [
-  { 
-    name: 'Basic', 
-    price: 'Free', 
-    features: ['Limited access', 'Basic support', '1 project'],
-    amount: 0
-  },
-  { 
-    name: 'Standard', 
-    price: '₹999/mo', 
-    features: ['Full access', 'Priority support', '5 projects'],
-    amount: 99900 // in paise
-  },
-  { 
-    name: 'Premium', 
-    price: '₹1999/mo', 
-    features: ['Premium features', '24/7 support', 'Unlimited projects'],
-    amount: 199900 // in paise
-  }
-];
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      address: '',
+      phone: ''
+    });
+    setSelectedPlan(null);
+  };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <Container maxWidth="md" sx={{ mt: 5 }}>
       <Box
         sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 2,
-          bgcolor: 'background.default',
-          transition: 'background-color 0.3s'
+          p: 3,
+          borderRadius: 4,
+          boxShadow: 3,
+          bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#fff'
         }}
       >
-        {/* Dark Mode Toggle */}
-        <FormControlLabel
-          control={
-            <Switch 
-              checked={isDarkMode} 
-              onChange={toggleDarkMode} 
-              icon={<LightModeIcon />}
-              checkedIcon={<DarkModeIcon />}
-              sx={{ 
-                '& .MuiSwitch-switchBase.Mui-checked': { 
-                  color: '#f9a825' 
-                } 
-              }}
-            />
-          }
-          label={isDarkMode ? "Dark Mode" : "Light Mode"}
-          sx={{
-            position: 'absolute',
-            top: 16,
-            right: 16
-          }}
-        />
+        <Typography variant="h5" align="center" fontWeight="bold" gutterBottom>
+          Create Your Garage Account
+        </Typography>
 
-        <Container maxWidth="md">
-          <Paper 
-            elevation={6} 
-            sx={{
-              p: 4,
-              borderRadius: 2,
-              bgcolor: 'background.paper'
+        <form onSubmit={(e) => e.preventDefault()}>
+          {/* Garage Name */}
+          <TextField
+            fullWidth
+            label="Garage Name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            error={!!errors.name}
+            helperText={errors.name}
+            margin="normal"
+            size="small"
+          />
+
+          {/* Email */}
+          <TextField
+            fullWidth
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            error={!!errors.email}
+            helperText={errors.email}
+            margin="normal"
+            size="small"
+          />
+
+          {/* Password */}
+          <TextField
+            fullWidth
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={handleChange}
+            error={!!errors.password}
+            helperText={errors.password}
+            margin="normal"
+            size="small"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
             }}
-          >
-            <Typography 
-              variant="h4" 
-              component="h1" 
-              align="center" 
-              gutterBottom
-              sx={{ fontWeight: 'bold', color: 'primary.main' }}
+          />
+
+          {/* Address */}
+          <TextField
+            fullWidth
+            label="Address"
+            name="address"
+            multiline
+            rows={2}
+            value={formData.address}
+            onChange={handleChange}
+            error={!!errors.address}
+            helperText={errors.address}
+            margin="normal"
+            size="small"
+          />
+
+          {/* Phone */}
+          <TextField
+            fullWidth
+            label="Phone Number"
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            error={!!errors.phone}
+            helperText={errors.phone}
+            margin="normal"
+            size="small"
+          />
+
+          {/* Selected Plan Display */}
+          {selectedPlan && (
+            <Box
+              sx={{
+                border: '2px dashed #1976d2',
+                borderRadius: 2,
+                p: 2,
+                my: 2,
+                bgcolor: theme.palette.mode === 'dark' ? '#1a237e10' : '#bbdefb30'
+              }}
             >
-              Create Garage Account
-            </Typography>
-
-            <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-              <TextField
-                fullWidth
-                margin="normal"
-                id="name"
-                name="name"
-                label="Garage Name"
-                value={formData.name}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="email"
-                name="email"
-                label="Email Address"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="password"
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                variant="outlined"
-                required
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={togglePasswordVisibility}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="location"
-                name="location"
-                label="Location"
-                value={formData.location}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="address"
-                name="address"
-                label="Address"
-                value={formData.address}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="phone"
-                name="phone"
-                label="Phone Number"
-                value={formData.phone}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-
-              {/* Selected Plan Display */}
-              {selectedPlan && (
-                <Card 
-                  sx={{ 
-                    mt: 3,
-                    mb: 3,
-                    position: 'relative',
-                    border: `2px dashed ${theme.palette.primary.main}`,
-                    bgcolor: isDarkMode ? 'rgba(63, 81, 181, 0.1)' : 'rgba(63, 81, 181, 0.05)'
-                  }}
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography fontWeight="bold">{selectedPlan.name}</Typography>
+                  <Typography color={selectedPlan.amount === 0 ? 'green' : 'primary'}>
+                    {selectedPlan.price}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<AddCircleOutline />}
+                  onClick={() => setOpenPlanDialog(true)}
                 >
-                  <CardContent sx={{ textAlign: 'center' }}>
-                    <Typography variant="subtitle2" color="textSecondary">
-                      Selected Plan:
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      {selectedPlan.plan}
-                    </Typography>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        fontWeight: 'bold', 
-                        color: theme.palette.mode === 'dark' ? '#f9a825' : '#f57c00'
-                      }}
-                    >
-                      {selectedPlan.price}
-                    </Typography>
-                    <IconButton
-                      size="small"
-                      onClick={cancelPlan}
-                      sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        bgcolor: 'error.main',
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: 'error.dark',
-                        }
-                      }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Button
-                fullWidth
-                variant="outlined"
-                color="primary"
-                onClick={handleOpenSubscriptionDialog}
-                sx={{ mt: 2, mb: 2, py: 1.5 }}
-              >
-                Choose Subscription
-              </Button>
-
-              <Button
-  type="submit"
-  fullWidth
-  variant="contained"
-  color="primary"
-  disabled={loading || !selectedPlan}
-  sx={{ 
-    mt: 1, 
-    mb: 2, 
-    py: 1.5,
-    position: 'relative'
-  }}
->
-  {selectedPlan?.price === 'Free' 
-    ? (loading ? 'Creating Account...' : 'Sign Up') 
-    : (loading ? 'Processing...' : `Pay ${selectedPlan?.price} & Sign Up`)}
-</Button>
-
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2">
-                  Already have an account?{' '}
-                  <Link 
-                    href="#" 
-                    underline="hover" 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      cursor: 'pointer' 
-                    }}
-                  >
-                    Login
-                  </Link>
-                </Typography>
+                  Change Plan
+                </Button>
               </Box>
             </Box>
-          </Paper>
-        </Container>
+          )}
 
-        {/* Subscription Dialog */}
-        <Dialog
-          fullWidth
-          maxWidth="sm"
-          open={openSubscriptionDialog}
-          onClose={handleCloseSubscriptionDialog}
-          TransitionComponent={Transition}
-        >
-          <AppBar position="static" color="primary" sx={{ position: 'relative' }}>
-            <Toolbar>
-              <Typography sx={{ flex: 1 }} variant="h6" component="div">
-                Choose Your Plan
-              </Typography>
-              <IconButton
-                edge="end"
-                color="inherit"
-                onClick={handleCloseSubscriptionDialog}
-                aria-label="close"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Toolbar>
-          </AppBar>
-          
-          <Box sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-              {plans.map((plan, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card 
-                    raised={selectedPlan?.plan === plan.name}
-                    onClick={() => selectPlan(plan.name, plan.price)}
-                    sx={{ 
-                      cursor: 'pointer',
-                      transition: 'all 0.3s',
-                      transform: selectedPlan?.plan === plan.name ? 'scale(1.02)' : 'scale(1)',
-                      border: selectedPlan?.plan === plan.name ? `2px solid ${theme.palette.primary.main}` : 'none',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: 6
-                      }
-                    }}
-                  >
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="h5" component="div">
-                          {plan.name}
-                        </Typography>
-                        <Typography 
-                          variant="h5" 
-                          component="div" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            color: theme.palette.mode === 'dark' ? '#f9a825' : '#f57c00'
-                          }}
-                        >
-                          {plan.price}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        {plan.features.map((feature, i) => (
-                          <Box key={i} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <CheckCircleOutlineIcon color="primary" fontSize="small" sx={{ mr: 1 }} />
-                            <Typography variant="body2">{feature}</Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </Dialog>
-        
-        {/* Snackbar for notifications */}
-        <Snackbar 
-          open={snackbar.open} 
-          autoHideDuration={6000} 
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert 
-            onClose={handleCloseSnackbar} 
-            severity={snackbar.severity} 
-            variant="filled"
-            sx={{ width: '100%' }}
+          {/* Choose Plan Button */}
+          {!selectedPlan && (
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<AddCircleOutline />}
+              onClick={() => setOpenPlanDialog(true)}
+              sx={{ mb: 2 }}
+            >
+              Choose Subscription Plan
+            </Button>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={loading || !selectedPlan}
+            startIcon={selectedPlan?.amount > 0 ? <CheckCircleOutline /> : null}
+            onClick={handleSubmit}
+            sx={{ py: 1.5 }}
           >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </ThemeProvider>
-  );
-};
+            {loading ? 'Processing...' : selectedPlan?.amount === 0 ? 'Create Free Account' : `Pay ${selectedPlan?.price} & Create`}
+          </Button>
+        </form>
 
-export default SignUpPage;
+        {/* Login Link */}
+        <Box mt={3} textAlign="center">
+          <Typography variant="body2">
+            Already have an account?{' '}
+            <Typography
+              component="span"
+              color="primary"
+              sx={{ cursor: 'pointer' }}
+              fontWeight="bold"
+            >
+              Login here
+            </Typography>
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Plan Selection Dialog */}
+      <Dialog open={openPlanDialog} onClose={() => setOpenPlanDialog(false)} fullScreen={isMobile}>
+        <DialogTitle>Select Your Plan</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ my: 1 }}>
+            {plans.map((plan, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Box
+                  onClick={() => handleSelectPlan(plan)}
+                  sx={{
+                    p: 2,
+                    border: selectedPlan?.name === plan.name ? '2px solid #1976d2' : '1px solid #ccc',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease-in-out',
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: 3
+                    }
+                  }}
+                >
+                  <Typography variant="h6" fontWeight="bold">
+                    {plan.name}
+                  </Typography>
+                  <Typography variant="h5" color={plan.amount === 0 ? 'green' : 'orange'} fontWeight="bold">
+                    {plan.price}
+                  </Typography>
+                  {plan.popular && (
+                    <Chip label="Popular" color="secondary" size="small" sx={{ mt: 1 }} />
+                  )}
+                  <ul style={{ paddingLeft: '1rem', marginTop: '1rem' }}>
+                    {plan.features.map((feature, i) => (
+                      <li key={i}>
+                        <Typography variant="body2" color="textSecondary">
+                          • {feature}
+                        </Typography>
+                      </li>
+                    ))}
+                  </ul>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenPlanDialog(false)}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar Notification */}
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}

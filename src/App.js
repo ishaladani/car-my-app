@@ -37,14 +37,14 @@ function App() {
               <Route path="work-in-progress/:id" element={<WorkInProgress />} />
               <Route path="quality-check/:id" element={<QualityCheck />} />
               <Route path="reminders" element={<SetServiceReminder />} />
-              <Route path="insurance" element={<InsuranceManagement />} />
+              {/* <Route path="insurance" element={<InsuranceManagement />} /> */}
              <Route path="billing/:id" element={<BillingPage />} />
               <Route path='UserManagemt' element={<UserManagement/>}/>
               <Route path='MenuManagement' element={<MenuManagement/>}/>
               
      
             </Route>
-             
+             <Route path="/insurance" element={<InsuranceManagement />} />
 
           {/* <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>
