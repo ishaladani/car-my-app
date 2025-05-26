@@ -136,104 +136,117 @@ export default function SignUpPage() {
       await handleRazorpayPayment();
     }
   };
+// Replace the order handling section (around lines 140-155) with this fixed version:
 
-  const handleRazorpayPayment = async () => {
-    try {
-      setLoading(true);
-      
-      // Check if Razorpay is loaded
-      if (!window.Razorpay) {
-        throw new Error('Razorpay SDK not loaded. Please refresh the page and try again.');
-      }
-
-      // Validate Razorpay key - fixed validation logic
-      if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID === '' || RAZORPAY_KEY_ID.includes('your_actual_key_here')) {
-        throw new Error('Razorpay key not configured. Please contact support.');
-      }
-
-      console.log('Using Razorpay Key:', RAZORPAY_KEY_ID); // For debugging
-      
-      // 1. Create Razorpay order
-      const orderResponse = await fetch('https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          amount: selectedPlan.amount,
-          subscriptionType: selectedPlan.subscriptionType
-        })
-      });
-
-      if (!orderResponse.ok) {
-        const errorData = await orderResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || `Server error: ${orderResponse.status} - ${orderResponse.statusText}`);
-      }
-
-      const orderData = await orderResponse.json();
-      
-      // Debug log to see what we're getting from the server
-      console.log('Order response from server:', orderData);
-      
-      // Check for different possible response formats
-      const orderId = orderData.id || orderData.order_id || orderData.orderId || orderData.razorpayOrderId;
-      const orderAmount = orderData.amount || orderData.amount_due || selectedPlan.amount * 100; // Razorpay expects amount in paise
-      
-      if (!orderId) {
-        console.error('Full order response:', JSON.stringify(orderData, null, 2));
-        throw new Error(`Invalid order response from server. Expected 'id' field but got: ${Object.keys(orderData).join(', ')}`);
-      }
-
-      // 2. Open Razorpay payment dialog
-      const options = {
-        key: RAZORPAY_KEY_ID,
-        amount: orderAmount,
-        currency: 'INR',
-        name: 'Garage Management',
-        description: `${selectedPlan.name} Plan Subscription`,
-        order_id: orderId,
-        handler: async (response) => {
-          // 3. Verify payment and create account
-          await handleGarageSignup({
-            razorpayOrderId: response.razorpay_order_id,
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature
-          });
-        },
-        prefill: {
-          name: formData.name,
-          email: formData.email,
-          contact: formData.phone
-        },
-        theme: {
-          color: '#1976d2'
-        },
-        modal: {
-          ondismiss: () => {
-            setLoading(false);
-            showSnackbar('Payment cancelled', 'info');
-          }
-        }
-      };
-
-      const rzp = new window.Razorpay(options);
-      
-      rzp.on('payment.failed', (response) => {
-        setLoading(false);
-        showSnackbar(
-          response.error?.description || 'Payment failed. Please try again.',
-          'error'
-        );
-      });
-
-      rzp.open();
-      
-    } catch (err) {
-      console.error('Payment error:', err);
-      showSnackbar(err.message || 'Payment processing failed', 'error');
-      setLoading(false);
+const handleRazorpayPayment = async () => {
+  try {
+    setLoading(true);
+    
+    // Check if Razorpay is loaded
+    if (!window.Razorpay) {
+      throw new Error('Razorpay SDK not loaded. Please refresh the page and try again.');
     }
-  };
+
+    // Validate Razorpay key - fixed validation logic
+    if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID === '' || RAZORPAY_KEY_ID.includes('your_actual_key_here')) {
+      throw new Error('Razorpay key not configured. Please contact support.');
+    }
+
+    console.log('Using Razorpay Key:', RAZORPAY_KEY_ID); // For debugging
+    
+    // 1. Create Razorpay order
+    const orderResponse = await fetch('https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: selectedPlan.amount,
+        subscriptionType: selectedPlan.subscriptionType
+      })
+    });
+
+    if (!orderResponse.ok) {
+      const errorData = await orderResponse.json().catch(() => ({}));
+      throw new Error(errorData.message || `Server error: ${orderResponse.status} - ${orderResponse.statusText}`);
+    }
+
+    const orderData = await orderResponse.json();
+    
+    // Debug log to see what we're getting from the server
+    console.log('Order response from server:', orderData);
+    
+    // FIXED: Handle nested order object structure
+    let orderId, orderAmount;
+    
+    if (orderData.order && typeof orderData.order === 'object') {
+      // Server returns { success: true, order: { id: "...", amount: ... } }
+      orderId = orderData.order.id || orderData.order.order_id || orderData.order.orderId;
+      orderAmount = orderData.order.amount || orderData.order.amount_due || selectedPlan.amount * 100;
+    } else {
+      // Fallback: Server returns order details directly
+      orderId = orderData.id || orderData.order_id || orderData.orderId || orderData.razorpayOrderId;
+      orderAmount = orderData.amount || orderData.amount_due || selectedPlan.amount * 100;
+    }
+    
+    if (!orderId) {
+      console.error('Full order response:', JSON.stringify(orderData, null, 2));
+      throw new Error(`Invalid order response from server. No order ID found in response structure.`);
+    }
+
+    console.log('Extracted Order ID:', orderId);
+    console.log('Order Amount:', orderAmount);
+
+    // 2. Open Razorpay payment dialog
+    const options = {
+      key: RAZORPAY_KEY_ID,
+      amount: orderAmount,
+      currency: 'INR',
+      name: 'Garage Management',
+      description: `${selectedPlan.name} Plan Subscription`,
+      order_id: orderId,
+      handler: async (response) => {
+        // 3. Verify payment and create account
+        await handleGarageSignup({
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature
+        });
+      },
+      prefill: {
+        name: formData.name,
+        email: formData.email,
+        contact: formData.phone
+      },
+      theme: {
+        color: '#1976d2'
+      },
+      modal: {
+        ondismiss: () => {
+          setLoading(false);
+          showSnackbar('Payment cancelled', 'info');
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    
+    rzp.on('payment.failed', (response) => {
+      setLoading(false);
+      showSnackbar(
+        response.error?.description || 'Payment failed. Please try again.',
+        'error'
+      );
+    });
+
+    rzp.open();
+    
+  } catch (err) {
+    console.error('Payment error:', err);
+    showSnackbar(err.message || 'Payment processing failed', 'error');
+    setLoading(false);
+  }
+};
 
   const handleGarageSignup = async (paymentDetails = {}) => {
     try {
