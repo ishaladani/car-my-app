@@ -1,357 +1,180 @@
 import React, { useState, useEffect } from 'react';
-// Icons
-import { 
-  ArrowLeft, 
-  Edit, 
-  AlertTriangle, 
-  Calendar, 
-  Car, 
-  Shield, 
-  Building2, 
-  DollarSign,
-  Plus,
-  FileText,
-  Clock,
-  CheckCircle
-} from 'lucide-react';
-
-
-// Material-UI Components (simulated with Tailwind classes and Lucide icons)
-const Box = ({ children, className = '', ...props }) => (
-  <div className={`${className}`} {...props}>{children}</div>
-);
-
-const Typography = ({ variant = 'body1', children, className = '', fontWeight, color = 'inherit', ...props }) => {
-  const variants = {
-    h4: 'text-3xl font-bold',
-    h5: 'text-2xl font-bold',
-    h6: 'text-xl font-semibold',
-    subtitle1: 'text-lg font-medium',
-    body1: 'text-base',
-    body2: 'text-sm'
-  };
-  
-  const weightClass = fontWeight === 600 ? 'font-semibold' : fontWeight === 700 ? 'font-bold' : '';
-  const colorClass = color === 'textSecondary' ? 'text-gray-600' : color === 'primary' ? 'text-blue-600' : '';
-  
-  return (
-    <div className={`${variants[variant]} ${weightClass} ${colorClass} ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-const Card = ({ children, className = '', elevation = 1, ...props }) => {
-  const shadows = {
-    1: 'shadow-sm',
-    2: 'shadow-md',
-    3: 'shadow-lg',
-    4: 'shadow-xl'
-  };
-  
-  return (
-    <div className={`bg-white rounded-lg ${shadows[elevation]} border border-gray-200 ${className}`} {...props}>
-      {children}
-    </div>
-  );
-};
-
-const CardContent = ({ children, className = '', ...props }) => (
-  <div className={`p-6 ${className}`} {...props}>{children}</div>
-);
-
-const TextField = ({ 
-  label, 
-  value, 
-  onChange, 
-  name, 
-  type = 'text', 
-  required = false, 
-  select = false, 
-  children,
-  InputLabelProps = {},
-  className = '',
-  fullWidth = false,
-  variant = 'outlined',
-  placeholder = '',
-  ...props 
-}) => {
-  if (select) {
-    return (
-      <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {label} {required && <span className="text-red-500">*</span>}
-        </label>
-        <select
-          name={name}
-          value={value}
-          onChange={onChange}
-          required={required}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-        >
-          {children}
-        </select>
-      </div>
-    );
-  }
-  
-  return (
-    <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        required={required}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-        {...props}
-      />
-    </div>
-  );
-};
-
-const MenuItem = ({ value, children }) => (
-  <option value={value}>{children}</option>
-);
-
-const Button = ({ 
-  children, 
-  variant = 'contained', 
-  color = 'primary', 
-  size = 'medium',
-  onClick,
-  disabled = false,
-  startIcon,
-  className = '',
-  ...props 
-}) => {
-  const variants = {
-    contained: color === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
-               color === 'success' ? 'bg-green-600 hover:bg-green-700 text-white' :
-               color === 'error' ? 'bg-red-600 hover:bg-red-700 text-white' :
-               'bg-gray-600 hover:bg-gray-700 text-white',
-    outlined: color === 'primary' ? 'border-blue-600 text-blue-600 hover:bg-blue-50' :
-              'border-gray-600 text-gray-600 hover:bg-gray-50',
-    text: 'text-blue-600 hover:bg-blue-50'
-  };
-  
-  const sizes = {
-    small: 'px-3 py-1 text-sm',
-    medium: 'px-4 py-2',
-    large: 'px-6 py-3 text-lg'
-  };
-  
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`
-        ${variants[variant]} 
-        ${sizes[size]} 
-        ${variant === 'outlined' ? 'border-2' : ''} 
-        rounded-md font-medium transition-colors duration-200 
-        disabled:opacity-50 disabled:cursor-not-allowed
-        flex items-center gap-2
-        ${className}
-      `}
-      {...props}
-    >
-      {startIcon}
-      {children}
-    </button>
-  );
-};
-
-const Container = ({ children, maxWidth = 'lg', className = '' }) => {
-  const maxWidths = {
-    sm: 'max-w-2xl',
-    md: 'max-w-4xl',
-    lg: 'max-w-6xl',
-    xl: 'max-w-7xl'
-  };
-  
-  return (
-    <div className={`mx-auto px-4 ${maxWidths[maxWidth]} ${className}`}>
-      {children}
-    </div>
-  );
-};
-
-const Table = ({ children, className = '' }) => (
-  <table className={`w-full border-collapse ${className}`}>{children}</table>
-);
-
-const TableHead = ({ children, className = '' }) => (
-  <thead className={`bg-gray-50 ${className}`}>{children}</thead>
-);
-
-const TableBody = ({ children }) => <tbody className="divide-y divide-gray-200">{children}</tbody>;
-
-const TableRow = ({ children, className = '' }) => (
-  <tr className={`hover:bg-gray-50 transition-colors ${className}`}>{children}</tr>
-);
-
-const TableCell = ({ children, className = '', align = 'left' }) => {
-  const alignments = {
-    left: 'text-left',
-    center: 'text-center',
-    right: 'text-right'
-  };
-  
-  return (
-    <td className={`px-6 py-4 text-sm ${alignments[align]} ${className}`}>
-      {children}
-    </td>
-  );
-};
-
-const TableContainer = ({ children, component: Component = 'div' }) => (
-  <div className="overflow-x-auto border border-gray-200 rounded-lg">
-    {children}
-  </div>
-);
-
-const IconButton = ({ children, onClick, className = '' }) => (
-  <button
-    onClick={onClick}
-    className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${className}`}
-  >
-    {children}
-  </button>
-);
-
-const Grid = ({ children, container = false, item = false, xs, sm, md, lg, spacing = 0, className = '' }) => {
-  if (container) {
-    const spacingClass = spacing > 0 ? `gap-${spacing}` : '';
-    return <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${spacingClass} ${className}`}>{children}</div>;
-  }
-  return <div className={className}>{children}</div>;
-};
-
-const Alert = ({ severity = 'info', children, className = '' }) => {
-  const severities = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800'
-  };
-  
-  return (
-    <div className={`p-4 border rounded-md ${severities[severity]} ${className}`}>
-      {children}
-    </div>
-  );
-};
-
-const CircularProgress = ({ size = 20, className = '' }) => (
-  <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 ${className}`} 
-       style={{ width: size, height: size }} />
-);
-
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  TextField,
+  Button,
+  Container,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  CssBaseline,
+  useTheme,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
+} from '@mui/material';
+import { ArrowBack as ArrowBackIcon, Edit as EditIcon, Delete as DeleteIcon, Warning as WarningIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
 const InsuranceManagement = () => {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  
+  // State for form fields
   const [formData, setFormData] = useState({
     carName: '',
     insuranceType: '',
     insurancePrice: '',
     company: '',
     expiryDate: '',
-    taxAmount: '',
-    provider: '',
-    policyNumber: ''
+    taxAmount: ''
   });
 
+  // State for insurance data
   const [insuranceData, setInsuranceData] = useState([]);
   const [expiringInsurance, setExpiringInsurance] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [expiringLoading, setExpiringLoading] = useState(false);
+  const [showExpiring, setShowExpiring] = useState(false);
+  
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
-  const baseUrl = 'https://garage-management-system-cr4w.onrender.com/api/garage';
+  // Edit dialog state
+  const [editDialog, setEditDialog] = useState({
+    open: false,
+    data: null
+  });
 
-  // Fetch all insurance data
+  // API Base URLs
+  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
+  const INSURANCE_API = `${BASE_URL}/api/insurance`;
+
+  // Get token from localStorage
+  const getToken = () => {
+    return localStorage.getItem('token') || localStorage.getItem('authToken') || sessionStorage.getItem('token');
+  };
+
+  // Show snackbar message
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  // Close snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  // Fetch expiring insurance data
+  const fetchExpiringInsurance = async () => {
+    try {
+      setExpiringLoading(true);
+      const token = getToken();
+      
+      if (!token) {
+        showSnackbar('Please login to continue', 'error');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${BASE_URL}/admin/insurance/expiring`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          showSnackbar('Session expired. Please login again', 'error');
+          navigate('/login');
+          return;
+        }
+        throw new Error(`Failed to fetch expiring insurance data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setExpiringInsurance(data.data || data || []);
+      
+      if ((data.data || data || []).length > 0) {
+        showSnackbar(`Found ${(data.data || data || []).length} insurance policies expiring soon!`, 'warning');
+      }
+    } catch (error) {
+      console.error('Error fetching expiring insurance data:', error);
+      showSnackbar('Failed to load expiring insurance data', 'error');
+    } finally {
+      setExpiringLoading(false);
+    }
+  };
+
+  // Fetch insurance data
   const fetchInsuranceData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${baseUrl}/admin/insurance`, {
+      const token = getToken();
+      
+      if (!token) {
+        showSnackbar('Please login to continue', 'error');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${BASE_URL}/admin/insurance`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setInsuranceData(data);
-      } else {
-        setError('Failed to fetch insurance data');
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          showSnackbar('Session expired. Please login again', 'error');
+          navigate('/login');
+          return;
+        }
+        throw new Error(`Failed to fetch insurance data: ${response.status}`);
       }
-    } catch (err) {
-      setError('Network error while fetching data');
+
+      const data = await response.json();
+      setInsuranceData(data.data || data || []);
+    } catch (error) {
+      console.error('Error fetching insurance data:', error);
+      showSnackbar('Failed to load insurance data', 'error');
+      // Set sample data as fallback
+      setInsuranceData([
+        { id: 1, carNumber: 'ABC123', insuranceType: 'Comprehensive', price: '$500', company: 'Geico', expiry: '12/31/2023' },
+        { id: 2, carNumber: 'XYZ789', insuranceType: 'Liability', price: '$300', company: 'Progressive', expiry: '06/30/2024' },
+        { id: 3, carNumber: 'DEF456', insuranceType: 'Collision', price: '$400', company: 'State Farm', expiry: '09/15/2023' },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch expiring insurance
-  const fetchExpiringInsurance = async () => {
-    try {
-      const response = await fetch(`${baseUrl}/admin/insurance/expiring`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setExpiringInsurance(data);
-      }
-    } catch (err) {
-      console.error('Error fetching expiring insurance:', err);
-    }
-  };
-
-  // Add new insurance
-  const addInsurance = async (insuranceData) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${baseUrl}/admin/insurance/add`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(insuranceData),
-      });
-      
-      if (response.ok) {
-        setSuccess('Insurance added successfully!');
-        fetchInsuranceData();
-        setFormData({
-          carName: '',
-          insuranceType: '',
-          insurancePrice: '',
-          company: '',
-          expiryDate: '',
-          taxAmount: '',
-          provider: '',
-          policyNumber: ''
-        });
-        setTimeout(() => setSuccess(''), 3000);
-      } else {
-        setError('Failed to add insurance');
-      }
-    } catch (err) {
-      setError('Network error while adding insurance');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load data on component mount
   useEffect(() => {
     fetchInsuranceData();
     fetchExpiringInsurance();
@@ -364,355 +187,450 @@ const InsuranceManagement = () => {
       ...prev,
       [name]: value
     }));
-    if (error) setError('');
+  };
+
+  // Add insurance via API
+  const addInsurance = async (insuranceData) => {
+    const token = getToken();
+    
+    if (!token) {
+      showSnackbar('Please login to continue', 'error');
+      navigate('/login');
+      return false;
+    }
+
+    const response = await fetch(`${BASE_URL}/admin/insurance/add`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(insuranceData)
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        showSnackbar('Session expired. Please login again', 'error');
+        navigate('/login');
+        return false;
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Server error: ${response.status}`);
+    }
+
+    return await response.json();
   };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    
+    // Validate required fields
+    if (!formData.carName || !formData.insuranceType || !formData.insurancePrice || 
+        !formData.company || !formData.expiryDate) {
+      showSnackbar('Please fill in all required fields', 'error');
+      return;
+    }
 
-    const apiData = {
-      provider: formData.provider || formData.company,
-      policyNumber: formData.policyNumber,
-      carName: formData.carName,
-      insuranceType: formData.insuranceType,
-      insurancePrice: parseFloat(formData.insurancePrice),
-      company: formData.company,
-      expiryDate: formData.expiryDate,
-      taxAmount: parseFloat(formData.taxAmount) || 0
-    };
+    try {
+      setSubmitLoading(true);
+      
+      const insurancePayload = {
+        carName: formData.carName,
+        insuranceType: formData.insuranceType,
+        insurancePrice: parseFloat(formData.insurancePrice),
+        company: formData.company,
+        expiryDate: formData.expiryDate,
+        taxAmount: formData.taxAmount ? parseFloat(formData.taxAmount) : 0
+      };
 
-    await addInsurance(apiData);
+      const result = await addInsurance(insurancePayload);
+      
+      showSnackbar('Insurance added successfully!', 'success');
+      
+      // Reset form
+      setFormData({
+        carName: '',
+        insuranceType: '',
+        insurancePrice: '',
+        company: '',
+        expiryDate: '',
+        taxAmount: ''
+      });
+      
+      // Refresh the insurance data
+      await fetchInsuranceData();
+      
+    } catch (error) {
+      console.error('Error adding insurance:', error);
+      showSnackbar(error.message || 'Failed to add insurance', 'error');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  // Handle edit button click
+  const handleEdit = (insurance) => {
+    setEditDialog({
+      open: true,
+      data: insurance
+    });
+  };
+
+  // Handle delete insurance (if needed)
+  const handleDelete = async (insuranceId) => {
+    if (!window.confirm('Are you sure you want to delete this insurance record?')) {
+      return;
+    }
+
+    try {
+      const token = getToken();
+      const response = await fetch(`${BASE_URL}/admin/insurance/${insuranceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        showSnackbar('Insurance deleted successfully', 'success');
+        await fetchInsuranceData();
+        await fetchExpiringInsurance();
+      } else {
+        throw new Error('Failed to delete insurance');
+      }
+    } catch (error) {
+      console.error('Error deleting insurance:', error);
+      showSnackbar('Failed to delete insurance', 'error');
+    }
   };
 
   return (
-    <Box className="min-h-screen bg-gray-50">
-      <Container maxWidth="xl" className="py-8">
-        {/* Header */}
-        <Box className="flex items-center mb-8">
-          <IconButton className="mr-4 bg-white shadow-md">
-            <ArrowLeft className="w-5 h-5" />
-          </IconButton>
-          <Typography variant="h4" className="text-gray-800 flex items-center">
-            <Shield className="w-8 h-8 mr-3 text-blue-600" />
-            Insurance Management System
-          </Typography>
-        </Box>
-
-        {/* Alerts */}
-        {error && (
-          <Alert severity="error" className="mb-6">
-            <div className="flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2" />
-              {error}
-            </div>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" className="mb-6">
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              {success}
-            </div>
-          </Alert>
-        )}
-
-        {/* Expiring Insurance Alert */}
-        {expiringInsurance.length > 0 && (
-          <Alert severity="warning" className="mb-6">
-            <div className="flex items-center mb-2">
-              <Clock className="w-5 h-5 mr-2" />
-              <Typography variant="h6">Expiring Insurance Policies</Typography>
-            </div>
-            <Typography variant="body2">
-              {expiringInsurance.length} insurance policies are expiring soon and require renewal.
-            </Typography>
-          </Alert>
-        )}
-
-        {/* Statistics Cards */}
-        <Grid container spacing={4} className="mb-8">
-          <Card className="p-6 text-center">
-            <div className="flex items-center justify-center mb-4">
-              <Shield className="w-12 h-12 text-blue-600" />
-            </div>
-            <Typography variant="h5" className="text-gray-800 mb-2">
-              {insuranceData.length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Total Policies
-            </Typography>
-          </Card>
-          
-          <Card className="p-6 text-center">
-            <div className="flex items-center justify-center mb-4">
-              <AlertTriangle className="w-12 h-12 text-orange-600" />
-            </div>
-            <Typography variant="h5" className="text-gray-800 mb-2">
-              {expiringInsurance.length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Expiring Soon
-            </Typography>
-          </Card>
-          
-          <Card className="p-6 text-center">
-            <div className="flex items-center justify-center mb-4">
-              <Car className="w-12 h-12 text-green-600" />
-            </div>
-            <Typography variant="h5" className="text-gray-800 mb-2">
-              {insuranceData.length - expiringInsurance.length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Active Policies
-            </Typography>
-          </Card>
-        </Grid>
-
-        {/* Add Insurance Form */}
-        <Card className="mb-8" elevation={3}>
-          <CardContent>
-            <Typography variant="h5" className="mb-6 flex items-center text-gray-800">
-              <Plus className="w-6 h-6 mr-2 text-blue-600" />
-              Add New Insurance Policy
-            </Typography>
-            
-            <div onSubmit={handleSubmit}>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="carName"
-                    label="Car Name/Number"
-                    value={formData.carName}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    placeholder="e.g., BMW X5 - ABC123"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="insuranceType"
-                    label="Insurance Type"
-                    value={formData.insuranceType}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    select
-                  >
-                    <MenuItem value="">Select Insurance Type</MenuItem>
-                    <MenuItem value="Comprehensive">Comprehensive</MenuItem>
-                    <MenuItem value="Third Party">Third Party</MenuItem>
-                    <MenuItem value="Collision">Collision</MenuItem>
-                    <MenuItem value="Liability">Liability</MenuItem>
-                    <MenuItem value="Full Coverage">Full Coverage</MenuItem>
-                  </TextField>
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="insurancePrice"
-                    label="Insurance Price ($)"
-                    type="number"
-                    value={formData.insurancePrice}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    placeholder="0.00"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="company"
-                    label="Insurance Company"
-                    value={formData.company}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    placeholder="e.g., Geico, Progressive"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="policyNumber"
-                    label="Policy Number"
-                    value={formData.policyNumber}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    placeholder="Policy number"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="expiryDate"
-                    label="Expiry Date"
-                    type="date"
-                    value={formData.expiryDate}
-                    onChange={handleInputChange}
-                    fullWidth
-                    required
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="taxAmount"
-                    label="Tax Amount ($)"
-                    type="number"
-                    value={formData.taxAmount}
-                    onChange={handleInputChange}
-                    fullWidth
-                    placeholder="0.00"
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    name="provider"
-                    label="Provider Name"
-                    value={formData.provider}
-                    onChange={handleInputChange}
-                    fullWidth
-                    placeholder="Insurance provider"
-                  />
-                </Grid>
-              </Grid>
-
-              <Box className="flex justify-center mt-8">
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="large"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  startIcon={loading ? <CircularProgress size={20} /> : <Plus className="w-5 h-5" />}
-                  className="px-8 py-3"
-                >
-                  {loading ? 'Adding Insurance...' : 'Add Insurance Policy'}
-                </Button>
-              </Box>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Insurance Table */}
-        <Card elevation={3}>
-          <Box className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
-            <Typography variant="h5" className="flex items-center">
-              <FileText className="w-6 h-6 mr-2" />
-              Insurance Policies Overview
+    <Box sx={{ 
+      flexGrow: 1,
+      mb: 4,
+      ml: {xs: 0, sm: 35},
+      overflow: 'auto',
+      pt: 3
+    }}>
+      <CssBaseline />
+      <Container maxWidth="lg">
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton 
+              onClick={() => navigate(-1)} 
+              sx={{ 
+                mr: 2, 
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant="h5" component="h1" fontWeight={600}>
+              Insurance Management
             </Typography>
           </Box>
           
-          <CardContent className="p-0">
-            <TableContainer>
-              <Table>
-                <TableHead className="bg-gray-100">
-                  <TableRow>
-                    <TableCell className="font-semibold text-gray-700">Car Details</TableCell>
-                    <TableCell className="font-semibold text-gray-700">Insurance Type</TableCell>
-                    <TableCell className="font-semibold text-gray-700">Premium</TableCell>
-                    <TableCell className="font-semibold text-gray-700">Company</TableCell>
-                    <TableCell className="font-semibold text-gray-700">Policy Number</TableCell>
-                    <TableCell className="font-semibold text-gray-700">Expiry Date</TableCell>
-                    <TableCell className="font-semibold text-gray-700" align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" className="py-12">
-                        <div className="flex items-center justify-center">
-                          <CircularProgress className="mr-2" />
-                          <Typography>Loading insurance data...</Typography>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : insuranceData.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" className="py-12">
-                        <div className="text-center">
-                          <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                          <Typography variant="h6" color="textSecondary" className="mb-2">
-                            No Insurance Policies Found
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            Add your first insurance policy using the form above.
-                          </Typography>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    insuranceData.map((row, index) => (
-                      <TableRow key={row.id || index}>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Car className="w-5 h-5 text-gray-400 mr-2" />
-                            <div>
-                              <Typography variant="body2" className="font-medium">
-                                {row.carNumber || row.carName}
-                              </Typography>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {row.insuranceType}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <DollarSign className="w-4 h-4 text-green-600 mr-1" />
-                            <Typography variant="body2" className="font-medium">
-                              {row.price || (row.insurancePrice ? `$${row.insurancePrice}` : 'N/A')}
-                            </Typography>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Building2 className="w-4 h-4 text-gray-400 mr-2" />
-                            {row.company || row.provider}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" className="font-mono text-sm">
-                            {row.policyNumber || 'N/A'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                            {row.expiry || row.expiryDate}
-                          </div>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<Edit className="w-4 h-4" />}
-                            className="mr-2"
-                          >
-                            Edit
-                          </Button>
-                        </TableCell>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant={showExpiring ? "contained" : "outlined"}
+              color="warning"
+              startIcon={<WarningIcon />}
+              onClick={() => setShowExpiring(!showExpiring)}
+              disabled={expiringLoading}
+            >
+              {expiringLoading ? 'Loading...' : `Expiring (${expiringInsurance.length})`}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                fetchInsuranceData();
+                fetchExpiringInsurance();
+              }}
+              disabled={loading || expiringLoading}
+            >
+              Refresh
+            </Button>
+          </Box>
+        </Box>
+        
+        <Card sx={{ 
+          mb: 4, 
+          overflow: 'visible', 
+          borderRadius: 2,
+          boxShadow: theme.shadows[3]
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box 
+              component="form" 
+              onSubmit={handleSubmit}
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 2,
+                mb: 3
+              }}
+            >
+              <TextField
+                name="carName"
+                label="Car Name *"
+                variant="outlined"
+                value={formData.carName}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+                required
+              />
+              <TextField
+                name="insuranceType"
+                label="Insurance Type *"
+                variant="outlined"
+                value={formData.insuranceType}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+                required
+              />
+              <TextField
+                name="insurancePrice"
+                label="Insurance Price *"
+                variant="outlined"
+                type="number"
+                value={formData.insurancePrice}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+                required
+              />
+              <TextField
+                name="company"
+                label="Company *"
+                variant="outlined"
+                value={formData.company}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+                required
+              />
+              <TextField
+                name="expiryDate"
+                label="Expiry Date *"
+                type="date"
+                variant="outlined"
+                InputLabelProps={{ shrink: true }}
+                value={formData.expiryDate}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+                required
+              />
+              <TextField
+                name="taxAmount"
+                label="Tax Amount"
+                variant="outlined"
+                type="number"
+                value={formData.taxAmount}
+                onChange={handleInputChange}
+                sx={{ flex: '1 1 200px' }}
+              />
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="success"
+                disabled={submitLoading}
+                sx={{ 
+                  px: 4, 
+                  py: 1.5, 
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'uppercase',
+                  borderRadius: 2,
+                  boxShadow: theme.shadows[2],
+                  '&:hover': {
+                    boxShadow: theme.shadows[4],
+                  }
+                }}
+              >
+                {submitLoading ? (
+                  <>
+                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                    Adding...
+                  </>
+                ) : (
+                  'Add Insurance'
+                )}
+              </Button>
+            </Box>
+            
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <>
+                {/* Expiring Insurance Alert */}
+                {showExpiring && expiringInsurance.length > 0 && (
+                  <Alert 
+                    severity="warning" 
+                    sx={{ mb: 3 }}
+                    action={
+                      <Button color="inherit" size="small" onClick={() => setShowExpiring(false)}>
+                        Hide
+                      </Button>
+                    }
+                  >
+                    <Typography variant="subtitle1" fontWeight="600">
+                      ⚠️ {expiringInsurance.length} Insurance Policies Expiring Soon
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      {expiringInsurance.slice(0, 3).map((insurance, index) => (
+                        <Typography key={index} variant="body2">
+                          • {insurance.carNumber || insurance.carName} ({insurance.company}) - Expires: {insurance.expiry || insurance.expiryDate}
+                        </Typography>
+                      ))}
+                      {expiringInsurance.length > 3 && (
+                        <Typography variant="body2" fontStyle="italic">
+                          ...and {expiringInsurance.length - 3} more
+                        </Typography>
+                      )}
+                    </Box>
+                  </Alert>
+                )}
+
+                <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[1] }}>
+                  <Table sx={{ minWidth: 650 }} aria-label="insurance table">
+                    <TableHead sx={{ bgcolor: showExpiring && expiringInsurance.length > 0 ? theme.palette.warning.main : theme.palette.success.main }}>
+                      <TableRow>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Car Number</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Insurance Type</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Price/Unit</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Company</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Expiry</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Status</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Actions</TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {(showExpiring ? expiringInsurance : insuranceData).map((row) => {
+                        const isExpiring = expiringInsurance.some(exp => exp.id === row.id);
+                        const expiryDate = new Date(row.expiry || row.expiryDate);
+                        const today = new Date();
+                        const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+                        
+                        return (
+                          <TableRow
+                            key={row.id}
+                            sx={{ 
+                              '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover },
+                              backgroundColor: isExpiring ? 'rgba(255, 152, 0, 0.1)' : 'inherit'
+                            }}
+                          >
+                            <TableCell>{row.carNumber || row.carName}</TableCell>
+                            <TableCell>{row.insuranceType}</TableCell>
+                            <TableCell>
+                              {typeof row.price === 'string' ? row.price : `${row.insurancePrice || row.price}`}
+                            </TableCell>
+                            <TableCell>{row.company}</TableCell>
+                            <TableCell>{row.expiry || row.expiryDate}</TableCell>
+                            <TableCell>
+                              {isExpiring ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', color: 'warning.main' }}>
+                                  <WarningIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                                  <Typography variant="body2" color="warning.main">
+                                    {daysUntilExpiry <= 0 ? 'Expired' : `${daysUntilExpiry} days left`}
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Typography variant="body2" color="success.main">Active</Typography>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button 
+                                  variant="outlined" 
+                                  color="primary"
+                                  size="small"
+                                  startIcon={<EditIcon />}
+                                  onClick={() => handleEdit(row)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button 
+                                  variant="outlined" 
+                                  color="error"
+                                  size="small"
+                                  startIcon={<DeleteIcon />}
+                                  onClick={() => handleDelete(row.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Empty rows for better visual */}
+                      {Array.from({ 
+                        length: Math.max(0, 10 - (showExpiring ? expiringInsurance : insuranceData).length) 
+                      }).map((_, index) => (
+                        <TableRow key={`empty-${index}`}>
+                          <TableCell style={{ height: 53 }}></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
           </CardContent>
         </Card>
       </Container>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, data: null })}>
+        <DialogTitle>Edit Insurance</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Edit functionality can be implemented here with the selected insurance data.
+          </Typography>
+          {editDialog.data && (
+            <Box sx={{ mt: 2 }}>
+              <Typography><strong>Car:</strong> {editDialog.data.carNumber || editDialog.data.carName}</Typography>
+              <Typography><strong>Type:</strong> {editDialog.data.insuranceType}</Typography>
+              <Typography><strong>Company:</strong> {editDialog.data.company}</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog({ open: false, data: null })}>Cancel</Button>
+          <Button variant="contained">Save Changes</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -102,7 +102,7 @@
       
 //       try {
 //         const response = await axios.get(
-//           `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+//           `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
 //           {
 //             headers: {
 //               'Authorization': token,
@@ -129,7 +129,7 @@
 //         setError(null);
         
 //         const response = await axios.get(
-//           `https://garage-management-system-cr4w.onrender.com/api/engineers/${garageId}`,
+//           `https://garage-management-zi5z.onrender.com/api/engineers/${garageId}`,
 //           {
 //             headers: {
 //               'Content-Type': 'application/json',
@@ -188,7 +188,7 @@
 
       
 //       // API call to assign engineer
-//       const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/${id}`, {
+//       const response = await fetch(`https://garage-management-zi5z.onrender.com/api/jobCards/assign-engineer/${id}`, {
 //         method: 'PUT',
 //         headers: {
 //           'Authorization': token,
@@ -269,7 +269,7 @@
 
 //     try {
 //       const response = await axios.post(
-//         'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+//         'https://garage-management-zi5z.onrender.com/api/inventory/add',
 //         newPart,
 //         {
 //           headers: {
@@ -301,7 +301,7 @@
     
 //     try {
 //       const response = await axios.get(
-//         `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+//         `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
 //         {
 //           headers: {
 //             'Authorization': token,
@@ -862,7 +862,7 @@ const AssignEngineer = () => {
       
       try {
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+          `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
           {
             headers: {
               'Authorization': token,
@@ -889,7 +889,7 @@ const AssignEngineer = () => {
         setError(null);
         
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/engineers/${garageId}`,
+          `https://garage-management-zi5z.onrender.com/api/engineers/${garageId}`,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -944,7 +944,7 @@ const AssignEngineer = () => {
 
     try {
       // API call to assign engineer
-      const response = await fetch(`https://garage-management-system-cr4w.onrender.com/api/jobCards/assign-engineer/${id}`, {
+      const response = await fetch(`https://garage-management-zi5z.onrender.com/api/jobCards/assign-engineer/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': token,
@@ -1040,7 +1040,7 @@ const AssignEngineer = () => {
       };
 
       const response = await axios.post(
-        'https://garage-management-system-cr4w.onrender.com/api/engineers/add',
+        'https://garage-management-zi5z.onrender.com/api/engineers/add',
         formattedEngineer,
         {
           headers: {
@@ -1101,7 +1101,7 @@ const AssignEngineer = () => {
 
     try {
       const response = await axios.post(
-        'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+        'https://garage-management-zi5z.onrender.com/api/inventory/add',
         newPart,
         {
           headers: {
@@ -1133,7 +1133,7 @@ const AssignEngineer = () => {
     
     try {
       const response = await axios.get(
-        `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+        `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
         {
           headers: {
             'Authorization': token,

@@ -71,7 +71,7 @@ const RecordReport = () => {
         setError(null);
 
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`,
+          `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
           {
             headers: {
               Authorization: token,

@@ -84,7 +84,7 @@ const InventoryManagement = () => {
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Get token from storage or use hardcoded for testing
-  const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
   const garageId = localStorage.getItem('garageId') || "682194f72e0d12e864695009"; // Use stored ID or fallback to default
 
   // Function to fetch inventory data
@@ -92,7 +92,7 @@ const InventoryManagement = () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
-        `https://garage-management-system-cr4w.onrender.com/api/inventory/${garageId}`, 
+        `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`, 
         {
           headers: {
             'Authorization': token,
@@ -229,11 +229,11 @@ const InventoryManagement = () => {
 
       console.log('Updating item with ID:', editItemData.id);
       console.log('Request data:', requestData);
-      console.log('Full update URL:', `https://garage-management-system-cr4w.onrender.com/api/inventory/update/${editItemData.id}`);
+      console.log('Full update URL:', `https://garage-management-zi5z.onrender.com/api/inventory/update/${editItemData.id}`);
 
       // Make API call to update inventory item
       const response = await axios.put(
-        `https://garage-management-system-cr4w.onrender.com/api/inventory/update/${editItemData.id}`,
+        `https://garage-management-zi5z.onrender.com/api/inventory/update/${editItemData.id}`,
         requestData,
         {
           headers: {
@@ -298,7 +298,7 @@ const InventoryManagement = () => {
 
       // Make API call to add inventory item
       const response = await axios.post(
-        'https://garage-management-system-cr4w.onrender.com/api/inventory/add',
+        'https://garage-management-zi5z.onrender.com/api/inventory/add',
         requestData,
         {
           headers: {

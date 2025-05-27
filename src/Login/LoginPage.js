@@ -11,10 +11,21 @@ import {
   IconButton,
   InputAdornment,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Switch,
+  FormControlLabel,
+  Divider,
+  Chip
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Business, 
+  Person,
+  DirectionsCar,
+  AccountCircle 
+} from '@mui/icons-material';
 
 const LoginPage = () => {
   const theme = useTheme();
@@ -26,71 +37,72 @@ const LoginPage = () => {
     password: ''
   });
   const [error, setError] = useState('');
+  const [isGarageLogin, setIsGarageLogin] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // Get the intended destination (if any)
-  const from = location.state?.from?.pathname || '/';
+  // API Base URL
+  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
 
+  // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
+  
     // Basic validation
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
       setLoading(false);
       return;
     }
-
+  
     try {
-      // Make the API call to the garage login endpoint
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/garage/login', {
+      const endpoint = isGarageLogin 
+        ? `${BASE_URL}/api/garage/login`
+        : `${BASE_URL}/api/garage/user/login`;
+  
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
+        body: JSON.stringify(formData)
       });
-
+  
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Login failed');
+      }
+  
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed. Please check your credentials.');
+      // Store token and user type in localStorage
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
+      
+      // Store garageId - fix the path based on response structure
+      if (isGarageLogin && data.garage && data.garage._id) {
+        localStorage.setItem('garageId', data.garage._id);
+      } else if (!isGarageLogin && data.user && data.user._id) {
+        // For user login, the ID is at data.user._id
+        localStorage.setItem('garageId', data.user._id);
       }
       
-      console.log('Login successful:', data);
-
-      // Store the token and garage ID in localStorage
-      if (data.token) {
-        localStorage.setItem('authToken', data.token);
-        
-        // Store the garage ID from the response
-        if (data.garage && data.garage._id) {
-          localStorage.setItem('garageId', data.garage._id);
-          console.log('Garage ID stored in localStorage:', data.garage._id);
-        }
-        
-        console.log('Token stored in localStorage');
-      }
-      
-      // Navigate to the intended destination or dashboard
-      navigate(from, { replace: true });
-      
+      // Navigate to appropriate dashboard
+      const redirectPath = isGarageLogin ? '/' : '/';
+      navigate(redirectPath);
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -99,6 +111,22 @@ const LoginPage = () => {
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
+
+  const handleLoginTypeChange = (e) => {
+    setIsGarageLogin(e.target.checked);
+    // Clear form and error when switching login types
+    setFormData({ email: '', password: '' });
+    setError('');
+  };
+
+  // Dynamic styling based on login type
+  const getThemeColors = () => {
+    return isGarageLogin 
+      ? { primary: '#08197B', secondary: '#364ab8', accent: '#2196F3' }
+      : { primary: '#2E7D32', secondary: '#4CAF50', accent: '#66BB6A' };
+  };
+
+  const colors = getThemeColors();
 
   return (
     <>
@@ -110,60 +138,120 @@ const LoginPage = () => {
           alignItems: 'center',
           minHeight: '100vh',
           backgroundColor: theme.palette.background.default,
-          p: 2
+          p: 2,
+          background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`
         }}
       >
         <Paper
-          elevation={3}
+          elevation={6}
           sx={{
-            width: 430,
+            width: 450,
             p: 4,
             textAlign: 'center',
-            borderRadius: 2,
-            position: 'relative'
+            borderRadius: 3,
+            position: 'relative',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)'
           }}
         >
+          {/* Login Type Indicator */}
+          <Box sx={{ mb: 3 }}>
+            <Chip
+              icon={isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
+              label={`${isGarageLogin ? 'Garage' : 'User'} Login`}
+              sx={{
+                backgroundColor: colors.primary,
+                color: 'white',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                px: 2,
+                py: 1
+              }}
+            />
+          </Box>
+
           <Typography 
             variant="h3" 
             component="h1"
             sx={{
-              mb: 4,
-              fontWeight: 600,
-              color: '#08197B'
+              mb: 2,
+              fontWeight: 700,
+              color: colors.primary,
+              fontSize: { xs: '2rem', sm: '2.5rem' }
             }}
           >
-            Login
+            Welcome Back
+          </Typography>
+
+          <Typography 
+            variant="body1" 
+            sx={{
+              mb: 4,
+              color: theme.palette.text.secondary,
+              fontSize: '1.1rem'
+            }}
+          >
+            {isGarageLogin 
+              ? 'Access your garage management system'
+              : 'Sign in to your customer account'
+            }
           </Typography>
           
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3,
+                borderRadius: 2,
+                '& .MuiAlert-message': {
+                  fontWeight: 500
+                }
+              }}
+            >
               {error}
             </Alert>
           )}
           
           <Box 
             component="form" 
-            onSubmit={handleSubmit}
-            sx={{
-              width: '100%'
-            }}
+            onSubmit={handleLogin}
+            sx={{ width: '100%' }}
           >
             <TextField
               fullWidth
               name="email"
-              label="Email"
+              label="Email Address"
+              type="email"
               variant="outlined"
-              placeholder="Enter Your Email"
+              placeholder={isGarageLogin ? "garage@example.com" : "user@example.com"}
               value={formData.email}
               onChange={handleChange}
+              required
               sx={{
                 mb: 3,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#F3F3F3',
+                  backgroundColor: '#FAFAFA',
+                  borderRadius: 2,
                   '& fieldset': {
-                    border: 'none'
+                    borderColor: '#E0E0E0'
+                  },
+                  '&:hover fieldset': {
+                    borderColor: colors.secondary
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: colors.primary
                   }
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: colors.primary
                 }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {isGarageLogin ? <Business color="action" /> : <Person color="action" />}
+                  </InputAdornment>
+                )
               }}
             />
             
@@ -173,16 +261,27 @@ const LoginPage = () => {
               label="Password"
               type={showPassword ? 'text' : 'password'}
               variant="outlined"
-              placeholder="Enter Your Password"
+              placeholder="Enter your password"
               value={formData.password}
               onChange={handleChange}
+              required
               sx={{
-                mb: 3,
+                mb: 4,
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#F3F3F3',
+                  backgroundColor: '#FAFAFA',
+                  borderRadius: 2,
                   '& fieldset': {
-                    border: 'none'
+                    borderColor: '#E0E0E0'
+                  },
+                  '&:hover fieldset': {
+                    borderColor: colors.secondary
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: colors.primary
                   }
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: colors.primary
                 }
               }}
               InputProps={{
@@ -192,6 +291,7 @@ const LoginPage = () => {
                       aria-label="toggle password visibility"
                       onClick={togglePasswordVisibility}
                       edge="end"
+                      sx={{ color: colors.primary }}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -206,28 +306,65 @@ const LoginPage = () => {
               disabled={loading}
               fullWidth
               sx={{
-                height: 40,
-                width: 150,
-                fontSize: '1rem',
-                mb: 2,
-                backgroundColor: '#08197B',
+                height: 48,
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                mb: 3,
+                borderRadius: 2,
+                backgroundColor: colors.primary,
+                background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
                 '&:hover': {
-                  backgroundColor: '#364ab8'
+                  backgroundColor: colors.secondary,
+                  transform: 'translateY(-1px)',
+                  boxShadow: `0 6px 20px ${colors.primary}30`
                 },
                 '&:disabled': {
-                  backgroundColor: '#cccccc'
-                }
+                  backgroundColor: '#CCCCCC'
+                },
+                transition: 'all 0.3s ease'
               }}
             >
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'Login'
+                `Sign In as ${isGarageLogin ? 'Garage' : 'User'}`
               )}
             </Button>
           </Box>
-          
-          <Typography variant="body1">
+
+          <Divider sx={{ my: 3 }}>
+            <Typography variant="body2" color="text.secondary">
+              Switch Login Type
+            </Typography>
+          </Divider>
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isGarageLogin}
+                onChange={handleLoginTypeChange}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: colors.primary,
+                  },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    backgroundColor: colors.primary,
+                  },
+                }}
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
+                <Typography variant="body1" fontWeight={500}>
+                  {isGarageLogin ? 'Garage Owner' : 'Customer'}
+                </Typography>
+              </Box>
+            }
+            sx={{ mb: 3 }}
+          />
+
+          <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
             Don't have an account?{' '}
             <Link 
               component="button"
@@ -235,17 +372,27 @@ const LoginPage = () => {
               onClick={() => navigate('/signup')}
               sx={{
                 fontWeight: 600,
-                color: 'black',
+                color: colors.primary,
                 textDecoration: 'none',
                 '&:hover': {
-                  color: '#364ab8',
+                  color: colors.secondary,
                   textDecoration: 'underline'
                 }
               }}
             >
-              Sign up
+              Create Account
             </Link>
           </Typography>
+
+          {/* Additional Info based on login type */}
+          <Box sx={{ mt: 3, p: 2, backgroundColor: `${colors.primary}08`, borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {isGarageLogin 
+                ? '🔧 Manage your garage operations, appointments, and customer service'
+                : '🚗 Book services, track repairs, and manage your vehicle maintenance'
+              }
+            </Typography>
+          </Box>
         </Paper>
       </Box>
     </>

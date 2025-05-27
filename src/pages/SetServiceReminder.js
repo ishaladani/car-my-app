@@ -125,7 +125,7 @@ const SetServiceReminder = () => {
       };
       
       // API call
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/reminders/send', {
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/reminders/send', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

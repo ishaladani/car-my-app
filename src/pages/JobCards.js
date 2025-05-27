@@ -82,7 +82,7 @@ const JobCards = () => {
     message: '',
     severity: 'success'
   });
- const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
   const garageId = localStorage.getItem('garageId');
   // Form state
   const [formData, setFormData] = useState({
@@ -157,7 +157,7 @@ const JobCards = () => {
           'Authorization': token,}
       };
   
-      const apiBaseUrl = 'https://garage-management-system-cr4w.onrender.com';
+      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
       const response = await axios.post(
         `${apiBaseUrl}/api/jobCards/add`,
         formDataToSend,

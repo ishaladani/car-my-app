@@ -67,7 +67,7 @@ const QualityCheck = () => {
         setIsLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}`,
+          `https://garage-management-zi5z.onrender.com/api/jobCards/${id}`,
           {
             headers: {
               'Authorization': token,
@@ -134,7 +134,7 @@ const QualityCheck = () => {
   try {
     if (finalInspection) {
       await axios.put(
-        `https://garage-management-system-cr4w.onrender.com/api/jobcards/jobcard/${id}/qualitycheck`,
+        `https://garage-management-zi5z.onrender.com/api/jobcards/jobcard/${id}/qualitycheck`,
         { notes: finalInspection },
         { headers: { 'Authorization': token, 'Content-Type': 'application/json' } }
       );

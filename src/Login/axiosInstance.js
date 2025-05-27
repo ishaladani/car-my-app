@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: 'https://garage-management-system-cr4w.onrender.com/api/admin/', // Your API base URL
+  baseURL: 'https://garage-management-zi5z.onrender.com/api/admin/', // Your API base URL
 });
 
 // Add a request interceptor to include the token

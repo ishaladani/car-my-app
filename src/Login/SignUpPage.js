@@ -25,6 +25,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { Visibility, VisibilityOff, AddCircleOutline, CheckCircleOutline } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
 // Fixed Razorpay key configuration
 const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_qjd934YSnvGxQZ';
@@ -34,6 +35,7 @@ const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFA500', '#800080'];
 export default function SignUpPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigation = useNavigate(); 
 
   const [formData, setFormData] = useState({
     name: '',
@@ -464,6 +466,7 @@ const handleRazorpayPayment = async () => {
               color="primary"
               sx={{ cursor: 'pointer' }}
               fontWeight="bold"
+              onClick={() => navigation('/login')}
             >
               Login here
             </Typography>

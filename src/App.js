@@ -37,7 +37,7 @@ function App() {
               <Route path="work-in-progress/:id" element={<WorkInProgress />} />
               <Route path="quality-check/:id" element={<QualityCheck />} />
               <Route path="reminders" element={<SetServiceReminder />} />
-              {/* <Route path="insurance" element={<InsuranceManagement />} /> */}
+              <Route path="insurance" element={<InsuranceManagement />} />
              <Route path="billing/:id" element={<BillingPage />} />
               <Route path='UserManagemt' element={<UserManagement/>}/>
               <Route path='MenuManagement' element={<MenuManagement/>}/>
@@ -61,7 +61,7 @@ function App() {
           </Route> */}
           
           {/* Redirect any unknown routes to login */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+        
         </Routes>
       </Router>
     </ThemeProviderWrapper>

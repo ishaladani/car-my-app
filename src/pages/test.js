@@ -1,620 +1,998 @@
-import React,{ useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Container, 
-  Paper, 
-  InputAdornment, 
-  IconButton,
-  Switch, 
-  Card, 
-  CardContent,
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Typography,
   Grid,
-  FormControlLabel,
-  Dialog,
-  AppBar,
-  Toolbar,
-  Slide,
+  Card,
+  CardContent,
+  Button,
+  Avatar,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Stack,
+  LinearProgress,
+  Divider,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
   useTheme,
-  createTheme,
-  ThemeProvider,
+  Container,
   CssBaseline,
-  Link,
-  Snackbar,
-  Alert
-} from '@mui/material';
+  CircularProgress,
+} from "@mui/material";
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  Refresh as RefreshIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Build as BuildIcon,
+  Inventory as InventoryIcon,
+  Notifications as NotificationsIcon,
+  ArrowForward as ArrowForwardIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  CalendarToday as CalendarIcon,
+  Visibility as VisibilityIcon,
+  FilterList as FilterListIcon,
+  Dashboard as DashboardIcon,
+} from "@mui/icons-material";
+import { useThemeContext } from "../Layout/ThemeContext";
+import EditProfileButton from "../Login/EditProfileButton";
+import EditProfileModal from "../Login/EditProfileModal";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-// Import Material UI icons
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-
-// Transition for the subscription dialog
-const Transition = React.forwardRef(function Transition(props, ref) {
-  return <Slide direction="up" ref={ref} {...props} />;
-});
-
-const SignUpPage = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [openSubscriptionDialog, setOpenSubscriptionDialog] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
+const Dashboard = () => {
+  // Fixed token handling - consistent with UserManagement component
+  const token = localStorage.getItem("authToken") 
+    ? `Bearer ${localStorage.getItem("authToken")}` 
+    : "";
   
-  // Updated form fields to match API requirements
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    location: '',
-    address: '',
-    phone: ''
+  // Also try to get garageId from authToken storage if garageId doesn't exist
+  let garageId = localStorage.getItem("garageId");
+  if (!garageId) {
+    // Fallback: try to extract from token or use a default
+    garageId = localStorage.getItem("garage_id") || "681e446c397332bf4215171be";
+  }
+
+  const theme = useTheme();
+  const { darkMode } = useThemeContext();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: "",
+    image: "",
   });
 
-  // Create a theme based on dark mode preference
-  const theme = createTheme({
-    palette: {
-      mode: isDarkMode ? 'dark' : 'light',
-      primary: {
-        main: '#3f51b5',
-      },
-      secondary: {
-        main: '#f50057',
-      },
-      background: {
-        default: isDarkMode ? '#121212' : '#f5f5f5',
-        paper: isDarkMode ? '#1e1e1e' : '#ffffff',
-      },
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [currentJobs, setCurrentJobs] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState([
+    {
+      title: "Active Jobs",
+      value: 0,
+      change: 0,
+      isIncrease: true,
+      icon: <BuildIcon sx={{ fontSize: 40 }} />,
+      color: "#2563eb",
+      lightColor: "rgba(37, 99, 235, 0.1)",
     },
-  });
+    {
+      title: "Parts Available",
+      value: 0,
+      change: 0,
+      isIncrease: false,
+      icon: <InventoryIcon sx={{ fontSize: 40 }} />,
+      color: "#ea580c",
+      lightColor: "rgba(234, 88, 12, 0.1)",
+    },
+    {
+      title: "Pending Reminders",
+      value: 0,
+      change: 0,
+      isIncrease: false,
+      icon: <NotificationsIcon sx={{ fontSize: 40 }} />,
+      color: "#dc2626",
+      lightColor: "rgba(220, 38, 38, 0.1)",
+    },
+  ]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Inventory data will be fetched from API and separated into low/high stock
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [highStockItems, setHighStockItems] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState(null);
+  const navigate = useNavigate();
+
+  const handleSaveProfile = (data) => {
+    setProfileData(data);
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const [actionMenu, setActionMenu] = useState(null);
+  const [selectedJobId, setSelectedJobId] = useState(null);
+
+  const handleActionMenuOpen = (event, jobId) => {
+    setActionMenu(event.currentTarget);
+    setSelectedJobId(jobId);
   };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+  const handleActionMenuClose = () => {
+    setActionMenu(null);
+    setSelectedJobId(null);
   };
 
-  const handleOpenSubscriptionDialog = () => {
-    setOpenSubscriptionDialog(true);
+  const handleUpdate = (id) => {
+    navigate(`assign-engineer/${id}`);
   };
 
-  const handleCloseSubscriptionDialog = () => {
-    setOpenSubscriptionDialog(false);
-  };
+  // Fetch garage profile data
+  useEffect(() => {
+    const fetchGarageProfile = async () => {
+      if (!token || !garageId) {
+        console.warn("Token or garageId missing for profile fetch");
+        return;
+      }
 
-  const selectPlan = (plan, price) => {
-    setSelectedPlan({ plan, price });
-    handleCloseSubscriptionDialog();
-  };
+      try {
+        console.log("Fetching garage profile with:", { token: token.substring(0, 20) + "...", garageId });
+        
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json'
+            },
+          }
+        );
 
-  const cancelPlan = () => {
-    setSelectedPlan(null);
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({...snackbar, open: false});
-  };
-
-  const handleRazorpayPayment = async () => {
-  try {
-    // Load Razorpay script
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    // Create order on your backend (you'll need to implement this endpoint)
-    const orderResponse = await fetch('https://garage-management-system-cr4w.onrender.com/payment/create-order', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: selectedPlan.price === 'Free' ? 0 : parseInt(selectedPlan.price.replace(/\D/g, '')) * 100, // Convert to paise
-        currency: 'INR',
-        receipt: `garage_signup_${Date.now()}`
-      }),
-    });
-
-    const orderData = await orderResponse.json();
-
-    if (!orderResponse.ok) {
-      throw new Error(orderData.message || 'Failed to create payment order');
-    }
-
-    const options = {
-      key: 'YOUR_RAZORPAY_KEY_ID', // Replace with your Razorpay key
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: 'Garage Management System',
-      description: `Payment for ${selectedPlan.plan} plan`,
-      order_id: orderData.id,
-      handler: async function(response) {
-        // Verify payment on your backend
-        const verificationResponse = await fetch('https://your-backend-api/verify-payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
-            plan: selectedPlan.plan,
-            price: selectedPlan.price,
-            ...formData
-          }),
-        });
-
-        const verificationData = await verificationResponse.json();
-
-        if (verificationResponse.ok) {
-          setSnackbar({
-            open: true,
-            message: 'Payment successful! Account created.',
-            severity: 'success'
-          });
-          // Proceed with form submission
-          handleSubmit(new Event('submit'));
-        } else {
-          throw new Error(verificationData.message || 'Payment verification failed');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      },
-      prefill: {
-        name: formData.name,
-        email: formData.email,
-        contact: formData.phone
-      },
-      notes: {
-        address: formData.address,
-        plan: selectedPlan.plan
-      },
-      theme: {
-        color: '#3399cc'
+
+        const data = await response.json();
+        console.log("Garage profile response:", data);
+
+        if (data && data.name) {
+          setProfileData({
+            name: data.name || "Your Garage",
+            image: data.image || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching garage profile:", error);
+        // Set default values on error
+        setProfileData({
+          name: "Your Garage",
+          image: "",
+        });
       }
     };
 
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-    
-    rzp.on('payment.failed', function(response) {
-      setSnackbar({
-        open: true,
-        message: `Payment failed: ${response.error.description}`,
-        severity: 'error'
-      });
-    });
+    fetchGarageProfile();
+  }, [token, garageId]);
 
-  } catch (error) {
-    setSnackbar({
-      open: true,
-      message: error.message || 'Payment processing error',
-      severity: 'error'
-    });
-  }
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // If free plan, submit directly
-  if (selectedPlan?.price === 'Free') {
-    setLoading(true);
-    try {
-      const response = await fetch('https://garage-management-system-cr4w.onrender.com/api/garage/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          password: formData.password,
-          location: formData.location,
-          address: formData.address,
-          phone: formData.phone,
-          email: formData.email,
-          plan: selectedPlan?.plan || 'Free'
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: 'Garage created successfully!',
-          severity: 'success'
-        });
-      } else {
-        throw new Error(data.message || 'Failed to create garage');
+  // Fetch job data from API
+  useEffect(() => {
+    const fetchJobs = async () => {
+      if (!token || !garageId) {
+        setError("Authentication token or garage ID not found. Please log in again.");
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.message,
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
-    }
-  } else {
-    // For paid plans, initiate payment
-    handleRazorpayPayment();
-  }
-};
 
-  const plans = [
-  { 
-    name: 'Basic', 
-    price: 'Free', 
-    features: ['Limited access', 'Basic support', '1 project'],
-    amount: 0
-  },
-  { 
-    name: 'Standard', 
-    price: '₹999/mo', 
-    features: ['Full access', 'Priority support', '5 projects'],
-    amount: 99900 // in paise
-  },
-  { 
-    name: 'Premium', 
-    price: '₹1999/mo', 
-    features: ['Premium features', '24/7 support', 'Unlimited projects'],
-    amount: 199900 // in paise
-  }
-];
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log("Fetching jobs with:", { token: token.substring(0, 20) + "...", garageId });
+
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/jobCards/garage/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json'
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Jobs API response:", data);
+
+        // Process the response
+        const jobsData = Array.isArray(data)
+          ? data
+          : data.jobCards
+          ? data.jobCards
+          : data.data
+          ? data.data
+          : [];
+
+        // Extract and format job data from API response
+        setCurrentJobs(jobsData);
+
+        // Update dashboard stats
+        const updatedStats = [...dashboardStats];
+
+        // Count active jobs (Pending or In Progress)
+        const activeJobsCount = jobsData.filter(
+          (job) => job.status === "In Progress" || job.status === "Pending"
+        ).length;
+
+        updatedStats[0].value = activeJobsCount;
+        setDashboardStats(updatedStats);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        setError(`Failed to load jobs data: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [token, garageId]);
+
+  // Fetch inventory data from API
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!token || !garageId) {
+        console.warn("Token or garageId missing for inventory fetch");
+        return;
+      }
+
+      try {
+        setInventoryLoading(true);
+        setInventoryError(null);
+
+        console.log("Fetching inventory with:", { token: token.substring(0, 20) + "...", garageId });
+
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json'
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Inventory API response:", data);
+
+        // Process the response
+        const inventoryData = Array.isArray(data)
+          ? data
+          : data.inventory
+          ? data.inventory
+          : data.data
+          ? data.data
+          : [];
+
+        // Sort inventory items into high and low stock based on quantity
+        const highStock = [];
+        const lowStock = [];
+
+        inventoryData.forEach((item) => {
+          // Using the actual structure from the API
+          const inventoryItem = {
+            id: item._id || "",
+            name: item.partName || "Unknown Part",
+            quantity: item.quantity || 0,
+            price: item.pricePerUnit || 0,
+            carName: item.carName || "",
+            model: item.model || "",
+            reorderPoint: Math.floor(item.quantity * 0.2) || 5,
+          };
+
+          // Items with quantity >= 10 go to high stock, others to low stock (threshold can be adjusted)
+          if (item.quantity >= 10) {
+            highStock.push(inventoryItem);
+          } else {
+            lowStock.push(inventoryItem);
+          }
+        });
+
+        // Update the dashboard stats with total inventory count
+        const updatedStats = [...dashboardStats];
+        updatedStats[1].value = inventoryData.reduce(
+          (total, item) => total + (item.quantity || 0),
+          0
+        );
+        setDashboardStats(updatedStats);
+
+        // Update state with sorted inventory items
+        setHighStockItems(highStock);
+        setLowStockItems(lowStock);
+      } catch (error) {
+        console.error("Error fetching inventory:", error);
+        setInventoryError(`Failed to load inventory data: ${error.message}`);
+
+        // Set fallback empty arrays if API fails
+        setHighStockItems([]);
+        setLowStockItems([]);
+      } finally {
+        setInventoryLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, [token, garageId]);
+
+  const getStatusChip = (status) => {
+    // Standardize status value
+    const normalizedStatus = status || "Pending";
+
+    switch (normalizedStatus) {
+      case "Completed":
+        return (
+          <Chip
+            icon={<CheckCircleIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(22, 163, 74, 0.2)"
+                : "rgba(22, 163, 74, 0.1)",
+              color: theme.palette.success.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.success.main },
+            }}
+          />
+        );
+      case "In Progress":
+        return (
+          <Chip
+            icon={<WarningIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(234, 88, 12, 0.2)"
+                : "rgba(234, 88, 12, 0.1)",
+              color: theme.palette.warning.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.warning.main },
+            }}
+          />
+        );
+      case "Pending":
+        return (
+          <Chip
+            icon={<CalendarIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(37, 99, 235, 0.2)"
+                : "rgba(37, 99, 235, 0.1)",
+              color: theme.palette.info.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.info.main },
+            }}
+          />
+        );
+      default:
+        return (
+          <Chip
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(100, 116, 139, 0.2)"
+                : "rgba(100, 116, 139, 0.1)",
+              color: theme.palette.text.secondary,
+              fontWeight: 600,
+            }}
+          />
+        );
+    }
+  };
+
+  // Calculate job progress based on status
+  const getJobProgress = (status) => {
+    switch (status) {
+      case "Completed":
+        return 100;
+      case "In Progress":
+        return 60;
+      case "Pending":
+        return 10;
+      default:
+        return 0;
+    }
+  };
+
+  // Debug info (remove in production)
+  useEffect(() => {
+    console.log("Dashboard Debug Info:", {
+      token: token ? token.substring(0, 20) + "..." : "No token",
+      garageId,
+      hasAuthToken: !!localStorage.getItem("authToken"),
+      hasGarageId: !!localStorage.getItem("garageId"),
+      localStorageKeys: Object.keys(localStorage)
+    });
+  }, [token, garageId]);
 
   return (
-    <ThemeProvider theme={theme}>
+    <>
       <CssBaseline />
       <Box
         sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 2,
-          bgcolor: 'background.default',
-          transition: 'background-color 0.3s'
+          flexGrow: 1,
+          mb: 4,
+          ml: { xs: 0, sm: 35 },
+          overflow: "auto",
         }}
       >
-        {/* Dark Mode Toggle */}
-        <FormControlLabel
-          control={
-            <Switch 
-              checked={isDarkMode} 
-              onChange={toggleDarkMode} 
-              icon={<LightModeIcon />}
-              checkedIcon={<DarkModeIcon />}
-              sx={{ 
-                '& .MuiSwitch-switchBase.Mui-checked': { 
-                  color: '#f9a825' 
-                } 
-              }}
-            />
-          }
-          label={isDarkMode ? "Dark Mode" : "Light Mode"}
-          sx={{
-            position: 'absolute',
-            top: 16,
-            right: 16
-          }}
-        />
-
-        <Container maxWidth="md">
-          <Paper 
-            elevation={6} 
-            sx={{
-              p: 4,
-              borderRadius: 2,
-              bgcolor: 'background.paper'
-            }}
-          >
-            <Typography 
-              variant="h4" 
-              component="h1" 
-              align="center" 
-              gutterBottom
-              sx={{ fontWeight: 'bold', color: 'primary.main' }}
-            >
-              Create Garage Account
-            </Typography>
-
-            <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-              <TextField
-                fullWidth
-                margin="normal"
-                id="name"
-                name="name"
-                label="Garage Name"
-                value={formData.name}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="email"
-                name="email"
-                label="Email Address"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="password"
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                variant="outlined"
-                required
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={togglePasswordVisibility}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="location"
-                name="location"
-                label="Location"
-                value={formData.location}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="address"
-                name="address"
-                label="Address"
-                value={formData.address}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-              
-              <TextField
-                fullWidth
-                margin="normal"
-                id="phone"
-                name="phone"
-                label="Phone Number"
-                value={formData.phone}
-                onChange={handleChange}
-                variant="outlined"
-                required
-              />
-
-              {/* Selected Plan Display */}
-              {selectedPlan && (
-                <Card 
-                  sx={{ 
-                    mt: 3,
-                    mb: 3,
-                    position: 'relative',
-                    border: `2px dashed ${theme.palette.primary.main}`,
-                    bgcolor: isDarkMode ? 'rgba(63, 81, 181, 0.1)' : 'rgba(63, 81, 181, 0.05)'
+        <Container maxWidth="xl">
+          <Card sx={{ mb: 4, overflow: "visible", borderRadius: 2 }}>
+            <CardContent>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
+              >
+                <Box display="flex" alignItems="center">
+                  <DashboardIcon
+                    fontSize="large"
+                    sx={{ color: "#3f51b5", mr: 2 }}
+                  />
+                  <Typography variant="h5" color="primary">
+                    Dashboard Overview
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={() => setModalOpen(true)}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 2,
+                    fontWeight: 600,
                   }}
                 >
-                  <CardContent sx={{ textAlign: 'center' }}>
-                    <Typography variant="subtitle2" color="textSecondary">
-                      Selected Plan:
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                      {selectedPlan.plan}
-                    </Typography>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        fontWeight: 'bold', 
-                        color: theme.palette.mode === 'dark' ? '#f9a825' : '#f57c00'
-                      }}
-                    >
-                      {selectedPlan.price}
-                    </Typography>
-                    <IconButton
-                      size="small"
-                      onClick={cancelPlan}
-                      sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        bgcolor: 'error.main',
-                        color: 'white',
-                        '&:hover': {
-                          bgcolor: 'error.dark',
-                        }
-                      }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Button
-                fullWidth
-                variant="outlined"
-                color="primary"
-                onClick={handleOpenSubscriptionDialog}
-                sx={{ mt: 2, mb: 2, py: 1.5 }}
-              >
-                Choose Subscription
-              </Button>
-
-              <Button
-  type="submit"
-  fullWidth
-  variant="contained"
-  color="primary"
-  disabled={loading || !selectedPlan}
-  sx={{ 
-    mt: 1, 
-    mb: 2, 
-    py: 1.5,
-    position: 'relative'
-  }}
->
-  {selectedPlan?.price === 'Free' 
-    ? (loading ? 'Creating Account...' : 'Sign Up') 
-    : (loading ? 'Processing...' : `Pay ${selectedPlan?.price} & Sign Up`)}
-</Button>
-
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2">
-                  Already have an account?{' '}
-                  <Link 
-                    href="#" 
-                    underline="hover" 
-                    sx={{ 
-                      fontWeight: 'bold',
-                      cursor: 'pointer' 
-                    }}
-                  >
-                    Login
-                  </Link>
-                </Typography>
+                  Edit Profile
+                </Button>
               </Box>
-            </Box>
-          </Paper>
-        </Container>
 
-        {/* Subscription Dialog */}
-        <Dialog
-          fullWidth
-          maxWidth="sm"
-          open={openSubscriptionDialog}
-          onClose={handleCloseSubscriptionDialog}
-          TransitionComponent={Transition}
-        >
-          <AppBar position="static" color="primary" sx={{ position: 'relative' }}>
-            <Toolbar>
-              <Typography sx={{ flex: 1 }} variant="h6" component="div">
-                Choose Your Plan
-              </Typography>
-              <IconButton
-                edge="end"
-                color="inherit"
-                onClick={handleCloseSubscriptionDialog}
-                aria-label="close"
-              >
-                <CloseIcon />
-              </IconButton>
-            </Toolbar>
-          </AppBar>
-          
-          <Box sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-              {plans.map((plan, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card 
-                    raised={selectedPlan?.plan === plan.name}
-                    onClick={() => selectPlan(plan.name, plan.price)}
-                    sx={{ 
-                      cursor: 'pointer',
-                      transition: 'all 0.3s',
-                      transform: selectedPlan?.plan === plan.name ? 'scale(1.02)' : 'scale(1)',
-                      border: selectedPlan?.plan === plan.name ? `2px solid ${theme.palette.primary.main}` : 'none',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: 6
-                      }
-                    }}
-                  >
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="h5" component="div">
-                          {plan.name}
-                        </Typography>
-                        <Typography 
-                          variant="h5" 
-                          component="div" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            color: theme.palette.mode === 'dark' ? '#f9a825' : '#f57c00'
+              <Divider sx={{ my: 3 }} />
+
+              {/* Stats Cards - exactly 3 cards */}
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                {dashboardStats.map((card, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: "16px",
+                        borderTop: `4px solid ${card.color}`,
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 2,
                           }}
                         >
-                          {plan.price}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        {plan.features.map((feature, i) => (
-                          <Box key={i} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <CheckCircleOutlineIcon color="primary" fontSize="small" sx={{ mr: 1 }} />
-                            <Typography variant="body2">{feature}</Typography>
+                          <Box>
+                            <Typography
+                              variant="h5"
+                              sx={{ fontWeight: "bold", mb: 0.5 }}
+                            >
+                              {card.value}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {card.title}
+                            </Typography>
                           </Box>
-                        ))}
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </Dialog>
-        
-        {/* Snackbar for notifications */}
-        <Snackbar 
-          open={snackbar.open} 
-          autoHideDuration={6000} 
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert 
-            onClose={handleCloseSnackbar} 
-            severity={snackbar.severity} 
-            variant="filled"
-            sx={{ width: '100%' }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </ThemeProvider>
-  );
-};
+                          <Avatar
+                            sx={{
+                              bgcolor: darkMode ? card.color : card.lightColor,
+                              color: darkMode ? "white" : card.color,
+                              width: 56,
+                              height: 56,
+                            }}
+                          >
+                            {card.icon}
+                          </Avatar>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <Chip
+                            icon={
+                              card.isIncrease ? (
+                                <TrendingUpIcon fontSize="small" />
+                              ) : (
+                                <TrendingDownIcon fontSize="small" />
+                              )
+                            }
+                            label={`${card.change}%`}
+                            size="small"
+                            sx={{
+                              backgroundColor: darkMode
+                                ? card.isIncrease
+                                  ? "rgba(22, 163, 74, 0.2)"
+                                  : "rgba(220, 38, 38, 0.2)"
+                                : card.isIncrease
+                                ? "rgba(22, 163, 74, 0.1)"
+                                : "rgba(220, 38, 38, 0.1)",
+                              color: card.isIncrease
+                                ? theme.palette.success.main
+                                : theme.palette.error.main,
+                              fontWeight: 600,
+                              ".MuiChip-icon": { color: "inherit" },
+                              mr: 1,
+                            }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            vs. last week
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
 
-export default SignUpPage;
+              {/* Current Jobs Table */}
+              <Box sx={{ mb: 4 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Current Jobs
+                  </Typography>
+                  <Box>{/* You can add buttons here if needed */}</Box>
+                </Box>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    bgcolor: theme.palette.background.paper,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                  }}
+                >
+                  {loading ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <CircularProgress size={40} />
+                      <Typography variant="body1" sx={{ mt: 2 }}>
+                        Loading job data...
+                      </Typography>
+                    </Box>
+                  ) : error ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <Typography variant="body1" color="error">
+                        {error}
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        sx={{ mt: 2 }}
+                        onClick={() => window.location.reload()}
+                      >
+                        Retry
+                      </Button>
+                    </Box>
+                  ) : currentJobs.length === 0 ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <Typography variant="body1">
+                        No jobs found. Create your first job to get started.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        sx={{ mt: 2 }}
+                        startIcon={<AddIcon />}
+                      >
+                        Create New Job
+                      </Button>
+                    </Box>
+                  ) : (
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Vehicle No.</TableCell>
+                            <TableCell>Customer</TableCell>
+                            <TableCell>Service</TableCell>
+                            <TableCell>Progress</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Update</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {currentJobs.map((job) => (
+                            <TableRow key={job._id}>
+                              <TableCell sx={{ fontWeight: 500 }}>
+                                {job.carNumber ||
+                                  job.registrationNumber ||
+                                  "N/A"}
+                              </TableCell>
+                              <TableCell>{job.customerName || "N/A"}</TableCell>
+                              <TableCell>
+                                {job.jobDetails ||
+                                  job.type ||
+                                  "General Service"}
+                              </TableCell>
+                              <TableCell>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    width: "100%",
+                                  }}
+                                >
+                                  <Box sx={{ width: "100%", mr: 1 }}>
+                                    <LinearProgress
+                                      variant="determinate"
+                                      value={getJobProgress(job.status)}
+                                      sx={{
+                                        height: 6,
+                                        borderRadius: 5,
+                                        backgroundColor: darkMode
+                                          ? "rgba(255, 255, 255, 0.12)"
+                                          : "rgba(0, 0, 0, 0.08)",
+                                        "& .MuiLinearProgress-bar": {
+                                          borderRadius: 5,
+                                          backgroundColor:
+                                            job.status === "Completed"
+                                              ? theme.palette.success.main
+                                              : job.status === "In Progress"
+                                              ? theme.palette.warning.main
+                                              : theme.palette.info.main,
+                                        },
+                                      }}
+                                    />
+                                  </Box>
+                                  <Box sx={{ minWidth: 35 }}>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      {`${getJobProgress(job.status)}%`}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell>{getStatusChip(job.status)}</TableCell>
+
+                              <TableCell>
+                                <Button onClick={() => handleUpdate(job._id)}>
+                                  Update
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                  {currentJobs.length > 5 && (
+                    <Box sx={{ textAlign: "center", py: 2 }}>
+                      <Button
+                        endIcon={<ArrowForwardIcon />}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        View All Jobs
+                      </Button>
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
+
+              {/* Inventory Section - now with Low Stock and High Stock side by side */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Inventory Management
+              </Typography>
+              <Grid container spacing={3}>
+                {/* Low Stock Inventory */}
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 600,
+                          color: theme.palette.error.main,
+                        }}
+                      >
+                        Low in Stock
+                      </Typography>
+                      <Chip
+                        label={`${lowStockItems.length} items`}
+                        size="small"
+                        color="error"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        borderLeft: `4px solid ${theme.palette.error.main}`,
+                      }}
+                    >
+                      {inventoryLoading ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <CircularProgress size={30} />
+                        </Box>
+                      ) : inventoryError ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2" color="error">
+                            {inventoryError}
+                          </Typography>
+                        </Box>
+                      ) : lowStockItems.length === 0 ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2">
+                            No low stock items found.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <TableContainer sx={{ maxHeight: 300 }}>
+                          <Table stickyHeader size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Part Name</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="right">Unit Price</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {lowStockItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell sx={{ fontWeight: 500 }}>
+                                    {item.name}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip
+                                      label={item.quantity}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: darkMode
+                                          ? "rgba(220, 38, 38, 0.2)"
+                                          : "rgba(220, 38, 38, 0.1)",
+                                        color: theme.palette.error.main,
+                                        fontWeight: 600,
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    ₹{item.price.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          textAlign: "center",
+                          borderTop: `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Button
+                          variant="text"
+                          color="error"
+                          endIcon={<ArrowForwardIcon />}
+                          sx={{ fontWeight: 600 }}
+                        >
+                          Order Low Stock Items
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Box>
+                </Grid>
+
+                {/* High in Stock */}
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 600,
+                          color: theme.palette.success.main,
+                        }}
+                      >
+                        High in Stock
+                      </Typography>
+                      <Chip
+                        label={`${highStockItems.length} items`}
+                        size="small"
+                        color="success"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        borderLeft: `4px solid ${theme.palette.success.main}`,
+                      }}
+                    >
+                      {inventoryLoading ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <CircularProgress size={30} />
+                        </Box>
+                      ) : inventoryError ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2" color="error">
+                            {inventoryError}
+                          </Typography>
+                        </Box>
+                      ) : highStockItems.length === 0 ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2">
+                            No high stock items found.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <TableContainer sx={{ maxHeight: 300 }}>
+                          <Table stickyHeader size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Part Name</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="right">Unit Price</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {highStockItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell sx={{ fontWeight: 500 }}>
+                                    {item.name}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip
+                                      label={item.quantity}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: darkMode
+                                          ? "rgba(22, 163, 74, 0.2)"
+                                          : "rgba(22, 163, 74, 0.1)",
+                                        color: theme.palette.success.main,
+                                        fontWeight: 600,
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    ₹{item.price.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                        <Box
+                                              sx={{
+                                                p: 1.5,
+                                                textAlign: "center",
+                                                borderTop: `1px solid ${theme.palette.divider}`,
+                                              }}
+                                            >
+                                              <Button
+                                                variant="text"
+                                                color="success"
+                                                endIcon={<ArrowForwardIcon />}
+                                                sx={{ fontWeight: 600 }}
+                                              >
+                                                Manage Inventory
+                                              </Button>
+                                            </Box>
+                                          </Paper>
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
+                                  </CardContent>
+                                </Card>
+                              </Container>
+                            </Box>
+                      
+                            {/* Job Actions Menu */}
+                            <Menu
+                              anchorEl={actionMenu}
+                              open={Boolean(actionMenu)}
+                              onClose={handleActionMenuClose}
+                              PaperProps={{
+                                elevation: 2,
+                                sx: {
+                                  minWidth: 180,
+                                  borderRadius: 2,
+                                  bgcolor: theme.palette.background.paper,
+                                },
+                              }}
+                            >
+                              <MenuItem onClick={handleActionMenuClose}>
+                                <ListItemIcon>
+                                  <VisibilityIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary="View Details" />
+                              </MenuItem>
+                              <MenuItem onClick={handleActionMenuClose}>
+                                <ListItemIcon>
+                                  <EditIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary="Edit Job" />
+                              </MenuItem>
+                              <Divider />
+                              <MenuItem
+                                onClick={handleActionMenuClose}
+                                sx={{ color: theme.palette.error.main }}
+                              >
+                                <ListItemIcon>
+                                  <DeleteIcon fontSize="small" color="error" />
+                                </ListItemIcon>
+                                <ListItemText primary="Cancel Job" />
+                              </MenuItem>
+                            </Menu>
+                            <EditProfileModal
+                              open={modalOpen}
+                              onClose={() => setModalOpen(false)}
+                              onSave={handleSaveProfile}
+                              currentName={profileData.name}
+                              currentImage={profileData.image}
+                            />
+                          </>
+                        );
+                      };
+                      
+                      export default Dashboard;

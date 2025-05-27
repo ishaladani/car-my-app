@@ -108,7 +108,7 @@ const WorkInProgress = () => {
         setFetchLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-system-cr4w.onrender.com/api/jobCards/${id}`,
+          `https://garage-management-zi5z.onrender.com/api/jobCards/${id}`,
           {
             headers: {
               'Authorization':token,
@@ -237,7 +237,7 @@ const WorkInProgress = () => {
       
       // Make API call
       const response = await axios.put(
-        `https://garage-management-system-cr4w.onrender.com/api/jobCards/jobcard/${id}/workprogress`,
+        `https://garage-management-zi5z.onrender.com/api/jobCards/jobcard/${id}/workprogress`,
         requestData,
         {
           headers: {
