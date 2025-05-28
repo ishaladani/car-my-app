@@ -55,58 +55,60 @@ const LoginPage = () => {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-  
-    // Basic validation
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      setLoading(false);
-      return;
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+
+  // Basic validation
+  if (!formData.email || !formData.password) {
+    setError('Please fill in all fields');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const endpoint = isGarageLogin 
+      ? `${BASE_URL}/api/garage/login`
+      : `${BASE_URL}/api/garage/user/login`;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formData)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Login failed');
     }
-  
-    try {
-      const endpoint = isGarageLogin 
-        ? `${BASE_URL}/api/garage/login`
-        : `${BASE_URL}/api/garage/user/login`;
-  
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Login failed');
-      }
-  
-      const data = await response.json();
-      
-      // Store token and user type in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
-      
-      // Store garageId - fix the path based on response structure
-      if (isGarageLogin && data.garage && data.garage._id) {
-        localStorage.setItem('garageId', data.garage._id);
-      } else if (!isGarageLogin && data.user && data.user._id) {
-        // For user login, the ID is at data.user._id
-        localStorage.setItem('garageId', data.user._id);
-      }
-      
-      // Navigate to appropriate dashboard
-      const redirectPath = isGarageLogin ? '/' : '/';
-      navigate(redirectPath);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+
+    const data = await response.json();
+    
+    // Store token and user type in localStorage
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
+    // localStorage.setItem('garageId', data.user.garageId);
+    
+    // Store garageId based on login type and response structure
+    if (isGarageLogin && data.garage && data.garage._id) {
+      // For garage login: garageId is at data.garage._id
+      localStorage.setItem('garageId', data.garage._id);
+    } else if (!isGarageLogin && data.user && data.user._id) {
+      // For user login: garageId is at data.user.garageId (FIXED)
+      localStorage.setItem('garageId', data.user._id);
     }
-  };
+    
+    // Navigate to appropriate dashboard
+    const redirectPath = isGarageLogin ? '/' : '/';
+    navigate(redirectPath);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
