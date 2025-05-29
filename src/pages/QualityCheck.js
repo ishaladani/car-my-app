@@ -36,7 +36,7 @@ const QualityCheck = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { id } = useParams(); // Get jobCard ID from URL params
-  const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
+  const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
 
   // State for parts table and final inspection remarks
   const [parts, setParts] = useState([]);
@@ -67,7 +67,7 @@ const QualityCheck = () => {
         setIsLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-zi5z.onrender.com/api/jobCards/${id}`,
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
           {
             headers: {
               'Authorization': token,
@@ -134,7 +134,7 @@ const QualityCheck = () => {
   try {
     if (finalInspection) {
       await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobcards/jobcard/${id}/qualitycheck`,
+        `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/qualitycheck`,
         { notes: finalInspection },
         { headers: { 'Authorization': token, 'Content-Type': 'application/json' } }
       );

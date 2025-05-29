@@ -44,7 +44,7 @@ function App() {
               
      
             </Route>
-             <Route path="/insurance" element={<InsuranceManagement />} />
+             
 
           {/* <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>

@@ -1,638 +1,920 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  TextField,
-  Button,
-  Container,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  CssBaseline,
-  useTheme,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
-} from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Edit as EditIcon, Delete as DeleteIcon, Warning as WarningIcon, Refresh as RefreshIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
 
 const InsuranceManagement = () => {
-  const theme = useTheme();
-  const navigate = useNavigate();
-  
-  // State for form fields
-  const [formData, setFormData] = useState({
-    carName: '',
-    insuranceType: '',
-    insurancePrice: '',
-    company: '',
-    expiryDate: '',
-    taxAmount: ''
-  });
-
-  // State for insurance data
-  const [insuranceData, setInsuranceData] = useState([]);
-  const [expiringInsurance, setExpiringInsurance] = useState([]);
+  // State management
+  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [expiringLoading, setExpiringLoading] = useState(false);
-  const [showExpiring, setShowExpiring] = useState(false);
+  const [expiringInsurances, setExpiringInsurances] = useState([]);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [openDialog, setOpenDialog] = useState(false);
   
-  // Snackbar state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
+  // Form state for adding insurance - Updated field names to match API
+  const [insuranceForm, setInsuranceForm] = useState({
+    policyNumber: '',
+    company: '', // Changed from insuranceCompany
+    type: '', // Changed from policyType
+    startDate: '',
+    expiryDate: '', // Changed from endDate
+    premiumAmount: '',
+    carNumber: '', // Changed from vehicleId
+    contactPerson: '',
+    phoneNumber: '',
+    garageId: '' // Added required field
   });
 
-  // Edit dialog state
-  const [editDialog, setEditDialog] = useState({
-    open: false,
-    data: null
-  });
-
-  // API Base URLs
-  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
-  const INSURANCE_API = `${BASE_URL}/api/insurance`;
-
-  // Get token from localStorage
-  const getToken = () => {
-    return localStorage.getItem('token') || localStorage.getItem('authToken') || sessionStorage.getItem('token');
+  // Get token from localStorage (you might need to implement proper token management)
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : ''
+    };
   };
 
-  // Show snackbar message
-  const showSnackbar = (message, severity = 'success') => {
-    setSnackbar({
-      open: true,
-      message,
-      severity
-    });
-  };
-
-  // Close snackbar
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  // Fetch expiring insurance data
-  const fetchExpiringInsurance = async () => {
+  // Fetch expiring insurances
+  const fetchExpiringInsurances = async () => {
+    setLoading(true);
     try {
-      setExpiringLoading(true);
-      const token = getToken();
-      
-      if (!token) {
-        showSnackbar('Please login to continue', 'error');
-        navigate('/login');
-        return;
-      }
-
-      const response = await fetch(`${BASE_URL}/admin/insurance/expiring`, {
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/expiring', {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: getAuthHeaders()
       });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          showSnackbar('Session expired. Please login again', 'error');
-          navigate('/login');
-          return;
-        }
-        throw new Error(`Failed to fetch expiring insurance data: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setExpiringInsurance(data.data || data || []);
       
-      if ((data.data || data || []).length > 0) {
-        showSnackbar(`Found ${(data.data || data || []).length} insurance policies expiring soon!`, 'warning');
+      if (response.ok) {
+        const data = await response.json();
+        setExpiringInsurances(data.insurances || data || []);
+        setMessage({ type: 'success', text: 'Expiring insurances loaded successfully!' });
+      } else {
+        throw new Error('Failed to fetch expiring insurances');
       }
     } catch (error) {
-      console.error('Error fetching expiring insurance data:', error);
-      showSnackbar('Failed to load expiring insurance data', 'error');
-    } finally {
-      setExpiringLoading(false);
-    }
-  };
-
-  // Fetch insurance data
-  const fetchInsuranceData = async () => {
-    try {
-      setLoading(true);
-      const token = getToken();
-      
-      if (!token) {
-        showSnackbar('Please login to continue', 'error');
-        navigate('/login');
-        return;
-      }
-
-      const response = await fetch(`${BASE_URL}/admin/insurance`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          showSnackbar('Session expired. Please login again', 'error');
-          navigate('/login');
-          return;
-        }
-        throw new Error(`Failed to fetch insurance data: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setInsuranceData(data.data || data || []);
-    } catch (error) {
-      console.error('Error fetching insurance data:', error);
-      showSnackbar('Failed to load insurance data', 'error');
-      // Set sample data as fallback
-      setInsuranceData([
-        { id: 1, carNumber: 'ABC123', insuranceType: 'Comprehensive', price: '$500', company: 'Geico', expiry: '12/31/2023' },
-        { id: 2, carNumber: 'XYZ789', insuranceType: 'Liability', price: '$300', company: 'Progressive', expiry: '06/30/2024' },
-        { id: 3, carNumber: 'DEF456', insuranceType: 'Collision', price: '$400', company: 'State Farm', expiry: '09/15/2023' },
-      ]);
+      setMessage({ type: 'error', text: `Error: ${error.message}` });
+      console.error('Error fetching expiring insurances:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    fetchInsuranceData();
-    fetchExpiringInsurance();
-  }, []);
+  // Add new insurance
+  const addInsurance = async () => {
+    setLoading(true);
+    try {
+      // Prepare data with correct field names for API
+      const insuranceData = {
+        policyNumber: insuranceForm.policyNumber,
+        company: insuranceForm.company,
+        type: insuranceForm.type,
+        startDate: insuranceForm.startDate,
+        expiryDate: insuranceForm.expiryDate,
+        premiumAmount: insuranceForm.premiumAmount,
+        carNumber: insuranceForm.carNumber,
+        contactPerson: insuranceForm.contactPerson,
+        phoneNumber: insuranceForm.phoneNumber,
+        garageId: insuranceForm.garageId || 'DEFAULT_GARAGE_ID' // You'll need to set this properly
+      };
+
+      console.log('Sending insurance data:', insuranceData); // For debugging
+
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/add', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(insuranceData)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMessage({ type: 'success', text: 'Insurance added successfully!' });
+        setOpenDialog(false);
+        // Reset form
+        setInsuranceForm({
+          policyNumber: '',
+          company: '',
+          type: '',
+          startDate: '',
+          expiryDate: '',
+          premiumAmount: '',
+          carNumber: '',
+          contactPerson: '',
+          phoneNumber: '',
+          garageId: ''
+        });
+        // Refresh expiring insurances if on that tab
+        if (activeTab === 1) {
+          fetchExpiringInsurances();
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Failed to add insurance');
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Error: ${error.message}` });
+      console.error('Error adding insurance:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+  const handleInputChange = (field, value) => {
+    setInsuranceForm(prev => ({
       ...prev,
-      [name]: value
+      [field]: value
     }));
   };
 
-  // Add insurance via API
-  const addInsurance = async (insuranceData) => {
-    const token = getToken();
-    
-    if (!token) {
-      showSnackbar('Please login to continue', 'error');
-      navigate('/login');
-      return false;
-    }
-
-    const response = await fetch(`${BASE_URL}/admin/insurance/add`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(insuranceData)
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        showSnackbar('Session expired. Please login again', 'error');
-        navigate('/login');
-        return false;
-      }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Server error: ${response.status}`);
-    }
-
-    return await response.json();
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validate required fields
-    if (!formData.carName || !formData.insuranceType || !formData.insurancePrice || 
-        !formData.company || !formData.expiryDate) {
-      showSnackbar('Please fill in all required fields', 'error');
-      return;
-    }
-
-    try {
-      setSubmitLoading(true);
-      
-      const insurancePayload = {
-        carName: formData.carName,
-        insuranceType: formData.insuranceType,
-        insurancePrice: parseFloat(formData.insurancePrice),
-        company: formData.company,
-        expiryDate: formData.expiryDate,
-        taxAmount: formData.taxAmount ? parseFloat(formData.taxAmount) : 0
-      };
-
-      const result = await addInsurance(insurancePayload);
-      
-      showSnackbar('Insurance added successfully!', 'success');
-      
-      // Reset form
-      setFormData({
-        carName: '',
-        insuranceType: '',
-        insurancePrice: '',
-        company: '',
-        expiryDate: '',
-        taxAmount: ''
-      });
-      
-      // Refresh the insurance data
-      await fetchInsuranceData();
-      
-    } catch (error) {
-      console.error('Error adding insurance:', error);
-      showSnackbar(error.message || 'Failed to add insurance', 'error');
-    } finally {
-      setSubmitLoading(false);
+  // Handle tab change
+  const handleTabChange = (tabIndex) => {
+    setActiveTab(tabIndex);
+    if (tabIndex === 1) {
+      fetchExpiringInsurances();
     }
   };
 
-  // Handle edit button click
-  const handleEdit = (insurance) => {
-    setEditDialog({
-      open: true,
-      data: insurance
-    });
+  // Calculate days until expiry
+  const getDaysUntilExpiry = (endDate) => {
+    const today = new Date();
+    const expiry = new Date(endDate);
+    const diffTime = expiry - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
   };
 
-  // Handle delete insurance (if needed)
-  const handleDelete = async (insuranceId) => {
-    if (!window.confirm('Are you sure you want to delete this insurance record?')) {
-      return;
-    }
-
-    try {
-      const token = getToken();
-      const response = await fetch(`${BASE_URL}/admin/insurance/${insuranceId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        showSnackbar('Insurance deleted successfully', 'success');
-        await fetchInsuranceData();
-        await fetchExpiringInsurance();
-      } else {
-        throw new Error('Failed to delete insurance');
-      }
-    } catch (error) {
-      console.error('Error deleting insurance:', error);
-      showSnackbar('Failed to delete insurance', 'error');
+  // Get status badge based on days until expiry
+  const getStatusBadge = (endDate) => {
+    const days = getDaysUntilExpiry(endDate);
+    if (days < 0) {
+      return <span className="status-badge expired">Expired</span>;
+    } else if (days <= 30) {
+      return <span className="status-badge warning">{days} days left</span>;
+    } else {
+      return <span className="status-badge active">Active</span>;
     }
   };
+
+  // Clear messages after 5 seconds
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => {
+        setMessage({ type: '', text: '' });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  // Mobile card view for insurance items
+  const renderMobileInsuranceCard = (insurance, index) => (
+    <div key={index} className="mobile-card">
+      <div className="mobile-card-header">
+        <h4>{insurance.policyNumber || 'N/A'}</h4>
+        {(insurance.expiryDate || insurance.endDate) ? 
+          getStatusBadge(insurance.expiryDate || insurance.endDate) : 
+          <span className="status-badge">N/A</span>}
+      </div>
+      <div className="mobile-card-content">
+        <div className="mobile-card-row">
+          <span className="label">Company:</span>
+          <span>{insurance.company || insurance.insuranceCompany || 'N/A'}</span>
+        </div>
+        <div className="mobile-card-row">
+          <span className="label">Type:</span>
+          <span>{insurance.type || insurance.policyType || 'N/A'}</span>
+        </div>
+        <div className="mobile-card-row">
+          <span className="label">End Date:</span>
+          <span>{insurance.expiryDate || insurance.endDate ? 
+            new Date(insurance.expiryDate || insurance.endDate).toLocaleDateString() : 'N/A'}</span>
+        </div>
+        <div className="mobile-card-row">
+          <span className="label">Car Number:</span>
+          <span>{insurance.carNumber || insurance.vehicleId || 'N/A'}</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <Box sx={{ 
-      flexGrow: 1,
-      mb: 4,
-      ml: {xs: 0, sm: 35},
-      overflow: 'auto',
-      pt: 3
-    }}>
-      <CssBaseline />
-      <Container maxWidth="lg">
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton 
-              onClick={() => navigate(-1)} 
-              sx={{ 
-                mr: 2, 
-                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
-                '&:hover': {
-                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                }
-              }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-            <Typography variant="h5" component="h1" fontWeight={600}>
-              Insurance Management
-            </Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant={showExpiring ? "contained" : "outlined"}
-              color="warning"
-              startIcon={<WarningIcon />}
-              onClick={() => setShowExpiring(!showExpiring)}
-              disabled={expiringLoading}
-            >
-              {expiringLoading ? 'Loading...' : `Expiring (${expiringInsurance.length})`}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                fetchInsuranceData();
-                fetchExpiringInsurance();
-              }}
-              disabled={loading || expiringLoading}
-            >
-              Refresh
-            </Button>
-          </Box>
-        </Box>
-        
-        <Card sx={{ 
-          mb: 4, 
-          overflow: 'visible', 
-          borderRadius: 2,
-          boxShadow: theme.shadows[3]
-        }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box 
-              component="form" 
-              onSubmit={handleSubmit}
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 2,
-                mb: 3
-              }}
-            >
-              <TextField
-                name="carName"
-                label="Car Name *"
-                variant="outlined"
-                value={formData.carName}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-                required
-              />
-              <TextField
-                name="insuranceType"
-                label="Insurance Type *"
-                variant="outlined"
-                value={formData.insuranceType}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-                required
-              />
-              <TextField
-                name="insurancePrice"
-                label="Insurance Price *"
-                variant="outlined"
-                type="number"
-                value={formData.insurancePrice}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-                required
-              />
-              <TextField
-                name="company"
-                label="Company *"
-                variant="outlined"
-                value={formData.company}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-                required
-              />
-              <TextField
-                name="expiryDate"
-                label="Expiry Date *"
-                type="date"
-                variant="outlined"
-                InputLabelProps={{ shrink: true }}
-                value={formData.expiryDate}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-                required
-              />
-              <TextField
-                name="taxAmount"
-                label="Tax Amount"
-                variant="outlined"
-                type="number"
-                value={formData.taxAmount}
-                onChange={handleInputChange}
-                sx={{ flex: '1 1 200px' }}
-              />
-            </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="success"
-                disabled={submitLoading}
-                sx={{ 
-                  px: 4, 
-                  py: 1.5, 
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  textTransform: 'uppercase',
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[2],
-                  '&:hover': {
-                    boxShadow: theme.shadows[4],
-                  }
-                }}
-              >
-                {submitLoading ? (
-                  <>
-                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                    Adding...
-                  </>
-                ) : (
-                  'Add Insurance'
-                )}
-              </Button>
-            </Box>
-            
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <>
-                {/* Expiring Insurance Alert */}
-                {showExpiring && expiringInsurance.length > 0 && (
-                  <Alert 
-                    severity="warning" 
-                    sx={{ mb: 3 }}
-                    action={
-                      <Button color="inherit" size="small" onClick={() => setShowExpiring(false)}>
-                        Hide
-                      </Button>
-                    }
-                  >
-                    <Typography variant="subtitle1" fontWeight="600">
-                      ⚠️ {expiringInsurance.length} Insurance Policies Expiring Soon
-                    </Typography>
-                    <Box sx={{ mt: 1 }}>
-                      {expiringInsurance.slice(0, 3).map((insurance, index) => (
-                        <Typography key={index} variant="body2">
-                          • {insurance.carNumber || insurance.carName} ({insurance.company}) - Expires: {insurance.expiry || insurance.expiryDate}
-                        </Typography>
-                      ))}
-                      {expiringInsurance.length > 3 && (
-                        <Typography variant="body2" fontStyle="italic">
-                          ...and {expiringInsurance.length - 3} more
-                        </Typography>
-                      )}
-                    </Box>
-                  </Alert>
-                )}
+    <div style={styles.container}>
+      <h1 style={styles.title}>Insurance Management System</h1>
+      
+      {/* Message Alert */}
+      {message.text && (
+        <div className={`alert alert-${message.type}`} style={styles.alert}>
+          <span>{message.text}</span>
+          <button 
+            onClick={() => setMessage({ type: '', text: '' })}
+            style={styles.closeBtn}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
-                <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[1] }}>
-                  <Table sx={{ minWidth: 650 }} aria-label="insurance table">
-                    <TableHead sx={{ bgcolor: showExpiring && expiringInsurance.length > 0 ? theme.palette.warning.main : theme.palette.success.main }}>
-                      <TableRow>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Car Number</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Insurance Type</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Price/Unit</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Company</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Expiry</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Status</TableCell>
-                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(showExpiring ? expiringInsurance : insuranceData).map((row) => {
-                        const isExpiring = expiringInsurance.some(exp => exp.id === row.id);
-                        const expiryDate = new Date(row.expiry || row.expiryDate);
-                        const today = new Date();
-                        const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-                        
-                        return (
-                          <TableRow
-                            key={row.id}
-                            sx={{ 
-                              '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover },
-                              backgroundColor: isExpiring ? 'rgba(255, 152, 0, 0.1)' : 'inherit'
-                            }}
-                          >
-                            <TableCell>{row.carNumber || row.carName}</TableCell>
-                            <TableCell>{row.insuranceType}</TableCell>
-                            <TableCell>
-                              {typeof row.price === 'string' ? row.price : `${row.insurancePrice || row.price}`}
-                            </TableCell>
-                            <TableCell>{row.company}</TableCell>
-                            <TableCell>{row.expiry || row.expiryDate}</TableCell>
-                            <TableCell>
-                              {isExpiring ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', color: 'warning.main' }}>
-                                  <WarningIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                                  <Typography variant="body2" color="warning.main">
-                                    {daysUntilExpiry <= 0 ? 'Expired' : `${daysUntilExpiry} days left`}
-                                  </Typography>
-                                </Box>
-                              ) : (
-                                <Typography variant="body2" color="success.main">Active</Typography>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', gap: 1 }}>
-                                <Button 
-                                  variant="outlined" 
-                                  color="primary"
-                                  size="small"
-                                  startIcon={<EditIcon />}
-                                  onClick={() => handleEdit(row)}
-                                >
-                                  Edit
-                                </Button>
-                                <Button 
-                                  variant="outlined" 
-                                  color="error"
-                                  size="small"
-                                  startIcon={<DeleteIcon />}
-                                  onClick={() => handleDelete(row.id)}
-                                >
-                                  Delete
-                                </Button>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {/* Empty rows for better visual */}
-                      {Array.from({ 
-                        length: Math.max(0, 10 - (showExpiring ? expiringInsurance : insuranceData).length) 
-                      }).map((_, index) => (
-                        <TableRow key={`empty-${index}`}>
-                          <TableCell style={{ height: 53 }}></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </Container>
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
+      {/* Tabs */}
+      <div style={styles.tabContainer}>
+        <button 
+          className={activeTab === 0 ? 'tab active' : 'tab'}
+          onClick={() => handleTabChange(0)}
+          style={{...styles.tab, ...(activeTab === 0 ? styles.activeTab : {})}}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          Add Insurance
+        </button>
+        <button 
+          className={activeTab === 1 ? 'tab active' : 'tab'}
+          onClick={() => handleTabChange(1)}
+          style={{...styles.tab, ...(activeTab === 1 ? styles.activeTab : {})}}
+        >
+          Expiring Insurances
+        </button>
+      </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, data: null })}>
-        <DialogTitle>Edit Insurance</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            Edit functionality can be implemented here with the selected insurance data.
-          </Typography>
-          {editDialog.data && (
-            <Box sx={{ mt: 2 }}>
-              <Typography><strong>Car:</strong> {editDialog.data.carNumber || editDialog.data.carName}</Typography>
-              <Typography><strong>Type:</strong> {editDialog.data.insuranceType}</Typography>
-              <Typography><strong>Company:</strong> {editDialog.data.company}</Typography>
-            </Box>
+      {/* Add Insurance Tab */}
+      {activeTab === 0 && (
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <h2 style={styles.cardTitle}>Add New Insurance Policy</h2>
+            <button
+              style={styles.primaryBtn}
+              onClick={() => setOpenDialog(true)}
+            >
+              + Add Insurance
+            </button>
+          </div>
+          
+          <p style={styles.description}>
+            Click the "Add Insurance" button to create a new insurance policy record.
+            All insurance policies will be tracked for expiration dates automatically.
+          </p>
+        </div>
+      )}
+
+      {/* Expiring Insurances Tab */}
+      {activeTab === 1 && (
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <h2 style={styles.cardTitle}>Expiring Insurance Policies</h2>
+            <button
+              style={styles.secondaryBtn}
+              onClick={fetchExpiringInsurances}
+              disabled={loading}
+            >
+              {loading ? '⟳ Loading...' : '⚠ Refresh'}
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={styles.loading}>
+              <div style={styles.spinner}></div>
+            </div>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="desktop-only" style={styles.tableContainer}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.tableHeader}>
+                      <th>Policy Number</th>
+                      <th>Company</th>
+                      <th>Policy Type</th>
+                      <th>End Date</th>
+                      <th>Car Number</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expiringInsurances.length > 0 ? (
+                      expiringInsurances.map((insurance, index) => (
+                        <tr key={index} style={styles.tableRow}>
+                          <td>{insurance.policyNumber || 'N/A'}</td>
+                          <td>{insurance.company || insurance.insuranceCompany || 'N/A'}</td>
+                          <td>{insurance.type || insurance.policyType || 'N/A'}</td>
+                          <td>{insurance.expiryDate || insurance.endDate ? 
+                            new Date(insurance.expiryDate || insurance.endDate).toLocaleDateString() : 'N/A'}</td>
+                          <td>{insurance.carNumber || insurance.vehicleId || 'N/A'}</td>
+                          <td>
+                            {(insurance.expiryDate || insurance.endDate) ? 
+                              getStatusBadge(insurance.expiryDate || insurance.endDate) : 'N/A'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" style={styles.emptyState}>
+                          No expiring insurances found. Click "Refresh" to check for updates.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="mobile-only">
+                {expiringInsurances.length > 0 ? (
+                  expiringInsurances.map((insurance, index) => 
+                    renderMobileInsuranceCard(insurance, index)
+                  )
+                ) : (
+                  <div style={styles.emptyState}>
+                    No expiring insurances found. Click "Refresh" to check for updates.
+                  </div>
+                )}
+              </div>
+            </>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialog({ open: false, data: null })}>Cancel</Button>
-          <Button variant="contained">Save Changes</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        </div>
+      )}
+
+      {/* Add Insurance Dialog */}
+      {openDialog && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <div style={styles.dialogHeader}>
+              <h3>Add New Insurance Policy</h3>
+              <button 
+                onClick={() => setOpenDialog(false)}
+                style={styles.closeBtn}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={styles.dialogContent}>
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label>Policy Number *</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.policyNumber}
+                    onChange={(e) => handleInputChange('policyNumber', e.target.value)}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Insurance Company *</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.company}
+                    onChange={(e) => handleInputChange('company', e.target.value)}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Policy Type *</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.type}
+                    onChange={(e) => handleInputChange('type', e.target.value)}
+                    style={styles.input}
+                    placeholder="e.g., Comprehensive, Third Party"
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Car Number *</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.carNumber}
+                    onChange={(e) => handleInputChange('carNumber', e.target.value)}
+                    style={styles.input}
+                    placeholder="e.g., ABC-123"
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Garage ID *</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.garageId}
+                    onChange={(e) => handleInputChange('garageId', e.target.value)}
+                    style={styles.input}
+                    placeholder="Enter garage ID"
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Start Date</label>
+                  <input
+                    type="date"
+                    value={insuranceForm.startDate}
+                    onChange={(e) => handleInputChange('startDate', e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Expiry Date *</label>
+                  <input
+                    type="date"
+                    value={insuranceForm.expiryDate}
+                    onChange={(e) => handleInputChange('expiryDate', e.target.value)}
+                    style={styles.input}
+                    required
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Premium Amount</label>
+                  <input
+                    type="number"
+                    value={insuranceForm.premiumAmount}
+                    onChange={(e) => handleInputChange('premiumAmount', e.target.value)}
+                    style={styles.input}
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div style={styles.formGroup}>
+                  <label>Contact Person</label>
+                  <input
+                    type="text"
+                    value={insuranceForm.contactPerson}
+                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+                
+                <div style={styles.formGroupFull}>
+                  <label>Phone Number</label>
+                  <input
+                    type="tel"
+                    value={insuranceForm.phoneNumber}
+                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                    style={styles.input}
+                    placeholder="e.g., +1-234-567-8900"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div style={styles.dialogActions}>
+              <button 
+                onClick={() => setOpenDialog(false)}
+                style={styles.cancelBtn}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addInsurance}
+                style={{...styles.primaryBtn, opacity: loading ? 0.7 : 1}}
+                disabled={loading || !insuranceForm.policyNumber || !insuranceForm.company || !insuranceForm.type || !insuranceForm.carNumber || !insuranceForm.expiryDate}
+              >
+                {loading ? 'Adding...' : '+ Add Insurance'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        
+        .alert-success {
+          background-color: #d4edda;
+          border-color: #c3e6cb;
+          color: #155724;
+        }
+        
+        .alert-error {
+          background-color: #f8d7da;
+          border-color: #f5c6cb;
+          color: #721c24;
+        }
+        
+        .status-badge {
+          padding: 4px 12px;
+          border-radius: 16px;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        
+        .status-badge.active {
+          background-color: #d4edda;
+          color: #155724;
+        }
+        
+        .status-badge.warning {
+          background-color: #fff3cd;
+          color: #856404;
+        }
+        
+        .status-badge.expired {
+          background-color: #f8d7da;
+          color: #721c24;
+        }
+        
+        table th, table td {
+          padding: 12px;
+          text-align: left;
+          border-bottom: 1px solid #e0e0e0;
+        }
+        
+        table th {
+          font-weight: 600;
+          color: #333;
+        }
+        
+        button:hover {
+          opacity: 0.9;
+        }
+        
+        button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        
+        input:focus {
+          outline: none;
+          border-color: #1976d2;
+          box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+        }
+        
+        label {
+          font-weight: 500;
+          color: #333;
+          margin-bottom: 4px;
+        }
+
+        /* Mobile-first responsive styles */
+        .desktop-only {
+          display: none;
+        }
+        
+        .mobile-only {
+          display: block;
+        }
+        
+        .mobile-card {
+          background: white;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          margin-bottom: 16px;
+          padding: 16px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .mobile-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        
+        .mobile-card-header h4 {
+          margin: 0;
+          color: #1976d2;
+          font-size: 16px;
+          font-weight: 600;
+        }
+        
+        .mobile-card-content {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        
+        .mobile-card-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 0;
+          border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .mobile-card-row:last-child {
+          border-bottom: none;
+        }
+        
+        .mobile-card-row .label {
+          font-weight: 500;
+          color: #666;
+          font-size: 14px;
+        }
+        
+        .mobile-card-row span:not(.label) {
+          font-size: 14px;
+          text-align: right;
+          max-width: 60%;
+          word-break: break-word;
+        }
+
+        /* Tablet and Desktop styles */
+        @media (min-width: 768px) {
+          .desktop-only {
+            display: block;
+          }
+          
+          .mobile-only {
+            display: none;
+          }
+        }
+
+        /* Mobile-specific adjustments */
+        @media (max-width: 767px) {
+          .container {
+            padding: 12px !important;
+          }
+          
+          .title {
+            font-size: 1.5rem !important;
+            margin-bottom: 16px !important;
+          }
+          
+          .tab-container {
+            flex-direction: column !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+          }
+          
+          .card-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 12px !important;
+          }
+          
+          .card-title {
+            font-size: 1.2rem !important;
+            margin: 0 !important;
+          }
+          
+          .primary-btn, .secondary-btn {
+            width: 100% !important;
+            padding: 12px 16px !important;
+          }
+          
+          .dialog {
+            width: 95% !important;
+            max-height: 95vh !important;
+            margin: 10px !important;
+          }
+          
+          .form-grid {
+            grid-template-columns: 1fr !important;
+          }
+          
+          .dialog-actions {
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          
+          .dialog-actions button {
+            width: 100% !important;
+          }
+        }
+
+        /* Small mobile adjustments */
+        @media (max-width: 480px) {
+          .container {
+            padding: 8px !important;
+          }
+          
+          .mobile-card {
+            padding: 12px !important;
+          }
+          
+          .mobile-card-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+          
+          .mobile-card-row {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 4px !important;
+          }
+          
+          .mobile-card-row span:not(.label) {
+            max-width: 100% !important;
+            text-align: left !important;
+          }
+        }
+      `}</style>
+    </div>
   );
+};
+
+// Updated responsive styles object
+const styles = {
+  container: {
+    maxWidth: '1200px',
+    // margin: '0 auto',
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+    marginLeft:"270px"
+  },
+  title: {
+    color: '#1976d2',
+    marginBottom: '20px',
+    fontSize: '2rem',
+    fontWeight: 'bold'
+  },
+  alert: {
+    padding: '12px 16px',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    border: '1px solid',
+    flexWrap: 'wrap',
+    gap: '8px'
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    padding: '0',
+    width: '24px',
+    height: '24px',
+    flexShrink: 0
+  },
+  tabContainer: {
+    display: 'flex',
+    borderBottom: '2px solid #e0e0e0',
+    marginBottom: '20px'
+  },
+  tab: {
+    padding: '12px 24px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '500',
+    color: '#666',
+    borderBottom: '2px solid transparent',
+    flex: 1,
+    textAlign: 'center'
+  },
+  activeTab: {
+    color: '#1976d2',
+    borderBottom: '2px solid #1976d2'
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    padding: '24px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    border: '1px solid #e0e0e0'
+  },
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+    flexWrap: 'wrap',
+    gap: '12px'
+  },
+  cardTitle: {
+    margin: 0,
+    fontSize: '1.5rem',
+    color: '#333'
+  },
+  description: {
+    color: '#666',
+    fontSize: '16px',
+    lineHeight: '1.5'
+  },
+  primaryBtn: {
+    backgroundColor: '#1976d2',
+    color: 'white',
+    border: 'none',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    minWidth: '140px'
+  },
+  secondaryBtn: {
+    backgroundColor: '#f5f5f5',
+    color: '#333',
+    border: '1px solid #ddd',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    minWidth: '140px'
+  },
+  loading: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '40px'
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #1976d2',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  },
+  tableContainer: {
+    overflowX: 'auto'
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    marginTop: '16px',
+    minWidth: '600px'
+  },
+  tableHeader: {
+    backgroundColor: '#f5f5f5'
+  },
+  tableRow: {
+    borderBottom: '1px solid #e0e0e0'
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#666'
+  },
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '10px'
+  },
+  dialog: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    maxWidth: '600px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto'
+  },
+  dialogHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px',
+    borderBottom: '1px solid #e0e0e0'
+  },
+  dialogContent: {
+    padding: '20px'
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: '16px'
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  formGroupFull: {
+    display: 'flex',
+    flexDirection: 'column',
+    gridColumn: '1 / -1'
+  },
+  input: {
+    padding: '12px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '14px',
+    marginTop: '4px'
+  },
+  dialogActions: {
+    padding: '20px',
+    borderTop: '1px solid #e0e0e0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    flexWrap: 'wrap'
+  },
+  cancelBtn: {
+    backgroundColor: 'transparent',
+    color: '#666',
+    border: '1px solid #ddd',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    minWidth: '100px'
+  }
 };
 
 export default InsuranceManagement;

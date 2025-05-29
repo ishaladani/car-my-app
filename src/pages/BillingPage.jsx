@@ -161,7 +161,7 @@ const AutoServeBilling = () => {
                 setIsLoading(true);
 
                 const response = await axios.get(
-                    `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardIdFromUrl}`,
+                    `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${jobCardIdFromUrl}`,
                     {
                         headers: {
                             'Authorization': token,
@@ -345,17 +345,12 @@ Contact: 9909047943`);
             maximumFractionDigits: 0,
         }).format(amount);
     };
-
-    const generatePdfBase64 = () => {
+const generatePdfBase64 = () => {
     const doc = new jsPDF();
-    
-    // Add content to your PDF
     doc.text("Invoice Details", 10, 10);
     doc.text(`Customer: ${carDetails.customerName}`, 10, 20);
     doc.text(`Total: ₹${summary.totalAmount}`, 10, 30);
-
-    // Output as base64 string
-    return doc.output('datauristring').split(',')[1]; // Remove data URI prefix
+    return doc.output('datauristring').split(',')[1]; // Return Base64 without prefix
 };
 
     // Enhanced PDF generation function
@@ -609,18 +604,17 @@ const generatePdf = () => {
     const openEmailDialog = () => {
         setShowEmailDialog(true);
     };
-   const sendBillViaEmail = () => {
+ const sendBillViaEmail = () => {
     const pdfBase64 = generatePdfBase64();
     const fileName = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber}.pdf`;
-
+    
     const subject = encodeURIComponent(emailSubject || 'Your Invoice');
     const body = encodeURIComponent(emailMessage || 'Please find attached your invoice.');
     const recipient = encodeURIComponent(emailRecipient || '');
-
+    
     const dataUri = `data:application/pdf;base64,${pdfBase64}`;
     
-    // Open mail client with attachment
-window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&attachment=${encodeURIComponent(dataUri)}`;   
+    window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}&attachment=${encodeURIComponent(dataUri)}`;
 };
 
     // Add new part
@@ -737,7 +731,7 @@ const processOnlinePayment = async () => {
     try {
         // First generate the bill
         const billResponse = await axios.post(
-            `https://garage-management-zi5z.onrender.com/api/billing/generate/${jobCardIdFromUrl}`,
+            `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
             {
                 parts: parts.map((part) => ({
                     name: part.name,
@@ -777,7 +771,7 @@ const processOnlinePayment = async () => {
 
         // Then process the online payment
         const paymentResponse = await axios.post(
-            "https://garage-management-zi5z.onrender.com/api/billing/pay",
+            "https://garage-management-zi5z.onrender.com/api/garage/billing/pay",
             {
                 billId: billId,
                 paymentMethod: "Online Payment"
@@ -846,7 +840,7 @@ const processOnlinePayment = async () => {
 
     try {
         const response = await axios.post(
-            `https://garage-management-zi5z.onrender.com/api/billing/generate/${jobCardIdFromUrl}`,
+            `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
             apiData,
             {
                 headers: {

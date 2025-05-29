@@ -45,7 +45,7 @@ import axios from 'axios';
 const WorkInProgress = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { id } = useParams(); // Assuming you're passing the jobCard ID in URL
+  const { id } = useParams(); 
   
 
   
@@ -108,7 +108,7 @@ const WorkInProgress = () => {
         setFetchLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-zi5z.onrender.com/api/jobCards/${id}`,
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
           {
             headers: {
               'Authorization':token,
@@ -232,12 +232,9 @@ const WorkInProgress = () => {
         engineerRemarks: remarks,
         status: status
       };
-      
-      // Use the id defined at the component level
-      
-      // Make API call
+      console.log("id", id)
       const response = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobCards/jobcard/${id}/workprogress`,
+        `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
         requestData,
         {
           headers: {

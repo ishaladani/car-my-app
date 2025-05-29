@@ -159,7 +159,7 @@ const JobCards = () => {
   
       const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
       const response = await axios.post(
-        `${apiBaseUrl}/api/jobCards/add`,
+        `${apiBaseUrl}/api/garage/jobCards/add`,
         formDataToSend,
         config
       );

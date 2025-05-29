@@ -198,7 +198,7 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
         console.log("Fetching jobs with:", { token: token.substring(0, 20) + "...", garageId });
 
         const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/jobCards/garage/${garageId}`,
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
           {
             method: 'GET',
             headers: {
@@ -263,7 +263,7 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
         console.log("Fetching inventory with:", { token: token.substring(0, 20) + "...", garageId });
 
         const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
+          `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
           {
             method: 'GET',
             headers: {
@@ -818,10 +818,10 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
                         <Button
                           variant="text"
                           color="error"
-                          endIcon={<ArrowForwardIcon />}
+                          // endIcon={<ArrowForwardIcon />}
                           sx={{ fontWeight: 600 }}
                         >
-                          Order Low Stock Items
+                         Low Stock Items
                         </Button>
                       </Box>
                     </Paper>
@@ -930,7 +930,7 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
                                               <Button
                                                 variant="text"
                                                 color="success"
-                                                endIcon={<ArrowForwardIcon />}
+                                                // endIcon={<ArrowForwardIcon />}
                                                 sx={{ fontWeight: 600 }}
                                               >
                                                 Manage Inventory
