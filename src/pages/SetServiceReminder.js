@@ -111,11 +111,7 @@ const SetServiceReminder = () => {
     setSuccessMessage('');
     
     try {
-      // Get token from localStorage
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
+      
       
       // Prepare the request data
       const reminderData = {
@@ -128,7 +124,6 @@ const SetServiceReminder = () => {
       const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/reminders/send', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(reminderData)

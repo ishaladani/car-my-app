@@ -54,13 +54,9 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
-  // Fixed token handling - consistent with UserManagement component
-const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
   
-  // Also try to get garageId from authToken storage if garageId doesn't exist
   let garageId = localStorage.getItem("garageId");
   if (!garageId) {
-    // Fallback: try to extract from token or use a default
     garageId = localStorage.getItem("garage_id");
   }
 
@@ -137,20 +133,16 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
   // Fetch garage profile data
   useEffect(() => {
     const fetchGarageProfile = async () => {
-      if (!token || !garageId) {
-        console.warn("Token or garageId missing for profile fetch");
-        return;
-      }
+      
 
       try {
-        console.log("Fetching garage profile with:", { token: token.substring(0, 20) + "...", garageId });
-        
+          
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
           {
             method: 'GET',
             headers: {
-              'Authorization': token,
+          
               'Content-Type': 'application/json'
             },
           }
@@ -180,13 +172,13 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
     };
 
     fetchGarageProfile();
-  }, [token, garageId]);
+  }, [garageId]);
 
   // Fetch job data from API
   useEffect(() => {
     const fetchJobs = async () => {
-      if (!token || !garageId) {
-        setError("Authentication token or garage ID not found. Please log in again.");
+      if (!garageId) {
+        setError("Authentication garage ID not found. Please log in again.");
         setLoading(false);
         return;
       }
@@ -195,14 +187,12 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
         setLoading(true);
         setError(null);
 
-        console.log("Fetching jobs with:", { token: token.substring(0, 20) + "...", garageId });
 
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
           {
             method: 'GET',
             headers: {
-              'Authorization': token,
               'Content-Type': 'application/json'
             },
           }
@@ -246,13 +236,13 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
     };
 
     fetchJobs();
-  }, [token, garageId]);
+  }, [ garageId]);
 
   // Fetch inventory data from API
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!token || !garageId) {
-        console.warn("Token or garageId missing for inventory fetch");
+      if (!garageId) {
+        console.warn("garageId missing for inventory fetch");
         return;
       }
 
@@ -260,14 +250,12 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
         setInventoryLoading(true);
         setInventoryError(null);
 
-        console.log("Fetching inventory with:", { token: token.substring(0, 20) + "...", garageId });
 
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
           {
             method: 'GET',
             headers: {
-              'Authorization': token,
               'Content-Type': 'application/json'
             },
           }
@@ -337,7 +325,7 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
     };
 
     fetchInventory();
-  }, [token, garageId]);
+  }, [ garageId]);
 
   const getStatusChip = (status) => {
     // Standardize status value
@@ -426,13 +414,12 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
   // Debug info (remove in production)
   useEffect(() => {
     console.log("Dashboard Debug Info:", {
-      token: token ? token.substring(0, 20) + "..." : "No token",
+
       garageId,
-      hasAuthToken: !!localStorage.getItem("authToken"),
       hasGarageId: !!localStorage.getItem("garageId"),
       localStorageKeys: Object.keys(localStorage)
     });
-  }, [token, garageId]);
+  }, [ garageId]);
 
   return (
     <>

@@ -44,9 +44,8 @@ const AppLayout = () => {
   const { darkMode } = useThemeContext();
   const location = useLocation();
   const roll = localStorage.getItem("userType");
-  const userId = localStorage.getItem("userId"); // Assuming userId is stored in localStorage
+  const userId = localStorage.getItem("userId");
 
-  // CHANGE THIS LINE
   const isMobile = useMediaQuery("(max-width:599px)");
   const [profileData, setProfileData] = useState({
     name: "",
@@ -57,8 +56,6 @@ const AppLayout = () => {
   const [userPermissions, setUserPermissions] = useState([]);
   const [filteredNavItems, setFilteredNavItems] = useState([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
-  
-const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
 
   // All available nav items
   const allNavItems = [
@@ -77,29 +74,20 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
 
   // Fetch user permissions if role is "user"
   const fetchUserPermissions = async () => {
-    if (roll === "user" ) {
-
-      
-      if (!token) {
-        console.warn("Token missing for permissions fetch");
-        setFilteredNavItems([]);
-        setPermissionsLoaded(true);
-        return;
-      }
-
+    if (roll === "user") {
+      const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
+       console.log("user", roll, token)
       try {
-        
+        // FIXED: Correct API call format
         const response = await axios.get(
           "https://garage-management-zi5z.onrender.com/api/garage/user/getpermission",
           {
             headers: {
               'Authorization': token,
               'Content-Type': 'application/json'
-            }
+            },
           }
         );
-        
-        console.log("Permissions API response:", response.data);
         
         if (response.data && response.data.permissions) {
           setUserPermissions(response.data.permissions);
@@ -110,19 +98,14 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
           );
           setFilteredNavItems(filtered);
           
-          console.log("Filtered nav items:", filtered);
         } else {
-          console.warn("No permissions found in response");
           setFilteredNavItems([]);
         }
       } catch (error) {
-        console.error("Error fetching user permissions:", error);
         // On error, show empty navigation for security
         setFilteredNavItems([]);
       }
     } else {
-      // For non-user roles, show all nav items
-      console.log("Non-user role detected, showing all nav items");
       setFilteredNavItems(allNavItems);
     }
     setPermissionsLoaded(true);
@@ -156,10 +139,25 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
     };
   }, []);
 
-  // Fetch permissions on mount
+  // Fetch permissions on mount, page refresh, and when roll/userId changes
   useEffect(() => {
     fetchUserPermissions();
   }, [roll, userId]);
+
+  // Additional effect to handle page visibility changes (optional)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && roll === "user") {
+        fetchUserPermissions();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [roll]);
 
   // State for drawer and menus
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -173,7 +171,6 @@ const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('to
     // Clear all items from localStorage
     localStorage.clear();
 
-    console.log("User logged out, localStorage cleared");
 
     // Navigate to login page
     navigate("/login");

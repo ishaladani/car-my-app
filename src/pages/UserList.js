@@ -101,9 +101,7 @@ const UserManagement = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // const token = localStorage.getItem("authToken")
-    //     ? `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY4MWU0NDZjMzk3MzMyYmY0MjE1MTdiZSIsImlhdCI6MTc0Nzk5MDY3NywiZXhwIjoxNzQ4NTk1NDc3fQ.ZhG48y8wkgsBt2qrQiJpCZtYjeDi6at1U_uetK8CbL4`
-    //     : "";
+
     const token = localStorage.getItem("token") 
   ? `Bearer ${localStorage.getItem("token")}` 
   : "";
@@ -400,22 +398,19 @@ const UserManagement = () => {
         setSelectedSites([1]); // Mocked assigned sites
     };
 
-    useEffect(() => {
-        console.log('Current users:', users);
-        console.log('Filtered users:', filteredUsers);
-    }, [users, filteredUsers]);
+   
 
     function ErrorBoundary({ children }) {
         const [hasError, setHasError] = useState(false);
 
-        useEffect(() => {
-            const errorHandler = (error) => {
-                console.error('Error caught:', error);
-                setHasError(true);
-            };
-            window.addEventListener('error', errorHandler);
-            return () => window.removeEventListener('error', errorHandler);
-        }, []);
+        // useEffect(() => {
+        //     const errorHandler = (error) => {
+        //         console.error('Error caught:', error);
+        //         setHasError(true);
+        //     };
+        //     window.addEventListener('error', errorHandler);
+        //     return () => window.removeEventListener('error', errorHandler);
+        // }, []);
 
         if (hasError) return <div>Something went wrong.</div>;
         return children;

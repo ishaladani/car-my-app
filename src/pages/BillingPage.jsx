@@ -63,9 +63,7 @@ const AutoServeBilling = () => {
 
     const jobCardIdFromUrl = jobCardId || getJobCardIdFromUrl();
     const today = new Date().toISOString().split("T")[0];
-    const token = localStorage.getItem("authToken")
-        ? `Bearer ${localStorage.getItem("authToken")}`
-        : "";
+  
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -164,7 +162,7 @@ const AutoServeBilling = () => {
                     `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${jobCardIdFromUrl}`,
                     {
                         headers: {
-                            'Authorization': token,
+                       
                             'Content-Type': 'application/json'
                         }
                     }
@@ -275,7 +273,7 @@ const AutoServeBilling = () => {
         };
 
         fetchJobCardData();
-    }, [jobCardIdFromUrl, token, today]);
+    }, [jobCardIdFromUrl,  today]);
 
     // Calculate totals whenever parts, services, or discount changes
     useEffect(() => {
@@ -748,7 +746,7 @@ const processOnlinePayment = async () => {
             {
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: token,
+                    
                 },
             }
         );
@@ -779,7 +777,7 @@ const processOnlinePayment = async () => {
             {
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: token,
+                   
                 },
             }
         );
@@ -845,7 +843,7 @@ const processOnlinePayment = async () => {
             {
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: token,
+                
                 },
             }
         );

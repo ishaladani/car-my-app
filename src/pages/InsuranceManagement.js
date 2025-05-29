@@ -22,12 +22,10 @@ const InsuranceManagement = () => {
     garageId: '' // Added required field
   });
 
-  // Get token from localStorage (you might need to implement proper token management)
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    
     return {
       'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
     };
   };
 
@@ -42,7 +40,7 @@ const InsuranceManagement = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setExpiringInsurances(data.insurances || data || []);
+        setExpiringInsurances(data || data || []);
         setMessage({ type: 'success', text: 'Expiring insurances loaded successfully!' });
       } else {
         throw new Error('Failed to fetch expiring insurances');
@@ -268,57 +266,58 @@ const InsuranceManagement = () => {
           ) : (
             <>
               {/* Desktop Table View */}
-              <div className="desktop-only" style={styles.tableContainer}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr style={styles.tableHeader}>
-                      <th>Policy Number</th>
-                      <th>Company</th>
-                      <th>Policy Type</th>
-                      <th>End Date</th>
-                      <th>Car Number</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expiringInsurances.length > 0 ? (
-                      expiringInsurances.map((insurance, index) => (
-                        <tr key={index} style={styles.tableRow}>
-                          <td>{insurance.policyNumber || 'N/A'}</td>
-                          <td>{insurance.company || insurance.insuranceCompany || 'N/A'}</td>
-                          <td>{insurance.type || insurance.policyType || 'N/A'}</td>
-                          <td>{insurance.expiryDate || insurance.endDate ? 
-                            new Date(insurance.expiryDate || insurance.endDate).toLocaleDateString() : 'N/A'}</td>
-                          <td>{insurance.carNumber || insurance.vehicleId || 'N/A'}</td>
-                          <td>
-                            {(insurance.expiryDate || insurance.endDate) ? 
-                              getStatusBadge(insurance.expiryDate || insurance.endDate) : 'N/A'}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="6" style={styles.emptyState}>
-                          No expiring insurances found. Click "Refresh" to check for updates.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            {/* Desktop Table View */}
+<div className="desktop-only" style={styles.tableContainer}>
+  <table style={styles.table}>
+    <thead>
+      <tr style={styles.tableHeader}>
+        <th>Policy Number</th>
+        <th>Company</th>
+        <th>Policy Type</th>
+        <th>End Date</th>
+        <th>Car Number</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {expiringInsurances.length > 0 ? (
+        expiringInsurances.map((insurance, index) => (
+          <tr key={insurance._id || index} style={styles.tableRow}>
+            <td>{insurance.policyNumber || 'N/A'}</td>
+            <td>{insurance.company || 'N/A'}</td>
+            <td>{insurance.type || 'N/A'}</td>
+            <td>{insurance.expiryDate ? 
+              new Date(insurance.expiryDate).toLocaleDateString() : 'N/A'}</td>
+            <td>{insurance.carNumber || 'N/A'}</td>
+            <td>
+              {insurance.expiryDate ? 
+                getStatusBadge(insurance.expiryDate) : 'N/A'}
+            </td>
+          </tr>
+        ))
+      ) : (
+        <tr>
+          <td colSpan="6" style={styles.emptyState}>
+            No expiring insurances found. Click "Refresh" to check for updates.
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>
 
-              {/* Mobile Card View */}
-              <div className="mobile-only">
-                {expiringInsurances.length > 0 ? (
-                  expiringInsurances.map((insurance, index) => 
-                    renderMobileInsuranceCard(insurance, index)
-                  )
-                ) : (
-                  <div style={styles.emptyState}>
-                    No expiring insurances found. Click "Refresh" to check for updates.
-                  </div>
-                )}
-              </div>
+{/* Mobile Card View */}
+<div className="mobile-only">
+  {expiringInsurances.length > 0 ? (
+    expiringInsurances.map((insurance, index) => 
+      renderMobileInsuranceCard(insurance, index)
+    )
+  ) : (
+    <div style={styles.emptyState}>
+      No expiring insurances found. Click "Refresh" to check for updates.
+    </div>
+  )}
+</div>
             </>
           )}
         </div>

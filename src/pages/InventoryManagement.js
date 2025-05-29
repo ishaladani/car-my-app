@@ -83,8 +83,6 @@ const InventoryManagement = () => {
   });
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
-  // Get token from storage or use hardcoded for testing
-  const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
   const garageId = localStorage.getItem('garageId'); // Use stored ID or fallback to default
 
   // Function to fetch inventory data
@@ -95,7 +93,6 @@ const InventoryManagement = () => {
         `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`, 
         {
           headers: {
-            'Authorization': token,
           }
         }
       );
@@ -238,7 +235,6 @@ const InventoryManagement = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': token,
           }
         }
       );
@@ -303,7 +299,6 @@ const InventoryManagement = () => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': token,
           }
         }
       );

@@ -89,16 +89,14 @@ const LoginPage = () => {
     // Store token and user type in localStorage
     localStorage.setItem('token', data.token);
     localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
-    // localStorage.setItem('garageId', data.user.garageId);
     
     // Store garageId based on login type and response structure
     if (isGarageLogin && data.garage && data.garage._id) {
       // For garage login: garageId is at data.garage._id
       localStorage.setItem('garageId', data.garage._id);
-    } else if (!isGarageLogin && data.user && data.user._id) {
-      // For user login: garageId is at data.user.garageId (FIXED)
-      localStorage.setItem('garageId', data.user._id);
-    }
+    } else if (!isGarageLogin && data.user && data.user.garageId) {
+  localStorage.setItem('garageId', data.user.garageId);
+}
     
     // Navigate to appropriate dashboard
     const redirectPath = isGarageLogin ? '/' : '/';

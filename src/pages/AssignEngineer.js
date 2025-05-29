@@ -59,8 +59,7 @@ const AssignEngineer = () => {
   const {id} = useParams();
   const jobCardId = location.state?.jobCardId;
   
-  // Get token from localStorage
-  const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
+
   
   // State management
   const [engineers, setEngineers] = useState([]);
@@ -103,25 +102,20 @@ const AssignEngineer = () => {
   const [engineerAddSuccess, setEngineerAddSuccess] = useState(false);
   const [engineerAddError, setEngineerAddError] = useState(null);
 
-  // Check if token exists
-  useEffect(() => {
-    if (!token) {
-      setError('Authentication token not found. Please log in again.');
-      setTimeout(() => navigate('/login'), 2000);
-    }
-  }, [token, navigate]);
+
+
 
   // Fetch inventory parts from API on mount
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!token) return;
+
       
       try {
         const response = await axios.get(
           ` /api/garage/inventory/${garageId}`,
           {
             headers: {
-              'Authorization': token,
+              
             }
           }
         );
@@ -133,12 +127,12 @@ const AssignEngineer = () => {
       }
     };
     fetchInventory();
-  }, [partAddSuccess, token]);
+  }, [partAddSuccess, ]);
 
   // Fetch engineers from API
   useEffect(() => {
     const fetchEngineers = async () => {
-      if (!token) return;
+
       
       try {
         setIsLoading(true);
@@ -149,7 +143,7 @@ const AssignEngineer = () => {
           {
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': token,
+
             }
           }
         );
@@ -177,7 +171,7 @@ const AssignEngineer = () => {
     };
 
     fetchEngineers();
-  }, [token, engineerAddSuccess]); // Refetch when a new engineer is added
+  }, [, engineerAddSuccess]); // Refetch when a new engineer is added
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -189,11 +183,7 @@ const AssignEngineer = () => {
       return;
     }
 
-    if (!token) {
-      setError('Authentication token not found. Please log in again.');
-      setTimeout(() => navigate('/login'), 2000);
-      return;
-    }
+  
 
     setIsSubmitting(true);
     setError(null);
@@ -203,7 +193,7 @@ const AssignEngineer = () => {
       const response = await fetch(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/assign-engineer/${id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': token,
+     
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ engineerId: selectedEngineer._id })
@@ -280,10 +270,7 @@ const AssignEngineer = () => {
       return;
     }
 
-    if (!token) {
-      setEngineerAddError('Authentication token not found. Please log in again.');
-      return;
-    }
+ 
 
     setAddingEngineer(true);
     setEngineerAddError(null);
@@ -300,7 +287,7 @@ const AssignEngineer = () => {
         formattedEngineer,
         {
           headers: {
-            'Authorization': token,
+         
             'Content-Type': 'application/json'
           }
         }
@@ -347,10 +334,7 @@ const AssignEngineer = () => {
       return;
     }
 
-    if (!token) {
-      setPartAddError('Authentication token not found. Please log in again.');
-      return;
-    }
+    
 
     setAddingPart(true);
     setPartAddError(null);
@@ -361,7 +345,7 @@ const AssignEngineer = () => {
         newPart,
         {
           headers: {
-            'Authorization': token,
+     
             'Content-Type': 'application/json'
           }
         }
@@ -385,14 +369,14 @@ const AssignEngineer = () => {
 
   // Fetch inventory parts separately (to refresh after adding a new part)
   const fetchInventoryParts = async () => {
-    if (!token) return;
+
     
     try {
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
         {
           headers: {
-            'Authorization': token,
+            
           }
         }
       );

@@ -44,9 +44,7 @@ import { useThemeContext } from '../Layout/ThemeContext';
 import axios from 'axios';
 
 const RecordReport = () => {
-  const token = localStorage.getItem("authToken")
-    ? `Bearer ${localStorage.getItem("authToken")}`
-    : "";
+ 
   const garageId = localStorage.getItem("garageId");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -64,7 +62,7 @@ const RecordReport = () => {
   // Fetch inventory data
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!token || !garageId) return;
+     
 
       try {
         setLoading(true);
@@ -74,7 +72,7 @@ const RecordReport = () => {
           `https://garage-management-zi5z.onrender.com/api/inventory/${garageId}`,
           {
             headers: {
-              Authorization: token,
+             
             },
           }
         );
@@ -99,7 +97,7 @@ const RecordReport = () => {
     };
 
     fetchInventory();
-  }, [token, garageId]);
+  }, [ garageId]);
 
 const handleSearch = (e) => {
   const searchTerm = e.target.value.toLowerCase();

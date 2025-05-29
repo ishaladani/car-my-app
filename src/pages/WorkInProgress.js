@@ -93,8 +93,7 @@ const WorkInProgress = () => {
     message: '',
     severity: 'success'
   });
-   const token = localStorage.getItem('authToken') ? `Bearer ${localStorage.getItem('authToken')}` : '';
-  
+   
 
   // Handle snackbar close
   const handleSnackbarClose = () => {
@@ -111,7 +110,7 @@ const WorkInProgress = () => {
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
           {
             headers: {
-              'Authorization':token,
+          
               'Content-Type': 'application/json'
             }
           }
@@ -238,7 +237,6 @@ const WorkInProgress = () => {
         requestData,
         {
           headers: {
-            'Authorization':token,
             'Content-Type': 'application/json'
           }
         }

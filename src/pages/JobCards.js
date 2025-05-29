@@ -82,7 +82,6 @@ const JobCards = () => {
     message: '',
     severity: 'success'
   });
- const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
   const garageId = localStorage.getItem('garageId');
   // Form state
   const [formData, setFormData] = useState({
@@ -153,8 +152,7 @@ const JobCards = () => {
       }
   
       const config = {
-        headers: {
-          'Authorization': token,}
+  
       };
   
       const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
