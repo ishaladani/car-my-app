@@ -60,6 +60,8 @@ const Dashboard = () => {
     garageId = localStorage.getItem("garage_id");
   }
 
+  
+
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const [modalOpen, setModalOpen] = useState(false);
@@ -132,46 +134,48 @@ const Dashboard = () => {
 
   // Fetch garage profile data
   useEffect(() => {
-    const fetchGarageProfile = async () => {
-      
+    // const fetchGarageProfile = async () => {
+    //   if(!garageId){
+    //     navigate("\login")
+    //   }
 
-      try {
+    //   try {
           
-        const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
-          {
-            method: 'GET',
-            headers: {
+    //     const response = await fetch(
+    //       `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
+    //       {
+    //         method: 'GET',
+    //         headers: {
           
-              'Content-Type': 'application/json'
-            },
-          }
-        );
+    //           'Content-Type': 'application/json'
+    //         },
+    //       }
+    //     );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    //     if (!response.ok) {
+    //       throw new Error(`HTTP error! status: ${response.status}`);
+    //     }
 
-        const data = await response.json();
-        console.log("Garage profile response:", data);
+    //     const data = await response.json();
+    //     console.log("Garage profile response:", data);
 
-        if (data && data.name) {
-          setProfileData({
-            name: data.name || "Your Garage",
-            image: data.image || "",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching garage profile:", error);
-        // Set default values on error
-        setProfileData({
-          name: "Your Garage",
-          image: "",
-        });
-      }
-    };
+    //     if (data && data.name) {
+    //       setProfileData({
+    //         name: data.name || "Your Garage",
+    //         image: data.image || "",
+    //       });
+    //     }
+    //   } catch (error) {
+    //     console.error("Error fetching garage profile:", error);
+    //     // Set default values on error
+    //     setProfileData({
+    //       name: "Your Garage",
+    //       image: "",
+    //     });
+    //   }
+    // };
 
-    fetchGarageProfile();
+    // fetchGarageProfile();
   }, [garageId]);
 
   // Fetch job data from API

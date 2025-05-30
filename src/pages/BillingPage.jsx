@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
     Container,
     Box,
@@ -53,6 +53,11 @@ const AutoServeBilling = () => {
     // Get jobCardId from URL parameters
     const { jobCardId } = useParams();
     const location = useLocation();
+      const navigate = useNavigate();
+    let garageId = localStorage.getItem("garageId");
+  if (!garageId) {
+    garageId = localStorage.getItem("garage_id");
+  }
     
     // Alternative method to get jobCardId if not using react-router params
     const getJobCardIdFromUrl = () => {
@@ -144,6 +149,9 @@ const AutoServeBilling = () => {
 
     // Fetch job card data from API
     useEffect(() => {
+         if(!garageId){
+        navigate("\login")
+      }
         const fetchJobCardData = async () => {
             if (!jobCardIdFromUrl) {
                 setSnackbar({

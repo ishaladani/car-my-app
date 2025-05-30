@@ -88,6 +88,7 @@ const InventoryManagement = () => {
   // Function to fetch inventory data
   const fetchInventory = async () => {
     try {
+      
       setIsLoading(true);
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`, 
@@ -113,6 +114,9 @@ const InventoryManagement = () => {
 
   // Initial fetch on component mount
   useEffect(() => {
+    if(!garageId){
+        navigate("\login")
+      }
     fetchInventory();
   }, []);
 

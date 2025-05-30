@@ -46,6 +46,10 @@ const WorkInProgress = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { id } = useParams(); 
+      let garageId = localStorage.getItem("garageId");
+    if (!garageId) {
+      garageId = localStorage.getItem("garage_id");
+    }
   
 
   
@@ -103,6 +107,9 @@ const WorkInProgress = () => {
   // Fetch job card data when component mounts
   useEffect(() => {
     const fetchJobCardData = async () => {
+       if(!garageId){
+          navigate("\login")
+        }
       try {
         setFetchLoading(true);
         

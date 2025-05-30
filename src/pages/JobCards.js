@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -112,6 +112,12 @@ const JobCards = () => {
   });
   const [videoFile, setVideoFile] = useState(null);
 
+  useEffect(() => {
+      if(!garageId){
+          navigate("\login")
+        }
+    }, []);
+ 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -154,7 +160,10 @@ const JobCards = () => {
       const config = {
   
       };
-  
+       if(!garageId){
+        navigate("\login")
+      }
+       
       const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
       const response = await axios.post(
         `${apiBaseUrl}/api/garage/jobCards/add`,

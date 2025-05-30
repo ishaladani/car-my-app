@@ -47,6 +47,7 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { styled } from '@mui/material/styles';
 import { green, red, orange } from '@mui/material/colors';
+import { useNavigate } from 'react-router-dom';
 // import Swal from 'sweetalert2';
 
 import { useThemeContext } from "../Layout/ThemeContext";
@@ -78,6 +79,11 @@ const ActionButton = styled(Button)(({ theme }) => ({
 }));
 
 const UserManagement = () => {
+     const navigate = useNavigate();
+        let garageId = localStorage.getItem("garageId");
+      if (!garageId) {
+        garageId = localStorage.getItem("garage_id");
+      }
     const { darkMode } = useThemeContext();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -346,6 +352,9 @@ const UserManagement = () => {
     };
 
     useEffect(() => {
+         if(!garageId){
+          navigate("\login")
+        }
         fetchUsers();
     }, []);
 

@@ -42,10 +42,14 @@ import {
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const RecordReport = () => {
- 
-  const garageId = localStorage.getItem("garageId");
+  const navigate = useNavigate();
+     let garageId = localStorage.getItem("garageId");
+   if (!garageId) {
+     garageId = localStorage.getItem("garage_id");
+   }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const theme = useTheme();
@@ -65,6 +69,9 @@ const RecordReport = () => {
      
 
       try {
+         if(!garageId){
+        navigate("\login")
+      }
         setLoading(true);
         setError(null);
 

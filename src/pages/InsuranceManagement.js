@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const InsuranceManagement = () => {
   // State management
+   const navigate = useNavigate();
+      let garageId = localStorage.getItem("garageId");
+    if (!garageId) {
+      garageId = localStorage.getItem("garage_id");
+    }
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [expiringInsurances, setExpiringInsurances] = useState([]);
@@ -31,6 +37,7 @@ const InsuranceManagement = () => {
 
   // Fetch expiring insurances
   const fetchExpiringInsurances = async () => {
+     
     setLoading(true);
     try {
       const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/expiring', {
@@ -151,6 +158,9 @@ const InsuranceManagement = () => {
 
   // Clear messages after 5 seconds
   useEffect(() => {
+    if(!garageId){
+        navigate("\login")
+      }
     if (message.text) {
       const timer = setTimeout(() => {
         setMessage({ type: '', text: '' });

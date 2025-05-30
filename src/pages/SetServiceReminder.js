@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -40,6 +40,11 @@ const SetServiceReminder = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   
+      let garageId = localStorage.getItem("garageId");
+    if (!garageId) {
+      garageId = localStorage.getItem("garage_id");
+    }
+  
   // State for form fields
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [reminderDate, setReminderDate] = useState('');
@@ -55,6 +60,12 @@ const SetServiceReminder = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
+
+    useEffect(() => {
+        if(!garageId){
+            navigate("\login")
+          }
+      }, []);
 
   // Handle search input changes
   const handleSearchChange = (e) => {

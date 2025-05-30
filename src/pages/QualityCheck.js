@@ -36,6 +36,11 @@ const QualityCheck = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { id } = useParams(); // Get jobCard ID from URL params
+ 
+      let garageId = localStorage.getItem("garageId");
+    if (!garageId) {
+      garageId = localStorage.getItem("garage_id");
+    }
 
   // State for parts table and final inspection remarks
   const [parts, setParts] = useState([]);
@@ -63,6 +68,9 @@ const QualityCheck = () => {
   useEffect(() => {
     const fetchJobCardData = async () => {
       try {
+         if(!garageId){
+        navigate("\login")
+      }
         setIsLoading(true);
         
         const response = await axios.get(

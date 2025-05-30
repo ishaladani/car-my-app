@@ -1,942 +1,1012 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Button,
+  Avatar,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Stack,
+  LinearProgress,
+  Divider,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  useTheme,
+  Container,
+  CssBaseline,
+  CircularProgress,
+} from "@mui/material";
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  Refresh as RefreshIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Build as BuildIcon,
+  Inventory as InventoryIcon,
+  Notifications as NotificationsIcon,
+  ArrowForward as ArrowForwardIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  CalendarToday as CalendarIcon,
+  Visibility as VisibilityIcon,
+  FilterList as FilterListIcon,
+  Dashboard as DashboardIcon,
+} from "@mui/icons-material";
+import { useThemeContext } from "../Layout/ThemeContext";
+import EditProfileButton from "../Login/EditProfileButton";
+import EditProfileModal from "../Login/EditProfileModal";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-const InsuranceManagement = () => {
-  // State management
-  const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [expiringInsurances, setExpiringInsurances] = useState([]);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [openDialog, setOpenDialog] = useState(false);
+const Dashboard = () => {
+  const navigate = useNavigate();
   
-  // Form state for adding insurance - Updated field names to match API
-  const [insuranceForm, setInsuranceForm] = useState({
-    policyNumber: '',
-    company: '', // Changed from insuranceCompany
-    type: '', // Changed from policyType
-    startDate: '',
-    expiryDate: '', // Changed from endDate
-    premiumAmount: '',
-    carNumber: '', // Changed from vehicleId
-    contactPerson: '',
-    phoneNumber: '',
-    garageId: '' // Added required field
+  // Check for garageId and redirect if not found
+  let garageId = localStorage.getItem("garageId");
+  if (!garageId) {
+    garageId = localStorage.getItem("garage_id");
+  }
+
+  // Redirect to login if no garageId is found
+  useEffect(() => {
+    if (!garageId) {
+      console.log("No garageId found, redirecting to login");
+      navigate("/login", { replace: true });
+      return;
+    }
+  }, [garageId, navigate]);
+
+  const theme = useTheme();
+  const { darkMode } = useThemeContext();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: "",
+    image: "",
   });
 
-  // Mock data for demonstration - replace with your actual API call
-  const mockData = [
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [currentJobs, setCurrentJobs] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState([
     {
-      "_id": "68381034ff73f30b5324ec7e",
-      "carNumber": "12",
-      "type": "full",
-      "company": "Tesla",
-      "expiryDate": "2025-06-07T00:00:00.000Z",
-      "garageId": "6834830e16ae218b17be45b2",
-      "createdAt": "2025-05-29T07:43:48.870Z",
-      "updatedAt": "2025-05-29T07:43:48.870Z",
-      "__v": 0,
-      "policyNumber": "POL-12345" // Added for display
-    }
-  ];
+      title: "Active Jobs",
+      value: 0,
+      change: 0,
+      isIncrease: true,
+      icon: <BuildIcon sx={{ fontSize: 40 }} />,
+      color: "#2563eb",
+      lightColor: "rgba(37, 99, 235, 0.1)",
+    },
+    {
+      title: "Parts Available",
+      value: 0,
+      change: 0,
+      isIncrease: false,
+      icon: <InventoryIcon sx={{ fontSize: 40 }} />,
+      color: "#ea580c",
+      lightColor: "rgba(234, 88, 12, 0.1)",
+    },
+    {
+      title: "Pending Reminders",
+      value: 0,
+      change: 0,
+      isIncrease: false,
+      icon: <NotificationsIcon sx={{ fontSize: 40 }} />,
+      color: "#dc2626",
+      lightColor: "rgba(220, 38, 38, 0.1)",
+    },
+  ]);
 
-  // Get token from localStorage (you might need to implement proper token management)
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
-    };
+  // Inventory data will be fetched from API and separated into low/high stock
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [highStockItems, setHighStockItems] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState(null);
+
+  const handleSaveProfile = (data) => {
+    setProfileData(data);
   };
 
-  // Fetch expiring insurances
-  const fetchExpiringInsurances = async () => {
-    setLoading(true);
-    try {
-      // For demonstration, using mock data - replace with actual API call
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/expiring', {
-        method: 'GET',
-        headers: getAuthHeaders()
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setExpiringInsurances(data.insurances || data || []);
-      } else {
-        throw new Error('Failed to fetch expiring insurances');
-      }
+  const [actionMenu, setActionMenu] = useState(null);
+  const [selectedJobId, setSelectedJobId] = useState(null);
 
-      // Simulating API call with mock data
-      setTimeout(() => {
-        setExpiringInsurances(mockData);
-        setMessage({ type: 'success', text: 'Expiring insurances loaded successfully!' });
-        setLoading(false);
-      }, 1000);
-      
-    } catch (error) {
-      setMessage({ type: 'error', text: `Error: ${error.message}` });
-      console.error('Error fetching expiring insurances:', error);
-      setLoading(false);
-    }
+  const handleActionMenuOpen = (event, jobId) => {
+    setActionMenu(event.currentTarget);
+    setSelectedJobId(jobId);
   };
 
-  // Add new insurance
-  const addInsurance = async () => {
-    setLoading(true);
-    try {
-      // Prepare data with correct field names for API
-      const insuranceData = {
-        policyNumber: insuranceForm.policyNumber,
-        company: insuranceForm.company,
-        type: insuranceForm.type,
-        startDate: insuranceForm.startDate,
-        expiryDate: insuranceForm.expiryDate,
-        premiumAmount: insuranceForm.premiumAmount,
-        carNumber: insuranceForm.carNumber,
-        contactPerson: insuranceForm.contactPerson,
-        phoneNumber: insuranceForm.phoneNumber,
-        garageId: insuranceForm.garageId || 'DEFAULT_GARAGE_ID' // You'll need to set this properly
-      };
-
-      console.log('Sending insurance data:', insuranceData); // For debugging
-
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/add', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(insuranceData)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setMessage({ type: 'success', text: 'Insurance added successfully!' });
-        setOpenDialog(false);
-        // Reset form
-        setInsuranceForm({
-          policyNumber: '',
-          company: '',
-          type: '',
-          startDate: '',
-          expiryDate: '',
-          premiumAmount: '',
-          carNumber: '',
-          contactPerson: '',
-          phoneNumber: '',
-          garageId: ''
-        });
-        // Refresh expiring insurances if on that tab
-        if (activeTab === 1) {
-          fetchExpiringInsurances();
-        }
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || errorData.error || 'Failed to add insurance');
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: `Error: ${error.message}` });
-      console.error('Error adding insurance:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleActionMenuClose = () => {
+    setActionMenu(null);
+    setSelectedJobId(null);
   };
 
-  // Handle form input changes
-  const handleInputChange = (field, value) => {
-    setInsuranceForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleUpdate = (id) => {
+    navigate(`assign-engineer/${id}`);
   };
 
-  // Handle tab change
-  const handleTabChange = (tabIndex) => {
-    setActiveTab(tabIndex);
-    if (tabIndex === 1) {
-      fetchExpiringInsurances();
-    }
-  };
+  // Early return if no garageId - prevents rendering while redirect is happening
+  if (!garageId) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          flexDirection: 'column'
+        }}
+      >
+        <CircularProgress size={40} />
+        <Typography variant="body1" sx={{ mt: 2 }}>
+          Redirecting to login...
+        </Typography>
+      </Box>
+    );
+  }
 
-  // Calculate days until expiry
-  const getDaysUntilExpiry = (endDate) => {
-    const today = new Date();
-    const expiry = new Date(endDate);
-    const diffTime = expiry - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  // Get status badge based on days until expiry
-  const getStatusBadge = (endDate) => {
-    const days = getDaysUntilExpiry(endDate);
-    if (days < 0) {
-      return <span className="status-badge expired">Expired</span>;
-    } else if (days <= 30) {
-      return <span className="status-badge warning">{days} days left</span>;
-    } else {
-      return <span className="status-badge active">Active</span>;
-    }
-  };
-
-  // Clear messages after 5 seconds
+  // Fetch garage profile data
   useEffect(() => {
-    if (message.text) {
-      const timer = setTimeout(() => {
-        setMessage({ type: '', text: '' });
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
+    const fetchGarageProfile = async () => {
+      try {
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+          }
+        );
 
-  // Mobile card view for insurance items
-  const renderMobileInsuranceCard = (insurance, index) => (
-    <div key={index} className="mobile-card">
-      <div className="mobile-card-header">
-        <h4>{insurance.policyNumber || 'N/A'}</h4>
-        {insurance.expiryDate ? 
-          getStatusBadge(insurance.expiryDate) : 
-          <span className="status-badge">N/A</span>}
-      </div>
-      <div className="mobile-card-content">
-        <div className="mobile-card-row">
-          <span className="label">Company:</span>
-          <span>{insurance.company || 'N/A'}</span>
-        </div>
-        <div className="mobile-card-row">
-          <span className="label">Type:</span>
-          <span>{insurance.type || 'N/A'}</span>
-        </div>
-        <div className="mobile-card-row">
-          <span className="label">Expiry Date:</span>
-          <span>{insurance.expiryDate ? 
-            new Date(insurance.expiryDate).toLocaleDateString() : 'N/A'}</span>
-        </div>
-        <div className="mobile-card-row">
-          <span className="label">Car Number:</span>
-          <span>{insurance.carNumber || 'N/A'}</span>
-        </div>
-      </div>
-    </div>
-  );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Garage profile response:", data);
+
+        if (data && data.name) {
+          setProfileData({
+            name: data.name || "Your Garage",
+            image: data.image || "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching garage profile:", error);
+        // Set default values on error
+        setProfileData({
+          name: "Your Garage",
+          image: "",
+        });
+      }
+    };
+
+    if (garageId) {
+      fetchGarageProfile();
+    }
+  }, [garageId]);
+
+  // Fetch job data from API
+  useEffect(() => {
+    const fetchJobs = async () => {
+      if (!garageId) {
+        setError("Authentication garage ID not found. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Jobs API response:", data);
+
+        // Process the response
+        const jobsData = Array.isArray(data)
+          ? data
+          : data.jobCards
+          ? data.jobCards
+          : data.data
+          ? data.data
+          : [];
+
+        // Extract and format job data from API response
+        setCurrentJobs(jobsData);
+
+        // Update dashboard stats
+        const updatedStats = [...dashboardStats];
+
+        // Count active jobs (Pending or In Progress)
+        const activeJobsCount = jobsData.filter(
+          (job) => job.status === "In Progress" || job.status === "Pending"
+        ).length;
+
+        updatedStats[0].value = activeJobsCount;
+        setDashboardStats(updatedStats);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        setError(`Failed to load jobs data: ${error.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (garageId) {
+      fetchJobs();
+    }
+  }, [garageId]);
+
+  // Fetch inventory data from API
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!garageId) {
+        console.warn("garageId missing for inventory fetch");
+        return;
+      }
+
+      try {
+        setInventoryLoading(true);
+        setInventoryError(null);
+
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Inventory API response:", data);
+
+        // Process the response
+        const inventoryData = Array.isArray(data)
+          ? data
+          : data.inventory
+          ? data.inventory
+          : data.data
+          ? data.data
+          : [];
+
+        // Sort inventory items into high and low stock based on quantity
+        const highStock = [];
+        const lowStock = [];
+
+        inventoryData.forEach((item) => {
+          // Using the actual structure from the API
+          const inventoryItem = {
+            id: item._id || "",
+            name: item.partName || "Unknown Part",
+            quantity: item.quantity || 0,
+            price: item.pricePerUnit || 0,
+            carName: item.carName || "",
+            model: item.model || "",
+            reorderPoint: Math.floor(item.quantity * 0.2) || 5,
+          };
+
+          // Items with quantity >= 10 go to high stock, others to low stock (threshold can be adjusted)
+          if (item.quantity >= 10) {
+            highStock.push(inventoryItem);
+          } else {
+            lowStock.push(inventoryItem);
+          }
+        });
+
+        // Update the dashboard stats with total inventory count
+        const updatedStats = [...dashboardStats];
+        updatedStats[1].value = inventoryData.reduce(
+          (total, item) => total + (item.quantity || 0),
+          0
+        );
+        setDashboardStats(updatedStats);
+
+        // Update state with sorted inventory items
+        setHighStockItems(highStock);
+        setLowStockItems(lowStock);
+      } catch (error) {
+        console.error("Error fetching inventory:", error);
+        setInventoryError(`Failed to load inventory data: ${error.message}`);
+
+        // Set fallback empty arrays if API fails
+        setHighStockItems([]);
+        setLowStockItems([]);
+      } finally {
+        setInventoryLoading(false);
+      }
+    };
+
+    if (garageId) {
+      fetchInventory();
+    }
+  }, [garageId]);
+
+  const getStatusChip = (status) => {
+    // Standardize status value
+    const normalizedStatus = status || "Pending";
+
+    switch (normalizedStatus) {
+      case "Completed":
+        return (
+          <Chip
+            icon={<CheckCircleIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(22, 163, 74, 0.2)"
+                : "rgba(22, 163, 74, 0.1)",
+              color: theme.palette.success.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.success.main },
+            }}
+          />
+        );
+      case "In Progress":
+        return (
+          <Chip
+            icon={<WarningIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(234, 88, 12, 0.2)"
+                : "rgba(234, 88, 12, 0.1)",
+              color: theme.palette.warning.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.warning.main },
+            }}
+          />
+        );
+      case "Pending":
+        return (
+          <Chip
+            icon={<CalendarIcon fontSize="small" />}
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(37, 99, 235, 0.2)"
+                : "rgba(37, 99, 235, 0.1)",
+              color: theme.palette.info.main,
+              fontWeight: 600,
+              "& .MuiChip-icon": { color: theme.palette.info.main },
+            }}
+          />
+        );
+      default:
+        return (
+          <Chip
+            label={normalizedStatus}
+            size="small"
+            sx={{
+              backgroundColor: darkMode
+                ? "rgba(100, 116, 139, 0.2)"
+                : "rgba(100, 116, 139, 0.1)",
+              color: theme.palette.text.secondary,
+              fontWeight: 600,
+            }}
+          />
+        );
+    }
+  };
+
+  // Calculate job progress based on status
+  const getJobProgress = (status) => {
+    switch (status) {
+      case "Completed":
+        return 100;
+      case "In Progress":
+        return 60;
+      case "Pending":
+        return 10;
+      default:
+        return 0;
+    }
+  };
+
+  // Debug info (remove in production)
+  useEffect(() => {
+    console.log("Dashboard Debug Info:", {
+      garageId,
+      hasGarageId: !!localStorage.getItem("garageId"),
+      localStorageKeys: Object.keys(localStorage)
+    });
+  }, [garageId]);
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>Insurance Management System</h1>
-      
-      {/* Message Alert */}
-      {message.text && (
-        <div className={`alert alert-${message.type}`} style={styles.alert}>
-          <span>{message.text}</span>
-          <button 
-            onClick={() => setMessage({ type: '', text: '' })}
-            style={styles.closeBtn}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div style={styles.tabContainer}>
-        <button 
-          className={activeTab === 0 ? 'tab active' : 'tab'}
-          onClick={() => handleTabChange(0)}
-          style={{...styles.tab, ...(activeTab === 0 ? styles.activeTab : {})}}
-        >
-          Add Insurance
-        </button>
-        <button 
-          className={activeTab === 1 ? 'tab active' : 'tab'}
-          onClick={() => handleTabChange(1)}
-          style={{...styles.tab, ...(activeTab === 1 ? styles.activeTab : {})}}
-        >
-          Expiring Insurances
-        </button>
-      </div>
-
-      {/* Add Insurance Tab */}
-      {activeTab === 0 && (
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>Add New Insurance Policy</h2>
-            <button
-              style={styles.primaryBtn}
-              onClick={() => setOpenDialog(true)}
-            >
-              + Add Insurance
-            </button>
-          </div>
-          
-          <p style={styles.description}>
-            Click the "Add Insurance" button to create a new insurance policy record.
-            All insurance policies will be tracked for expiration dates automatically.
-          </p>
-        </div>
-      )}
-
-      {/* Expiring Insurances Tab */}
-      {activeTab === 1 && (
-        <div style={styles.card}>
-          <div style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>Expiring Insurance Policies</h2>
-            <button
-              style={styles.secondaryBtn}
-              onClick={fetchExpiringInsurances}
-              disabled={loading}
-            >
-              {loading ? '⟳ Loading...' : '⚠ Refresh'}
-            </button>
-          </div>
-
-          {loading ? (
-            <div style={styles.loading}>
-              <div style={styles.spinner}></div>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Table View */}
-              <div className="desktop-only" style={styles.tableContainer}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr style={styles.tableHeader}>
-                      <th>Policy Number</th>
-                      <th>Company</th>
-                      <th>Policy Type</th>
-                      <th>Expiry Date</th>
-                      <th>Car Number</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expiringInsurances.length > 0 ? (
-                      expiringInsurances.map((insurance, index) => (
-                        <tr key={insurance._id || index} style={styles.tableRow}>
-                          <td>{insurance.policyNumber || 'N/A'}</td>
-                          <td>{insurance.company || 'N/A'}</td>
-                          <td>{insurance.type || 'N/A'}</td>
-                          <td>{insurance.expiryDate ? 
-                            new Date(insurance.expiryDate).toLocaleDateString() : 'N/A'}</td>
-                          <td>{insurance.carNumber || 'N/A'}</td>
-                          <td>
-                            {insurance.expiryDate ? 
-                              getStatusBadge(insurance.expiryDate) : 'N/A'}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="6" style={styles.emptyState}>
-                          No expiring insurances found. Click "Refresh" to check for updates.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Card View */}
-              <div className="mobile-only">
-                {expiringInsurances.length > 0 ? (
-                  expiringInsurances.map((insurance, index) => 
-                    renderMobileInsuranceCard(insurance, index)
-                  )
-                ) : (
-                  <div style={styles.emptyState}>
-                    No expiring insurances found. Click "Refresh" to check for updates.
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Add Insurance Dialog */}
-      {openDialog && (
-        <div style={styles.overlay}>
-          <div style={styles.dialog}>
-            <div style={styles.dialogHeader}>
-              <h3>Add New Insurance Policy</h3>
-              <button 
-                onClick={() => setOpenDialog(false)}
-                style={styles.closeBtn}
+   <>
+      <CssBaseline />
+      <Box
+        sx={{
+          flexGrow: 1,
+          mb: 4,
+          ml: { xs: 0, sm: 35 },
+          overflow: "auto",
+        }}
+      >
+        <Container maxWidth="xl">
+          <Card sx={{ mb: 4, overflow: "visible", borderRadius: 2 }}>
+            <CardContent>
+              <Box
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                mb={2}
               >
-                ×
-              </button>
-            </div>
-            
-            <div style={styles.dialogContent}>
-              <div style={styles.formGrid}>
-                <div style={styles.formGroup}>
-                  <label>Policy Number *</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.policyNumber}
-                    onChange={(e) => handleInputChange('policyNumber', e.target.value)}
-                    style={styles.input}
-                    required
+                <Box display="flex" alignItems="center">
+                  <DashboardIcon
+                    fontSize="large"
+                    sx={{ color: "#3f51b5", mr: 2 }}
                   />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Insurance Company *</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.company}
-                    onChange={(e) => handleInputChange('company', e.target.value)}
-                    style={styles.input}
-                    required
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Policy Type *</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.type}
-                    onChange={(e) => handleInputChange('type', e.target.value)}
-                    style={styles.input}
-                    placeholder="e.g., Comprehensive, Third Party"
-                    required
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Car Number *</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.carNumber}
-                    onChange={(e) => handleInputChange('carNumber', e.target.value)}
-                    style={styles.input}
-                    placeholder="e.g., ABC-123"
-                    required
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Garage ID *</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.garageId}
-                    onChange={(e) => handleInputChange('garageId', e.target.value)}
-                    style={styles.input}
-                    placeholder="Enter garage ID"
-                    required
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Start Date</label>
-                  <input
-                    type="date"
-                    value={insuranceForm.startDate}
-                    onChange={(e) => handleInputChange('startDate', e.target.value)}
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Expiry Date *</label>
-                  <input
-                    type="date"
-                    value={insuranceForm.expiryDate}
-                    onChange={(e) => handleInputChange('expiryDate', e.target.value)}
-                    style={styles.input}
-                    required
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Premium Amount</label>
-                  <input
-                    type="number"
-                    value={insuranceForm.premiumAmount}
-                    onChange={(e) => handleInputChange('premiumAmount', e.target.value)}
-                    style={styles.input}
-                    placeholder="0.00"
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label>Contact Person</label>
-                  <input
-                    type="text"
-                    value={insuranceForm.contactPerson}
-                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.formGroupFull}>
-                  <label>Phone Number</label>
-                  <input
-                    type="tel"
-                    value={insuranceForm.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    style={styles.input}
-                    placeholder="e.g., +1-234-567-8900"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div style={styles.dialogActions}>
-              <button 
-                onClick={() => setOpenDialog(false)}
-                style={styles.cancelBtn}
-                disabled={loading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addInsurance}
-                style={{...styles.primaryBtn, opacity: loading ? 0.7 : 1}}
-                disabled={loading || !insuranceForm.policyNumber || !insuranceForm.company || !insuranceForm.type || !insuranceForm.carNumber || !insuranceForm.expiryDate}
-              >
-                {loading ? 'Adding...' : '+ Add Insurance'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                  <Typography variant="h5" color="primary">
+                    Dashboard Overview
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={() => setModalOpen(true)}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 2,
+                    fontWeight: 600,
+                  }}
+                >
+                  Edit Profile
+                </Button>
+              </Box>
 
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        
-        .alert-success {
-          background-color: #d4edda;
-          border-color: #c3e6cb;
-          color: #155724;
-        }
-        
-        .alert-error {
-          background-color: #f8d7da;
-          border-color: #f5c6cb;
-          color: #721c24;
-        }
-        
-        .status-badge {
-          padding: 4px 12px;
-          border-radius: 16px;
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-        
-        .status-badge.active {
-          background-color: #d4edda;
-          color: #155724;
-        }
-        
-        .status-badge.warning {
-          background-color: #fff3cd;
-          color: #856404;
-        }
-        
-        .status-badge.expired {
-          background-color: #f8d7da;
-          color: #721c24;
-        }
-        
-        table th, table td {
-          padding: 12px;
-          text-align: left;
-          border-bottom: 1px solid #e0e0e0;
-        }
-        
-        table th {
-          font-weight: 600;
-          color: #333;
-        }
-        
-        button:hover {
-          opacity: 0.9;
-        }
-        
-        button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        
-        input:focus {
-          outline: none;
-          border-color: #1976d2;
-          box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
-        }
-        
-        label {
-          font-weight: 500;
-          color: #333;
-          margin-bottom: 4px;
-        }
+              <Divider sx={{ my: 3 }} />
 
-        /* Mobile-first responsive styles */
-        .desktop-only {
-          display: none;
-        }
-        
-        .mobile-only {
-          display: block;
-        }
-        
-        .mobile-card {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          margin-bottom: 16px;
-          padding: 16px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .mobile-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        
-        .mobile-card-header h4 {
-          margin: 0;
-          color: #1976d2;
-          font-size: 16px;
-          font-weight: 600;
-        }
-        
-        .mobile-card-content {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        
-        .mobile-card-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 4px 0;
-          border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .mobile-card-row:last-child {
-          border-bottom: none;
-        }
-        
-        .mobile-card-row .label {
-          font-weight: 500;
-          color: #666;
-          font-size: 14px;
-        }
-        
-        .mobile-card-row span:not(.label) {
-          font-size: 14px;
-          text-align: right;
-          max-width: 60%;
-          word-break: break-word;
-        }
+              {/* Stats Cards - exactly 3 cards */}
+              <Grid container spacing={3} sx={{ mb: 4 }}>
+                {dashboardStats.map((card, index) => (
+                  <Grid item xs={12} sm={6} md={4} key={index}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: "16px",
+                        borderTop: `4px solid ${card.color}`,
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            mb: 2,
+                          }}
+                        >
+                          <Box>
+                            <Typography
+                              variant="h5"
+                              sx={{ fontWeight: "bold", mb: 0.5 }}
+                            >
+                              {card.value}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {card.title}
+                            </Typography>
+                          </Box>
+                          <Avatar
+                            sx={{
+                              bgcolor: darkMode ? card.color : card.lightColor,
+                              color: darkMode ? "white" : card.color,
+                              width: 56,
+                              height: 56,
+                            }}
+                          >
+                            {card.icon}
+                          </Avatar>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <Chip
+                            icon={
+                              card.isIncrease ? (
+                                <TrendingUpIcon fontSize="small" />
+                              ) : (
+                                <TrendingDownIcon fontSize="small" />
+                              )
+                            }
+                            label={`${card.change}%`}
+                            size="small"
+                            sx={{
+                              backgroundColor: darkMode
+                                ? card.isIncrease
+                                  ? "rgba(22, 163, 74, 0.2)"
+                                  : "rgba(220, 38, 38, 0.2)"
+                                : card.isIncrease
+                                ? "rgba(22, 163, 74, 0.1)"
+                                : "rgba(220, 38, 38, 0.1)",
+                              color: card.isIncrease
+                                ? theme.palette.success.main
+                                : theme.palette.error.main,
+                              fontWeight: 600,
+                              ".MuiChip-icon": { color: "inherit" },
+                              mr: 1,
+                            }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            vs. last week
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
 
-        /* Tablet and Desktop styles */
-        @media (min-width: 768px) {
-          .desktop-only {
-            display: block;
-          }
-          
-          .mobile-only {
-            display: none;
-          }
-        }
+              {/* Current Jobs Table */}
+              <Box sx={{ mb: 4 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Current Jobs
+                  </Typography>
+                  <Box>{/* You can add buttons here if needed */}</Box>
+                </Box>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    bgcolor: theme.palette.background.paper,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                  }}
+                >
+                  {loading ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <CircularProgress size={40} />
+                      <Typography variant="body1" sx={{ mt: 2 }}>
+                        Loading job data...
+                      </Typography>
+                    </Box>
+                  ) : error ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <Typography variant="body1" color="error">
+                        {error}
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        sx={{ mt: 2 }}
+                        onClick={() => window.location.reload()}
+                      >
+                        Retry
+                      </Button>
+                    </Box>
+                  ) : currentJobs.length === 0 ? (
+                    <Box sx={{ p: 4, textAlign: "center" }}>
+                      <Typography variant="body1">
+                        No jobs found. Create your first job to get started.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        sx={{ mt: 2 }}
+                        startIcon={<AddIcon />}
+                      >
+                        Create New Job
+                      </Button>
+                    </Box>
+                  ) : (
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Vehicle No.</TableCell>
+                            <TableCell>Customer</TableCell>
+                            <TableCell>Service</TableCell>
+                            <TableCell>Progress</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Update</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {currentJobs.map((job) => (
+                            <TableRow key={job._id}>
+                              <TableCell sx={{ fontWeight: 500 }}>
+                                {job.carNumber ||
+                                  job.registrationNumber ||
+                                  "N/A"}
+                              </TableCell>
+                              <TableCell>{job.customerName || "N/A"}</TableCell>
+                              <TableCell>
+                                {job.jobDetails ||
+                                  job.type ||
+                                  "General Service"}
+                              </TableCell>
+                              <TableCell>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    width: "100%",
+                                  }}
+                                >
+                                  <Box sx={{ width: "100%", mr: 1 }}>
+                                    <LinearProgress
+                                      variant="determinate"
+                                      value={getJobProgress(job.status)}
+                                      sx={{
+                                        height: 6,
+                                        borderRadius: 5,
+                                        backgroundColor: darkMode
+                                          ? "rgba(255, 255, 255, 0.12)"
+                                          : "rgba(0, 0, 0, 0.08)",
+                                        "& .MuiLinearProgress-bar": {
+                                          borderRadius: 5,
+                                          backgroundColor:
+                                            job.status === "Completed"
+                                              ? theme.palette.success.main
+                                              : job.status === "In Progress"
+                                              ? theme.palette.warning.main
+                                              : theme.palette.info.main,
+                                        },
+                                      }}
+                                    />
+                                  </Box>
+                                  <Box sx={{ minWidth: 35 }}>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      {`${getJobProgress(job.status)}%`}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+                              <TableCell>{getStatusChip(job.status)}</TableCell>
 
-        /* Mobile-specific adjustments */
-        @media (max-width: 767px) {
-          .container {
-            padding: 12px !important;
-          }
-          
-          .title {
-            font-size: 1.5rem !important;
-            margin-bottom: 16px !important;
-          }
-          
-          .tab-container {
-            flex-direction: column !important;
-            border: 1px solid #e0e0e0 !important;
-            border-radius: 8px !important;
-            overflow: hidden !important;
-          }
-          
-          .card-header {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            gap: 12px !important;
-          }
-          
-          .card-title {
-            font-size: 1.2rem !important;
-            margin: 0 !important;
-          }
-          
-          .primary-btn, .secondary-btn {
-            width: 100% !important;
-            padding: 12px 16px !important;
-          }
-          
-          .dialog {
-            width: 95% !important;
-            max-height: 95vh !important;
-            margin: 10px !important;
-          }
-          
-          .form-grid {
-            grid-template-columns: 1fr !important;
-          }
-          
-          .dialog-actions {
-            flex-direction: column !important;
-            gap: 8px !important;
-          }
-          
-          .dialog-actions button {
-            width: 100% !important;
-          }
-        }
+                              <TableCell>
+                                <Button onClick={() => handleUpdate(job._id)}>
+                                  Update
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                  {currentJobs.length > 5 && (
+                    <Box sx={{ textAlign: "center", py: 2 }}>
+                      <Button
+                        endIcon={<ArrowForwardIcon />}
+                        sx={{ fontWeight: 600 }}
+                      >
+                        View All Jobs
+                      </Button>
+                    </Box>
+                  )}
+                </Paper>
+              </Box>
 
-        /* Small mobile adjustments */
-        @media (max-width: 480px) {
-          .container {
-            padding: 8px !important;
-          }
-          
-          .mobile-card {
-            padding: 12px !important;
-          }
-          
-          .mobile-card-header {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-          }
-          
-          .mobile-card-row {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-            gap: 4px !important;
-          }
-          
-          .mobile-card-row span:not(.label) {
-            max-width: 100% !important;
-            text-align: left !important;
-          }
-        }
-      `}</style>
-    </div>
-  );
-};
+              {/* Inventory Section - now with Low Stock and High Stock side by side */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Inventory Management
+              </Typography>
+              <Grid container spacing={3}>
+                {/* Low Stock Inventory */}
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 600,
+                          color: theme.palette.error.main,
+                        }}
+                      >
+                        Low in Stock
+                      </Typography>
+                      <Chip
+                        label={`${lowStockItems.length} items`}
+                        size="small"
+                        color="error"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        borderLeft: `4px solid ${theme.palette.error.main}`,
+                      }}
+                    >
+                      {inventoryLoading ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <CircularProgress size={30} />
+                        </Box>
+                      ) : inventoryError ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2" color="error">
+                            {inventoryError}
+                          </Typography>
+                        </Box>
+                      ) : lowStockItems.length === 0 ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2">
+                            No low stock items found.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <TableContainer sx={{ maxHeight: 300 }}>
+                          <Table stickyHeader size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Part Name</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="right">Unit Price</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {lowStockItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell sx={{ fontWeight: 500 }}>
+                                    {item.name}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip
+                                      label={item.quantity}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: darkMode
+                                          ? "rgba(220, 38, 38, 0.2)"
+                                          : "rgba(220, 38, 38, 0.1)",
+                                        color: theme.palette.error.main,
+                                        fontWeight: 600,
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    ₹{item.price.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          textAlign: "center",
+                          borderTop: `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        <Button
+                          variant="text"
+                          color="error"
+                          // endIcon={<ArrowForwardIcon />}
+                          sx={{ fontWeight: 600 }}
+                        >
+                         Low Stock Items
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Box>
+                </Grid>
 
-// Updated responsive styles object
-const styles = {
-  container: {
-    maxWidth: '1200px',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-    marginLeft: '270px'
-  },
-  title: {
-    color: '#1976d2',
-    marginBottom: '20px',
-    fontSize: '2rem',
-    fontWeight: 'bold'
-  },
-  alert: {
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    border: '1px solid',
-    flexWrap: 'wrap',
-    gap: '8px'
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '20px',
-    cursor: 'pointer',
-    padding: '0',
-    width: '24px',
-    height: '24px',
-    flexShrink: 0
-  },
-  tabContainer: {
-    display: 'flex',
-    borderBottom: '2px solid #e0e0e0',
-    marginBottom: '20px'
-  },
-  tab: {
-    padding: '12px 24px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#666',
-    borderBottom: '2px solid transparent',
-    flex: 1,
-    textAlign: 'center'
-  },
-  activeTab: {
-    color: '#1976d2',
-    borderBottom: '2px solid #1976d2'
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    border: '1px solid #e0e0e0'
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '16px',
-    flexWrap: 'wrap',
-    gap: '12px'
-  },
-  cardTitle: {
-    margin: 0,
-    fontSize: '1.5rem',
-    color: '#333'
-  },
-  description: {
-    color: '#666',
-    fontSize: '16px',
-    lineHeight: '1.5'
-  },
-  primaryBtn: {
-    backgroundColor: '#1976d2',
-    color: 'white',
-    border: 'none',
-    padding: '10px 20px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    minWidth: '140px'
-  },
-  secondaryBtn: {
-    backgroundColor: '#f5f5f5',
-    color: '#333',
-    border: '1px solid #ddd',
-    padding: '10px 20px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    minWidth: '140px'
-  },
-  loading: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '40px'
-  },
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid #f3f3f3',
-    borderTop: '4px solid #1976d2',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
-  tableContainer: {
-    overflowX: 'auto'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    marginTop: '16px',
-    minWidth: '600px'
-  },
-  tableHeader: {
-    backgroundColor: '#f5f5f5'
-  },
-  tableRow: {
-    borderBottom: '1px solid #e0e0e0'
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#666'
-  },
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: '10px'
-  },
-  dialog: {
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    maxWidth: '600px',
-    width: '100%',
-    maxHeight: '90vh',
-    overflowY: 'auto'
-  },
-  dialogHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    borderBottom: '1px solid #e0e0e0'
-  },
-  dialogContent: {
-    padding: '20px'
-  },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '16px'
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  formGroupFull: {
-    display: 'flex',
-    flexDirection: 'column',
-    gridColumn: '1 / -1'
-  },
-  input: {
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    marginTop: '4px'
-  },
-  dialogActions: {
-    padding: '20px',
-    borderTop: '1px solid #e0e0e0',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    flexWrap: 'wrap'
-  },
-  cancelBtn: {
-    backgroundColor: 'transparent',
-    color: '#666',
-    border: '1px solid #ddd',
-    padding: '10px 20px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    minWidth: '100px'
-  }
-};
-
-export default InsuranceManagement;
+                {/* High in Stock */}
+                <Grid item xs={12} md={6}>
+                  <Box sx={{ mb: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 600,
+                          color: theme.palette.success.main,
+                        }}
+                      >
+                        High in Stock
+                      </Typography>
+                      <Chip
+                        label={`${highStockItems.length} items`}
+                        size="small"
+                        color="success"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: "100%",
+                        border: `1px solid ${theme.palette.divider}`,
+                        bgcolor: theme.palette.background.paper,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        borderLeft: `4px solid ${theme.palette.success.main}`,
+                      }}
+                    >
+                      {inventoryLoading ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <CircularProgress size={30} />
+                        </Box>
+                      ) : inventoryError ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2" color="error">
+                            {inventoryError}
+                          </Typography>
+                        </Box>
+                      ) : highStockItems.length === 0 ? (
+                        <Box sx={{ p: 4, textAlign: "center" }}>
+                          <Typography variant="body2">
+                            No high stock items found.
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <TableContainer sx={{ maxHeight: 300 }}>
+                          <Table stickyHeader size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Part Name</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="right">Unit Price</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {highStockItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell sx={{ fontWeight: 500 }}>
+                                    {item.name}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    <Chip
+                                      label={item.quantity}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: darkMode
+                                          ? "rgba(22, 163, 74, 0.2)"
+                                          : "rgba(22, 163, 74, 0.1)",
+                                        color: theme.palette.success.main,
+                                        fontWeight: 600,
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    ₹{item.price.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      )}
+                        <Box
+                                              sx={{
+                                                p: 1.5,
+                                                textAlign: "center",
+                                                borderTop: `1px solid ${theme.palette.divider}`,
+                                              }}
+                                            >
+                                              <Button
+                                                variant="text"
+                                                color="success"
+                                                // endIcon={<ArrowForwardIcon />}
+                                                sx={{ fontWeight: 600 }}
+                                              >
+                                                Manage Inventory
+                                              </Button>
+                                            </Box>
+                                          </Paper>
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
+                                  </CardContent>
+                                </Card>
+                              </Container>
+                            </Box>
+                      
+                            {/* Job Actions Menu */}
+                            <Menu
+                              anchorEl={actionMenu}
+                              open={Boolean(actionMenu)}
+                              onClose={handleActionMenuClose}
+                              PaperProps={{
+                                elevation: 2,
+                                sx: {
+                                  minWidth: 180,
+                                  borderRadius: 2,
+                                  bgcolor: theme.palette.background.paper,
+                                },
+                              }}
+                            >
+                              <MenuItem onClick={handleActionMenuClose}>
+                                <ListItemIcon>
+                                  <VisibilityIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary="View Details" />
+                              </MenuItem>
+                              <MenuItem onClick={handleActionMenuClose}>
+                                <ListItemIcon>
+                                  <EditIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary="Edit Job" />
+                              </MenuItem>
+                              <Divider />
+                              <MenuItem
+                                onClick={handleActionMenuClose}
+                                sx={{ color: theme.palette.error.main }}
+                              >
+                                <ListItemIcon>
+                                  <DeleteIcon fontSize="small" color="error" />
+                                </ListItemIcon>
+                                <ListItemText primary="Cancel Job" />
+                              </MenuItem>
+                            </Menu>
+                            <EditProfileModal
+                              open={modalOpen}
+                              onClose={() => setModalOpen(false)}
+                              onSave={handleSaveProfile}
+                              currentName={profileData.name}
+                              currentImage={profileData.image}
+                            />
+                          </>
+                        );
+                      };
+                      
+                      export default Dashboard;

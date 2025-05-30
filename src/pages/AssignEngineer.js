@@ -108,7 +108,9 @@ const AssignEngineer = () => {
   // Fetch inventory parts from API on mount
   useEffect(() => {
     const fetchInventory = async () => {
-
+       if(!garageId){
+        navigate("\login")
+      }
       
       try {
         const response = await axios.get(
