@@ -134,10 +134,8 @@ const Dashboard = () => {
 
   // Fetch garage profile data
   useEffect(() => {
-    // const fetchGarageProfile = async () => {
-    //   if(!garageId){
-    //     navigate("\login")
-    //   }
+   
+    
 
     //   try {
           
@@ -180,6 +178,9 @@ const Dashboard = () => {
 
   // Fetch job data from API
   useEffect(() => {
+      if(!garageId){
+        navigate("\login")
+      }
     const fetchJobs = async () => {
       if (!garageId) {
         setError("Authentication garage ID not found. Please log in again.");

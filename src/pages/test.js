@@ -1,542 +1,1231 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
 import {
-  Container,
   Box,
-  Typography,
-  TextField,
   Button,
+  Card,
+  CardContent,
+  Checkbox,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  FormControlLabel,
   Grid,
   IconButton,
   InputAdornment,
-  Chip,
-  Snackbar,
-  Alert,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
   useTheme,
-  useMediaQuery
+  Container,
+  alpha,
+  useMediaQuery,
+  Chip,
+  ListItemText
 } from '@mui/material';
-import { Visibility, VisibilityOff, AddCircleOutline, CheckCircleOutline } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  Lock as LockIcon,
+  Person as PersonIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
+  Business as BusinessIcon,
+  Devices as DevicesIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Search as SearchIcon,
+  MoreVert as MoreVertIcon
+} from '@mui/icons-material';
+import { DataGrid } from '@mui/x-data-grid';
+import { styled } from '@mui/material/styles';
+import { green, red, orange } from '@mui/material/colors';
 import { useNavigate } from 'react-router-dom';
+// import Swal from 'sweetalert2';
 
-const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_qjd934YSnvGxQZ';
+import { useThemeContext } from "../Layout/ThemeContext";
 
-export default function SignUpPage() {
+const StyledCard = styled(Card)(({ theme }) => ({
+  margin: theme.spacing(2),
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: theme.shadows[3],
+}));
+
+const HeaderCard = styled(Card)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: theme.shadows[2],
+  background: theme.palette.mode === 'dark'
+    ? `linear-gradient(45deg, ${alpha(theme.palette.primary.dark, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.6)} 100%)`
+    : `linear-gradient(45deg, #e0e0e0 0%, #f5f5f5 100%)`, // Softer light background
+  padding: theme.spacing(2),
+}));
+
+// Action button for mobile view
+const ActionButton = styled(Button)(({ theme }) => ({
+  marginRight: theme.spacing(1),
+  marginBottom: theme.spacing(1),
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.75rem',
+    padding: '4px 8px',
+  },
+}));
+
+const UserManagement = () => {
+  const navigate = useNavigate();
+  let garageId = localStorage.getItem("garageId");
+  if (!garageId) {
+    garageId = localStorage.getItem("garage_id");
+  }
+  const { darkMode } = useThemeContext();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const navigate = useNavigate();
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const [users, setUsers] = useState([]);
+  const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
+  const [openSiteDialog, setOpenSiteDialog] = useState(false);
+  const [openDeviceDialog, setOpenDeviceDialog] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState(false);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [sites, setSites] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [selectedSites, setSelectedSites] = useState([]);
+  const [selectedDevices, setSelectedDevices] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Form state
+  const token = localStorage.getItem("token")
+    ? `Bearer ${localStorage.getItem("token")}`
+    : "";
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    address: '',
-    phone: ''
+    role: 'manager', // default role
+    permissions: [] // Fixed: Initialize as empty array
   });
 
-  // UI/UX state
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [openPlanDialog, setOpenPlanDialog] = useState(false);
-
-  // Available plans
-  const plans = [
-    {
-      name: 'Free',
-      price: 'Free',
-      features: ['Basic garage management', 'Up to 5 vehicles', 'Basic reporting'],
-      amount: 0,
-      subscriptionType: 'free',
-      popular: false,
-      durationInMonths: 1,
-      isFreePlan: true
-    },
-    {
-      name: '1 Month',
-      price: '₹999',
-      features: ['Full garage management', 'Unlimited vehicles', 'Advanced reporting'],
-      amount: 999,
-      subscriptionType: 'monthly',
-      popular: true,
-      durationInMonths: 1,
-      isFreePlan: false
-    },
-    {
-      name: '6 Months',
-      price: '₹2999',
-      features: ['All premium features', 'Inventory management', 'Priority support'],
-      amount: 2999,
-      subscriptionType: 'half_yearly',
-      popular: false,
-      durationInMonths: 6,
-      isFreePlan: false
-    }
+  const availableRoles = [
+    { value: 'admin', label: 'Administrator' },
+    { value: 'manager', label: 'Manager' },
+    { value: 'staff', label: 'Staff' }
   ];
 
-  // Handle input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
+  const availablePermissions = [
+    { value: 'Dashboard', label: 'Dashboard' },
+    { value: 'Create Job Cards', label: 'Create Job Cards' },
+    { value: 'Manage Inventory', label: 'Manage Inventory' },
+    { value: 'Reports & Records', label: 'Reports & Records' },
+    { value: 'Service Reminders', label: 'Service Reminders' },
+    { value: 'Insurance', label: 'Insurance' },
+    // Add more permissions as needed
+  ];
+
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    contact: '',
+    username: '',
+    enabled: true,
+    permissions: [] // Fixed: Initialize as empty array
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    editadmin: '',
+    newpass: '',
+    repass: ''
+  });
+
+  // Memoized filtered users to prevent unnecessary re-renders
+  const filteredUsers = useMemo(() => {
+    if (!Array.isArray(users)) return [];
+
+    const searchLower = (searchTerm || '').toLowerCase().trim();
+
+    if (!searchLower) return users;
+
+    return users.filter(user => {
+      if (!user) return false;
+
+      const fieldsToSearch = [
+        user.name || '',
+        user.username || '',
+        user.email || '',
+        user.contact || ''
+      ];
+
+      return fieldsToSearch.some(field =>
+        field.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [users, searchTerm]);
+
+  // Responsive columns for DataGrid
+  const getColumns = () => {
+    const baseColumns = [
+      {
+        field: 'id',
+        headerName: 'ID',
+        width: isMobile ? 60 : 100,
+        flex: isMobile ? 0 : 0.5
+      },
+      {
+        field: 'username',
+        headerName: 'Username',
+        width: 150,
+        flex: 1
+      },
+      {
+        field: 'name',
+        headerName: 'Name',
+        width: 150,
+        flex: 1,
+        hide: isMobile
+      },
+      {
+        field: 'email',
+        headerName: 'Email',
+        width: 200,
+        flex: 1.5,
+        hide: isMobile
+      },
+      {
+        field: 'contact',
+        headerName: 'Contact',
+        width: 150,
+        flex: 1,
+        hide: isMobile && isTablet
+      },
+      {
+        field: 'actions',
+        headerName: 'Actions',
+        width: isMobile ? 100 : 400,
+        flex: isMobile ? 0.8 : 2,
+        sortable: false,
+        renderCell: (params) => (
+          <Box sx={{
+            display: 'flex',
+            flexWrap: isMobile ? 'wrap' : 'nowrap',
+            gap: 0.5
+          }}>
+            {isMobile ? (
+              // Compact mobile layout
+              <>
+                <IconButton
+                  color="primary"
+                  onClick={() => handleEditOpen(params.row)}
+                  size="small"
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  color="error"
+                  onClick={() => handleDelete(params.row._id)}
+                  size="small"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  color="info"
+                  onClick={(e) => {
+                    setSelectedUser(params.row);
+                    setActionMenuAnchor(e.currentTarget);
+                    setOpenActionMenu(true);
+                  }}
+                  size="small"
+                >
+                  <MoreVertIcon fontSize="small" />
+                </IconButton>
+              </>
+            ) : (
+              // Full desktop layout
+              <>
+                <IconButton
+                  color="primary"
+                  onClick={() => handleEditOpen(params.row)}
+                  size="small"
+                  sx={{ mr: 0.5 }}
+                >
+                  <EditIcon />
+                </IconButton>
+                <IconButton
+                  color="error"
+                  onClick={() => handleDelete(params.row._id)}
+                  size="small"
+                  sx={{ mr: 0.5 }}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </>
+            )}
+          </Box>
+        ),
+      },
+    ];
+
+    return baseColumns;
+  };
+
+  // Function to render mobile action menu
+  const renderMobileActionMenu = () => {
+    return (
+      <Dialog
+        open={openActionMenu}
+        onClose={() => setOpenActionMenu(false)}
+        PaperProps={{
+          sx: { width: '80%', maxWidth: '300px', p: 1 }
+        }}
+      >
+        <DialogTitle sx={{ p: 2 }}>Actions</DialogTitle>
+        <DialogContent sx={{ p: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {selectedUser?.enabled ? (
+              <ActionButton
+                color="error"
+                onClick={() => {
+                  handleDeactivate(selectedUser.id);
+                  setOpenActionMenu(false);
+                }}
+                variant="outlined"
+                startIcon={<CloseIcon />}
+                fullWidth
+              >
+                Deactivate
+              </ActionButton>
+            ) : (
+              <ActionButton
+                color="success"
+                onClick={() => {
+                  handleActivate(selectedUser.id);
+                  setOpenActionMenu(false);
+                }}
+                variant="outlined"
+                startIcon={<CheckIcon />}
+                fullWidth
+              >
+                Activate
+              </ActionButton>
+            )}
+            <ActionButton
+              color="info"
+              onClick={() => {
+                handleAssignSiteOpen(selectedUser);
+                setOpenActionMenu(false);
+              }}
+              variant="outlined"
+              startIcon={<BusinessIcon />}
+              fullWidth
+            >
+              Assign Sites
+            </ActionButton>
+            <ActionButton
+              color="info"
+              onClick={() => {
+                handleAssignDeviceOpen(selectedUser);
+                setOpenActionMenu(false);
+              }}
+              variant="outlined"
+              startIcon={<DevicesIcon />}
+              fullWidth
+            >
+              Assign Devices
+            </ActionButton>
+            <ActionButton
+              color="warning"
+              onClick={() => {
+                handlePasswordOpen(selectedUser);
+                setOpenActionMenu(false);
+              }}
+              variant="outlined"
+              startIcon={<LockIcon />}
+              fullWidth
+            >
+              Change Password
+            </ActionButton>
+          </Box>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  useEffect(() => {
+    if (!garageId) {
+      navigate("\login")
     }
-  };
+    fetchUsers();
+  }, []);
 
-  // Validate form fields
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Garage Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6)
-      newErrors.password = 'Password must be at least 6 characters';
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, '')))
-      newErrors.phone = 'Phone number must be 10 digits';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Show snackbar notification
-  const showSnackbar = (message, severity = 'success') => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setOpenSnackbar(true);
-  };
-
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-  };
-
-  // Plan selection handler
-  const handleSelectPlan = (plan) => {
-    setSelectedPlan(plan);
-    setOpenPlanDialog(false);
-  };
-
-  // Submit handler
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      showSnackbar('Please fix the errors in the form.', 'error');
-      return;
-    }
-
-    if (!selectedPlan) {
-      showSnackbar('Please select a plan before submitting.', 'warning');
-      return;
-    }
-
-    if (selectedPlan.isFreePlan) {
-      await handleFreeSignup();
-    } else {
-      await handlePaidSignup();
-    }
-  };
-
-  // Handle free signup
-  const handleFreeSignup = async () => {
+  const fetchUsers = async () => {
     try {
-      setLoading(true);
-      
-      const requestBody = {
-        name: formData.name,
-        address: formData.address,
-        phone: formData.phone,
-        email: formData.email,
-        password: formData.password,
-        durationInMonths: selectedPlan.durationInMonths,
-        amount: selectedPlan.amount,
-        isFreePlan: true
-      };
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/users', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJnYXJhZ2VJZCI6IjY4MWU0NDZjMzk3MzMyYmY0MjE1MTdiZSIsImlhdCI6MTc0Nzk5MDY3NywiZXhwIjoxNzQ4NTk1NDc3fQ.ZhG48y8wkgsBt2qrQiJpCZtYjeDi6at1U_uetK8CbL4`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      console.log('Creating free account with:', requestBody);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
+      const data = await response.json();
+      // Add id field to each user object and ensure permissions exists
+      const usersWithId = data.map(user => ({
+        ...user,
+        id: user._id, // Use the _id as id
+        permissions: user.permissions || [] // Ensure permissions is an array
+      }));
+      setUsers(usersWithId);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUsers([]); // Set empty array on error
+    }
+  };
+
+  const fetchSites = async (userId) => {
+    // Implement API call here
+    // For now, using mock data
+    setSites([
+      { siteId: 1, siteName: 'Main Office' },
+      { siteId: 2, siteName: 'Branch A' },
+      { siteId: 3, siteName: 'Branch B' },
+    ]);
+    setSelectedSites([1]); // Mocked assigned sites
+  };
+
+  function ErrorBoundary({ children }) {
+    const [hasError, setHasError] = useState(false);
+
+    if (hasError) return <div>Something went wrong.</div>;
+    return children;
+  }
+
+  const fetchDevices = async (userId) => {
+    // Implement API call here
+    // For now, using mock data
+    setDevices([
+      { id: 1, devicename: 'Device A' },
+      { id: 2, devicename: 'Device B' },
+      { id: 3, devicename: 'Device C' },
+    ]);
+    setSelectedDevices([1]); // Mocked assigned devices
+  };
+
+  const handleAddOpen = () => {
+    setOpenAddDialog(true);
+  };
+
+  const handleAddClose = () => {
+    setOpenAddDialog(false);
+    // Reset formData with permissions array included
+    setFormData({
+      name: '',
+      email: '',
+      contact: '',
+      username: '',
+      password: '',
+      role: 'manager',
+      enabled: true,
+      permissions: []
+    });
+  };
+
+  const handleEditOpen = (user) => {
+    setSelectedUser(user);
+    setEditFormData({
+      name: user.name || '',
+      email: user.email || '',
+      contact: user.contact || '',
+      username: user.username || '',
+      enabled: user.enabled !== undefined ? user.enabled : true,
+      permissions: Array.isArray(user.permissions) ? user.permissions : []
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleEditClose = () => {
+    setOpenEditDialog(false);
+    setSelectedUser(null);
+  };
+
+  const handlePasswordOpen = (user) => {
+    setSelectedUserId(user.id);
+    setSelectedUser(user);
+    setOpenPasswordDialog(true);
+  };
+
+  const handlePasswordClose = () => {
+    setOpenPasswordDialog(false);
+    setPasswordForm({
+      editadmin: '',
+      newpass: '',
+      repass: ''
+    });
+    setSelectedUserId(null);
+  };
+
+  const handleAssignSiteOpen = (user) => {
+    setSelectedUserId(user.id);
+    setSelectedUser(user);
+    fetchSites(user.id);
+    setOpenSiteDialog(true);
+  };
+
+  const handleAssignSiteClose = () => {
+    setOpenSiteDialog(false);
+    setSelectedSites([]);
+    setSelectedUserId(null);
+  };
+
+  const handleAssignDeviceOpen = (user) => {
+    setSelectedUserId(user.id);
+    setSelectedUser(user);
+    fetchDevices(user.id);
+    setOpenDeviceDialog(true);
+  };
+
+  const handleAssignDeviceClose = () => {
+    setOpenDeviceDialog(false);
+    setSelectedDevices([]);
+    setSelectedUserId(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSiteChange = (event) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedSites(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  const handleDeviceChange = (event) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedDevices(typeof value === 'string' ? value.split(',') : value);
+  };
+
+  // Clear search function
+  const handleSearchClear = () => {
+    setSearchTerm('');
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create-user', {
+        method: 'POST',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          permissions: formData.permissions
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create user');
+      }
+
+      const data = await response.json();
+      console.log('User created successfully:', data);
+
+      // Refresh the users list
+      await fetchUsers();
+
+      // Close the dialog
+      handleAddClose();
+
+    } catch (error) {
+      console.error('Error creating user:', error);
+    }
+  };
+
+  const handleUpdate = async () => {
+    try {
+      if (!selectedUser?.id) {
+        throw new Error('No user selected');
+      }
+
+      const response = await fetch(`https://garage-management-zi5z.onrender.com/api/garage/update-permissions/${selectedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          permissions: editFormData.permissions
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update user permissions');
+      }
+
+      const data = await response.json();
+      console.log('User permissions updated successfully:', data);
+
+      // Refresh the users list
+      await fetchUsers();
+      handleEditClose();
+
+    } catch (error) {
+      console.error('Error updating user permissions:', error);
+    }
+  };
+
+  const handlePasswordUpdate = async () => {
+    // Implement password update logic here
+    console.log('Updating password:', passwordForm);
+    // Mock successful password update
+    handlePasswordClose();
+  };
+
+  const handleAssignSites = async () => {
+    // Implement site assignment logic here
+    console.log('Assigning sites:', selectedSites);
+    // Mock successful site assignment
+    handleAssignSiteClose();
+  };
+
+  const handleAssignDevices = async () => {
+    // Implement device assignment logic here
+    console.log('Assigning devices:', selectedDevices);
+    // Mock successful device assignment
+    handleAssignDeviceClose();
+  };
+
+  const handleDelete = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
+
+    try {
       const response = await fetch(
-        'https://garage-management-zi5z.onrender.com/api/garage/create',
+        `https://garage-management-zi5z.onrender.com/api/garage/delete-user/${userId}`,
         {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          method: "DELETE",
+          headers: {
+            Authorization: token,
+            "Content-Type": "application/json",
+          },
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Account creation failed');
+        throw new Error(errorData.message || "Failed to delete user");
       }
 
-      showSnackbar('✅ Free account created successfully!', 'success');
-      navigate('/login');
-    } catch (err) {
-      console.error('Signup Error:', err);
-      showSnackbar(err.message || 'Failed to create account', 'error');
-    } finally {
-      setLoading(false);
+      // Successfully deleted
+      console.log("User deleted successfully");
+      await fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      alert(error.message || "An error occurred while deleting the user.");
     }
   };
 
-  // Handle paid signup with Razorpay
-  const handlePaidSignup = async () => {
-    try {
-      setLoading(true);
-
-      // 1. Create order with backend
-      const orderResponse = await fetch(
-        'https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.name,
-            address: formData.address,
-            phone: formData.phone,
-            email: formData.email,
-            password: formData.password,
-            durationInMonths: selectedPlan.durationInMonths,
-            amount: selectedPlan.amount,
-            subscriptionType: selectedPlan.subscriptionType,
-            isFreePlan: false
-          })
-        }
-      );
-
-      if (!orderResponse.ok) {
-        const errorData = await orderResponse.json();
-        throw new Error(errorData.message || 'Failed to create payment order');
-      }
-
-      const orderData = await orderResponse.json();
-      console.log('Order created:', orderData);
-
-      // 2. Initialize Razorpay payment
-      const options = {
-        key: RAZORPAY_KEY_ID,
-        amount: selectedPlan.amount * 100, // Razorpay expects paise
-        currency: 'INR',
-        name: 'Garage Management',
-        description: `${selectedPlan.name} Subscription`,
-        order_id: orderData.orderId || orderData.id,
-        handler: async (response) => {
-          // 3. Handle successful payment
-          try {
-            const verificationResponse = await fetch(
-              'https://garage-management-zi5z.onrender.com/api/garage/create',
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name: formData.name,
-                  address: formData.address,
-                  phone: formData.phone,
-                  email: formData.email,
-                  password: formData.password,
-                  durationInMonths: selectedPlan.durationInMonths,
-                  amount: selectedPlan.amount,
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpayPaymentId: response.razorpay_payment_id,
-                  razorpaySignature: response.razorpay_signature,
-                  isFreePlan: false
-                })
-              }
-            );
-
-            if (!verificationResponse.ok) {
-              const errorData = await verificationResponse.json();
-              throw new Error(errorData.message || 'Account creation failed after payment');
-            }
-
-            showSnackbar('✅ Payment successful! Account created.', 'success');
-            navigate('/login');
-          } catch (err) {
-            console.error('Account creation error:', err);
-            showSnackbar(err.message || 'Account creation failed after payment', 'error');
-          }
-        },
-        prefill: {
-          name: formData.name,
-          email: formData.email,
-          contact: formData.phone
-        },
-        theme: {
-          color: '#1976d2'
-        }
-      };
-
-      // 4. Open Razorpay payment dialog
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-
-      rzp.on('payment.failed', (response) => {
-        showSnackbar(`Payment failed: ${response.error.description}`, 'error');
-      });
-
-    } catch (err) {
-      console.error('Payment setup error:', err);
-      showSnackbar(err.message || 'Payment setup failed', 'error');
-    } finally {
-      setLoading(false);
-    }
+  const handleActivate = async (userId) => {
+    // Implement activate logic here
+    console.log('Activating user:', userId);
+    // Mock successful activation
+    await fetchUsers();
   };
 
-  // ... (rest of the component remains the same)
+  const handleDeactivate = async (userId) => {
+    // Implement deactivate logic here
+    console.log('Deactivating user:', userId);
+    // Mock successful deactivation
+    await fetchUsers();
+  };
+
   return (
-     <Container maxWidth="md" sx={{ mt: 5 }}>
-          <Box
-            sx={{
-              p: 3,
-              borderRadius: 4,
-              boxShadow: 3,
-              bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#fff'
-            }}
-          >
-            <Typography variant="h5" align="center" fontWeight="bold" gutterBottom>
-              Create Your Garage Account
-            </Typography>
-    
-            {/* Form */}
-            <form onSubmit={(e) => e.preventDefault()}>
-              {/* Garage Name */}
-              <TextField
-                fullWidth
-                label="Garage Name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                error={!!errors.name}
-                helperText={errors.name}
-                margin="normal"
-                size="small"
-              />
-    
-              {/* Email */}
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                error={!!errors.email}
-                helperText={errors.email}
-                margin="normal"
-                size="small"
-              />
-    
-              {/* Password */}
-              <TextField
-                fullWidth
-                label="Password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleChange}
-                error={!!errors.password}
-                helperText={errors.password}
-                margin="normal"
-                size="small"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
+    <ErrorBoundary>
+      <Box sx={{
+        flexGrow: 1,
+        mb: 4,
+        ml: { xs: 0, sm: 35 },
+        overflow: 'auto',
+        pt: 3
+      }}>
+        <Card elevation={3} sx={{ borderRadius: 1 }}>
+          <CardContent sx={{ p: { xs: 1, sm: 2 } }}>
+            <Box
+              display="flex"
+              flexDirection={{ xs: 'column', sm: 'row' }}
+              justifyContent="space-between"
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              mb={2}
+              gap={1}
+            >
+              <Typography variant="h5" fontWeight={500} sx={{ mb: { xs: 1, sm: 0 } }}>
+                User List
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={handleAddOpen}
+                size={isMobile ? "small" : "medium"}
+                sx={{
+                  alignSelf: { xs: 'flex-end', sm: 'auto' },
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                New User
+              </Button>
+            </Box>
+
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Search users by name, username or email"
+              margin="normal"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={handleSearchClear}
+                      size="small"
+                      edge="end"
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
+              size={isMobile ? "small" : "medium"}
+            />
+
+            <Box sx={{ height: { xs: 400, sm: 500, md: 600 }, width: '100%' }}>
+              <DataGrid
+                rows={filteredUsers}
+                columns={getColumns()}
+                pageSize={isMobile ? 5 : 10}
+                rowsPerPageOptions={[5, 10, 25, 50]}
+                disableSelectionOnClick
+                density={isMobile ? "compact" : "standard"}
+                getRowId={(row) => row._id}
+                loading={!Array.isArray(users)}
+                sx={{
+                  '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? alpha(theme.palette.primary.dark, 0.8)
+                      : alpha(theme.palette.primary.light, 0.6),
+                    color: theme.palette.mode === 'dark' ? 'white' : 'black',
+                    fontWeight: 600,
+                  },
+                  '& .MuiDataGrid-cell': {
+                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                  },
+                  width: '100%',
+                  border: 'none',
+                  '& .MuiDataGrid-virtualScroller': {
+                    overflowX: 'auto',
+                  }
                 }}
               />
-    
-              {/* Address */}
-              <TextField
-                fullWidth
-                label="Address"
-                name="address"
-                multiline
-                rows={2}
-                value={formData.address}
-                onChange={handleChange}
-                error={!!errors.address}
-                helperText={errors.address}
-                margin="normal"
-                size="small"
-              />
-    
-              {/* Phone */}
-              <TextField
-                fullWidth
-                label="Phone Number"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                error={!!errors.phone}
-                helperText={errors.phone}
-                margin="normal"
-                size="small"
-              />
-    
-              {/* Selected Plan Display */}
-              {selectedPlan && (
-                <Box
-                  sx={{
-                    border: '2px dashed #1976d2',
-                    borderRadius: 2,
-                    p: 2,
-                    my: 2,
-                    bgcolor: theme.palette.mode === 'dark' ? '#1a237e10' : '#bbdefb30'
-                  }}
-                >
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Typography fontWeight="bold">{selectedPlan.name}</Typography>
-                      <Typography color={selectedPlan.isFreePlan ? 'green' : 'primary'}>
-                        {selectedPlan.price}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Duration: {selectedPlan.durationInMonths} month{selectedPlan.durationInMonths > 1 ? 's' : ''}
-                      </Typography>
-                    </Box>
-                    <Button
-                      size="small"
-                      color="error"
-                      startIcon={<AddCircleOutline />}
-                      onClick={() => setOpenPlanDialog(true)}
-                    >
-                      Change Plan
-                    </Button>
-                  </Box>
-                </Box>
-              )}
-    
-              {/* Choose Plan Button */}
-              {!selectedPlan && (
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<AddCircleOutline />}
-                  onClick={() => setOpenPlanDialog(true)}
-                  sx={{ mb: 2 }}
-                >
-                  Choose Subscription Plan
-                </Button>
-              )}
-    
-              {/* Submit Button */}
-              <Button
-                fullWidth
-                variant="contained"
-                disabled={loading || !selectedPlan}
-                startIcon={selectedPlan?.isFreePlan ? null : <CheckCircleOutline />}
-                onClick={handleSubmit}
-                sx={{ py: 1.5 }}
-              >
-                {loading
-                  ? 'Processing...'
-                  : selectedPlan?.isFreePlan
-                  ? 'Create Free Account'
-                  : `Pay ${selectedPlan?.price} & Create Account`}
-              </Button>
-    
-              {/* Login Link */}
-              <Box mt={3} textAlign="center">
-                <Typography variant="body2">
-                  Already have an account?{' '}
-                  <Typography
-                    component="span"
-                    color="primary"
-                    sx={{ cursor: 'pointer' }}
-                    fontWeight="bold"
-                    onClick={() => navigate('/login')}
-                  >
-                    Login here
-                  </Typography>
-                </Typography>
-              </Box>
-            </form>
-          </Box>
-    
-          {/* Plan Selection Dialog */}
-          <Dialog open={openPlanDialog} onClose={() => setOpenPlanDialog(false)} fullScreen={isMobile}>
-            <DialogTitle>Select Your Plan</DialogTitle>
-            <DialogContent>
-              <Grid container spacing={2} sx={{ my: 1 }}>
-                {plans.map((plan, index) => (
-                  <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Box
-                      onClick={() => handleSelectPlan(plan)}
-                      sx={{
-                        p: 2,
-                        border: selectedPlan?.name === plan.name ? '2px solid #1976d2' : '1px solid #ccc',
-                        borderRadius: 2,
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease-in-out',
-                        position: 'relative',
-                        '&:hover': {
-                          transform: 'scale(1.02)',
-                          boxShadow: 3
-                        }
-                      }}
-                    >
-                      {plan.popular && (
-                        <Chip
-                          label="Popular"
-                          color="secondary"
-                          size="small"
-                          sx={{ position: 'absolute', top: -8, right: 8 }}
-                        />
-                      )}
-                      <Typography variant="h6" fontWeight="bold">
-                        {plan.name}
-                      </Typography>
-                      <Typography
-                        variant="h5"
-                        color={plan.isFreePlan ? 'green' : 'orange'}
-                        fontWeight="bold"
-                      >
-                        {plan.price}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-                        {plan.durationInMonths} month{plan.durationInMonths > 1 ? 's' : ''}
-                      </Typography>
-                      <Box component="ul" sx={{ paddingLeft: '1rem', mt: 1, mb: 0 }}>
-                        {plan.features.map((feature, i) => (
-                          <Box component="li" key={i} sx={{ mb: 0.5 }}>
-                            <Typography variant="body2" color="textSecondary">
-                              {feature}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Box>
+            </Box>
+
+            {renderMobileActionMenu()}
+
+            <Dialog
+              open={openAddDialog}
+              onClose={handleAddClose}
+              maxWidth="sm"
+              fullWidth
+              fullScreen={isMobile}
+            >
+              <DialogTitle>New User</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                      size={isMobile ? "small" : "medium"}
+                    />
                   </Grid>
-                ))}
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenPlanDialog(false)}>Cancel</Button>
-            </DialogActions>
-          </Dialog>
-    
-          {/* Snackbar Notification */}
-          <Snackbar
-            open={openSnackbar}
-            autoHideDuration={4000}
-            onClose={handleCloseSnackbar}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          >
-            <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
-              {snackbarMessage}
-            </Alert>
-          </Snackbar>
-        </Container>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      required
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowPassword(!showPassword)}
+                              edge="end"
+                            >
+                              {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      required
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Role</InputLabel>
+                      <Select
+                        value={formData.role}
+                        onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                        label="Role"
+                        size={isMobile ? "small" : "medium"}
+                      >
+                        {availableRoles.map((role) => (
+                          <MenuItem key={role.value} value={role.value}>
+                            {role.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Permissions</InputLabel>
+                      <Select
+                        multiple
+                        value={formData.permissions || []}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            permissions: typeof value === 'string' ? value.split(',') : value,
+                          }));
+                        }}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => {
+                              const perm = availablePermissions.find(p => p.value === value);
+                              return <Chip key={value} label={perm?.label || value} size="small" />;
+                            })}
+                          </Box>
+                        )}
+                        size={isMobile ? "small" : "medium"}
+                      >
+                        {availablePermissions.map((permission) => (
+                          <MenuItem key={permission.value} value={permission.value}>
+                            <Checkbox checked={(formData.permissions || []).indexOf(permission.value) > -1} />
+                            <ListItemText primary={permission.label} />
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button onClick={handleAddClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
+                <Button
+                  onClick={handleSubmit}
+                  color="primary"
+                  variant="contained"
+                  size={isMobile ? "small" : "medium"}
+                  disabled={!formData.name || !formData.email || !formData.password}
+                >
+                  Save User
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Edit User Dialog */}
+            {/* Edit User Dialog */}
+            <Dialog
+              open={openEditDialog}
+              onClose={handleEditClose}
+              maxWidth="sm"
+              fullWidth
+              fullScreen={isMobile}
+            >
+              <DialogTitle>Modify User Permissions</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Name"
+                      name="name"
+                      value={editFormData.name}
+                      onChange={handleEditInputChange}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                      disabled
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={editFormData.email}
+                      onChange={handleEditInputChange}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <EmailIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                      disabled
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Permissions</InputLabel>
+                      <Select
+                        multiple
+                        value={editFormData.permissions || []}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setEditFormData({
+                            ...editFormData,
+                            permissions: typeof value === 'string' ? value.split(',') : value,
+                          });
+                        }}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => {
+                              const perm = availablePermissions.find(p => p.value === value);
+                              return <Chip key={value} label={perm?.label || value} size="small" />;
+                            })}
+                          </Box>
+                        )}
+                        size={isMobile ? "small" : "medium"}
+                      >
+                        {availablePermissions.map((permission) => (
+                          <MenuItem key={permission.value} value={permission.value}>
+                            <Checkbox checked={editFormData.permissions?.includes(permission.value) || false} />
+                            <ListItemText primary={permission.label} />
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions sx={{ p: 2, gap: 1 }}>
+                <Button onClick={handleEditClose} size={isMobile ? "small" : "medium"}>Cancel</Button>
+                <Button
+                  onClick={handleUpdate}
+                  color="primary"
+                  variant="contained"
+                  size={isMobile ? "small" : "medium"}
+                >
+                  Save Changes
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Change Password Dialog */}
+            <Dialog
+              open={openPasswordDialog}
+              onClose={handlePasswordClose}
+              maxWidth="sm"
+              fullWidth
+              fullScreen={isMobile}
+            >
+              <DialogTitle>Modify Password</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Master Password"
+                      name="editadmin"
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwordForm.editadmin}
+                      onChange={handlePasswordChange}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowPassword(!showPassword)}
+                              edge="end"
+                              size={isMobile ? "small" : "medium"}
+                            >
+                              {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      required
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="New Password"
+                      name="newpass"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={passwordForm.newpass}
+                      onChange={handlePasswordChange}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                              edge="end"
+                            >
+                              {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      required
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Re-enter Password"
+                      name="repass"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={passwordForm.repass}
+                      onChange={handlePasswordChange}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              edge="end"
+                            >
+                              {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                      required
+                      error={passwordForm.newpass !== passwordForm.repass && passwordForm.repass !== ''}
+                      helperText={
+                        passwordForm.newpass !== passwordForm.repass && passwordForm.repass !== ''
+                          ? 'Passwords do not match'
+                          : ''
+                      }
+                    />
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handlePasswordClose}>Cancel</Button>
+                <Button
+                  onClick={handlePasswordUpdate}
+                  color="primary"
+                  variant="contained"
+                  disabled={
+                    !passwordForm.editadmin ||
+                    !passwordForm.newpass ||
+                    !passwordForm.repass ||
+                    passwordForm.newpass !== passwordForm.repass
+                  }
+                >
+                  Change Password
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Assign Sites Dialog */}
+            <Dialog open={openSiteDialog} onClose={handleAssignSiteClose} maxWidth="sm" fullWidth>
+              <DialogTitle>Assign Site To User</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Username"
+                      value={selectedUser?.username || ''}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                      disabled
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Site</InputLabel>
+                      <Select
+                        multiple
+                        value={selectedSites}
+                        onChange={handleSiteChange}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => {
+                              const site = sites.find((s) => s.siteId === value);
+                              return <Typography key={value}>{site?.siteName || value}</Typography>;
+                            })}
+                          </Box>
+                        )}
+                      >
+                        {sites.map((site) => (
+                          <MenuItem key={site.siteId} value={site.siteId}>
+                            {site.siteName}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleAssignSiteClose}>Cancel</Button>
+                <Button onClick={handleAssignSites} color="primary" variant="contained">
+                  Assign
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Assign Devices Dialog */}
+            <Dialog open={openDeviceDialog} onClose={handleAssignDeviceClose} maxWidth="sm" fullWidth>
+              <DialogTitle>Assign Device To User</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mt: 1 }}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Username"
+                      value={selectedUser?.username || ''}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                      disabled
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Select Device</InputLabel>
+                      <Select
+                        multiple
+                        value={selectedDevices}
+                        onChange={handleDeviceChange}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {selected.map((value) => {
+                              const device = devices.find((d) => d.id === value);
+                              return <Typography key={value}>{device?.devicename || value}</Typography>;
+                            })}
+                          </Box>
+                        )}
+                      >
+                        {devices.map((device) => (
+                          <MenuItem key={device.id} value={device.id}>
+                            {device.devicename}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={handleAssignDeviceClose}>Cancel</Button>
+                <Button onClick={handleAssignDevices} color="primary" variant="contained">
+                  Assign
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </CardContent>
+        </Card>
+      </Box>
+    </ErrorBoundary >
   );
-}
+};
+
+export default UserManagement;
+

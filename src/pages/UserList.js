@@ -703,17 +703,6 @@ const handleDelete = async (userId) => {
 
     return (
         <ErrorBoundary>
-            {/* <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    mb: 4,
-                    overflow: 'auto',
-                    px: { xs: 1, sm: 2, md: 3 }, // Responsive padding
-                    width: '100%', // Ensure full width
-                    maxWidth: '100%' // Prevent overflow
-                }}
-            > */}
             <Box sx={{
                 flexGrow: 1,
                 mb: 4,
@@ -796,11 +785,8 @@ const handleDelete = async (userId) => {
 />
                         </Box>
 
-                        {/* Mobile Action Menu */}
                         {renderMobileActionMenu()}
 
-                        {/* Add User Dialog */}
-                        {/* Add User Dialog */}
                         <Dialog
                             open={openAddDialog}
                             onClose={handleAddClose}
