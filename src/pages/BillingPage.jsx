@@ -57,17 +57,56 @@ const AutoServeBilling = () => {
     let garageId = localStorage.getItem("garageId");
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
+
   }
+     const{ id } =useParams();
+
+    const jobCardIdFromUrl = id;
     
-    // Alternative method to get jobCardId if not using react-router params
-    const getJobCardIdFromUrl = () => {
-        const pathSegments = location.pathname.split('/');
-        const idIndex = pathSegments.findIndex(segment => segment === 'billing') + 1;
-        return pathSegments[idIndex] || '';
+    const today = new Date().toISOString().split("T")[0];
+
+  const [garageDetails, setGarageDetails] = useState({
+    name: "",
+    address: "",
+    phone: "",
+});
+
+useEffect(() => {
+    const fetchJobCardData = async () => {
+        // Existing code...
     };
 
-    const jobCardIdFromUrl = jobCardId || getJobCardIdFromUrl();
-    const today = new Date().toISOString().split("T")[0];
+    const fetchGarageData = async () => {
+        try {
+            const response = await axios.get(
+                `https://garage-management-zi5z.onrender.com/api/garage/getgaragebyid/${garageId}` 
+            );
+            const data = response.data;
+
+            setGarageDetails({
+                name: data.name,
+                address: data.address,
+                phone: data.phone,
+            });
+        } catch (error) {
+            console.error("Error fetching garage data:", error);
+        }
+    };
+
+    if (garageId) {
+        fetchGarageData();
+    }
+
+    fetchJobCardData();
+}, [jobCardIdFromUrl, today, garageId]);
+    
+    // Alternative method to get jobCardId if not using react-router params
+    // const getJobCardIdFromUrl = () => {
+    //     const pathSegments = location.pathname.split('/');
+    //     const idIndex = pathSegments.findIndex(segment => segment === 'billing') + 1;
+    //     return pathSegments[idIndex] || '';
+    // };
+ 
   
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -123,6 +162,7 @@ const AutoServeBilling = () => {
     const [apiResponseMessage, setApiResponseMessage] = useState(null);
     const [showApiResponse, setShowApiResponse] = useState(false);
     const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+    const [isGarageLoading, setIsGarageLoading] = useState(true);
 
     // Dialog states for adding/editing
     const [showNewPartDialog, setShowNewPartDialog] = useState(false);
@@ -371,19 +411,15 @@ const generatePdfBase64 = () => {
             let currentY = 15;
 
             // Add company header
-            doc.setFontSize(18);
-            doc.setFont('helvetica', 'bold');
-            doc.text('SHIVAM MOTORS', centerX, currentY, { align: 'center' });
-            currentY += 7;
-
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text('PLOT NO:5, PHASE-1 NARODA GIDC, OPP.BSNL TELEPHONE EXCHANGE,NARODA', centerX, currentY, { align: 'center' });
-            currentY += 5;
-            doc.text('GST: 24ADPFS3849B1ZY', centerX, currentY, { align: 'center' });
-            currentY += 5;
-            doc.text('Contact: 9909047943', centerX, currentY, { align: 'center' });
-            currentY += 8;
+           doc.setFontSize(18);
+doc.setFont('helvetica', 'bold');
+doc.text(garageDetails.name, centerX, currentY, { align: 'center' });
+currentY += 7;
+doc.setFontSize(10);
+doc.setFont('helvetica', 'normal');
+doc.text(garageDetails.address, centerX, currentY, { align: 'center' });
+currentY += 5;
+doc.text(`Contact: ${garageDetails.phone}`, centerX, currentY, { align: 'center' });
 
             // Add line separator
             doc.setDrawColor(0);

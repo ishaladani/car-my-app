@@ -1,1012 +1,542 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from 'react';
 import {
+  Container,
   Box,
   Typography,
-  Grid,
-  Card,
-  CardContent,
+  TextField,
   Button,
-  Avatar,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
   IconButton,
-  Stack,
-  LinearProgress,
-  Divider,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
+  InputAdornment,
+  Chip,
+  Snackbar,
+  Alert,
   useTheme,
-  Container,
-  CssBaseline,
-  CircularProgress,
-} from "@mui/material";
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Add as AddIcon,
-  MoreVert as MoreVertIcon,
-  Refresh as RefreshIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Build as BuildIcon,
-  Inventory as InventoryIcon,
-  Notifications as NotificationsIcon,
-  ArrowForward as ArrowForwardIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  CalendarToday as CalendarIcon,
-  Visibility as VisibilityIcon,
-  FilterList as FilterListIcon,
-  Dashboard as DashboardIcon,
-} from "@mui/icons-material";
-import { useThemeContext } from "../Layout/ThemeContext";
-import EditProfileButton from "../Login/EditProfileButton";
-import EditProfileModal from "../Login/EditProfileModal";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+  useMediaQuery
+} from '@mui/material';
+import { Visibility, VisibilityOff, AddCircleOutline, CheckCircleOutline } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
-const Dashboard = () => {
-  const navigate = useNavigate();
-  
-  // Check for garageId and redirect if not found
-  let garageId = localStorage.getItem("garageId");
-  if (!garageId) {
-    garageId = localStorage.getItem("garage_id");
-  }
+const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_qjd934YSnvGxQZ';
 
-  // Redirect to login if no garageId is found
-  useEffect(() => {
-    if (!garageId) {
-      console.log("No garageId found, redirecting to login");
-      navigate("/login", { replace: true });
-      return;
-    }
-  }, [garageId, navigate]);
-
+export default function SignUpPage() {
   const theme = useTheme();
-  const { darkMode } = useThemeContext();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "",
-    image: "",
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigate = useNavigate();
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    address: '',
+    phone: ''
   });
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // UI/UX state
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [openPlanDialog, setOpenPlanDialog] = useState(false);
 
-  const [currentJobs, setCurrentJobs] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState([
+  // Available plans
+  const plans = [
     {
-      title: "Active Jobs",
-      value: 0,
-      change: 0,
-      isIncrease: true,
-      icon: <BuildIcon sx={{ fontSize: 40 }} />,
-      color: "#2563eb",
-      lightColor: "rgba(37, 99, 235, 0.1)",
+      name: 'Free',
+      price: 'Free',
+      features: ['Basic garage management', 'Up to 5 vehicles', 'Basic reporting'],
+      amount: 0,
+      subscriptionType: 'free',
+      popular: false,
+      durationInMonths: 1,
+      isFreePlan: true
     },
     {
-      title: "Parts Available",
-      value: 0,
-      change: 0,
-      isIncrease: false,
-      icon: <InventoryIcon sx={{ fontSize: 40 }} />,
-      color: "#ea580c",
-      lightColor: "rgba(234, 88, 12, 0.1)",
+      name: '1 Month',
+      price: '₹999',
+      features: ['Full garage management', 'Unlimited vehicles', 'Advanced reporting'],
+      amount: 999,
+      subscriptionType: 'monthly',
+      popular: true,
+      durationInMonths: 1,
+      isFreePlan: false
     },
     {
-      title: "Pending Reminders",
-      value: 0,
-      change: 0,
-      isIncrease: false,
-      icon: <NotificationsIcon sx={{ fontSize: 40 }} />,
-      color: "#dc2626",
-      lightColor: "rgba(220, 38, 38, 0.1)",
-    },
-  ]);
+      name: '6 Months',
+      price: '₹2999',
+      features: ['All premium features', 'Inventory management', 'Priority support'],
+      amount: 2999,
+      subscriptionType: 'half_yearly',
+      popular: false,
+      durationInMonths: 6,
+      isFreePlan: false
+    }
+  ];
 
-  // Inventory data will be fetched from API and separated into low/high stock
-  const [lowStockItems, setLowStockItems] = useState([]);
-  const [highStockItems, setHighStockItems] = useState([]);
-  const [inventoryLoading, setInventoryLoading] = useState(true);
-  const [inventoryError, setInventoryError] = useState(null);
-
-  const handleSaveProfile = (data) => {
-    setProfileData(data);
+  // Handle input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
   };
 
-  const [actionMenu, setActionMenu] = useState(null);
-  const [selectedJobId, setSelectedJobId] = useState(null);
+  // Validate form fields
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.name.trim()) newErrors.name = 'Garage Name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6)
+      newErrors.password = 'Password must be at least 6 characters';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, '')))
+      newErrors.phone = 'Phone number must be 10 digits';
 
-  const handleActionMenuOpen = (event, jobId) => {
-    setActionMenu(event.currentTarget);
-    setSelectedJobId(jobId);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleActionMenuClose = () => {
-    setActionMenu(null);
-    setSelectedJobId(null);
+  // Show snackbar notification
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setOpenSnackbar(true);
   };
 
-  const handleUpdate = (id) => {
-    navigate(`assign-engineer/${id}`);
+  const handleCloseSnackbar = () => {
+    setOpenSnackbar(false);
   };
 
-  // Early return if no garageId - prevents rendering while redirect is happening
-  if (!garageId) {
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          flexDirection: 'column'
-        }}
-      >
-        <CircularProgress size={40} />
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          Redirecting to login...
-        </Typography>
-      </Box>
-    );
-  }
+  // Plan selection handler
+  const handleSelectPlan = (plan) => {
+    setSelectedPlan(plan);
+    setOpenPlanDialog(false);
+  };
 
-  // Fetch garage profile data
-  useEffect(() => {
-    const fetchGarageProfile = async () => {
-      try {
-        const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-          }
-        );
+  // Submit handler
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      showSnackbar('Please fix the errors in the form.', 'error');
+      return;
+    }
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    if (!selectedPlan) {
+      showSnackbar('Please select a plan before submitting.', 'warning');
+      return;
+    }
+
+    if (selectedPlan.isFreePlan) {
+      await handleFreeSignup();
+    } else {
+      await handlePaidSignup();
+    }
+  };
+
+  // Handle free signup
+  const handleFreeSignup = async () => {
+    try {
+      setLoading(true);
+      
+      const requestBody = {
+        name: formData.name,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        password: formData.password,
+        durationInMonths: selectedPlan.durationInMonths,
+        amount: selectedPlan.amount,
+        isFreePlan: true
+      };
+
+      console.log('Creating free account with:', requestBody);
+
+      const response = await fetch(
+        'https://garage-management-zi5z.onrender.com/api/garage/create',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
         }
+      );
 
-        const data = await response.json();
-        console.log("Garage profile response:", data);
-
-        if (data && data.name) {
-          setProfileData({
-            name: data.name || "Your Garage",
-            image: data.image || "",
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching garage profile:", error);
-        // Set default values on error
-        setProfileData({
-          name: "Your Garage",
-          image: "",
-        });
-      }
-    };
-
-    if (garageId) {
-      fetchGarageProfile();
-    }
-  }, [garageId]);
-
-  // Fetch job data from API
-  useEffect(() => {
-    const fetchJobs = async () => {
-      if (!garageId) {
-        setError("Authentication garage ID not found. Please log in again.");
-        setLoading(false);
-        return;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Account creation failed');
       }
 
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Jobs API response:", data);
-
-        // Process the response
-        const jobsData = Array.isArray(data)
-          ? data
-          : data.jobCards
-          ? data.jobCards
-          : data.data
-          ? data.data
-          : [];
-
-        // Extract and format job data from API response
-        setCurrentJobs(jobsData);
-
-        // Update dashboard stats
-        const updatedStats = [...dashboardStats];
-
-        // Count active jobs (Pending or In Progress)
-        const activeJobsCount = jobsData.filter(
-          (job) => job.status === "In Progress" || job.status === "Pending"
-        ).length;
-
-        updatedStats[0].value = activeJobsCount;
-        setDashboardStats(updatedStats);
-      } catch (error) {
-        console.error("Error fetching jobs:", error);
-        setError(`Failed to load jobs data: ${error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (garageId) {
-      fetchJobs();
-    }
-  }, [garageId]);
-
-  // Fetch inventory data from API
-  useEffect(() => {
-    const fetchInventory = async () => {
-      if (!garageId) {
-        console.warn("garageId missing for inventory fetch");
-        return;
-      }
-
-      try {
-        setInventoryLoading(true);
-        setInventoryError(null);
-
-        const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log("Inventory API response:", data);
-
-        // Process the response
-        const inventoryData = Array.isArray(data)
-          ? data
-          : data.inventory
-          ? data.inventory
-          : data.data
-          ? data.data
-          : [];
-
-        // Sort inventory items into high and low stock based on quantity
-        const highStock = [];
-        const lowStock = [];
-
-        inventoryData.forEach((item) => {
-          // Using the actual structure from the API
-          const inventoryItem = {
-            id: item._id || "",
-            name: item.partName || "Unknown Part",
-            quantity: item.quantity || 0,
-            price: item.pricePerUnit || 0,
-            carName: item.carName || "",
-            model: item.model || "",
-            reorderPoint: Math.floor(item.quantity * 0.2) || 5,
-          };
-
-          // Items with quantity >= 10 go to high stock, others to low stock (threshold can be adjusted)
-          if (item.quantity >= 10) {
-            highStock.push(inventoryItem);
-          } else {
-            lowStock.push(inventoryItem);
-          }
-        });
-
-        // Update the dashboard stats with total inventory count
-        const updatedStats = [...dashboardStats];
-        updatedStats[1].value = inventoryData.reduce(
-          (total, item) => total + (item.quantity || 0),
-          0
-        );
-        setDashboardStats(updatedStats);
-
-        // Update state with sorted inventory items
-        setHighStockItems(highStock);
-        setLowStockItems(lowStock);
-      } catch (error) {
-        console.error("Error fetching inventory:", error);
-        setInventoryError(`Failed to load inventory data: ${error.message}`);
-
-        // Set fallback empty arrays if API fails
-        setHighStockItems([]);
-        setLowStockItems([]);
-      } finally {
-        setInventoryLoading(false);
-      }
-    };
-
-    if (garageId) {
-      fetchInventory();
-    }
-  }, [garageId]);
-
-  const getStatusChip = (status) => {
-    // Standardize status value
-    const normalizedStatus = status || "Pending";
-
-    switch (normalizedStatus) {
-      case "Completed":
-        return (
-          <Chip
-            icon={<CheckCircleIcon fontSize="small" />}
-            label={normalizedStatus}
-            size="small"
-            sx={{
-              backgroundColor: darkMode
-                ? "rgba(22, 163, 74, 0.2)"
-                : "rgba(22, 163, 74, 0.1)",
-              color: theme.palette.success.main,
-              fontWeight: 600,
-              "& .MuiChip-icon": { color: theme.palette.success.main },
-            }}
-          />
-        );
-      case "In Progress":
-        return (
-          <Chip
-            icon={<WarningIcon fontSize="small" />}
-            label={normalizedStatus}
-            size="small"
-            sx={{
-              backgroundColor: darkMode
-                ? "rgba(234, 88, 12, 0.2)"
-                : "rgba(234, 88, 12, 0.1)",
-              color: theme.palette.warning.main,
-              fontWeight: 600,
-              "& .MuiChip-icon": { color: theme.palette.warning.main },
-            }}
-          />
-        );
-      case "Pending":
-        return (
-          <Chip
-            icon={<CalendarIcon fontSize="small" />}
-            label={normalizedStatus}
-            size="small"
-            sx={{
-              backgroundColor: darkMode
-                ? "rgba(37, 99, 235, 0.2)"
-                : "rgba(37, 99, 235, 0.1)",
-              color: theme.palette.info.main,
-              fontWeight: 600,
-              "& .MuiChip-icon": { color: theme.palette.info.main },
-            }}
-          />
-        );
-      default:
-        return (
-          <Chip
-            label={normalizedStatus}
-            size="small"
-            sx={{
-              backgroundColor: darkMode
-                ? "rgba(100, 116, 139, 0.2)"
-                : "rgba(100, 116, 139, 0.1)",
-              color: theme.palette.text.secondary,
-              fontWeight: 600,
-            }}
-          />
-        );
+      showSnackbar('✅ Free account created successfully!', 'success');
+      navigate('/login');
+    } catch (err) {
+      console.error('Signup Error:', err);
+      showSnackbar(err.message || 'Failed to create account', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Calculate job progress based on status
-  const getJobProgress = (status) => {
-    switch (status) {
-      case "Completed":
-        return 100;
-      case "In Progress":
-        return 60;
-      case "Pending":
-        return 10;
-      default:
-        return 0;
+  // Handle paid signup with Razorpay
+  const handlePaidSignup = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Create order with backend
+      const orderResponse = await fetch(
+        'https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            address: formData.address,
+            phone: formData.phone,
+            email: formData.email,
+            password: formData.password,
+            durationInMonths: selectedPlan.durationInMonths,
+            amount: selectedPlan.amount,
+            subscriptionType: selectedPlan.subscriptionType,
+            isFreePlan: false
+          })
+        }
+      );
+
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json();
+        throw new Error(errorData.message || 'Failed to create payment order');
+      }
+
+      const orderData = await orderResponse.json();
+      console.log('Order created:', orderData);
+
+      // 2. Initialize Razorpay payment
+      const options = {
+        key: RAZORPAY_KEY_ID,
+        amount: selectedPlan.amount * 100, // Razorpay expects paise
+        currency: 'INR',
+        name: 'Garage Management',
+        description: `${selectedPlan.name} Subscription`,
+        order_id: orderData.orderId || orderData.id,
+        handler: async (response) => {
+          // 3. Handle successful payment
+          try {
+            const verificationResponse = await fetch(
+              'https://garage-management-zi5z.onrender.com/api/garage/create',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: formData.name,
+                  address: formData.address,
+                  phone: formData.phone,
+                  email: formData.email,
+                  password: formData.password,
+                  durationInMonths: selectedPlan.durationInMonths,
+                  amount: selectedPlan.amount,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  isFreePlan: false
+                })
+              }
+            );
+
+            if (!verificationResponse.ok) {
+              const errorData = await verificationResponse.json();
+              throw new Error(errorData.message || 'Account creation failed after payment');
+            }
+
+            showSnackbar('✅ Payment successful! Account created.', 'success');
+            navigate('/login');
+          } catch (err) {
+            console.error('Account creation error:', err);
+            showSnackbar(err.message || 'Account creation failed after payment', 'error');
+          }
+        },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone
+        },
+        theme: {
+          color: '#1976d2'
+        }
+      };
+
+      // 4. Open Razorpay payment dialog
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+
+      rzp.on('payment.failed', (response) => {
+        showSnackbar(`Payment failed: ${response.error.description}`, 'error');
+      });
+
+    } catch (err) {
+      console.error('Payment setup error:', err);
+      showSnackbar(err.message || 'Payment setup failed', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Debug info (remove in production)
-  useEffect(() => {
-    console.log("Dashboard Debug Info:", {
-      garageId,
-      hasGarageId: !!localStorage.getItem("garageId"),
-      localStorageKeys: Object.keys(localStorage)
-    });
-  }, [garageId]);
-
+  // ... (rest of the component remains the same)
   return (
-   <>
-      <CssBaseline />
-      <Box
-        sx={{
-          flexGrow: 1,
-          mb: 4,
-          ml: { xs: 0, sm: 35 },
-          overflow: "auto",
-        }}
-      >
-        <Container maxWidth="xl">
-          <Card sx={{ mb: 4, overflow: "visible", borderRadius: 2 }}>
-            <CardContent>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-                mb={2}
-              >
-                <Box display="flex" alignItems="center">
-                  <DashboardIcon
-                    fontSize="large"
-                    sx={{ color: "#3f51b5", mr: 2 }}
-                  />
-                  <Typography variant="h5" color="primary">
-                    Dashboard Overview
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  onClick={() => setModalOpen(true)}
+     <Container maxWidth="md" sx={{ mt: 5 }}>
+          <Box
+            sx={{
+              p: 3,
+              borderRadius: 4,
+              boxShadow: 3,
+              bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#fff'
+            }}
+          >
+            <Typography variant="h5" align="center" fontWeight="bold" gutterBottom>
+              Create Your Garage Account
+            </Typography>
+    
+            {/* Form */}
+            <form onSubmit={(e) => e.preventDefault()}>
+              {/* Garage Name */}
+              <TextField
+                fullWidth
+                label="Garage Name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                error={!!errors.name}
+                helperText={errors.name}
+                margin="normal"
+                size="small"
+              />
+    
+              {/* Email */}
+              <TextField
+                fullWidth
+                label="Email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                error={!!errors.email}
+                helperText={errors.email}
+                margin="normal"
+                size="small"
+              />
+    
+              {/* Password */}
+              <TextField
+                fullWidth
+                label="Password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={handleChange}
+                error={!!errors.password}
+                helperText={errors.password}
+                margin="normal"
+                size="small"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)}>
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+    
+              {/* Address */}
+              <TextField
+                fullWidth
+                label="Address"
+                name="address"
+                multiline
+                rows={2}
+                value={formData.address}
+                onChange={handleChange}
+                error={!!errors.address}
+                helperText={errors.address}
+                margin="normal"
+                size="small"
+              />
+    
+              {/* Phone */}
+              <TextField
+                fullWidth
+                label="Phone Number"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                error={!!errors.phone}
+                helperText={errors.phone}
+                margin="normal"
+                size="small"
+              />
+    
+              {/* Selected Plan Display */}
+              {selectedPlan && (
+                <Box
                   sx={{
-                    textTransform: "none",
+                    border: '2px dashed #1976d2',
                     borderRadius: 2,
-                    fontWeight: 600,
+                    p: 2,
+                    my: 2,
+                    bgcolor: theme.palette.mode === 'dark' ? '#1a237e10' : '#bbdefb30'
                   }}
                 >
-                  Edit Profile
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Typography fontWeight="bold">{selectedPlan.name}</Typography>
+                      <Typography color={selectedPlan.isFreePlan ? 'green' : 'primary'}>
+                        {selectedPlan.price}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        Duration: {selectedPlan.durationInMonths} month{selectedPlan.durationInMonths > 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<AddCircleOutline />}
+                      onClick={() => setOpenPlanDialog(true)}
+                    >
+                      Change Plan
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+    
+              {/* Choose Plan Button */}
+              {!selectedPlan && (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<AddCircleOutline />}
+                  onClick={() => setOpenPlanDialog(true)}
+                  sx={{ mb: 2 }}
+                >
+                  Choose Subscription Plan
                 </Button>
+              )}
+    
+              {/* Submit Button */}
+              <Button
+                fullWidth
+                variant="contained"
+                disabled={loading || !selectedPlan}
+                startIcon={selectedPlan?.isFreePlan ? null : <CheckCircleOutline />}
+                onClick={handleSubmit}
+                sx={{ py: 1.5 }}
+              >
+                {loading
+                  ? 'Processing...'
+                  : selectedPlan?.isFreePlan
+                  ? 'Create Free Account'
+                  : `Pay ${selectedPlan?.price} & Create Account`}
+              </Button>
+    
+              {/* Login Link */}
+              <Box mt={3} textAlign="center">
+                <Typography variant="body2">
+                  Already have an account?{' '}
+                  <Typography
+                    component="span"
+                    color="primary"
+                    sx={{ cursor: 'pointer' }}
+                    fontWeight="bold"
+                    onClick={() => navigate('/login')}
+                  >
+                    Login here
+                  </Typography>
+                </Typography>
               </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              {/* Stats Cards - exactly 3 cards */}
-              <Grid container spacing={3} sx={{ mb: 4 }}>
-                {dashboardStats.map((card, index) => (
+            </form>
+          </Box>
+    
+          {/* Plan Selection Dialog */}
+          <Dialog open={openPlanDialog} onClose={() => setOpenPlanDialog(false)} fullScreen={isMobile}>
+            <DialogTitle>Select Your Plan</DialogTitle>
+            <DialogContent>
+              <Grid container spacing={2} sx={{ my: 1 }}>
+                {plans.map((plan, index) => (
                   <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Card
-                      elevation={0}
+                    <Box
+                      onClick={() => handleSelectPlan(plan)}
                       sx={{
-                        height: "100%",
-                        border: `1px solid ${theme.palette.divider}`,
-                        bgcolor: theme.palette.background.paper,
-                        borderRadius: "16px",
-                        borderTop: `4px solid ${card.color}`,
+                        p: 2,
+                        border: selectedPlan?.name === plan.name ? '2px solid #1976d2' : '1px solid #ccc',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease-in-out',
+                        position: 'relative',
+                        '&:hover': {
+                          transform: 'scale(1.02)',
+                          boxShadow: 3
+                        }
                       }}
                     >
-                      <CardContent sx={{ p: 3 }}>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            mb: 2,
-                          }}
-                        >
-                          <Box>
-                            <Typography
-                              variant="h5"
-                              sx={{ fontWeight: "bold", mb: 0.5 }}
-                            >
-                              {card.value}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {card.title}
+                      {plan.popular && (
+                        <Chip
+                          label="Popular"
+                          color="secondary"
+                          size="small"
+                          sx={{ position: 'absolute', top: -8, right: 8 }}
+                        />
+                      )}
+                      <Typography variant="h6" fontWeight="bold">
+                        {plan.name}
+                      </Typography>
+                      <Typography
+                        variant="h5"
+                        color={plan.isFreePlan ? 'green' : 'orange'}
+                        fontWeight="bold"
+                      >
+                        {plan.price}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                        {plan.durationInMonths} month{plan.durationInMonths > 1 ? 's' : ''}
+                      </Typography>
+                      <Box component="ul" sx={{ paddingLeft: '1rem', mt: 1, mb: 0 }}>
+                        {plan.features.map((feature, i) => (
+                          <Box component="li" key={i} sx={{ mb: 0.5 }}>
+                            <Typography variant="body2" color="textSecondary">
+                              {feature}
                             </Typography>
                           </Box>
-                          <Avatar
-                            sx={{
-                              bgcolor: darkMode ? card.color : card.lightColor,
-                              color: darkMode ? "white" : card.color,
-                              width: 56,
-                              height: 56,
-                            }}
-                          >
-                            {card.icon}
-                          </Avatar>
-                        </Box>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Chip
-                            icon={
-                              card.isIncrease ? (
-                                <TrendingUpIcon fontSize="small" />
-                              ) : (
-                                <TrendingDownIcon fontSize="small" />
-                              )
-                            }
-                            label={`${card.change}%`}
-                            size="small"
-                            sx={{
-                              backgroundColor: darkMode
-                                ? card.isIncrease
-                                  ? "rgba(22, 163, 74, 0.2)"
-                                  : "rgba(220, 38, 38, 0.2)"
-                                : card.isIncrease
-                                ? "rgba(22, 163, 74, 0.1)"
-                                : "rgba(220, 38, 38, 0.1)",
-                              color: card.isIncrease
-                                ? theme.palette.success.main
-                                : theme.palette.error.main,
-                              fontWeight: 600,
-                              ".MuiChip-icon": { color: "inherit" },
-                              mr: 1,
-                            }}
-                          />
-                          <Typography variant="caption" color="text.secondary">
-                            vs. last week
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
+                        ))}
+                      </Box>
+                    </Box>
                   </Grid>
                 ))}
               </Grid>
-
-              {/* Current Jobs Table */}
-              <Box sx={{ mb: 4 }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 2,
-                  }}
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Current Jobs
-                  </Typography>
-                  <Box>{/* You can add buttons here if needed */}</Box>
-                </Box>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    border: `1px solid ${theme.palette.divider}`,
-                    bgcolor: theme.palette.background.paper,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                  }}
-                >
-                  {loading ? (
-                    <Box sx={{ p: 4, textAlign: "center" }}>
-                      <CircularProgress size={40} />
-                      <Typography variant="body1" sx={{ mt: 2 }}>
-                        Loading job data...
-                      </Typography>
-                    </Box>
-                  ) : error ? (
-                    <Box sx={{ p: 4, textAlign: "center" }}>
-                      <Typography variant="body1" color="error">
-                        {error}
-                      </Typography>
-                      <Button
-                        variant="outlined"
-                        sx={{ mt: 2 }}
-                        onClick={() => window.location.reload()}
-                      >
-                        Retry
-                      </Button>
-                    </Box>
-                  ) : currentJobs.length === 0 ? (
-                    <Box sx={{ p: 4, textAlign: "center" }}>
-                      <Typography variant="body1">
-                        No jobs found. Create your first job to get started.
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        sx={{ mt: 2 }}
-                        startIcon={<AddIcon />}
-                      >
-                        Create New Job
-                      </Button>
-                    </Box>
-                  ) : (
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Vehicle No.</TableCell>
-                            <TableCell>Customer</TableCell>
-                            <TableCell>Service</TableCell>
-                            <TableCell>Progress</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Update</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {currentJobs.map((job) => (
-                            <TableRow key={job._id}>
-                              <TableCell sx={{ fontWeight: 500 }}>
-                                {job.carNumber ||
-                                  job.registrationNumber ||
-                                  "N/A"}
-                              </TableCell>
-                              <TableCell>{job.customerName || "N/A"}</TableCell>
-                              <TableCell>
-                                {job.jobDetails ||
-                                  job.type ||
-                                  "General Service"}
-                              </TableCell>
-                              <TableCell>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    width: "100%",
-                                  }}
-                                >
-                                  <Box sx={{ width: "100%", mr: 1 }}>
-                                    <LinearProgress
-                                      variant="determinate"
-                                      value={getJobProgress(job.status)}
-                                      sx={{
-                                        height: 6,
-                                        borderRadius: 5,
-                                        backgroundColor: darkMode
-                                          ? "rgba(255, 255, 255, 0.12)"
-                                          : "rgba(0, 0, 0, 0.08)",
-                                        "& .MuiLinearProgress-bar": {
-                                          borderRadius: 5,
-                                          backgroundColor:
-                                            job.status === "Completed"
-                                              ? theme.palette.success.main
-                                              : job.status === "In Progress"
-                                              ? theme.palette.warning.main
-                                              : theme.palette.info.main,
-                                        },
-                                      }}
-                                    />
-                                  </Box>
-                                  <Box sx={{ minWidth: 35 }}>
-                                    <Typography
-                                      variant="body2"
-                                      color="text.secondary"
-                                    >
-                                      {`${getJobProgress(job.status)}%`}
-                                    </Typography>
-                                  </Box>
-                                </Box>
-                              </TableCell>
-                              <TableCell>{getStatusChip(job.status)}</TableCell>
-
-                              <TableCell>
-                                <Button onClick={() => handleUpdate(job._id)}>
-                                  Update
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  )}
-                  {currentJobs.length > 5 && (
-                    <Box sx={{ textAlign: "center", py: 2 }}>
-                      <Button
-                        endIcon={<ArrowForwardIcon />}
-                        sx={{ fontWeight: 600 }}
-                      >
-                        View All Jobs
-                      </Button>
-                    </Box>
-                  )}
-                </Paper>
-              </Box>
-
-              {/* Inventory Section - now with Low Stock and High Stock side by side */}
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Inventory Management
-              </Typography>
-              <Grid container spacing={3}>
-                {/* Low Stock Inventory */}
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        mb: 2,
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 600,
-                          color: theme.palette.error.main,
-                        }}
-                      >
-                        Low in Stock
-                      </Typography>
-                      <Chip
-                        label={`${lowStockItems.length} items`}
-                        size="small"
-                        color="error"
-                        sx={{ fontWeight: 600 }}
-                      />
-                    </Box>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        border: `1px solid ${theme.palette.divider}`,
-                        bgcolor: theme.palette.background.paper,
-                        borderRadius: 3,
-                        overflow: "hidden",
-                        borderLeft: `4px solid ${theme.palette.error.main}`,
-                      }}
-                    >
-                      {inventoryLoading ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <CircularProgress size={30} />
-                        </Box>
-                      ) : inventoryError ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <Typography variant="body2" color="error">
-                            {inventoryError}
-                          </Typography>
-                        </Box>
-                      ) : lowStockItems.length === 0 ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <Typography variant="body2">
-                            No low stock items found.
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <TableContainer sx={{ maxHeight: 300 }}>
-                          <Table stickyHeader size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Part Name</TableCell>
-                                <TableCell align="center">Quantity</TableCell>
-                                <TableCell align="right">Unit Price</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {lowStockItems.map((item) => (
-                                <TableRow key={item.id}>
-                                  <TableCell sx={{ fontWeight: 500 }}>
-                                    {item.name}
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    <Chip
-                                      label={item.quantity}
-                                      size="small"
-                                      sx={{
-                                        backgroundColor: darkMode
-                                          ? "rgba(220, 38, 38, 0.2)"
-                                          : "rgba(220, 38, 38, 0.1)",
-                                        color: theme.palette.error.main,
-                                        fontWeight: 600,
-                                      }}
-                                    />
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    ₹{item.price.toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      )}
-                      <Box
-                        sx={{
-                          p: 1.5,
-                          textAlign: "center",
-                          borderTop: `1px solid ${theme.palette.divider}`,
-                        }}
-                      >
-                        <Button
-                          variant="text"
-                          color="error"
-                          // endIcon={<ArrowForwardIcon />}
-                          sx={{ fontWeight: 600 }}
-                        >
-                         Low Stock Items
-                        </Button>
-                      </Box>
-                    </Paper>
-                  </Box>
-                </Grid>
-
-                {/* High in Stock */}
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ mb: 2 }}>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        mb: 2,
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 600,
-                          color: theme.palette.success.main,
-                        }}
-                      >
-                        High in Stock
-                      </Typography>
-                      <Chip
-                        label={`${highStockItems.length} items`}
-                        size="small"
-                        color="success"
-                        sx={{ fontWeight: 600 }}
-                      />
-                    </Box>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        height: "100%",
-                        border: `1px solid ${theme.palette.divider}`,
-                        bgcolor: theme.palette.background.paper,
-                        borderRadius: 3,
-                        overflow: "hidden",
-                        borderLeft: `4px solid ${theme.palette.success.main}`,
-                      }}
-                    >
-                      {inventoryLoading ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <CircularProgress size={30} />
-                        </Box>
-                      ) : inventoryError ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <Typography variant="body2" color="error">
-                            {inventoryError}
-                          </Typography>
-                        </Box>
-                      ) : highStockItems.length === 0 ? (
-                        <Box sx={{ p: 4, textAlign: "center" }}>
-                          <Typography variant="body2">
-                            No high stock items found.
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <TableContainer sx={{ maxHeight: 300 }}>
-                          <Table stickyHeader size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Part Name</TableCell>
-                                <TableCell align="center">Quantity</TableCell>
-                                <TableCell align="right">Unit Price</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {highStockItems.map((item) => (
-                                <TableRow key={item.id}>
-                                  <TableCell sx={{ fontWeight: 500 }}>
-                                    {item.name}
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    <Chip
-                                      label={item.quantity}
-                                      size="small"
-                                      sx={{
-                                        backgroundColor: darkMode
-                                          ? "rgba(22, 163, 74, 0.2)"
-                                          : "rgba(22, 163, 74, 0.1)",
-                                        color: theme.palette.success.main,
-                                        fontWeight: 600,
-                                      }}
-                                    />
-                                  </TableCell>
-                                  <TableCell align="right">
-                                    ₹{item.price.toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      )}
-                        <Box
-                                              sx={{
-                                                p: 1.5,
-                                                textAlign: "center",
-                                                borderTop: `1px solid ${theme.palette.divider}`,
-                                              }}
-                                            >
-                                              <Button
-                                                variant="text"
-                                                color="success"
-                                                // endIcon={<ArrowForwardIcon />}
-                                                sx={{ fontWeight: 600 }}
-                                              >
-                                                Manage Inventory
-                                              </Button>
-                                            </Box>
-                                          </Paper>
-                                        </Box>
-                                      </Grid>
-                                    </Grid>
-                                  </CardContent>
-                                </Card>
-                              </Container>
-                            </Box>
-                      
-                            {/* Job Actions Menu */}
-                            <Menu
-                              anchorEl={actionMenu}
-                              open={Boolean(actionMenu)}
-                              onClose={handleActionMenuClose}
-                              PaperProps={{
-                                elevation: 2,
-                                sx: {
-                                  minWidth: 180,
-                                  borderRadius: 2,
-                                  bgcolor: theme.palette.background.paper,
-                                },
-                              }}
-                            >
-                              <MenuItem onClick={handleActionMenuClose}>
-                                <ListItemIcon>
-                                  <VisibilityIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText primary="View Details" />
-                              </MenuItem>
-                              <MenuItem onClick={handleActionMenuClose}>
-                                <ListItemIcon>
-                                  <EditIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText primary="Edit Job" />
-                              </MenuItem>
-                              <Divider />
-                              <MenuItem
-                                onClick={handleActionMenuClose}
-                                sx={{ color: theme.palette.error.main }}
-                              >
-                                <ListItemIcon>
-                                  <DeleteIcon fontSize="small" color="error" />
-                                </ListItemIcon>
-                                <ListItemText primary="Cancel Job" />
-                              </MenuItem>
-                            </Menu>
-                            <EditProfileModal
-                              open={modalOpen}
-                              onClose={() => setModalOpen(false)}
-                              onSave={handleSaveProfile}
-                              currentName={profileData.name}
-                              currentImage={profileData.image}
-                            />
-                          </>
-                        );
-                      };
-                      
-                      export default Dashboard;
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenPlanDialog(false)}>Cancel</Button>
+            </DialogActions>
+          </Dialog>
+    
+          {/* Snackbar Notification */}
+          <Snackbar
+            open={openSnackbar}
+            autoHideDuration={4000}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+              {snackbarMessage}
+            </Alert>
+          </Snackbar>
+        </Container>
+  );
+}

@@ -58,10 +58,12 @@ export default function SignUpPage() {
     {
       name: 'Free',
       price: 'Free',
-      features: ['Basic garage management', 'Up to 5 vehicles', 'Basic reporting'],
+      features: ['Basicgarage  management', 'Up to 5 vehicles', 'Basic reporting'],
       amount: 0,
       subscriptionType: 'free',
-      popular: false
+      popular: false,
+      durationInMonths: 1,
+      isFreePlan: true
     },
     {
       name: '1 Month',
@@ -69,7 +71,9 @@ export default function SignUpPage() {
       features: ['Full garage management', 'Unlimited vehicles', 'Advanced reporting'],
       amount: 999,
       subscriptionType: '1_month',
-      popular: true
+      popular: true,
+      durationInMonths: 1,
+      isFreePlan: false
     },
     {
       name: '3 Months',
@@ -77,7 +81,9 @@ export default function SignUpPage() {
       features: ['All Free features', 'Inventory management', 'Priority support'],
       amount: 1999,
       subscriptionType: '3_months',
-      popular: false
+      popular: false,
+      durationInMonths: 3,
+      isFreePlan: false
     }
   ];
 
@@ -482,43 +488,42 @@ const handleRazorpayPayment = async () => {
             {plans.map((plan, index) => (
               <Grid item xs={12} sm={6} md={4} key={index}>
                 <Box
-                  onClick={() => handleSelectPlan(plan)}
-                  sx={{
-                    p: 2,
-                    border: selectedPlan?.name === plan.name ? '2px solid #1976d2' : '1px solid #ccc',
-                    borderRadius: 2,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease-in-out',
-                    '&:hover': {
-                      transform: 'scale(1.02)',
-                      boxShadow: 3
-                    }
-                  }}
-                >
-                  <Typography variant="h6" fontWeight="bold">
-                    {plan.name}
-                  </Typography>
-                  <Typography variant="h5" color={plan.amount === 0 ? 'green' : 'orange'} fontWeight="bold">
-                    {plan.price}
-                  </Typography>
-                  {plan.popular && (
-                    <Chip label="Popular" color="secondary" size="small" sx={{ mt: 1 }} />
-                  )}
-                  <ul style={{ paddingLeft: '1rem', marginTop: '1rem' }}>
-                    {plan.features.map((feature, i) => (
-                      <li key={i}>
-                        <Typography variant="body2" color="textSecondary">
-                          • {feature}
-                        </Typography>
-                      </li>
-                    ))}
-                  </ul>
-                </Box>
+  onClick={() => handleSelectPlan(plan)}
+  sx={{
+    p: 2,
+    border: selectedPlan?.name === plan.name ? '2px solid #1976d2' : '1px solid #ccc',
+    borderRadius: 2,
+    cursor: 'pointer',
+    transition: '0.3s',
+    boxShadow: selectedPlan?.name === plan.name ? 4 : 1,
+    bgcolor: selectedPlan?.name === plan.name ? '#e3f2fd' : '#fff',
+    '&:hover': {
+      boxShadow: 3,
+      bgcolor: '#f1f1f1',
+    }
+  }}
+>
+  <Typography variant="h6" fontWeight="bold" gutterBottom>
+    {plan.name}
+  </Typography>
+  <Typography color={plan.amount === 0 ? 'green' : 'primary'} gutterBottom>
+    {plan.price}
+  </Typography>
+  <ul style={{ paddingLeft: '1.2rem', margin: 0 }}>
+    {plan.features.map((feature, i) => (
+      <li key={i} style={{ marginBottom: 4 }}>{feature}</li>
+    ))}
+  </ul>
+  {plan.popular && (
+    <Chip label="Most Popular" color="secondary" size="small" sx={{ mt: 1 }} />
+  )}
+</Box>
+
               </Grid>
             ))}
           </Grid>
         </DialogContent>
-        <DialogActions>
+              <DialogActions>
           <Button onClick={() => setOpenPlanDialog(false)}>Cancel</Button>
         </DialogActions>
       </Dialog>
