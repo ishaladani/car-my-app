@@ -52,6 +52,7 @@ import EditProfileButton from "../Login/EditProfileButton";
 import EditProfileModal from "../Login/EditProfileModal";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import JobDetailsModal from "./jobDetailsModal";
 
 const Dashboard = () => {
   
@@ -72,6 +73,8 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [jobDetailsModalOpen, setJobDetailsModalOpen] = useState(false);
+const [selectedJobData, setSelectedJobData] = useState(null);
 
   const [currentJobs, setCurrentJobs] = useState([]);
   const [dashboardStats, setDashboardStats] = useState([
@@ -132,48 +135,19 @@ const Dashboard = () => {
     navigate(`assign-engineer/${id}`);
   };
 
+  const handleViewDetails = (job) => {
+  setSelectedJobData(job);
+  setJobDetailsModalOpen(true);
+};
+
+const handleDownloadPDF = (job) => {
+  setSelectedJobData(job);
+  setJobDetailsModalOpen(true);
+  // The PDF will be generated when user clicks download in the modal
+};
+
   // Fetch garage profile data
   useEffect(() => {
-   
-    
-
-    //   try {
-          
-    //     const response = await fetch(
-    //       `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`,
-    //       {
-    //         method: 'GET',
-    //         headers: {
-          
-    //           'Content-Type': 'application/json'
-    //         },
-    //       }
-    //     );
-
-    //     if (!response.ok) {
-    //       throw new Error(`HTTP error! status: ${response.status}`);
-    //     }
-
-    //     const data = await response.json();
-    //     console.log("Garage profile response:", data);
-
-    //     if (data && data.name) {
-    //       setProfileData({
-    //         name: data.name || "Your Garage",
-    //         image: data.image || "",
-    //       });
-    //     }
-    //   } catch (error) {
-    //     console.error("Error fetching garage profile:", error);
-    //     // Set default values on error
-    //     setProfileData({
-    //       name: "Your Garage",
-    //       image: "",
-    //     });
-    //   }
-    // };
-
-    // fetchGarageProfile();
   }, [garageId]);
 
   // Fetch job data from API
@@ -455,7 +429,7 @@ const Dashboard = () => {
                     Dashboard Overview
                   </Typography>
                 </Box>
-                <Button
+                {/* <Button
                   variant="outlined"
                   startIcon={<EditIcon />}
                   onClick={() => setModalOpen(true)}
@@ -466,7 +440,7 @@ const Dashboard = () => {
                   }}
                 >
                   Edit Profile
-                </Button>
+                </Button> */}
               </Box>
 
               <Divider sx={{ my: 3 }} />
@@ -621,6 +595,8 @@ const Dashboard = () => {
                             <TableCell>Progress</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Update</TableCell>
+                            <TableCell>Details</TableCell>
+                            {/* <TableCell>PDF Download</TableCell> */}
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -680,10 +656,36 @@ const Dashboard = () => {
                               <TableCell>{getStatusChip(job.status)}</TableCell>
 
                               <TableCell>
-                                <Button onClick={() => handleUpdate(job._id)}>
+                                <Button 
+                                  variant="outlined"
+                                  size="small"
+                                  sx={{ mr: 1 }}
+                                onClick={() => handleUpdate(job._id)}>
                                   Update
                                 </Button>
+                              
                               </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => handleViewDetails(job)}
+                                  sx={{ mr: 1 }}
+                                >
+                                  Details
+                                </Button>
+                              </TableCell>
+                              
+                              {/* <TableCell>
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={() => handleDownloadPDF(job)}
+                                >
+                                  Download
+                                </Button>
+                              </TableCell> */}
+                               
                             </TableRow>
                           ))}
                         </TableBody>
@@ -974,13 +976,23 @@ const Dashboard = () => {
                                 <ListItemText primary="Cancel Job" />
                               </MenuItem>
                             </Menu>
-                            <EditProfileModal
-                              open={modalOpen}
-                              onClose={() => setModalOpen(false)}
-                              onSave={handleSaveProfile}
-                              currentName={profileData.name}
-                              currentImage={profileData.image}
-                            />
+                           <EditProfileModal
+  open={modalOpen}
+  onClose={() => setModalOpen(false)}
+  onSave={handleSaveProfile}
+  currentName={profileData.name}
+  currentImage={profileData.image}
+/>
+
+{/* Job Details Modal */}
+<JobDetailsModal
+  open={jobDetailsModalOpen}
+  onClose={() => {
+    setJobDetailsModalOpen(false);
+    setSelectedJobData(null);
+  }}
+  jobData={selectedJobData}
+/>
                           </>
                         );
                       };

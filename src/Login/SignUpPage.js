@@ -266,8 +266,9 @@ const handleRazorpayPayment = async () => {
         phone: formData.phone,
         email: formData.email,
         password: formData.password,
-        subscriptionType: selectedPlan.subscriptionType,
+        durationInMonths: selectedPlan.durationInMonths,
         amount: selectedPlan.amount,
+        isFreePlan:selectedPlan.amount == 0 ? true : false,
         ...paymentDetails
       };
 

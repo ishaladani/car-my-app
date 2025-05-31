@@ -48,6 +48,8 @@ import {
 import { DownloadOutlined as DownloadIcon } from "@mui/icons-material";
 import axios from "axios";
 import { jsPDF } from 'jspdf';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 const AutoServeBilling = () => {
     // Get jobCardId from URL parameters
@@ -400,201 +402,279 @@ const generatePdfBase64 = () => {
 };
 
     // Enhanced PDF generation function
-    const generatePdfInvoice = () => {
-        try {
-            const doc = new jsPDF();
+    // Enhanced PDF generation function with proper rupee symbol handling
+const generatePdfInvoice = () => {
+    try {
+        const doc = new jsPDF();
 
-            // Set properties
-            const pageWidth = doc.internal.pageSize.width;
-            const pageHeight = doc.internal.pageSize.height;
-            const centerX = pageWidth / 2;
-            let currentY = 15;
+        // Set properties
+        const pageWidth = doc.internal.pageSize.width;
+        const pageHeight = doc.internal.pageSize.height;
+        const centerX = pageWidth / 2;
+        let currentY = 15;
 
-            // Add company header
-           doc.setFontSize(18);
-doc.setFont('helvetica', 'bold');
-doc.text(garageDetails.name, centerX, currentY, { align: 'center' });
-currentY += 7;
-doc.setFontSize(10);
-doc.setFont('helvetica', 'normal');
-doc.text(garageDetails.address, centerX, currentY, { align: 'center' });
-currentY += 5;
-doc.text(`Contact: ${garageDetails.phone}`, centerX, currentY, { align: 'center' });
+        // Use 'Rs.' instead of rupee symbol for better compatibility
+        const rupeeSymbol = 'Rs.';
 
-            // Add line separator
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.5);
-            doc.line(10, currentY, pageWidth - 10, currentY);
-            currentY += 10;
+        // Add company header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(garageDetails.name, centerX, currentY, { align: 'center' });
+        currentY += 7;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(garageDetails.address, centerX, currentY, { align: 'center' });
+        currentY += 5;
+        doc.text(`Contact: ${garageDetails.phone}`, centerX, currentY, { align: 'center' });
 
-            // Add invoice number and date
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`INVOICE #${carDetails.invoiceNo}`, 10, currentY);
+        // Add line separator
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        doc.line(10, currentY, pageWidth - 10, currentY);
+        currentY += 10;
 
-            const today = new Date();
-            const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Date: ${formattedDate}`, pageWidth - 10, currentY, { align: 'right' });
-            currentY += 15;
+        // Add invoice number and date
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`INVOICE #${carDetails.invoiceNo}`, 10, currentY);
 
-            // Customer details
+        const today = new Date();
+        const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Date: ${formattedDate}`, pageWidth - 10, currentY, { align: 'right' });
+        currentY += 15;
+
+        // Customer details
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Customer Details:', 10, currentY);
+        currentY += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Name: ${carDetails.customerName}`, 10, currentY);
+        currentY += 7;
+        doc.text(`Vehicle: ${carDetails.company} ${carDetails.model} (${carDetails.carNumber})`, 10, currentY);
+        currentY += 7;
+        doc.text(`Contact: ${carDetails.contact}`, 10, currentY);
+        currentY += 7;
+        doc.text(`Email: ${carDetails.email}`, 10, currentY);
+        currentY += 15;
+
+        // Parts section if available
+        if (parts.length > 0) {
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
-            doc.text('Customer Details:', 10, currentY);
-            currentY += 7;
-
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Name: ${carDetails.customerName}`, 10, currentY);
-            currentY += 7;
-            doc.text(`Vehicle: ${carDetails.company} ${carDetails.model} (${carDetails.carNumber})`, 10, currentY);
-            currentY += 7;
-            doc.text(`Contact: ${carDetails.contact}`, 10, currentY);
-            currentY += 7;
-            doc.text(`Email: ${carDetails.email}`, 10, currentY);
-            currentY += 15;
-
-            // Parts section if available
-            if (parts.length > 0) {
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Parts Used:', 10, currentY);
-                currentY += 10;
-
-                // Parts table header
-                const colWidths = [60, 25, 35, 35];
-                const colX = [10, 70, 95, 130];
-
-                // Draw table header
-                doc.setFillColor(66, 139, 202);
-                doc.rect(10, currentY - 5, 155, 8, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Part Name', colX[0] + 2, currentY);
-                doc.text('Qty', colX[1] + 2, currentY);
-                doc.text('Price/Piece', colX[2] + 2, currentY);
-                doc.text('Total', colX[3] + 2, currentY);
-                currentY += 8;
-
-                // Draw parts data
-                doc.setTextColor(0, 0, 0);
-                doc.setFont('helvetica', 'normal');
-                parts.forEach((part, index) => {
-                    const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
-                    doc.setFillColor(...bgColor);
-                    doc.rect(10, currentY - 5, 155, 8, 'F');
-
-                    doc.text(String(part.name || ''), colX[0] + 2, currentY);
-                    doc.text(String(part.quantity || ''), colX[1] + 2, currentY);
-                    doc.text(`₹${part.pricePerUnit || ''}`, colX[2] + 2, currentY);
-                    doc.text(`₹${part.total || ''}`, colX[3] + 2, currentY);
-                    currentY += 8;
-                });
-
-                currentY += 10;
-            }
-
-            // Services section if available
-            if (services.length > 0) {
-                doc.setFont('helvetica', 'bold');
-                doc.text('Services:', 10, currentY);
-                currentY += 10;
-
-                // Services table header
-                const colX = [10, 70, 95, 130];
-                doc.setFillColor(66, 139, 202);
-                doc.rect(10, currentY - 5, 155, 8, 'F');
-                doc.setTextColor(255, 255, 255);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Service Name', colX[0] + 2, currentY);
-                doc.text('Engineer', colX[1] + 2, currentY);
-                doc.text('Status', colX[2] + 2, currentY);
-                doc.text('Labor Cost', colX[3] + 2, currentY);
-                currentY += 8;
-
-                // Draw services data
-                doc.setTextColor(0, 0, 0);
-                doc.setFont('helvetica', 'normal');
-                services.forEach((service, index) => {
-                    const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
-                    doc.setFillColor(...bgColor);
-                    doc.rect(10, currentY - 5, 155, 8, 'F');
-
-                    doc.text(String(service.name || ''), colX[0] + 2, currentY);
-                    doc.text(String(service.engineer || '-'), colX[1] + 2, currentY);
-                    doc.text(String(service.status || 'Completed'), colX[2] + 2, currentY);
-                    doc.text(`₹${service.laborCost || ''}`, colX[3] + 2, currentY);
-                    currentY += 8;
-                });
-
-                currentY += 15;
-            }
-
-            // Tax and total summary
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Bill Summary:', 10, currentY);
+            doc.text('Parts Used:', 10, currentY);
             currentY += 10;
 
-            const halfGst = Math.round(summary.gstAmount / 2);
-            const summaryData = [
-                ['Parts Total:', `₹${summary.totalPartsCost}`],
-                ['Labor Total:', `₹${summary.totalLaborCost}`],
-                ['Subtotal:', `₹${summary.subtotal}`],
-                ['CGST (9%):', `₹${halfGst}`],
-                ['SGST (9%):', `₹${halfGst}`],
-                ['Discount:', `₹${summary.discount}`],
-                ['Total Amount:', `₹${summary.totalAmount}`]
-            ];
+            // Parts table header
+            const colWidths = [60, 25, 35, 35];
+            const colX = [10, 70, 95, 130];
 
-            const summaryStartX = pageWidth / 2 + 10;
-            summaryData.forEach((item, index) => {
-                const isTotal = index === summaryData.length - 1;
-                doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
-                doc.text(item[0], summaryStartX, currentY);
-                doc.text(item[1], pageWidth - 20, currentY, { align: 'right' });
-                currentY += 7;
+            // Draw table header
+            doc.setFillColor(66, 139, 202);
+            doc.rect(10, currentY - 5, 155, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Part Name', colX[0] + 2, currentY);
+            doc.text('Qty', colX[1] + 2, currentY);
+            doc.text('Price/Piece', colX[2] + 2, currentY);
+            doc.text('Total', colX[3] + 2, currentY);
+            currentY += 8;
+
+            // Draw parts data
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            parts.forEach((part, index) => {
+                const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
+                doc.setFillColor(...bgColor);
+                doc.rect(10, currentY - 5, 155, 8, 'F');
+
+                doc.text(String(part.name || ''), colX[0] + 2, currentY);
+                doc.text(String(part.quantity || ''), colX[1] + 2, currentY);
+                doc.text(`${rupeeSymbol} ${part.pricePerUnit || ''}`, colX[2] + 2, currentY);
+                doc.text(`${rupeeSymbol} ${part.total || ''}`, colX[3] + 2, currentY);
+                currentY += 8;
             });
 
             currentY += 10;
+        }
 
-            // Notes section
-            if (finalInspection && finalInspection.trim() !== '') {
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Notes:', 10, currentY);
-                currentY += 7;
-                doc.setFont('helvetica', 'normal');
-
-                // Split text if too long
-                const lines = doc.splitTextToSize(finalInspection, pageWidth - 20);
-                lines.forEach(line => {
-                    if (currentY > pageHeight - 20) {
-                        doc.addPage();
-                        currentY = 20;
-                    }
-                    doc.text(line, 10, currentY);
-                    currentY += 7;
-                });
-                currentY += 5;
-            }
-
-            // Payment info and footer
-            doc.setFontSize(10);
+        // Services section if available
+        if (services.length > 0) {
             doc.setFont('helvetica', 'bold');
-            doc.text(`Payment Method: ${paymentMethod || 'DELIVERY AGAINST CASH ONLY'}`, 10, currentY);
+            doc.text('Services:', 10, currentY);
             currentY += 10;
 
-            doc.setFont('helvetica', 'italic');
-            doc.text('Thank you for choosing our service!', centerX, currentY, { align: 'center' });
+            // Services table header
+            const colX = [10, 70, 95, 130];
+            doc.setFillColor(66, 139, 202);
+            doc.rect(10, currentY - 5, 155, 8, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Service Name', colX[0] + 2, currentY);
+            doc.text('Engineer', colX[1] + 2, currentY);
+            doc.text('Status', colX[2] + 2, currentY);
+            doc.text('Labor Cost', colX[3] + 2, currentY);
+            currentY += 8;
 
-            return doc;
-        } catch (error) {
-            console.error('PDF Generation Error:', error);
-            throw new Error('Failed to generate PDF document');
+            // Draw services data
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            services.forEach((service, index) => {
+                const bgColor = index % 2 === 0 ? [245, 245, 245] : [255, 255, 255];
+                doc.setFillColor(...bgColor);
+                doc.rect(10, currentY - 5, 155, 8, 'F');
+
+                doc.text(String(service.name || ''), colX[0] + 2, currentY);
+                doc.text(String(service.engineer || '-'), colX[1] + 2, currentY);
+                doc.text(String(service.status || 'Completed'), colX[2] + 2, currentY);
+                doc.text(`${rupeeSymbol} ${service.laborCost || ''}`, colX[3] + 2, currentY);
+                currentY += 8;
+            });
+
+            currentY += 15;
         }
-    };
+
+        // Tax and total summary
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Bill Summary:', 10, currentY);
+        currentY += 10;
+
+        const halfGst = Math.round(summary.gstAmount / 2);
+
+        // Updated summary data with proper rupee symbol
+        const summaryData = [
+            ['Parts Total:', `${rupeeSymbol} ${summary.totalPartsCost}`],
+            ['Labor Total:', `${rupeeSymbol} ${summary.totalLaborCost}`],
+            ['Subtotal:', `${rupeeSymbol} ${summary.subtotal}`],
+            ['CGST (9%):', `${rupeeSymbol} ${halfGst}`],
+            ['SGST (9%):', `${rupeeSymbol} ${halfGst}`],
+            ['Discount:', `${rupeeSymbol} ${summary.discount}`],
+            ['Total Amount:', `${rupeeSymbol} ${summary.totalAmount}`]
+        ];
+
+        const summaryStartX = pageWidth / 2 + 10;
+        summaryData.forEach((item, index) => {
+            const isTotal = index === summaryData.length - 1;
+            doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
+            doc.text(item[0], summaryStartX, currentY);
+            doc.text(item[1], pageWidth - 20, currentY, { align: 'right' });
+            currentY += 7;
+        });
+
+        currentY += 10;
+
+        // Notes section
+        if (finalInspection && finalInspection.trim() !== '') {
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Notes:', 10, currentY);
+            currentY += 7;
+            doc.setFont('helvetica', 'normal');
+
+            // Split text if too long
+            const lines = doc.splitTextToSize(finalInspection, pageWidth - 20);
+            lines.forEach(line => {
+                if (currentY > pageHeight - 20) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+                doc.text(line, 10, currentY);
+                currentY += 7;
+            });
+            currentY += 5;
+        }
+
+        // Payment info and footer
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Payment Method: ${paymentMethod || 'DELIVERY AGAINST CASH ONLY'}`, 10, currentY);
+        currentY += 10;
+
+        doc.setFont('helvetica', 'italic');
+        doc.text('Thank you for choosing our service!', centerX, currentY, { align: 'center' });
+
+        return doc;
+    } catch (error) {
+        console.error('PDF Generation Error:', error);
+        throw new Error('Failed to generate PDF document');
+    }
+};
+
+// Alternative function with number formatting for currency
+const formatCurrencyForPdf = (amount) => {
+    return new Intl.NumberFormat("en-IN", {
+        maximumFractionDigits: 0,
+    }).format(amount);
+};
+
+// Enhanced WhatsApp function with proper rupee symbol
+// const sendBillViaWhatsApp = async () => {
+//     setSendingWhatsApp(true);
+
+//     try {
+//         if (!carDetails.contact || carDetails.contact.length < 10) {
+//             throw new Error("Valid contact number is required to send WhatsApp message");
+//         }
+
+//         const today = new Date();
+//         const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+
+//         const billMessage = `*INVOICE #${carDetails.invoiceNo}*
+
+// *SHIVAM MOTORS*
+// PLOT NO:5, PHASE-1 NARODA GIDC, OPP.BSNL TELEPHONE EXCHANGE,NARODA
+// GST: 24ADPFS3849B1ZY
+// Contact: 9909047943
+
+// *Customer:* ${carDetails.customerName}
+// *Vehicle:* ${carDetails.company} ${carDetails.model} (${carDetails.carNumber})
+// *Date:* ${formattedDate}
+
+// ${parts.length > 0 ? `*Parts:*
+// ${parts.map(part => `- ${part.name}: Rs. ${formatCurrencyForPdf(part.total)}`).join('\n')}` : ''}
+
+// ${services.length > 0 ? `*Services:*
+// ${services.map(service => `- ${service.name}: Rs. ${formatCurrencyForPdf(service.laborCost)}`).join('\n')}` : ''}
+
+// *Taxes:*
+// - CGST (9%): Rs. ${formatCurrencyForPdf(Math.round(summary.gstAmount / 2))}
+// - SGST (9%): Rs. ${formatCurrencyForPdf(Math.round(summary.gstAmount / 2))}
+
+// *Total Amount: Rs. ${formatCurrencyForPdf(summary.totalAmount)}*
+
+// ${finalInspection ? finalInspection : ''}
+
+// *Payment Method: ${paymentMethod || 'DELIVERY AGAINST CASH ONLY'}*
+
+// Thank you for choosing our service!`;
+
+//         let phoneNumber = carDetails.contact.replace(/\D/g, '');
+//         if (phoneNumber.length === 10) {
+//             phoneNumber = `91${phoneNumber}`;
+//         }
+
+//         const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(billMessage)}`;
+//         window.open(whatsappUrl, '_blank');
+
+//         setApiResponseMessage({
+//             type: "success",
+//             message: `WhatsApp invoice prepared for ${carDetails.customerName}. Please send the message in the opened WhatsApp tab.`,
+//         });
+//     } catch (error) {
+//         console.error("WhatsApp send error:", error);
+//         setApiResponseMessage({
+//             type: "warning",
+//             message: error.message || "Couldn't send WhatsApp message. Please try again.",
+//         });
+//     } finally {
+//         setSendingWhatsApp(false);
+//         setShowApiResponse(true);
+//     }
+// };
 
     const blobToBase64 = (blob) => {
     return new Promise((resolve, reject) => {
@@ -1043,7 +1123,7 @@ Thank you for choosing our service!`;
                     }}
                 >
                     <Typography variant="h4" color="primary" fontWeight="bold">
-                        Billing {jobCardIdFromUrl ? `- Job #${jobCardIdFromUrl}` : ''}
+                        Billing
                     </Typography>
                     <Button
                         variant="contained"
@@ -1146,7 +1226,7 @@ Thank you for choosing our service!`;
                             </CardContent>
                         </Card>
 
-                        {/* Parts Used */}
+
                         <Card sx={{ mb: 4 }}>
                             <CardContent>
                                 <Box
@@ -1195,80 +1275,87 @@ Thank you for choosing our service!`;
                                         variant="outlined"
                                         sx={{ mb: 2, overflowX: "auto" }}
                                     >
-                                        <Table size={isMobile ? "small" : "medium"}>
-                                            <TableHead>
-                                                <TableRow sx={{ backgroundColor: "primary.main" }}>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Sr.No
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Part Name
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Qty
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Price/Piece
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Total Price
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Action
-                                                    </TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {parts.map((part, index) => (
-                                                    <TableRow key={part.id} hover>
-                                                        <TableCell sx={tableCellStyle}>{index + 1}</TableCell>
-                                                        <TableCell sx={tableCellStyle}>{part.name}</TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            {part.quantity}
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                                                                {formatCurrency(part.pricePerUnit).replace(
-                                                                    "₹",
-                                                                    ""
-                                                                )}
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="primary"
-                                                                    onClick={() =>
-                                                                        openEditPrice(
-                                                                            part.id,
-                                                                            "part",
-                                                                            "pricePerUnit",
-                                                                            part.pricePerUnit
-                                                                        )
-                                                                    }
-                                                                    sx={{ ml: 1 }}
-                                                                >
-                                                                    <EditIcon
-                                                                        fontSize={isMobile ? "small" : "medium"}
-                                                                    />
-                                                                </IconButton>
-                                                            </Box>
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            {formatCurrency(part.total)}
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => removePart(part.id)}
-                                                            >
-                                                                <DeleteIcon
-                                                                    fontSize={isMobile ? "small" : "medium"}
-                                                                />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
+                                      <Table size={isMobile ? "small" : "medium"}>
+  <TableHead>
+    <TableRow
+      sx={{
+        backgroundColor: theme.palette.primary.main,
+        '& .MuiTableCell-head': {
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          letterSpacing: '0.02em',
+          textTransform: 'uppercase',
+          border: 'none',
+          '&:first-of-type': {
+            borderTopLeftRadius: theme.shape.borderRadius,
+          },
+          '&:last-of-type': {
+            borderTopRightRadius: theme.shape.borderRadius,
+          }
+        }
+      }}
+    >
+      <TableCell>Sr.No</TableCell>
+      <TableCell>Part Name</TableCell>
+      <TableCell>Qty</TableCell>
+      <TableCell>Price/Piece</TableCell>
+      <TableCell>Total Price</TableCell>
+      <TableCell>Action</TableCell>
+    </TableRow>
+  </TableHead>
+  <TableBody>
+    {parts.map((part, index) => (
+      <TableRow key={part.id} hover>
+        <TableCell sx={tableCellStyle}>{index + 1}</TableCell>
+        <TableCell sx={tableCellStyle}>{part.name}</TableCell>
+        <TableCell sx={tableCellStyle}>
+          {part.quantity}
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            {formatCurrency(part.pricePerUnit).replace(
+              "₹",
+              ""
+            )}
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={() =>
+                openEditPrice(
+                  part.id,
+                  "part",
+                  "pricePerUnit",
+                  part.pricePerUnit
+                )
+              }
+              sx={{ ml: 1 }}
+            >
+              <EditIcon
+                fontSize={isMobile ? "small" : "medium"}
+              />
+            </IconButton>
+          </Box>
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          {formatCurrency(part.total)}
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => removePart(part.id)}
+          >
+            <DeleteIcon
+              fontSize={isMobile ? "small" : "medium"}
+            />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
                                     </TableContainer>
                                 ) : (
                                     <Typography 
@@ -1331,92 +1418,99 @@ Thank you for choosing our service!`;
                                         variant="outlined"
                                         sx={{ mb: 2, overflowX: "auto" }}
                                     >
-                                        <Table size={isMobile ? "small" : "medium"}>
-                                            <TableHead>
-                                                <TableRow sx={{ backgroundColor: "primary.main" }}>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Service
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Engineer
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Progress
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Status
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Labour Cost
-                                                    </TableCell>
-                                                    <TableCell sx={{ color: "white", ...tableCellStyle }}>
-                                                        Action
-                                                    </TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {services.map((service) => (
-                                                    <TableRow key={service.id} hover>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            {service.name}
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            {service.engineer}
-                                                        </TableCell>
-                                                        <TableCell sx={{ ...tableCellStyle, width: "15%" }}>
-                                                            <LinearProgress
-                                                                variant="determinate"
-                                                                value={service.progress}
-                                                                sx={{ height: 8, borderRadius: 4 }}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            <Chip
-                                                                label={service.status}
-                                                                color={getStatusColor(service.status)}
-                                                                size={isMobile ? "small" : "medium"}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                                                                {formatCurrency(service.laborCost).replace(
-                                                                    "₹",
-                                                                    ""
-                                                                )}
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="primary"
-                                                                    onClick={() =>
-                                                                        openEditPrice(
-                                                                            service.id,
-                                                                            "service",
-                                                                            "laborCost",
-                                                                            service.laborCost
-                                                                        )
-                                                                    }
-                                                                    sx={{ ml: 1 }}
-                                                                >
-                                                                    <EditIcon
-                                                                        fontSize={isMobile ? "small" : "medium"}
-                                                                    />
-                                                                </IconButton>
-                                                            </Box>
-                                                        </TableCell>
-                                                        <TableCell sx={tableCellStyle}>
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => removeService(service.id)}
-                                                            >
-                                                                <DeleteIcon
-                                                                    fontSize={isMobile ? "small" : "medium"}
-                                                                />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
+                                     <Table size={isMobile ? "small" : "medium"}>
+  <TableHead>
+    <TableRow
+      sx={{
+        backgroundColor: theme.palette.primary.main,
+        '& .MuiTableCell-head': {
+          backgroundColor: theme.palette.primary.main,
+          color: theme.palette.primary.contrastText,
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          letterSpacing: '0.02em',
+          textTransform: 'uppercase',
+          border: 'none',
+          '&:first-of-type': {
+            borderTopLeftRadius: theme.shape.borderRadius,
+          },
+          '&:last-of-type': {
+            borderTopRightRadius: theme.shape.borderRadius,
+          }
+        }
+      }}
+    >
+      <TableCell>Service</TableCell>
+      <TableCell>Engineer</TableCell>
+      <TableCell>Progress</TableCell>
+      <TableCell>Status</TableCell>
+      <TableCell>Labour Cost</TableCell>
+      <TableCell>Action</TableCell>
+    </TableRow>
+  </TableHead>
+  <TableBody>
+    {services.map((service) => (
+      <TableRow key={service.id} hover>
+        <TableCell sx={tableCellStyle}>
+          {service.name}
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          {service.engineer}
+        </TableCell>
+        <TableCell sx={{ ...tableCellStyle, width: "15%" }}>
+          <LinearProgress
+            variant="determinate"
+            value={service.progress}
+            sx={{ height: 8, borderRadius: 4 }}
+          />
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          <Chip
+            label={service.status}
+            color={getStatusColor(service.status)}
+            size={isMobile ? "small" : "medium"}
+          />
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            {formatCurrency(service.laborCost).replace(
+              "₹",
+              ""
+            )}
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={() =>
+                openEditPrice(
+                  service.id,
+                  "service",
+                  "laborCost",
+                  service.laborCost
+                )
+              }
+              sx={{ ml: 1 }}
+            >
+              <EditIcon
+                fontSize={isMobile ? "small" : "medium"}
+              />
+            </IconButton>
+          </Box>
+        </TableCell>
+        <TableCell sx={tableCellStyle}>
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => removeService(service.id)}
+          >
+            <DeleteIcon
+              fontSize={isMobile ? "small" : "medium"}
+            />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
                                     </TableContainer>
                                 ) : (
                                     <Typography 
@@ -1467,7 +1561,7 @@ Thank you for choosing our service!`;
                         </Card>
 
                         {/* Bill Summary */}
-                        <Card>
+                        {/* <Card>
                             <CardContent>
                                 <Typography
                                     variant="h6"
@@ -1583,7 +1677,134 @@ Thank you for choosing our service!`;
                                     </Box>
                                 </Paper>
                             </CardContent>
-                        </Card>
+                        </Card> */}
+
+<Card sx={{ mb: 4 }}>
+    <CardContent>
+        <Typography
+            variant="h6"
+            color="primary"
+            gutterBottom
+            sx={{
+                display: "flex",
+                alignItems: "center",
+                "&::before": {
+                    content: '""',
+                    display: "inline-block",
+                    width: 4,
+                    height: 20,
+                    backgroundColor: "primary.main",
+                    marginRight: 1,
+                    borderRadius: 1,
+                },
+            }}
+        >
+            Bill Summary
+        </Typography>
+        <Paper
+            variant="outlined"
+            sx={{ 
+                p: isMobile ? 2 : 3, 
+                backgroundColor: (theme) => 
+                    theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' // Dark mode background
+                        : 'grey.50' // Light mode background
+            }}
+        >
+            {[
+                {
+                    label: "Total Parts Cost:",
+                    value: formatCurrency(summary.totalPartsCost),
+                },
+                {
+                    label: "Total Labour Cost:",
+                    value: formatCurrency(summary.totalLaborCost),
+                },
+                {
+                    label: "Subtotal:",
+                    value: formatCurrency(summary.subtotal),
+                },
+                {
+                    label: "GST (18%):",
+                    value: formatCurrency(summary.gstAmount),
+                },
+                {
+                    label: "Discount:",
+                    value: (
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <TextField
+                                size="small"
+                                type="number"
+                                value={summary.discount}
+                                onChange={handleDiscountChange}
+                                sx={{ width: isMobile ? 80 : 100, mr: 1 }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            ₹
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <Typography>
+                                ({formatCurrency(summary.discount)})
+                            </Typography>
+                        </Box>
+                    ),
+                    custom: true,
+                },
+            ].map((item, index) => (
+                <Box
+                    key={index}
+                    sx={{
+                        display: "flex",
+                        flexDirection: isMobile ? "column" : "row",
+                        justifyContent: "space-between",
+                        mb: 1,
+                        py: 1,
+                        borderBottom: (theme) => 
+                            `1px dashed ${theme.palette.mode === 'dark' 
+                                ? 'rgba(255, 255, 255, 0.12)' 
+                                : theme.palette.grey[300]}`,
+                        gap: isMobile ? 1 : 0,
+                    }}
+                >
+                    <Typography>{item.label}</Typography>
+                    {item.custom ? (
+                        item.value
+                    ) : (
+                        <Typography>{item.value}</Typography>
+                    )}
+                </Box>
+            ))}
+            <Box
+                sx={{
+                    display: "flex",
+                    flexDirection: isMobile ? "column" : "row",
+                    justifyContent: "space-between",
+                    py: 1,
+                    fontWeight: "bold",
+                    gap: isMobile ? 1 : 0,
+                }}
+            >
+                <Typography
+                    fontWeight="bold"
+                    color="primary.dark"
+                    fontSize={isMobile ? "16px" : "18px"}
+                >
+                    Total Amount:
+                </Typography>
+                <Typography
+                    fontWeight="bold"
+                    color="primary.dark"
+                    fontSize={isMobile ? "16px" : "18px"}
+                >
+                    {formatCurrency(summary.totalAmount)}
+                </Typography>
+            </Box>
+        </Paper>
+    </CardContent>
+</Card>
                     </>
                 )}
 
@@ -2044,6 +2265,5 @@ Thank you for choosing our service!`;
           };
           
           export default AutoServeBilling;
-
 
 

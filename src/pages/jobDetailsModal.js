@@ -34,19 +34,19 @@ import autoTable from 'jspdf-autotable';
 const JobDetailsModal = ({ open, onClose, jobData }) => {
   const theme = useTheme();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-
+  
   if (!jobData) return null;
-
+  
   // Base URL for accessing uploaded files
-  const BASE_URL = 'https://garage-management-zi5z.onrender.com'; 
-
+  const BASE_URL = 'https://garage-management-zi5z.onrender.com';  
+  
   // Helper to convert local image path to public URL
   const getPublicImageUrl = (filePath) => {
     if (!filePath) return '';
     const filename = filePath.split('/').pop(); // Extract filename from full path
     return `${BASE_URL}/uploads/${filename}`;
   };
-
+  
   // Status chip based on job status
   const getStatusChip = (status) => {
     const normalizedStatus = status || "Pending";
@@ -91,7 +91,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         );
     }
   };
-
+  
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -100,7 +100,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       day: 'numeric'
     });
   };
-
+  
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString('en-IN', {
@@ -111,57 +111,61 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       minute: '2-digit'
     });
   };
-
+  
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
     try {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
-
+      
       // Header
       doc.setFontSize(20);
       doc.setTextColor(63, 81, 181);
       doc.text('JOB CARD DETAILS', pageWidth / 2, 20, { align: 'center' });
-
+      
       // Job ID
       doc.setFontSize(12);
       doc.setTextColor(100, 100, 100);
       doc.text(`Job ID: ${jobData._id}`, pageWidth / 2, 30, { align: 'center' });
-
+      
       let yPos = 50;
       const lineHeight = 8;
       const sectionSpacing = 15;
-
+      
+      // Helper function to add a section
       const addSection = (title, data) => {
+        // Check if we need a new page
         if (yPos + (data.length * lineHeight) + 30 > pageHeight - 20) {
           doc.addPage();
           yPos = 20;
         }
-
+        
+        // Section title
         doc.setFontSize(14);
         doc.setTextColor(63, 81, 181);
         doc.text(title, 20, yPos);
         yPos += 10;
-
+        
+        // Section content
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
-
         data.forEach(([label, value]) => {
           doc.setFont(undefined, 'bold');
           doc.text(`${label}:`, 25, yPos);
           doc.setFont(undefined, 'normal');
-
+          
+          // Handle long text by wrapping
           const maxWidth = pageWidth - 80;
           const valueText = String(value || 'N/A');
           const lines = doc.splitTextToSize(valueText, maxWidth);
           doc.text(lines, 80, yPos);
           yPos += lineHeight * lines.length;
         });
-
+        
         yPos += sectionSpacing;
       };
-
+      
       // Add all sections
       addSection('CUSTOMER INFORMATION', [
         ['Customer Name', jobData.customerName],
@@ -169,7 +173,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         ['Email', jobData.email],
         ['Company', jobData.company]
       ]);
-
+      
       addSection('VEHICLE INFORMATION', [
         ['Car Number', jobData.carNumber],
         ['Registration Number', jobData.registrationNumber],
@@ -177,14 +181,14 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
         ['Fuel Type', jobData.fuelType]
       ]);
-
+      
       addSection('INSURANCE INFORMATION', [
         ['Insurance Provider', jobData.insuranceProvider],
         ['Policy Number', jobData.policyNumber],
         ['Expiry Date', formatDate(jobData.expiryDate)],
-        ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount}` : 'N/A']
+        ['Excess Amount', jobData.excessAmount ? `Rs.${jobData.excessAmount}` : 'N/A']
       ]);
-
+      
       addSection('JOB INFORMATION', [
         ['Job Type', jobData.type],
         ['Job Details', jobData.jobDetails],
@@ -195,7 +199,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         ['Created Date', formatDateTime(jobData.createdAt)],
         ['Last Updated', formatDateTime(jobData.updatedAt)]
       ]);
-
+      
       if (jobData.qualityCheck && jobData.qualityCheck.notes) {
         addSection('QUALITY CHECK', [
           ['Notes', jobData.qualityCheck.notes],
@@ -204,7 +208,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
           ['Bill Approved', jobData.qualityCheck.billApproved ? 'Yes' : 'No']
         ]);
       }
-
+      
       if (jobData.images && jobData.images.length > 0) {
         const imageList = jobData.images.map((image, index) => {
           const url = getPublicImageUrl(image);
@@ -212,15 +216,18 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         });
         addSection('ATTACHMENTS', imageList);
       }
-
-      // Footer
+      
+      // Footer on all pages
       const totalPages = doc.internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(128, 128, 128);
+        
+        // Add a line above footer
         doc.setDrawColor(200, 200, 200);
         doc.line(20, pageHeight - 20, pageWidth - 20, pageHeight - 20);
+        
         doc.text(
           `Generated on ${new Date().toLocaleString('en-IN')}`,
           20,
@@ -233,16 +240,20 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
           { align: 'right' }
         );
       }
-
+      
+      // Generate filename with safe characters
       const safeCarNumber = (jobData.carNumber || jobData._id || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
       const dateStr = new Date().toISOString().split('T')[0];
       const filename = `JobCard_${safeCarNumber}_${dateStr}.pdf`;
-
+      
+      // Save the PDF
       doc.save(filename);
       console.log('PDF generated successfully');
     } catch (error) {
       console.error('Detailed PDF Error:', error);
       console.error('Error stack:', error.stack);
+      
+      // More specific error message
       let errorMessage = 'Error generating PDF. ';
       if (error.message.includes('jsPDF')) {
         errorMessage += 'PDF library not loaded properly.';
@@ -254,7 +265,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       setIsGeneratingPDF(false);
     }
   };
-
+  
   return (
     <Dialog
       open={open}
@@ -268,7 +279,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         }
       }}
     >
-      <DialogTitle sx={{
+      <DialogTitle sx={{ 
         pb: 1,
         display: 'flex',
         justifyContent: 'space-between',
@@ -296,7 +307,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       </DialogTitle>
       <DialogContent sx={{ px: 3 }}>
         <Grid container spacing={3}>
-          {/* Customer Info */}
+          {/* Customer Information */}
           <Grid item xs={12} md={6}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
@@ -306,59 +317,205 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     Customer Information
                   </Typography>
                 </Box>
-                {/* Display customer fields */}
-                {/* Same as before */}
+                <Box sx={{ space: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Name</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.customerName || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Contact</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.contactNumber || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Email</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.email || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Company</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {jobData.company || 'N/A'}
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Vehicle Info */}
+          
+          {/* Vehicle Information */}
           <Grid item xs={12} md={6}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
-                {/* Display vehicle fields */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <BuildIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Vehicle Information
+                  </Typography>
+                </Box>
+                <Box sx={{ space: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Car Number</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.carNumber || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Registration Number</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.registrationNumber || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Model</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.model || 'N/A'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 3 }}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Kilometer</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">Fuel Type</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {jobData.fuelType || 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Insurance Info */}
+          
+          {/* Insurance Information */}
           <Grid item xs={12} md={6}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
-                {/* Display insurance fields */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <InsuranceIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Insurance Information
+                  </Typography>
+                </Box>
+                <Box sx={{ space: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Provider</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.insuranceProvider || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Policy Number</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.policyNumber || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Expiry Date</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {formatDate(jobData.expiryDate)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Excess Amount</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A'}
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Job Info */}
+          
+          {/* Job Information */}
           <Grid item xs={12} md={6}>
             <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
-                {/* Display job fields */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <BuildIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Job Information
+                  </Typography>
+                </Box>
+                <Box sx={{ space: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Job Type</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.type || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Job Details</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.jobDetails || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Engineer</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.engineerId?.name || 'Not Assigned'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Engineer Remarks</Typography>
+                  <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                    {jobData.engineerRemarks || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Labor Hours</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {jobData.laborHours ? `${jobData.laborHours} hours` : 'N/A'}
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Quality Check */}
+          
+          {/* Quality Check Information */}
           {jobData.qualityCheck && (
             <Grid item xs={12}>
               <Card variant="outlined">
                 <CardContent>
-                  {/* Quality check fields */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <CheckCircleIcon sx={{ mr: 1, color: theme.palette.success.main }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Quality Check
+                    </Typography>
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="body2" color="text.secondary">Notes</Typography>
+                      <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                        {jobData.qualityCheck.notes || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Typography variant="body2" color="text.secondary">Date</Typography>
+                      <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
+                        {formatDateTime(jobData.qualityCheck.date)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Typography variant="body2" color="text.secondary">Bill Approved</Typography>
+                      <Chip 
+                        label={jobData.qualityCheck.billApproved ? 'Yes' : 'No'}
+                        color={jobData.qualityCheck.billApproved ? 'success' : 'default'}
+                        size="small"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Grid>
           )}
-
+          
           {/* Timestamps */}
           <Grid item xs={12}>
             <Card variant="outlined">
               <CardContent>
-                {/* Timeline fields */}
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ScheduleIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Timeline
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="text.secondary">Created Date</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatDateTime(jobData.createdAt)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="text.secondary">Last Updated</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatDateTime(jobData.updatedAt)}
+                    </Typography>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           </Grid>
-
+          
           {/* Images Section */}
           {jobData.images && jobData.images.length > 0 && (
             <Grid item xs={12}>
