@@ -382,9 +382,9 @@ const handleDownloadPDF = (job) => {
       case "Completed":
         return 100;
       case "In Progress":
-        return 60;
+        return 50;
       case "Pending":
-        return 10;
+        return 25;
       default:
         return 0;
     }
