@@ -708,7 +708,7 @@ const QualityCheck = () => {
         setIsLoading(true);
         
         const response = await axios.get(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
+          `https://garage-management-zi5z.onrender.com/api/jobCards/${id}`,
           {
             headers: {
               'Content-Type': 'application/json'
@@ -718,6 +718,7 @@ const QualityCheck = () => {
         
         const data = response.data;
         setJobCardData(data);
+        console.log(data)
         
         if (data.partsUsed && data.partsUsed.length > 0) {
           const existingParts = data.partsUsed.map((part, index) => ({

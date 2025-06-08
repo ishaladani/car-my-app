@@ -2399,35 +2399,43 @@ const AssignEngineer = () => {
   // Update Job Card Parts Used
   const updateJobCardPartsUsed = async (jobCardId, partsUsed) => {
     try {
+      console.log(`Updating job card ${jobCardId} with parts:`, partsUsed);
+      
+      // Validate parts data before sending
+      const validatedParts = partsUsed.map(part => ({
+        partId: part.partId || part._id,
+        partName: part.partName || '',
+        partNumber: part.partNumber || '',
+        quantity: Number(part.quantity) || 1,
+        pricePerUnit: Number(part.pricePerUnit) || 0,
+        gstPercentage: Number(part.gstPercentage) || 0,
+        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1)),
+        gstAmount: Number(((part.pricePerUnit || 0) * (part.quantity || 1) * (part.gstPercentage || 0)) / 100),
+        carName: part.carName || '',
+        model: part.model || ''
+      }));
+  
       const updatePayload = {
-        partsUsed: partsUsed.map(part => ({
-          partId: part.partId,
-          partName: part.partName,
-          partNumber: part.partNumber || '',
-          quantity: part.quantity,
-          pricePerUnit: part.pricePerUnit || 0,
-          gstPercentage: part.gstPercentage || 0,
-          totalPrice: (part.pricePerUnit || 0) * part.quantity,
-          gstAmount: ((part.pricePerUnit || 0) * part.quantity * (part.gstPercentage || 0)) / 100,
-          carName: part.carName || '',
-          model: part.model || ''
-        }))
+        partsUsed: validatedParts
       };
-
+  
+      console.log('Sending update payload:', updatePayload);
+  
       const response = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardId}`,
+        `${API_BASE_URL}/jobCards/${id}`,
         updatePayload,
         {
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': garageToken ? `Bearer ${garageToken}` : '',
           }
         }
       );
-
-      console.log(`Job card ${jobCardId} updated with parts:`, response.data);
+  
+      console.log(`Job card ${jobCardId} updated successfully:`, response.data);
       return response.data;
     } catch (err) {
-      console.error(`Failed to update job card ${jobCardId}:`, err);
+      console.error(`Failed to update job card ${jobCardId}:`, err.response?.data || err.message);
       throw err;
     }
   };
