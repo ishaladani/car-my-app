@@ -167,13 +167,62 @@ const AppLayout = () => {
   const [notificationCount] = useState(3);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // Clear all items from localStorage
-    localStorage.clear();
-
-
-    // Navigate to login page
-    navigate("/login");
+  const handleLogout = async () => {
+    console.log("=== LOGOUT BUTTON CLICKED ===");
+    
+    try {
+      // Get userId and token from localStorage
+      const storedUserId = localStorage.getItem("garageId");
+      const token = localStorage.getItem("token");
+      
+      console.log("Stored userId:", storedUserId);
+      console.log("Stored token:", token ? "Token exists" : "No token found");
+      
+      if (!storedUserId) {
+        console.error("No userId found in localStorage");
+        return;
+      }
+      
+      if (!token) {
+        console.error("No token found in localStorage");
+        return;
+      }
+      
+      console.log("Making API call to logout...");
+      
+      // Call the logout API with Authorization header
+      const response = await axios.post(
+        `https://garage-management-zi5z.onrender.com/api/garage/logout/${storedUserId}`,
+        {}, // Empty body since it's a POST request
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log("Logout API response:", response.data);
+      console.log("Logout API called successfully");
+      
+    } catch (error) {
+      console.error("Error calling logout API:", error);
+      console.error("Error details:", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+      // Continue with logout even if API call fails
+    } finally {
+      console.log("Clearing localStorage and redirecting...");
+      
+      // Clear all items from localStorage regardless of API call result
+      localStorage.clear();
+      
+      // Navigate to login page
+      navigate("/login");
+    }
   };
 
   // Handlers
@@ -283,7 +332,10 @@ const AppLayout = () => {
       {/* Bottom Actions - Logout */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
         <ListItemButton
-          onClick={handleLogout}
+          onClick={() => {
+            console.log("Logout button clicked!");
+            handleLogout();
+          }}
           sx={{
             borderRadius: 2,
             py: 1.5,

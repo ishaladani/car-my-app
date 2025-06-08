@@ -151,11 +151,11 @@ const WorkInProgress = () => {
         
         // Populate engineer details
         setEngineerDetails({
-          fullName: data.engineerId?.name || '',
-          speciality: '', // Not available in the response
-          assignedDateTime: data.createdAt ? 
-            new Date(data.createdAt).toISOString().slice(0, 16) : ''
-        });
+  fullName: data.engineerId && data.engineerId.length > 0 ? data.engineerId[0].name : '',  // Access first element of array
+  speciality: '', 
+  assignedDateTime: data.createdAt ? 
+    new Date(data.createdAt).toISOString().slice(0, 16) : ''
+});
         
         // Populate parts if available
         if (data.partsUsed && data.partsUsed.length > 0) {
@@ -702,7 +702,7 @@ const WorkInProgress = () => {
                       >
                         Part Name
                       </TableCell>
-                      <TableCell 
+                      {/* <TableCell 
                         align="center" 
                         sx={{ 
                           bgcolor: 'rgb(9, 141, 97)',
@@ -711,7 +711,7 @@ const WorkInProgress = () => {
                         }}
                       >
                         Part Number
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell 
                         align="center" 
                         sx={{ 
@@ -722,7 +722,7 @@ const WorkInProgress = () => {
                       >
                         Qty
                       </TableCell>
-                      <TableCell 
+                      {/* <TableCell 
                         align="center" 
                         sx={{ 
                           bgcolor: 'rgb(9, 141, 97)',
@@ -731,8 +731,8 @@ const WorkInProgress = () => {
                         }}
                       >
                         Price/Piece
-                      </TableCell>
-                      <TableCell 
+                      </TableCell> */}
+                      {/* <TableCell 
                         align="center" 
                         sx={{ 
                           bgcolor: 'rgb(9, 141, 97)',
@@ -741,7 +741,7 @@ const WorkInProgress = () => {
                         }}
                       >
                         GST %
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell 
                         align="center" 
                         sx={{ 
@@ -779,7 +779,7 @@ const WorkInProgress = () => {
                             onChange={(e) => handlePartChange(part.id, 'partName', e.target.value)}
                           />
                         </TableCell>
-                        <TableCell>
+                        {/* <TableCell>
                           <TextField 
                             fullWidth 
                             variant="outlined" 
@@ -787,7 +787,7 @@ const WorkInProgress = () => {
                             value={part.partNumber}
                             onChange={(e) => handlePartChange(part.id, 'partNumber', e.target.value)}
                           />
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell>
                           <TextField 
                             fullWidth 
@@ -798,7 +798,7 @@ const WorkInProgress = () => {
                             onChange={(e) => handlePartChange(part.id, 'qty', e.target.value)}
                           />
                         </TableCell>
-                        <TableCell>
+                        {/* <TableCell>
                           <TextField 
                             fullWidth 
                             variant="outlined" 
@@ -807,8 +807,8 @@ const WorkInProgress = () => {
                             value={part.pricePerPiece}
                             onChange={(e) => handlePartChange(part.id, 'pricePerPiece', e.target.value)}
                           />
-                        </TableCell>
-                        <TableCell>
+                        </TableCell> */}
+                        {/* <TableCell>
                           <TextField 
                             fullWidth 
                             variant="outlined" 
@@ -817,7 +817,7 @@ const WorkInProgress = () => {
                             value={part.gstPercent}
                             onChange={(e) => handlePartChange(part.id, 'gstPercent', e.target.value)}
                           />
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell>
                           <TextField 
                             fullWidth 

@@ -18,6 +18,8 @@ import ProtectedRoute from './Login/ProtectedRoute';
 import BillingPage from './pages/BillingPage';
 import UserManagement from './pages/UserList';
 import AwaitingApproval from './pages/AwaitingApproval';
+import WaitingApprovalPage from './pages/WaitingApprovalPage';
+import RenewPlanPage from './pages/RenewPlanPage';
 
 function App() {
   return (
@@ -25,9 +27,9 @@ function App() {
       <CssBaseline />
       <Router>
         <Routes>
-      
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/renew-plan" element={<RenewPlanPage />} />
           <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="jobs" element={<JobCards />} />
@@ -46,6 +48,7 @@ function App() {
             </Route>
              
             <Route path='AwaitingApproval' element={<AwaitingApproval/>}/>
+            <Route path='/waiting-approval' element={<WaitingApprovalPage/>}/>
           {/* <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
