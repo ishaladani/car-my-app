@@ -1008,8 +1008,8 @@ const InventoryManagement = () => {
       
       // Prepare the data for API call
       const requestData = {
-        carName: editItemData.carName,
-        model: editItemData.model,
+        carName: 'abc',
+        model: 1,
         partNumber: editItemData.partNumber,
         partName: editItemData.partName,
         quantity: parseInt(editItemData.quantity),
@@ -1237,7 +1237,7 @@ const InventoryManagement = () => {
                 mb: 3
               }}
             >
-              <TextField
+              {/* <TextField
                 name="carName"
                 label="Car Name"
                 variant="outlined"
@@ -1245,8 +1245,8 @@ const InventoryManagement = () => {
                 onChange={handleInputChange}
                 required
                 sx={{ flex: '1 1 200px' }}
-              />
-              <TextField
+              /> */}
+              {/* <TextField
                 name="model"
                 label="Model"
                 variant="outlined"
@@ -1254,7 +1254,7 @@ const InventoryManagement = () => {
                 onChange={handleInputChange}
                 required
                 sx={{ flex: '1 1 200px' }}
-              />
+              /> */}
               <TextField
                 name="partNumber"
                 label="Part Number"
@@ -1483,7 +1483,7 @@ const InventoryManagement = () => {
               mb: 2
             }}
           >
-            <TextField
+            {/* <TextField
               name="carName"
               label="Car Name"
               variant="outlined"
@@ -1502,7 +1502,7 @@ const InventoryManagement = () => {
               required
               fullWidth
               margin="normal"
-            />
+            /> */}
             <TextField
               name="partNumber"
               label="Part Number"

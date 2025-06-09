@@ -1797,128 +1797,114 @@ const SignUpPage = () => {
   };
 
   // FIXED: Modified handleGarageSignup to use actual form data
-  const handleGarageSignup = async (paymentDetails = {}) => {
-    try {
-      setLoading(true);
-      
-      // Determine if it's a free plan based on selected plan amount
-      const isFreePlan = selectedPlan.amount === 0;
-      
-      let requestData;
-      
-      if (isFreePlan) {
-        // Free plan data structure using actual form data
-        requestData = {
-          "name": formData.name,
-          "address": formData.address,
-          "phone": formData.phone,
-          "email": formData.email,
-          "password": formData.password,
-          "durationInMonths": selectedPlan.durationInMonths || 1,
-          "amount": selectedPlan.amount || 0,
-          "isFreePlan": true
-        };
-      } else {
-        // Paid plan data structure using actual form data and payment details
-        requestData = {
-          "name": formData.name,
-          "address": formData.address,
-          "phone": formData.phone,
-          "email": formData.email,
-          "password": formData.password,
-          "durationInMonths": selectedPlan.durationInMonths || 6,
-          "amount": selectedPlan.amount || 2999,
-          "razorpayOrderId": paymentDetails.razorpayOrderId || "",
-          "razorpayPaymentId": paymentDetails.razorpayPaymentId || "",
-          "razorpaySignature": paymentDetails.razorpaySignature || "",
-          "isFreePlan": false
-        };
-      }
-      
-      console.log('Sending request data to API:', requestData);
-      console.log('Selected plan details:', selectedPlan);
-      console.log('Is Free Plan:', isFreePlan);
-      
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create',  {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData),
-      });
-      
-      console.log('API Response status:', response.status);
-      const data = await response.json();
-      console.log('API Response data:', data);
-      
-      // Handle the specific case where garage creation is successful but API returns error
-      if (!response.ok) {
-        // Check if it's the specific "garage is not defined" error but garage was actually created
-        if (data.error && data.error.includes("garage is not defined")) {
-          // This appears to be a backend bug where garage is created successfully 
-          // but the response handler has an issue
-          showSnackbar(
-            'Garage created successfully! Waiting for admin approval.',
-            'success'
-          );
-          
-          // Navigate to waiting page after a short delay
-          setTimeout(() => {
-            navigation('/waiting-approval', { 
-              state: { 
-                garageName: formData.name,
-                email: formData.email,
-                planName: selectedPlan.name 
-              }
-            });
-          }, 2000);
-          
-          resetForm();
-          return;
-        }
-        
-        // Check for MongoDB duplicate key error (E11000)
-        if (data.error && data.error.includes("E11000")) {
-          throw new Error("Garage name already exists. Please choose a different name.");
-        }
-        
-        // Check for subscription duration error
-        if (data.message && data.message.toLowerCase().includes('subscription duration')) {
-          console.error('Duration error with data:', requestData);
-          throw new Error("Invalid subscription duration. Please contact support.");
-        }
-        
-        // General server or API error
-        throw new Error(data.message || data.error || `Server error: ${response.status}`);
-      }
-      
-      // Normal success case
-      showSnackbar(
-        selectedPlan.amount === 0 
-          ? 'Garage created successfully! Waiting for admin approval.' 
-          : 'Payment successful! Garage created successfully! Waiting for admin approval.', 
-        'success'
-      );
-      
-      // Navigate to waiting page after showing success message
-      setTimeout(() => {
-        navigation('/waiting-approval', { 
-          state: { 
-            garageName: formData.name,
-            email: formData.email,
-            planName: selectedPlan.name 
-          }
-        });
-      }, 2000);
-      
-      resetForm();
-    } catch (err) {
-      console.error('Signup error:', err);
-      showSnackbar(err.message || 'Something went wrong', 'error');
-    } finally {
-      setLoading(false);
+// FIXED: Modified handleGarageSignup to use FormData format like your curl example
+const handleGarageSignup = async (paymentDetails = {}) => {
+  try {
+    setLoading(true);
+    
+    // Create FormData object instead of JSON (renamed to avoid conflict with state)
+    const garageFormData = new FormData();
+    
+    // Add all required fields as FormData using the state formData
+    garageFormData.append('name', formData.name);
+    garageFormData.append('address', formData.address);
+    garageFormData.append('phone', formData.phone);
+    garageFormData.append('email', formData.email);
+    garageFormData.append('password', formData.password);
+    garageFormData.append('durationInMonths', selectedPlan.durationInMonths.toString());
+    garageFormData.append('amount', selectedPlan.amount.toString());
+    garageFormData.append('isFreePlan', selectedPlan.amount === 0 ? 'true' : 'false');
+    
+    // Add payment details (empty strings if free plan)
+    garageFormData.append('razorpayOrderId', paymentDetails.razorpayOrderId || '');
+    garageFormData.append('razorpayPaymentId', paymentDetails.razorpayPaymentId || '');
+    garageFormData.append('razorpaySignature', paymentDetails.razorpaySignature || '');
+    
+    // Add logo file if selected
+    if (logo) {
+      garageFormData.append('logo', logo);
     }
-  };
+    
+    console.log('Sending FormData to API...');
+    // Debug: Log FormData contents
+    for (let pair of garageFormData.entries()) {
+      console.log(pair[0] + ': ' + pair[1]);
+    }
+    
+    const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create', {
+      method: 'POST',
+      body: garageFormData, // Send FormData directly (no Content-Type header needed)
+    });
+    
+    console.log('API Response status:', response.status);
+    const data = await response.json();
+    console.log('API Response data:', data);
+    
+    // Handle the specific case where garage creation is successful but API returns error
+    if (!response.ok) {
+      // Check if it's the specific "garage is not defined" error but garage was actually created
+      if (data.error && data.error.includes("garage is not defined")) {
+        showSnackbar(
+          'Garage created successfully! Waiting for admin approval.',
+          'success'
+        );
+        
+        setTimeout(() => {
+          navigation('/waiting-approval', { 
+            state: { 
+              garageName: formData.name, // Use React state formData
+              email: formData.email,
+              planName: selectedPlan.name 
+            }
+          });
+        }, 2000);
+        
+        resetForm();
+        return;
+      }
+      
+      // Check for MongoDB duplicate key error (E11000)
+      if (data.error && data.error.includes("E11000")) {
+        throw new Error("Garage name already exists. Please choose a different name.");
+      }
+      
+      // Check for validation errors
+      if (data.message && data.message.toLowerCase().includes('validation')) {
+        console.error('Validation error with FormData:', data);
+        throw new Error(data.message || "Validation failed. Please check all fields.");
+      }
+      
+      // General server or API error
+      throw new Error(data.message || data.error || `Server error: ${response.status}`);
+    }
+    
+    // Normal success case
+    showSnackbar(
+      selectedPlan.amount === 0 
+        ? 'Garage created successfully! Waiting for admin approval.' 
+        : 'Payment successful! Garage created successfully! Waiting for admin approval.', 
+      'success'
+    );
+    
+    // Navigate to waiting page after showing success message
+    setTimeout(() => {
+      navigation('/waiting-approval', { 
+        state: { 
+          garageName: formData.name, // Use React state formData
+          email: formData.email,
+          planName: selectedPlan.name 
+        }
+      });
+    }, 2000);
+    
+    resetForm();
+  } catch (err) {
+    console.error('Signup error:', err);
+    showSnackbar(err.message || 'Something went wrong', 'error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({
