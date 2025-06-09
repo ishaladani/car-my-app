@@ -20,6 +20,7 @@ import UserManagement from './pages/UserList';
 import AwaitingApproval from './pages/AwaitingApproval';
 import WaitingApprovalPage from './pages/WaitingApprovalPage';
 import RenewPlanPage from './pages/RenewPlanPage';
+import Profile from './pages/Profile';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
               <Route path="insurance" element={<InsuranceManagement />} />
              <Route path="billing/:id" element={<BillingPage />} />
               <Route path='UserManagemt' element={<UserManagement/>}/>
+              <Route path='Profile' element={<Profile/>}/>
              
               
      

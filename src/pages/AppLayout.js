@@ -45,17 +45,24 @@ const AppLayout = () => {
   const location = useLocation();
   const roll = localStorage.getItem("userType");
   const userId = localStorage.getItem("userId");
+  const garageId = localStorage.getItem("garageId");
 
   const isMobile = useMediaQuery("(max-width:599px)");
   const [profileData, setProfileData] = useState({
     name: "",
     image: "",
+    email: "",
+    phone: "",
+    address: "",
+    subscriptionType: "",
+    isSubscribed: false,
   });
 
   // State for permissions and filtered nav items
   const [userPermissions, setUserPermissions] = useState([]);
   const [filteredNavItems, setFilteredNavItems] = useState([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   // All available nav items
   const allNavItems = [
@@ -72,13 +79,77 @@ const AppLayout = () => {
     { text: "User List", icon: <BuildIcon />, path: "/UserManagemt" },
   ];
 
+  // Fetch garage profile data
+  const fetchGarageProfile = async () => {
+    if (!garageId) {
+      console.error("No garageId found in localStorage");
+      setProfileLoaded(true);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      console.log("Fetching garage profile for ID:", garageId);
+      
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/garage/getgaragebyid/${garageId}`,
+        { headers }
+      );
+      
+      console.log("Garage profile response:", response.data);
+      
+      if (response.data) {
+        const garageData = response.data;
+        setProfileData({
+          name: garageData.name || "Garage",
+          image: garageData.logo || "",
+          email: garageData.email || "",
+          phone: garageData.phone || "",
+          address: garageData.address || "",
+          subscriptionType: garageData.subscriptionType || "",
+          isSubscribed: garageData.isSubscribed || false,
+        });
+
+        // Also update localStorage for backward compatibility
+        localStorage.setItem("garageName", garageData.name || "Garage");
+        if (garageData.logo) {
+          localStorage.setItem("garageLogo", garageData.logo);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching garage profile:", error);
+      console.error("Error details:", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+      
+      // Fallback to localStorage data
+      const savedName = localStorage.getItem("garageName");
+      const savedImage = localStorage.getItem("garageLogo");
+      setProfileData(prev => ({
+        ...prev,
+        name: savedName || "Garage",
+        image: savedImage || "",
+      }));
+    } finally {
+      setProfileLoaded(true);
+    }
+  };
+
   // Fetch user permissions if role is "user"
   const fetchUserPermissions = async () => {
     if (roll === "user") {
       const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
-       console.log("user", roll, token)
+      console.log("user", roll, token)
       try {
-        // FIXED: Correct API call format
         const response = await axios.get(
           "https://garage-management-zi5z.onrender.com/api/garage/user/getpermission",
           {
@@ -102,6 +173,7 @@ const AppLayout = () => {
           setFilteredNavItems([]);
         }
       } catch (error) {
+        console.error("Error fetching user permissions:", error);
         // On error, show empty navigation for security
         setFilteredNavItems([]);
       }
@@ -111,24 +183,23 @@ const AppLayout = () => {
     setPermissionsLoaded(true);
   };
 
+  // Load initial data
   useEffect(() => {
-    const loadProfile = () => {
-      const savedName = localStorage.getItem("garageName");
-      const savedImage = localStorage.getItem("garageLogo");
-      setProfileData({
-        name: savedName || "Garage",
-        image: savedImage || "",
-      });
+    const loadInitialData = async () => {
+      // Load profile data from API
+      await fetchGarageProfile();
+      
+      // Load permissions
+      await fetchUserPermissions();
     };
 
-    // Load initially
-    loadProfile();
+    loadInitialData();
 
-    // Also listen for storage changes
+    // Listen for storage changes (for backward compatibility)
     const handleStorageChange = () => {
       if (localStorage.getItem("profileUpdated") === "true") {
-        loadProfile();
-        localStorage.removeItem("profileUpdated"); // reset flag
+        fetchGarageProfile();
+        localStorage.removeItem("profileUpdated");
       }
     };
 
@@ -137,14 +208,16 @@ const AppLayout = () => {
     return () => {
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, []);
+  }, [garageId, roll, userId]);
 
-  // Fetch permissions on mount, page refresh, and when roll/userId changes
+  // Refresh permissions when role/userId changes
   useEffect(() => {
-    fetchUserPermissions();
+    if (permissionsLoaded) {
+      fetchUserPermissions();
+    }
   }, [roll, userId]);
 
-  // Additional effect to handle page visibility changes (optional)
+  // Handle page visibility changes (optional)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && roll === "user") {
@@ -250,8 +323,8 @@ const AppLayout = () => {
 
   const drawerWidth = 280;
 
-  // Show loading or empty state while permissions are loading
-  if (!permissionsLoaded) {
+  // Show loading while data is loading
+  if (!permissionsLoaded || !profileLoaded) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
         <Typography>Loading...</Typography>
@@ -273,17 +346,31 @@ const AppLayout = () => {
           borderColor: "divider",
         }}
       >
-        {profileData.image && (
-          <Avatar
-            src={profileData.image}
-            alt="Garage Logo"
-            sx={{ width: 40, height: 40, mr: 1 }}
-          />
-        )}
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          {profileData.name || "Garage"}
-        </Typography>
+        <Avatar
+          src={profileData.image}
+          alt="Garage Logo"
+          sx={{ 
+            width: 40, 
+            height: 40, 
+            mr: 1,
+            bgcolor: profileData.image ? 'transparent' : 'primary.main'
+          }}
+        >
+          {!profileData.image && profileData.name.charAt(0).toUpperCase()}
+        </Avatar>
+        <Box sx={{ ml: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+            {profileData.name}
+          </Typography>
+          {profileData.isSubscribed && (
+            <Typography variant="caption" color="success.main" sx={{ fontWeight: 500 }}>
+              {profileData.subscriptionType?.replace('_', ' ').toUpperCase()} Plan
+            </Typography>
+          )}
+        </Box>
       </Box>
+
+      
 
       {/* Navigation Items */}
       <Box sx={{ flexGrow: 1, p: 2, overflowY: "auto" }}>
@@ -391,6 +478,98 @@ const AppLayout = () => {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
             {getPageTitle()}
           </Typography>
+
+          {/* User Profile Section in App Bar */}
+          <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+            <Tooltip title="User Profile">
+              <IconButton
+                onClick={handleUserMenuOpen}
+                sx={{ p: 0 }}
+              >
+                <Avatar
+                  src={profileData.image}
+                  alt={profileData.name}
+                  sx={{ 
+                    width: 32, 
+                    height: 32,
+                    bgcolor: profileData.image ? 'transparent' : 'primary.main'
+                  }}
+                >
+                  {!profileData.image && profileData.name.charAt(0).toUpperCase()}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          {/* User Menu */}
+          <Menu
+            anchorEl={userMenu}
+            open={Boolean(userMenu)}
+            onClose={handleUserMenuClose}
+            onClick={handleUserMenuClose}
+            PaperProps={{
+              elevation: 0,
+              sx: {
+                overflow: 'visible',
+                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                mt: 1.5,
+                '& .MuiAvatar-root': {
+                  width: 32,
+                  height: 32,
+                  ml: -0.5,
+                  mr: 1,
+                },
+                '&:before': {
+                  content: '""',
+                  display: 'block',
+                  position: 'absolute',
+                  top: 0,
+                  right: 14,
+                  width: 10,
+                  height: 10,
+                  bgcolor: 'background.paper',
+                  transform: 'translateY(-50%) rotate(45deg)',
+                  zIndex: 0,
+                },
+              },
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {profileData.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {profileData.email}
+              </Typography>
+              {profileData.isSubscribed && (
+                <Typography variant="caption" color="success.main" sx={{ fontWeight: 500 }}>
+                  {profileData.subscriptionType?.replace('_', ' ').toUpperCase()} Plan
+                </Typography>
+              )}
+            </Box>
+            <Divider />
+            <MenuItem onClick={handleUserMenuClose}>
+              <ListItemIcon onClick={() => navigate("/profile")}>
+                <PersonIcon fontSize="small" />
+              </ListItemIcon>
+              Profile
+            </MenuItem>
+            {/* <MenuItem onClick={handleUserMenuClose}>
+              <ListItemIcon>
+                <SettingsIcon fontSize="small" />
+              </ListItemIcon>
+              Settings
+            </MenuItem> */}
+            <Divider />
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              Logout
+            </MenuItem>
+          </Menu>
 
           {/* Theme toggle */}
           <Box sx={{ mx: 0.5 }}>
