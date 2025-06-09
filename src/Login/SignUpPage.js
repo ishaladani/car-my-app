@@ -1796,33 +1796,60 @@ const SignUpPage = () => {
     }
   };
 
+  // FIXED: Modified handleGarageSignup to use actual form data
   const handleGarageSignup = async (paymentDetails = {}) => {
     try {
       setLoading(true);
       
-      const garageData = new FormData();
-      garageData.append('name', formData.name);
-      garageData.append('address', formData.address);
-      garageData.append('phone', formData.phone);
-      garageData.append('email', formData.email);
-      garageData.append('password', formData.password);
-      garageData.append('durationInMonths', selectedPlan.durationInMonths);
-      garageData.append('amount', selectedPlan.amount);
-      garageData.append('isFreePlan', selectedPlan.amount == 0 ? true : false);
-      garageData.append('razorpayOrderId', paymentDetails.razorpayOrderId || '');
-      garageData.append('razorpayPaymentId', paymentDetails.razorpayPaymentId || '');
-      garageData.append('razorpaySignature', paymentDetails.razorpaySignature || '');
+      // Determine if it's a free plan based on selected plan amount
+      const isFreePlan = selectedPlan.amount === 0;
       
-      if (logo) {
-        garageData.append('logo', logo); // Append logo file
+      let requestData;
+      
+      if (isFreePlan) {
+        // Free plan data structure using actual form data
+        requestData = {
+          "name": formData.name,
+          "address": formData.address,
+          "phone": formData.phone,
+          "email": formData.email,
+          "password": formData.password,
+          "durationInMonths": selectedPlan.durationInMonths || 1,
+          "amount": selectedPlan.amount || 0,
+          "isFreePlan": true
+        };
+      } else {
+        // Paid plan data structure using actual form data and payment details
+        requestData = {
+          "name": formData.name,
+          "address": formData.address,
+          "phone": formData.phone,
+          "email": formData.email,
+          "password": formData.password,
+          "durationInMonths": selectedPlan.durationInMonths || 6,
+          "amount": selectedPlan.amount || 2999,
+          "razorpayOrderId": paymentDetails.razorpayOrderId || "",
+          "razorpayPaymentId": paymentDetails.razorpayPaymentId || "",
+          "razorpaySignature": paymentDetails.razorpaySignature || "",
+          "isFreePlan": false
+        };
       }
+      
+      console.log('Sending request data to API:', requestData);
+      console.log('Selected plan details:', selectedPlan);
+      console.log('Is Free Plan:', isFreePlan);
       
       const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create',  {
         method: 'POST',
-        body: garageData,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData),
       });
       
+      console.log('API Response status:', response.status);
       const data = await response.json();
+      console.log('API Response data:', data);
       
       // Handle the specific case where garage creation is successful but API returns error
       if (!response.ok) {
@@ -1855,8 +1882,14 @@ const SignUpPage = () => {
           throw new Error("Garage name already exists. Please choose a different name.");
         }
         
+        // Check for subscription duration error
+        if (data.message && data.message.toLowerCase().includes('subscription duration')) {
+          console.error('Duration error with data:', requestData);
+          throw new Error("Invalid subscription duration. Please contact support.");
+        }
+        
         // General server or API error
-        throw new Error(data.message || `Server error: ${response.status}`);
+        throw new Error(data.message || data.error || `Server error: ${response.status}`);
       }
       
       // Normal success case
