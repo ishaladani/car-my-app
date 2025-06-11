@@ -550,18 +550,14 @@ const AppLayout = () => {
               )}
             </Box>
             <Divider />
+            <div onClick={() => navigate("/profile")}>
             <MenuItem onClick={handleUserMenuClose}>
-              <ListItemIcon onClick={() => navigate("/profile")}>
+              <ListItemIcon >
                 <PersonIcon fontSize="small" />
               </ListItemIcon>
               Profile
             </MenuItem>
-            {/* <MenuItem onClick={handleUserMenuClose}>
-              <ListItemIcon>
-                <SettingsIcon fontSize="small" />
-              </ListItemIcon>
-              Settings
-            </MenuItem> */}
+            </div>
             <Divider />
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>

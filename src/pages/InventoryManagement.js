@@ -218,8 +218,8 @@
       
 //       // Prepare the data for API call
 //       const requestData = {
-//         carName: editItemData.carName,
-//         model: editItemData.model,
+//         carName: 'abc',
+//         model: 1,
 //         partNumber: editItemData.partNumber,
 //         partName: editItemData.partName,
 //         quantity: parseInt(editItemData.quantity),
@@ -447,24 +447,7 @@
 //                 mb: 3
 //               }}
 //             >
-//               <TextField
-//                 name="carName"
-//                 label="Car Name"
-//                 variant="outlined"
-//                 value={formData.carName}
-//                 onChange={handleInputChange}
-//                 required
-//                 sx={{ flex: '1 1 200px' }}
-//               />
-//               <TextField
-//                 name="model"
-//                 label="Model"
-//                 variant="outlined"
-//                 value={formData.model}
-//                 onChange={handleInputChange}
-//                 required
-//                 sx={{ flex: '1 1 200px' }}
-//               />
+             
 //               <TextField
 //                 name="partNumber"
 //                 label="Part Number"
@@ -558,22 +541,52 @@
             
 //             <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[1] }}>
 //               <Table sx={{ minWidth: 650 }} aria-label="inventory table">
-//                 <TableHead sx={{ bgcolor: '#ff4d4d' }}>
-//                   <TableRow>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Part No.</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Name Of Part</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Qty</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Price/Unit</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Tax</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Total Price</TableCell>
-//                     <TableCell sx={{ color: 'white', fontWeight: 600 }}>Edit</TableCell>
+//                 <TableHead>
+//                   <TableRow
+//                     sx={{
+//                       backgroundColor: theme.palette.primary.main,
+//                       '& .MuiTableCell-head': {
+//                         backgroundColor: theme.palette.primary.main,
+//                         color: theme.palette.primary.contrastText,
+//                         fontWeight: 600,
+//                         fontSize: '0.875rem',
+//                         letterSpacing: '0.02em',
+//                         textTransform: 'uppercase',
+//                         border: 'none',
+//                         '&:first-of-type': {
+//                           borderTopLeftRadius: theme.shape.borderRadius,
+//                         },
+//                         '&:last-of-type': {
+//                           borderTopRightRadius: theme.shape.borderRadius,
+//                         }
+//                       }
+//                     }}
+//                   >
+//                     <TableCell>Part No.</TableCell>
+//                     <TableCell>Name Of Part</TableCell>
+//                     <TableCell>Qty</TableCell>
+//                     <TableCell>Price/Unit</TableCell>
+//                     <TableCell>Tax</TableCell>
+//                     <TableCell>Total Price</TableCell>
+//                     <TableCell>Edit</TableCell>
 //                   </TableRow>
 //                 </TableHead>
 //                 <TableBody>
 //                   {inventoryData.map((row, index) => (
 //                     <TableRow
 //                       key={row._id || row.id || `row-${index}`}
-//                       sx={{ '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover } }}
+//                       sx={{ 
+//                         '&:nth-of-type(even)': { 
+//                           backgroundColor: theme.palette.action.hover 
+//                         },
+//                         '&:hover': {
+//                           backgroundColor: theme.palette.action.selected,
+//                         },
+//                         '& .MuiTableCell-root': {
+//                           borderBottom: `1px solid ${theme.palette.divider}`,
+//                           padding: theme.spacing(1.5),
+//                         }
+//                       }}
 //                     >
 //                       <TableCell>{row.partNumber}</TableCell>
 //                       <TableCell>{row.partName}</TableCell>
@@ -592,6 +605,11 @@
 //                           size="small"
 //                           startIcon={<EditIcon />}
 //                           onClick={() => handleOpenEditModal(row)}
+//                           sx={{
+//                             borderRadius: 1,
+//                             textTransform: 'none',
+//                             fontWeight: 500,
+//                           }}
 //                         >
 //                           Edit
 //                         </Button>
@@ -658,26 +676,7 @@
 //               mb: 2
 //             }}
 //           >
-//             <TextField
-//               name="carName"
-//               label="Car Name"
-//               variant="outlined"
-//               value={editItemData.carName}
-//               onChange={handleEditInputChange}
-//               required
-//               fullWidth
-//               margin="normal"
-//             />
-//             <TextField
-//               name="model"
-//               label="Model"
-//               variant="outlined"
-//               value={editItemData.model}
-//               onChange={handleEditInputChange}
-//               required
-//               fullWidth
-//               margin="normal"
-//             />
+            
 //             <TextField
 //               name="partNumber"
 //               label="Part Number"
@@ -817,7 +816,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  CircularProgress
+  CircularProgress,
+  FormControlLabel,
+  Checkbox,
+  Grid
 } from '@mui/material';
 import { 
   ArrowBack as ArrowBackIcon,
@@ -839,8 +841,10 @@ const InventoryManagement = () => {
     partName: '',
     quantity: '',
     pricePerUnit: '',
-    taxType: '',
-    taxAmount: ''
+    sgstEnabled: false,
+    sgstPercentage: '',
+    cgstEnabled: false,
+    cgstPercentage: ''
   });
 
   // State for notifications
@@ -868,23 +872,48 @@ const InventoryManagement = () => {
     partName: '',
     quantity: '',
     pricePerUnit: '',
-    taxType: '',
-    taxAmount: ''
+    sgstEnabled: false,
+    sgstPercentage: '',
+    cgstEnabled: false,
+    cgstPercentage: ''
   });
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
-  const garageId = localStorage.getItem('garageId'); // Use stored ID or fallback to default
+  const garageId = localStorage.getItem('garageId');
+
+  // Calculate tax amounts based on percentages
+  const calculateTaxAmount = (pricePerUnit, quantity, percentage) => {
+    if (!pricePerUnit || !quantity || !percentage) return 0;
+    const totalPrice = parseFloat(pricePerUnit) * parseInt(quantity);
+    return (totalPrice * parseFloat(percentage)) / 100;
+  };
+
+  // Calculate total price including taxes
+  const calculateTotalPrice = (pricePerUnit, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage) => {
+    if (!pricePerUnit || !quantity) return 0;
+    
+    const basePrice = parseFloat(pricePerUnit) * parseInt(quantity);
+    let totalTax = 0;
+    
+    if (sgstEnabled && sgstPercentage) {
+      totalTax += (basePrice * parseFloat(sgstPercentage)) / 100;
+    }
+    
+    if (cgstEnabled && cgstPercentage) {
+      totalTax += (basePrice * parseFloat(cgstPercentage)) / 100;
+    }
+    
+    return basePrice + totalTax;
+  };
 
   // Function to fetch inventory data
   const fetchInventory = async () => {
     try {
-      
       setIsLoading(true);
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`, 
         {
-          headers: {
-          }
+          headers: {}
         }
       );
       
@@ -905,8 +934,8 @@ const InventoryManagement = () => {
   // Initial fetch on component mount
   useEffect(() => {
     if(!garageId){
-        navigate("\login")
-      }
+      navigate("/login")
+    }
     fetchInventory();
   }, []);
 
@@ -919,19 +948,19 @@ const InventoryManagement = () => {
 
   // Handle form input changes
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
   // Handle edit modal input changes
   const handleEditInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setEditItemData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -949,12 +978,14 @@ const InventoryManagement = () => {
           partName: selectedPartData.partName || '',
           quantity: selectedPartData.quantity || '',
           pricePerUnit: selectedPartData.pricePerUnit || '',
+          sgstEnabled: selectedPartData.sgstEnabled || false,
+          sgstPercentage: selectedPartData.sgstPercentage || '',
+          cgstEnabled: selectedPartData.cgstEnabled || false,
+          cgstPercentage: selectedPartData.cgstPercentage || '',
           // Extract numeric value from price string if needed
           ...(selectedPartData.price && typeof selectedPartData.price === 'string' && !selectedPartData.pricePerUnit && {
             pricePerUnit: selectedPartData.price.replace(/[^0-9.]/g, '')
-          }),
-          taxType: selectedPartData.tax || selectedPartData.taxType || '',
-          taxAmount: selectedPartData.taxAmount || ''
+          })
         }));
       }
     }
@@ -964,7 +995,6 @@ const InventoryManagement = () => {
   const handleOpenEditModal = (item) => {
     console.log("Opening edit modal for item:", item);
     
-    // Ensure we have the item ID
     if (!item._id && !item.id) {
       setNotification({
         open: true,
@@ -974,7 +1004,6 @@ const InventoryManagement = () => {
       return;
     }
     
-    // Use MongoDB _id field if available, otherwise fallback to id
     const itemId = item._id || item.id;
     
     setEditItemData({
@@ -985,8 +1014,10 @@ const InventoryManagement = () => {
       partName: item.partName || '',
       quantity: item.quantity?.toString() || '',
       pricePerUnit: item.pricePerUnit?.toString() || '',
-      taxType: item.taxType || item.tax || '',
-      taxAmount: item.taxAmount?.toString() || ''
+      sgstEnabled: item.sgstEnabled || false,
+      sgstPercentage: item.sgstPercentage?.toString() || '',
+      cgstEnabled: item.cgstEnabled || false,
+      cgstPercentage: item.cgstPercentage?.toString() || ''
     });
     setEditModalOpen(true);
   };
@@ -1001,12 +1032,16 @@ const InventoryManagement = () => {
     try {
       setIsEditSubmitting(true);
       
-      // Check if we have a valid item ID
       if (!editItemData.id) {
         throw new Error('Item ID is missing. Cannot update this item.');
       }
       
-      // Prepare the data for API call
+      // Calculate tax amounts
+      const sgstAmount = editItemData.sgstEnabled ? 
+        calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.sgstPercentage) : 0;
+      const cgstAmount = editItemData.cgstEnabled ? 
+        calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.cgstPercentage) : 0;
+      
       const requestData = {
         carName: 'abc',
         model: 1,
@@ -1014,15 +1049,18 @@ const InventoryManagement = () => {
         partName: editItemData.partName,
         quantity: parseInt(editItemData.quantity),
         pricePerUnit: parseFloat(editItemData.pricePerUnit),
-        taxAmount: parseFloat(editItemData.taxAmount),
-        taxType: editItemData.taxType
+        sgstEnabled: editItemData.sgstEnabled,
+        sgstPercentage: editItemData.sgstEnabled ? parseFloat(editItemData.sgstPercentage) : 0,
+        sgstAmount: sgstAmount,
+        cgstEnabled: editItemData.cgstEnabled,
+        cgstPercentage: editItemData.cgstEnabled ? parseFloat(editItemData.cgstPercentage) : 0,
+        cgstAmount: cgstAmount,
+        totalTaxAmount: sgstAmount + cgstAmount
       };
 
       console.log('Updating item with ID:', editItemData.id);
       console.log('Request data:', requestData);
-      console.log('Full update URL:', `https://garage-management-zi5z.onrender.com/api/garage/inventory/update/${editItemData.id}`);
 
-      // Make API call to update inventory item
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/inventory/update/${editItemData.id}`,
         requestData,
@@ -1035,21 +1073,18 @@ const InventoryManagement = () => {
       
       console.log('Update response:', response.data);
       
-      // Show success notification
       setNotification({
         open: true,
         message: 'Item updated successfully!',
         severity: 'success'
       });
 
-      // Close the modal and refresh inventory
       setEditModalOpen(false);
       fetchInventory();
       
     } catch (error) {
       console.error('Error updating item:', error);
       
-      // Log detailed error information for debugging
       if (error.response) {
         console.error('Error response data:', error.response.data);
         console.error('Error response status:', error.response.status);
@@ -1066,27 +1101,37 @@ const InventoryManagement = () => {
     }
   };
 
-  // Handle form submission - UPDATED to match API requirements
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     try {
       setIsSubmitting(true);
       
-      // Prepare the data for API call according to the specified format
+      // Calculate tax amounts
+      const sgstAmount = formData.sgstEnabled ? 
+        calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.sgstPercentage) : 0;
+      const cgstAmount = formData.cgstEnabled ? 
+        calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.cgstPercentage) : 0;
+      
       const requestData = {
-        name: formData.carName, // Using carName as the name field
-        garageId: garageId, // Using the stored garageId or default
+        name: formData.carName,
+        garageId: garageId,
         quantity: parseInt(formData.quantity),
         pricePerUnit: parseFloat(formData.pricePerUnit),
-        partNumber: parseInt(formData.partNumber) || formData.partNumber, // Try to parse as int if possible
-        partName: formData.partName
-        // Note: tax fields are not included as they're not in the example API request
+        partNumber: parseInt(formData.partNumber) || formData.partNumber,
+        partName: formData.partName,
+        sgstEnabled: formData.sgstEnabled,
+        sgstPercentage: formData.sgstEnabled ? parseFloat(formData.sgstPercentage) : 0,
+        sgstAmount: sgstAmount,
+        cgstEnabled: formData.cgstEnabled,
+        cgstPercentage: formData.cgstEnabled ? parseFloat(formData.cgstPercentage) : 0,
+        cgstAmount: cgstAmount,
+        totalTaxAmount: sgstAmount + cgstAmount
       };
 
       console.log('Adding inventory item with data:', requestData);
 
-      // Make API call to add inventory item
       const response = await axios.post(
         'https://garage-management-zi5z.onrender.com/api/garage/inventory/add',
         requestData,
@@ -1099,7 +1144,6 @@ const InventoryManagement = () => {
       
       console.log('Add response:', response.data);
       
-      // Show success notification
       setNotification({
         open: true,
         message: 'Part added successfully!',
@@ -1114,19 +1158,18 @@ const InventoryManagement = () => {
         partName: '',
         quantity: '',
         pricePerUnit: '',
-        taxType: '',
-        taxAmount: ''
+        sgstEnabled: false,
+        sgstPercentage: '',
+        cgstEnabled: false,
+        cgstPercentage: ''
       });
       
-      // Reset selected part
       setSelectedPart('');
-      // Refresh inventory
       fetchInventory();
 
     } catch (error) {
       console.error('Error adding part:', error);
       
-      // Log detailed error information for debugging
       if (error.response) {
         console.error('Error response data:', error.response.data);
         console.error('Error response status:', error.response.status);
@@ -1230,120 +1273,188 @@ const InventoryManagement = () => {
             <Box 
               component="form" 
               onSubmit={handleSubmit}
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 2,
-                mb: 3
-              }}
+              sx={{ mb: 3 }}
             >
-              {/* <TextField
-                name="carName"
-                label="Car Name"
-                variant="outlined"
-                value={formData.carName}
-                onChange={handleInputChange}
-                required
-                sx={{ flex: '1 1 200px' }}
-              /> */}
-              {/* <TextField
-                name="model"
-                label="Model"
-                variant="outlined"
-                value={formData.model}
-                onChange={handleInputChange}
-                required
-                sx={{ flex: '1 1 200px' }}
-              /> */}
-              <TextField
-                name="partNumber"
-                label="Part Number"
-                variant="outlined"
-                value={formData.partNumber}
-                onChange={handleInputChange}
-                required
-                sx={{ flex: '1 1 200px' }}
-              />
-              <TextField
-                name="partName"
-                label="Part Name"
-                variant="outlined"
-                value={formData.partName}
-                onChange={handleInputChange}
-                required
-                sx={{ flex: '1 1 200px' }}
-              />
-              <TextField
-                name="quantity"
-                label="Quantity"
-                type="number"
-                variant="outlined"
-                value={formData.quantity}
-                onChange={handleInputChange}
-                required
-                inputProps={{ min: 1 }}
-                sx={{ flex: '1 1 200px' }}
-              />
-              <TextField
-                name="pricePerUnit"
-                label="Price Per Unit"
-                type="number"
-                variant="outlined"
-                value={formData.pricePerUnit}
-                onChange={handleInputChange}
-                required
-                inputProps={{ min: 0, step: "0.01" }}
-                sx={{ flex: '1 1 200px' }}
-              />
-              <FormControl sx={{ flex: '1 1 200px' }}>
-                <InputLabel>Tax</InputLabel>
-                <Select
-                  name="taxType"
-                  value={formData.taxType}
-                  onChange={handleInputChange}
-                  required
-                  label="Tax"
-                >
-                  <MenuItem value="SGST">SGST</MenuItem>
-                  <MenuItem value="CGST">CGST</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                name="taxAmount"
-                label="Tax Amount"
-                type="number"
-                variant="outlined"
-                value={formData.taxAmount}
-                onChange={handleInputChange}
-                required
-                inputProps={{ min: 0, step: "0.01" }}
-                sx={{ flex: '1 1 200px' }}
-              />
-            </Box>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    name="partNumber"
+                    label="Part Number"
+                    variant="outlined"
+                    value={formData.partNumber}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    name="partName"
+                    label="Part Name"
+                    variant="outlined"
+                    value={formData.partName}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    name="quantity"
+                    label="Quantity"
+                    type="number"
+                    variant="outlined"
+                    value={formData.quantity}
+                    onChange={handleInputChange}
+                    required
+                    inputProps={{ min: 1 }}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    name="pricePerUnit"
+                    label="Price Per Unit"
+                    type="number"
+                    variant="outlined"
+                    value={formData.pricePerUnit}
+                    onChange={handleInputChange}
+                    required
+                    inputProps={{ min: 0, step: "0.01" }}
+                    fullWidth
+                  />
+                </Grid>
+              </Grid>
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                sx={{ 
-                  px: 4, 
-                  py: 1.5, 
-                  fontWeight: 600,
-                  fontSize: '1rem',
-                  textTransform: 'uppercase',
-                  borderRadius: 2,
-                  boxShadow: theme.shadows[2],
-                  backgroundColor: '#ff4d4d',
-                  '&:hover': {
-                    backgroundColor: '#e63939',
-                    boxShadow: theme.shadows[4],
-                  }
-                }}
-              >
-                {isSubmitting ? 'Adding...' : 'Add Part'}
-              </Button>
+              {/* Tax Section */}
+              <Box sx={{ mb: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Tax Configuration</Typography>
+                
+                <Grid container spacing={2}>
+                  {/* SGST Section */}
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            name="sgstEnabled"
+                            checked={formData.sgstEnabled}
+                            onChange={handleInputChange}
+                          />
+                        }
+                        label="Enable SGST"
+                      />
+                      {formData.sgstEnabled && (
+                        <Box sx={{ mt: 2 }}>
+                          <TextField
+                            name="sgstPercentage"
+                            label="SGST Percentage (%)"
+                            type="number"
+                            variant="outlined"
+                            value={formData.sgstPercentage}
+                            onChange={handleInputChange}
+                            required={formData.sgstEnabled}
+                            inputProps={{ min: 0, max: 100, step: "0.01" }}
+                            fullWidth
+                            size="small"
+                          />
+                          {formData.pricePerUnit && formData.quantity && formData.sgstPercentage && (
+                            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                              SGST Amount: ₹{calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.sgstPercentage).toFixed(2)}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  </Grid>
+
+                  {/* CGST Section */}
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            name="cgstEnabled"
+                            checked={formData.cgstEnabled}
+                            onChange={handleInputChange}
+                          />
+                        }
+                        label="Enable CGST"
+                      />
+                      {formData.cgstEnabled && (
+                        <Box sx={{ mt: 2 }}>
+                          <TextField
+                            name="cgstPercentage"
+                            label="CGST Percentage (%)"
+                            type="number"
+                            variant="outlined"
+                            value={formData.cgstPercentage}
+                            onChange={handleInputChange}
+                            required={formData.cgstEnabled}
+                            inputProps={{ min: 0, max: 100, step: "0.01" }}
+                            fullWidth
+                            size="small"
+                          />
+                          {formData.pricePerUnit && formData.quantity && formData.cgstPercentage && (
+                            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                              CGST Amount: ₹{calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.cgstPercentage).toFixed(2)}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Total Price Display */}
+                {formData.pricePerUnit && formData.quantity && (
+                  <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                    <Typography variant="h6">
+                      Total Price: ₹{calculateTotalPrice(
+                        formData.pricePerUnit, 
+                        formData.quantity, 
+                        formData.sgstEnabled, 
+                        formData.sgstPercentage, 
+                        formData.cgstEnabled, 
+                        formData.cgstPercentage
+                      ).toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Base Price: ₹{(parseFloat(formData.pricePerUnit) * parseInt(formData.quantity || 0)).toFixed(2)}
+                      {(formData.sgstEnabled && formData.sgstPercentage) && (
+                        <> + SGST: ₹{calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.sgstPercentage).toFixed(2)}</>
+                      )}
+                      {(formData.cgstEnabled && formData.cgstPercentage) && (
+                        <> + CGST: ₹{calculateTaxAmount(formData.pricePerUnit, formData.quantity, formData.cgstPercentage).toFixed(2)}</>
+                      )}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={isSubmitting}
+                  sx={{ 
+                    px: 4, 
+                    py: 1.5, 
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    textTransform: 'uppercase',
+                    borderRadius: 2,
+                    boxShadow: theme.shadows[2],
+                    backgroundColor: '#ff4d4d',
+                    '&:hover': {
+                      backgroundColor: '#e63939',
+                      boxShadow: theme.shadows[4],
+                    }
+                  }}
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Part'}
+                </Button>
+              </Box>
             </Box>
             
             <TableContainer component={Paper} sx={{ boxShadow: theme.shadows[1] }}>
@@ -1373,7 +1484,8 @@ const InventoryManagement = () => {
                     <TableCell>Name Of Part</TableCell>
                     <TableCell>Qty</TableCell>
                     <TableCell>Price/Unit</TableCell>
-                    <TableCell>Tax</TableCell>
+                    <TableCell>SGST</TableCell>
+                    <TableCell>CGST</TableCell>
                     <TableCell>Total Price</TableCell>
                     <TableCell>Edit</TableCell>
                   </TableRow>
@@ -1398,12 +1510,23 @@ const InventoryManagement = () => {
                       <TableCell>{row.partNumber}</TableCell>
                       <TableCell>{row.partName}</TableCell>
                       <TableCell>{row.quantity}</TableCell>
-                      <TableCell>{typeof row.pricePerUnit === 'number' ? `${row.pricePerUnit.toFixed(2)}` : row.price}</TableCell>
-                      <TableCell>{row.taxType || row.tax}</TableCell>
+                      <TableCell>{typeof row.pricePerUnit === 'number' ? `₹${row.pricePerUnit.toFixed(2)}` : row.price}</TableCell>
                       <TableCell>
-                        {row.totalPrice || (row.quantity && row.pricePerUnit ? 
-                          `${(row.quantity * row.pricePerUnit).toFixed(2)}` : 
-                          '')}
+                        {row.sgstEnabled ? `${row.sgstPercentage}% (₹${row.sgstAmount?.toFixed(2) || '0.00'})` : 'Not Applied'}
+                      </TableCell>
+                      <TableCell>
+                        {row.cgstEnabled ? `${row.cgstPercentage}% (₹${row.cgstAmount?.toFixed(2) || '0.00'})` : 'Not Applied'}
+                      </TableCell>
+                      <TableCell>
+                        ₹{(row.totalPrice || 
+                          calculateTotalPrice(
+                            row.pricePerUnit, 
+                            row.quantity, 
+                            row.sgstEnabled, 
+                            row.sgstPercentage, 
+                            row.cgstEnabled, 
+                            row.cgstPercentage
+                          )).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <Button 
@@ -1427,6 +1550,7 @@ const InventoryManagement = () => {
                   {Array.from({ length: Math.max(0, 10 - inventoryData.length) }).map((_, index) => (
                     <TableRow key={`empty-${index}`}>
                       <TableCell style={{ height: 53 }}></TableCell>
+                      <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
@@ -1475,103 +1599,165 @@ const InventoryManagement = () => {
           </Box>
         </DialogTitle>
         <DialogContent dividers>
-          <Box 
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 2,
-              mb: 2
-            }}
-          >
-            {/* <TextField
-              name="carName"
-              label="Car Name"
-              variant="outlined"
-              value={editItemData.carName}
-              onChange={handleEditInputChange}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              name="model"
-              label="Model"
-              variant="outlined"
-              value={editItemData.model}
-              onChange={handleEditInputChange}
-              required
-              fullWidth
-              margin="normal"
-            /> */}
-            <TextField
-              name="partNumber"
-              label="Part Number"
-              variant="outlined"
-              value={editItemData.partNumber}
-              onChange={handleEditInputChange}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              name="partName"
-              label="Part Name"
-              variant="outlined"
-              value={editItemData.partName}
-              onChange={handleEditInputChange}
-              required
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              name="quantity"
-              label="Quantity"
-              type="number"
-              variant="outlined"
-              value={editItemData.quantity}
-              onChange={handleEditInputChange}
-              required
-              inputProps={{ min: 1 }}
-              fullWidth
-              margin="normal"
-            />
-            <TextField
-              name="pricePerUnit"
-              label="Price Per Unit"
-              type="number"
-              variant="outlined"
-              value={editItemData.pricePerUnit}
-              onChange={handleEditInputChange}
-              required
-              inputProps={{ min: 0, step: "0.01" }}
-              fullWidth
-              margin="normal"
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Tax</InputLabel>
-              <Select
-                name="taxType"
-                value={editItemData.taxType}
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="partNumber"
+                label="Part Number"
+                variant="outlined"
+                value={editItemData.partNumber}
                 onChange={handleEditInputChange}
-                label="Tax"
                 required
-              >
-                <MenuItem value="SGST">SGST</MenuItem>
-                <MenuItem value="CGST">CGST</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              name="taxAmount"
-              label="Tax Amount"
-              type="number"
-              variant="outlined"
-              value={editItemData.taxAmount}
-              onChange={handleEditInputChange}
-              required
-              inputProps={{ min: 0, step: "0.01" }}
-              fullWidth
-              margin="normal"
-            />
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="partName"
+                label="Part Name"
+                variant="outlined"
+                value={editItemData.partName}
+                onChange={handleEditInputChange}
+                required
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="quantity"
+                label="Quantity"
+                type="number"
+                variant="outlined"
+                value={editItemData.quantity}
+                onChange={handleEditInputChange}
+                required
+                inputProps={{ min: 1 }}
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="pricePerUnit"
+                label="Price Per Unit"
+                type="number"
+                variant="outlined"
+                value={editItemData.pricePerUnit}
+                onChange={handleEditInputChange}
+                required
+                inputProps={{ min: 0, step: "0.01" }}
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+          </Grid>
+
+          {/* Tax Section for Edit Modal */}
+          <Box sx={{ mb: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Tax Configuration</Typography>
+            
+            <Grid container spacing={2}>
+              {/* SGST Section */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        name="sgstEnabled"
+                        checked={editItemData.sgstEnabled}
+                        onChange={handleEditInputChange}
+                      />
+                    }
+                    label="Enable SGST"
+                  />
+                  {editItemData.sgstEnabled && (
+                    <Box sx={{ mt: 2 }}>
+                      <TextField
+                        name="sgstPercentage"
+                        label="SGST Percentage (%)"
+                        type="number"
+                        variant="outlined"
+                        value={editItemData.sgstPercentage}
+                        onChange={handleEditInputChange}
+                        required={editItemData.sgstEnabled}
+                        inputProps={{ min: 0, max: 100, step: "0.01" }}
+                        fullWidth
+                        size="small"
+                      />
+                      {editItemData.pricePerUnit && editItemData.quantity && editItemData.sgstPercentage && (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                          SGST Amount: ₹{calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.sgstPercentage).toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              </Grid>
+
+              {/* CGST Section */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        name="cgstEnabled"
+                        checked={editItemData.cgstEnabled}
+                        onChange={handleEditInputChange}
+                      />
+                    }
+                    label="Enable CGST"
+                  />
+                  {editItemData.cgstEnabled && (
+                    <Box sx={{ mt: 2 }}>
+                      <TextField
+                        name="cgstPercentage"
+                        label="CGST Percentage (%)"
+                        type="number"
+                        variant="outlined"
+                        value={editItemData.cgstPercentage}
+                        onChange={handleEditInputChange}
+                        required={editItemData.cgstEnabled}
+                        inputProps={{ min: 0, max: 100, step: "0.01" }}
+                        fullWidth
+                        size="small"
+                      />
+                      {editItemData.pricePerUnit && editItemData.quantity && editItemData.cgstPercentage && (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
+                          CGST Amount: ₹{calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.cgstPercentage).toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
+
+            {/* Total Price Display */}
+            {editItemData.pricePerUnit && editItemData.quantity && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="h6">
+                  Total Price: ₹{calculateTotalPrice(
+                    editItemData.pricePerUnit, 
+                    editItemData.quantity, 
+                    editItemData.sgstEnabled, 
+                    editItemData.sgstPercentage, 
+                    editItemData.cgstEnabled, 
+                    editItemData.cgstPercentage
+                  ).toFixed(2)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Base Price: ₹{(parseFloat(editItemData.pricePerUnit) * parseInt(editItemData.quantity || 0)).toFixed(2)}
+                  {(editItemData.sgstEnabled && editItemData.sgstPercentage) && (
+                    <> + SGST: ₹{calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.sgstPercentage).toFixed(2)}</>
+                  )}
+                  {(editItemData.cgstEnabled && editItemData.cgstPercentage) && (
+                    <> + CGST: ₹{calculateTaxAmount(editItemData.pricePerUnit, editItemData.quantity, editItemData.cgstPercentage).toFixed(2)}</>
+                  )}
+                </Typography>
+              </Box>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
