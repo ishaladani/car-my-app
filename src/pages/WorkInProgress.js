@@ -9,11 +9,7 @@ import {
   Container,
   IconButton,
   Grid,
-  CssBaseline,
   Paper,
-  useTheme,
-  Select,
-  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -21,10 +17,12 @@ import {
   TableHead,
   TableRow,
   InputAdornment,
+  Chip,
+  Avatar,
   Divider,
-  Snackbar,
   Alert,
-  CircularProgress
+  Fade,
+  Skeleton
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -34,421 +32,285 @@ import {
   Engineering as EngineeringIcon,
   Comment as CommentIcon,
   Delete as DeleteIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Timer as TimerIcon,
+  CheckCircle as CheckCircleIcon,
+  Pending as PendingIcon,
+  Build as BuildIcon
 } from '@mui/icons-material';
-import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 
+import { useNavigate, useParams } from 'react-router-dom';
+
 const WorkInProgress = () => {
-  const theme = useTheme();
-  const navigate = useNavigate();
-  const { id } = useParams(); 
-  
-  let garageId = localStorage.getItem("garageId");
-  if (!garageId) {
-    garageId = localStorage.getItem("garage_id");
-  }
-
-  // Table rows state management
-  const [parts, setParts] = useState([]);
-  
-  // Car details state
-  const [carDetails, setCarDetails] = useState({
-    company: '',
-    model: '',
-    carNo: ''
-  });
-  
-  // Customer details state
-  const [customerDetails, setCustomerDetails] = useState({
-    name: '',
-    contactNo: '',
-    email: ''
-  });
-  
-  // Insurance details state
-  const [insuranceDetails, setInsuranceDetails] = useState({
-    company: '',
-    number: '',
-    type: '',
-    expiry: '',
-    regNo: '',
-    amount: ''
-  });
-  
-  // Engineer details state
-  const [engineerDetails, setEngineerDetails] = useState({
-    fullName: '',
-    assignedDateTime: ''
-  });
-  
-  const [status, setStatus] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [laborHours, setLaborHours] = useState('');
+  // Sample data - replace with your actual state management
   const [isLoading, setIsLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
-
-  // Handle snackbar close
-  const handleSnackbarClose = () => {
-    setSnackbar({...snackbar, open: false});
-  };
-  
-  // Fetch job card data when component mounts
-  useEffect(() => {
-    const fetchJobCardData = async () => {
-      if(!garageId){
-        navigate("/login")
-      }
-      try {
-        setFetchLoading(true);
-        
-        const response = await axios.get(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        const data = response.data;
-        
-        // Populate car details
-        setCarDetails({
-          company: data.company || '',
-          model: data.model || '',
-          carNo: data.carNumber || ''
-        });
-        
-        // Populate customer details
-        setCustomerDetails({
-          name: data.customerName || '',
-          contactNo: data.contactNumber || '',
-          email: data.email || ''
-        });
-        
-        // Populate insurance details
-        setInsuranceDetails({
-          company: data.insuranceProvider || '',
-          number: data.policyNumber || '',
-          type: data.type || '',
-          expiry: data.expiryDate ? data.expiryDate.split('T')[0] : '',
-          regNo: data.registrationNumber || '',
-          amount: data.excessAmount?.toString() || ''
-        });
-        
-        // Populate engineer details
-        setEngineerDetails({
-          fullName: data.engineerId && data.engineerId.length > 0 ? data.engineerId[0].name : '',
-          assignedDateTime: data.createdAt ? 
-            new Date(data.createdAt).toISOString().slice(0, 16) : ''
-        });
-        
-        // Populate parts if available
-        if (data.partsUsed && data.partsUsed.length > 0) {
-          const existingParts = data.partsUsed.map((part, index) => ({
-            id: index + 1,
-            partName: part.partName || '',
-            partNumber: '',
-            qty: part.quantity?.toString() || '',
-            pricePerPiece: part.pricePerPiece?.toString() || '',
-            gstPercent: '',
-            totalPrice: part.totalPrice?.toString() || ''
-          }));
-          
-          setParts(existingParts);
-        } else {
-          // Initialize with one empty row if no parts exist
-          setParts([{ 
-            id: 1, 
-            partName: '', 
-            partNumber: '', 
-            qty: '', 
-            pricePerPiece: '', 
-            gstPercent: '', 
-            totalPrice: '' 
-          }]);
-        }
-        
-        // Populate status, remarks, and labor hours
-        if (data.status) {
-          setStatus(data.status);
-        }
-        
-        if (data.engineerRemarks) {
-          setRemarks(data.engineerRemarks);
-        }
-        
-        if (data.laborHours !== undefined) {
-          setLaborHours(data.laborHours.toString());
-        }
-        
-      } catch (error) {
-        console.error('Error fetching job card data:', error);
-        setSnackbar({
-          open: true,
-          message: `Error: ${error.response?.data?.message || 'Failed to fetch job card data'}`,
-          severity: 'error'
-        });
-      } finally {
-        setFetchLoading(false);
-      }
-    };
-    
-    fetchJobCardData();
-  }, [id, garageId, navigate]);
-
-  // Handle form submission - FIXED VERSION
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      setIsLoading(true);
-      
-      // Filter out empty parts - only check for fields that are actually used in the UI
-      const validParts = parts.filter(part => 
-        part.partName && 
-        part.partName.trim() !== '' && 
-        part.qty && 
-        part.qty.trim() !== '' &&
-        part.totalPrice && 
-        part.totalPrice.trim() !== ''
-      );
-      
-      console.log('Valid parts found:', validParts);
-      
-      // Prepare request data
-      const requestData = {
-        laborHours: parseInt(laborHours) || 0,
-        engineerRemarks: remarks,
-        status: status
-      };
-      
-      // Only include partsUsed if there are valid parts to send
-      if (validParts.length > 0) {
-        const formattedParts = validParts.map(part => ({
-          partName: part.partName,
-          quantity: parseInt(part.qty) || 1,
-          pricePerPiece: parseFloat(part.pricePerPiece) || 0,
-          totalPrice: parseFloat(part.totalPrice) || 0
-        }));
-        
-        requestData.partsUsed = formattedParts;
-        console.log('Sending parts data:', formattedParts);
-      } else {
-        console.log('No valid parts to send, keeping existing parts data');
-      }
-      
-      console.log("Submitting to job card ID:", id);
-      console.log("Request data:", requestData);
-      
-      const response = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
-        requestData,
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      setSnackbar({
-        open: true,
-        message: 'Work progress updated successfully!',
+  const [fetchLoading, setFetchLoading] = useState(false);
+  const navigate = useNavigate();
+    const { id } = useParams(); 
+     const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
         severity: 'success'
       });
-      
-      // Navigate to Quality Check page after successful submission
-      setTimeout(() => {
-        navigate(`/Quality-Check/${id}`);
-      }, 1500);
-      
-    } catch (error) {
-      console.error('Error updating work progress:', error);
-      setSnackbar({
-        open: true,
-        message: `Error: ${error.response?.data?.message || 'Failed to update work progress'}`,
-        severity: 'error'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
+  const [carDetails, setCarDetails] = useState({
+    company: 'Toyota',
+    model: 'Camry 2022',
+    carNo: 'GJ-01-AB-1234'
+  });
+  
+  const [customerDetails, setCustomerDetails] = useState({
+    name: 'John Doe',
+    contactNo: '+91 98765 43210',
+    email: 'john.doe@email.com'
+  });
+  
+  const [insuranceDetails, setInsuranceDetails] = useState({
+    company: 'HDFC ERGO',
+    number: 'POL123456789',
+    type: 'Comprehensive',
+    expiry: '2025-12-31',
+    regNo: 'REG987654321',
+    amount: '50000'
+  });
+  
+  const [engineerDetails, setEngineerDetails] = useState({
+    fullName: 'Mike Johnson',
+    assignedDateTime: '2025-06-18T09:30'
+  });
+  
+  const [parts, setParts] = useState([
+    { id: 1, partName: 'Brake Pads', qty: '2', totalPrice: '2500' },
+    { id: 2, partName: 'Oil Filter', qty: '1', totalPrice: '850' }
+  ]);
+  
+  const [status, setStatus] = useState('Pending');
+  const [remarks, setRemarks] = useState('');
+  const [laborHours, setLaborHours] = useState('4');
 
-  // Add a new empty row to the parts table
   const handleAddRow = () => {
     const newId = parts.length > 0 ? Math.max(...parts.map(part => part.id)) + 1 : 1;
     setParts([...parts, {
       id: newId,
       partName: '',
-      partNumber: '',
       qty: '',
-      pricePerPiece: '',
-      gstPercent: '',
       totalPrice: ''
     }]);
   };
-  
-  // Delete a row from the parts table
+
   const handleDeleteRow = (id) => {
     if (parts.length > 1) {
       setParts(parts.filter(part => part.id !== id));
-    } else {
-      // If it's the last row, just clear it instead of removing
-      setParts([{
-        id: 1,
-        partName: '',
-        partNumber: '',
-        qty: '',
-        pricePerPiece: '',
-        gstPercent: '',
-        totalPrice: ''
-      }]);
     }
   };
 
-  // Update part data in the table
   const handlePartChange = (id, field, value) => {
     const updatedParts = parts.map(part => {
       if (part.id === id) {
-        const updatedPart = { ...part, [field]: value };
-        
-        // Auto-calculate total price if qty and pricePerPiece are filled
-        if ((field === 'qty' || field === 'pricePerPiece') && updatedPart.qty && updatedPart.pricePerPiece) {
-          const qty = parseFloat(updatedPart.qty);
-          const price = parseFloat(updatedPart.pricePerPiece);
-          const gst = updatedPart.gstPercent ? parseFloat(updatedPart.gstPercent) : 0;
-          
-          // Calculate total price with GST
-          const priceWithoutGst = qty * price;
-          const gstAmount = priceWithoutGst * (gst / 100);
-          updatedPart.totalPrice = (priceWithoutGst + gstAmount).toFixed(2);
-        }
-        
-        return updatedPart;
+        return { ...part, [field]: value };
       }
       return part;
     });
     setParts(updatedParts);
   };
 
+   const handleSubmit = async (e) => {
+     e.preventDefault();
+     
+     try {
+       setIsLoading(true);
+       
+       // Filter out empty parts - only check for fields that are actually used in the UI
+       const validParts = parts.filter(part => 
+         part.partName && 
+         part.partName.trim() !== '' && 
+         part.qty && 
+         part.qty.trim() !== '' &&
+         part.totalPrice && 
+         part.totalPrice.trim() !== ''
+       );
+       
+       console.log('Valid parts found:', validParts);
+       
+       // Prepare request data
+       const requestData = {
+         laborHours: parseInt(laborHours) || 0,
+         engineerRemarks: remarks,
+         status: status
+       };
+       
+       // Only include partsUsed if there are valid parts to send
+       if (validParts.length > 0) {
+         const formattedParts = validParts.map(part => ({
+           partName: part.partName,
+           quantity: parseInt(part.qty) || 1,
+           pricePerPiece: parseFloat(part.pricePerPiece) || 0,
+           totalPrice: parseFloat(part.totalPrice) || 0
+         }));
+         
+         requestData.partsUsed = formattedParts;
+         console.log('Sending parts data:', formattedParts);
+       } else {
+         console.log('No valid parts to send, keeping existing parts data');
+       }
+       
+       console.log("Submitting to job card ID:", id);
+       console.log("Request data:", requestData);
+       
+       const response = await axios.put(
+         `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
+         requestData,
+         {
+           headers: {
+             'Content-Type': 'application/json'
+           }
+         }
+       );
+       
+       setSnackbar({
+         open: true,
+         message: 'Work progress updated successfully!',
+         severity: 'success'
+       });
+       
+       // Navigate to Quality Check page after successful submission
+       setTimeout(() => {
+         navigate(`/Quality-Check/${id}`);
+       }, 1500);
+       
+     } catch (error) {
+       console.error('Error updating work progress:', error);
+       setSnackbar({
+         open: true,
+         message: `Error: ${error.response?.data?.message || 'Failed to update work progress'}`,
+         severity: 'error'
+       });
+     } finally {
+       setIsLoading(false);
+     }
+   };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Completed': return 'success';
+      case 'Pending': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Completed': return <CheckCircleIcon />;
+      case 'Pending': return <PendingIcon />;
+      default: return <TimerIcon />;
+    }
+  };
+
   return (
     <Box sx={{ 
-      flexGrow: 1,
+   flexGrow: 1,
       mb: 4,
       ml: {xs: 0, sm: 35},
       overflow: 'auto',
       pt: 3
     }}>
-      <CssBaseline />
-      
-      {/* Loading overlay */}
-      {fetchLoading && (
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          bgcolor: 'rgba(255, 255, 255, 0.7)',
-          zIndex: 9999
-        }}>
-          <CircularProgress />
-        </Box>
-      )}
-      
-      <Container maxWidth="md">
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-          <IconButton 
-            onClick={() => navigate(-1)} 
-            sx={{ 
-              mr: 2, 
-              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
-              '&:hover': {
-                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-              }
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h5" component="h1" fontWeight={600}>
-            Work In Progress
-          </Typography>
-        </Box>
-        
-        <Card sx={{ 
-          mb: 4, 
-          overflow: 'visible', 
-          borderRadius: 2,
-          boxShadow: theme.shadows[3]
-        }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box component="form" onSubmit={handleSubmit}>
-              <Grid container spacing={3}>
+      <Container maxWidth="xl">
+        {/* Header */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            bgcolor: '#1976d2',
+            borderRadius: 3,
+            border: '1px solid #e2e8f0'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton 
+                sx={{ 
+                  mr: 2,
+                  bgcolor: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
+                }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <Box>
+                <Typography variant="h4" fontWeight={700} color="white">
+                  Work In Progress
+                </Typography>
+                <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ mt: 0.5 }}>
+                  Update work status and parts used for job card
+                </Typography>
+              </Box>
+            </Box>
+            <Chip 
+              icon={getStatusIcon(status)}
+              label={status}
+              color={getStatusColor(status)}
+              size="large"
+              sx={{ fontWeight: 600 }}
+            />
+          </Box>
+        </Paper>
+
+        <form onSubmit={handleSubmit}>
+          <Grid container spacing={3}>
+            {/* Left Column */}
+            <Grid item xs={12} lg={8}>
+              {/* Vehicle & Customer Info */}
+              <Grid container spacing={3} sx={{ mb: 3 }}>
                 {/* Car Details */}
                 <Grid item xs={12} md={6}>
-                  <Card sx={{ 
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[3],
-                    height: '100%'
-                  }}>
+                  <Card 
+                    elevation={0}
+                    sx={{ 
+                      height: '100%',
+                      borderRadius: 3,
+                      border: '1px solid #e2e8f0'
+                    }}
+                  >
                     <Box sx={{ 
-                      bgcolor: theme.palette.primary.main,
+                      background: '#1976d2',
                       color: 'white',
-                      py: 1.5,
-                      px: 2,
-                      borderTopLeftRadius: 8,
-                      borderTopRightRadius: 8,
-                      fontWeight: 'bold'
+                      p: 2.5,
+                      display: 'flex',
+                      alignItems: 'center'
                     }}>
-                      Car Details
+                      <Avatar sx={{ bgcolor: '#1976d2', mr: 2 }}>
+                        <CarIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight={600}>
+                        Vehicle Details
+                      </Typography>
                     </Box>
-                    <CardContent>
+                    <CardContent sx={{ p: 3 }}>
                       <TextField 
                         fullWidth 
-                        placeholder="Company" 
-                        margin="normal"
+                        label="Company"
                         variant="outlined"
                         value={carDetails.company}
-                        onChange={(e) => setCarDetails({...carDetails, company: e.target.value})}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <CarIcon color="action" />
-                            </InputAdornment>
-                          ),
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
+                        sx={{ mb: 2 }}
                       />
                       <TextField 
                         fullWidth 
-                        placeholder="Model" 
-                        margin="normal"
+                        label="Model"
                         variant="outlined"
                         value={carDetails.model}
-                        onChange={(e) => setCarDetails({...carDetails, model: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
+                        sx={{ mb: 2 }}
                       />
                       <TextField 
                         fullWidth 
-                        placeholder="Car No." 
-                        margin="normal"
+                        label="Registration Number"
                         variant="outlined"
                         value={carDetails.carNo}
-                        onChange={(e) => setCarDetails({...carDetails, carNo: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
                       />
                     </CardContent>
                   </Card>
@@ -456,321 +318,162 @@ const WorkInProgress = () => {
 
                 {/* Customer Details */}
                 <Grid item xs={12} md={6}>
-                  <Card sx={{ 
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[3],
-                    height: '100%'
-                  }}>
+                  <Card 
+                    elevation={0}
+                    sx={{ 
+                      height: '100%',
+                      borderRadius: 3,
+                      border: '1px solid #e2e8f0'
+                    }}
+                  >
                     <Box sx={{ 
-                      bgcolor: 'rgb(9, 141, 97)',
+                      background: '#1976d2',
                       color: 'white',
-                      py: 1.5,
-                      px: 2,
-                      borderTopLeftRadius: 8,
-                      borderTopRightRadius: 8,
-                      fontWeight: 'bold'
+                      p: 2.5,
+                      display: 'flex',
+                      alignItems: 'center'
                     }}>
-                      Customer Details
+                      <Avatar sx={{ bgcolor: '#1976d2', mr: 2 }}>
+                        <PersonIcon />
+                      </Avatar>
+                      <Typography variant="h6" fontWeight={600}>
+                        Customer Details
+                      </Typography>
                     </Box>
-                    <CardContent>
+                    <CardContent sx={{ p: 3 }}>
                       <TextField 
                         fullWidth 
-                        placeholder="Name" 
-                        margin="normal"
+                        label="Customer Name"
                         variant="outlined"
                         value={customerDetails.name}
-                        onChange={(e) => setCustomerDetails({...customerDetails, name: e.target.value})}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <PersonIcon color="action" />
-                            </InputAdornment>
-                          ),
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
+                        sx={{ mb: 2 }}
                       />
                       <TextField 
                         fullWidth 
-                        placeholder="Contact No." 
-                        margin="normal"
+                        label="Contact Number"
                         variant="outlined"
                         value={customerDetails.contactNo}
-                        onChange={(e) => setCustomerDetails({...customerDetails, contactNo: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
+                        sx={{ mb: 2 }}
                       />
                       <TextField 
                         fullWidth 
-                        placeholder="Email" 
-                        margin="normal"
+                        label="Email Address"
                         variant="outlined"
-                        type="email"
                         value={customerDetails.email}
-                        onChange={(e) => setCustomerDetails({...customerDetails, email: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Insurance Details */}
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ 
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[3],
-                    mt: 2
-                  }}>
-                    <Box sx={{ 
-                      bgcolor: 'rgb(9, 141, 97)',
-                      color: 'white',
-                      py: 1.5,
-                      px: 2,
-                      borderTopLeftRadius: 8,
-                      borderTopRightRadius: 8,
-                      fontWeight: 'bold'
-                    }}>
-                      Insurance Details
-                    </Box>
-                    <CardContent>
-                      <TextField 
-                        fullWidth 
-                        placeholder="Company" 
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.company}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, company: e.target.value})}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <SecurityIcon color="action" />
-                            </InputAdornment>
-                          ),
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        placeholder="Number" 
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.number}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, number: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        placeholder="Type" 
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.type}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, type: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        type="date"
-                        label="Expiry"
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.expiry}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, expiry: e.target.value})}
-                        InputLabelProps={{
-                          shrink: true,
-                        }}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        placeholder="Reg. No." 
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.regNo}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, regNo: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        placeholder="Amount" 
-                        margin="normal"
-                        variant="outlined"
-                        value={insuranceDetails.amount}
-                        onChange={(e) => setInsuranceDetails({...insuranceDetails, amount: e.target.value})}
-                        InputProps={{
-                          readOnly: true
-                        }}
-                      />
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Engineer Details */}
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ 
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[3],
-                    mt: 2
-                  }}>
-                    <Box sx={{ 
-                      bgcolor: 'rgb(9, 141, 97)',
-                      color: 'white',
-                      py: 1.5,
-                      px: 2,
-                      borderTopLeftRadius: 8,
-                      borderTopRightRadius: 8,
-                      fontWeight: 'bold'
-                    }}>
-                      Engineer Details
-                    </Box>
-                    <CardContent>
-                      <TextField 
-                        fullWidth 
-                        placeholder="Full Name" 
-                        margin="normal"
-                        variant="outlined"
-                        value={engineerDetails.fullName}
-                        onChange={(e) => setEngineerDetails({...engineerDetails, fullName: e.target.value})}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <EngineeringIcon color="action" />
-                            </InputAdornment>
-                          ),
-                          readOnly: true
-                        }}
-                      />
-                      <TextField 
-                        fullWidth 
-                        type="datetime-local"
-                        label="Date & Time Assigned"
-                        margin="normal"
-                        variant="outlined"
-                        value={engineerDetails.assignedDateTime}
-                        onChange={(e) => setEngineerDetails({...engineerDetails, assignedDateTime: e.target.value})}
-                        InputLabelProps={{
-                          shrink: true,
-                        }}
-                        InputProps={{
-                          readOnly: true
-                        }}
+                        InputProps={{ readOnly: true }}
                       />
                     </CardContent>
                   </Card>
                 </Grid>
               </Grid>
 
-              {/* Parts Used */}
-              <Box sx={{ mt: 4 }}>
-                <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-                  Parts Used
-                </Typography>
-                <Paper sx={{ width: '100%', overflow: 'hidden', borderRadius: 2, boxShadow: theme.shadows[3] }}>
+              {/* Parts Used Section */}
+              <Card 
+                elevation={0}
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0'
+                }}
+              >
+                <Box sx={{ 
+                  background: '#1976d2',
+                  color: 'white',
+                  p: 2.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar sx={{ bgcolor: '#1976d2', mr: 2 }}>
+                      <BuildIcon />
+                    </Avatar>
+                    <Typography variant="h6" fontWeight={600}>
+                      Parts Used
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    onClick={handleAddRow}
+                    startIcon={<AddIcon />}
+                    sx={{ 
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
+                    }}
+                  >
+                    Add Part
+                  </Button>
+                </Box>
+                <CardContent sx={{ p: 0 }}>
                   <TableContainer>
-                    <Table aria-label="parts table">
+                    <Table>
                       <TableHead>
-                        <TableRow>
-                          <TableCell 
-                            align="center" 
-                            sx={{ 
-                              bgcolor: 'rgb(9, 141, 97)',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            Sr.No.
-                          </TableCell>
-                          <TableCell 
-                            align="center" 
-                            sx={{ 
-                              bgcolor: 'rgb(9, 141, 97)',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            Part Name
-                          </TableCell>
-                          <TableCell 
-                            align="center" 
-                            sx={{ 
-                              bgcolor: 'rgb(9, 141, 97)',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            Qty
-                          </TableCell>
-                          <TableCell 
-                            align="center" 
-                            sx={{ 
-                              bgcolor: 'rgb(9, 141, 97)',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            Total Price
-                          </TableCell>
-                          <TableCell 
-                            align="center" 
-                            sx={{ 
-                              bgcolor: 'rgb(9, 141, 97)',
-                              color: 'white',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            Actions
-                          </TableCell>
+                        <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                          <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Sr.No.</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Part Name</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Quantity</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Total Price (₹)</TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {parts.map((part) => (
-                          <TableRow key={part.id}>
-                            <TableCell align="center">
-                              {part.id}
+                        {parts.map((part, index) => (
+                          <TableRow key={part.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                            <TableCell>
+                              <Chip 
+                                label={index + 1} 
+                                size="small" 
+                                color="primary" 
+                                variant="outlined" 
+                              />
                             </TableCell>
                             <TableCell>
                               <TextField 
                                 fullWidth 
-                                variant="outlined" 
                                 size="small"
+                                variant="outlined"
+                                placeholder="Enter part name"
                                 value={part.partName}
                                 onChange={(e) => handlePartChange(part.id, 'partName', e.target.value)}
+                                sx={{ minWidth: 200 }}
                               />
                             </TableCell>
                             <TableCell>
                               <TextField 
                                 fullWidth 
-                                variant="outlined" 
                                 size="small"
                                 type="number"
+                                variant="outlined"
+                                placeholder="Qty"
                                 value={part.qty}
                                 onChange={(e) => handlePartChange(part.id, 'qty', e.target.value)}
+                                sx={{ maxWidth: 100 }}
                               />
                             </TableCell>
                             <TableCell>
                               <TextField 
                                 fullWidth 
-                                variant="outlined" 
                                 size="small"
                                 type="number"
+                                variant="outlined"
+                                placeholder="Price"
                                 value={part.totalPrice}
                                 onChange={(e) => handlePartChange(part.id, 'totalPrice', e.target.value)}
+                                sx={{ maxWidth: 120 }}
                               />
                             </TableCell>
-                            <TableCell align="center">
+                            <TableCell>
                               <IconButton 
-                                color="error" 
-                                size="small"
+                                color="error"
                                 onClick={() => handleDeleteRow(part.id)}
+                                disabled={parts.length === 1}
+                                sx={{ 
+                                  '&:hover': { 
+                                    bgcolor: 'rgba(239, 68, 68, 0.1)' 
+                                  }
+                                }}
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -780,115 +483,292 @@ const WorkInProgress = () => {
                       </TableBody>
                     </Table>
                   </TableContainer>
-                  
-                  {/* Add Row Button */}
-                  <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      onClick={handleAddRow}
-                      startIcon={<AddIcon />}
-                    >
-                      Add Part
-                    </Button>
-                  </Box>
-                </Paper>
-              </Box>
+                </CardContent>
+              </Card>
 
-              {/* Additional Fields */}
-              <Grid container spacing={3} sx={{ mt: 2 }}>
-                <Grid item xs={12} md={4}>
-                  <TextField 
-                    fullWidth 
-                    label="Labour Hours"
-                    variant="outlined" 
-                    type="number"
-                    value={laborHours}
-                    onChange={(e) => setLaborHours(e.target.value)}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Status"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    variant="outlined"
-                    required
-                  >
-                    <MenuItem value="">Select Status</MenuItem>
-                    <MenuItem value="Pending">Pending</MenuItem>
-                    <MenuItem value="Completed">Completed</MenuItem>
-                  </TextField>
-                </Grid>
-              </Grid>
-
-              {/* Remarks */}
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                placeholder="Enter Remarks"
-                variant="outlined"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                sx={{ mt: 3 }}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-                      <CommentIcon color="action" />
-                    </InputAdornment>
-                  ),
+              {/* Work Details */}
+              <Card 
+                elevation={0}
+                sx={{ 
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0'
                 }}
-              />
+              >
+                <Box sx={{ 
+                  background: '#1976d2',
+                  color: 'white',
+                  p: 2.5,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', mr: 2 }}>
+                    <CommentIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight={600}>
+                    Work Details
+                  </Typography>
+                </Box>
+                <CardContent sx={{ p: 3 }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <TextField 
+                        fullWidth 
+                        label="Labor Hours"
+                        type="number"
+                        variant="outlined"
+                        value={laborHours}
+                        onChange={(e) => setLaborHours(e.target.value)}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <TimerIcon color="action" />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Work Status"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        variant="outlined"
+                        SelectProps={{
+                          native: true,
+                        }}
+                      >
+                        <option value="">Select Status</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                      </TextField>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Engineer Remarks"
+                        placeholder="Enter detailed remarks about the work performed..."
+                        variant="outlined"
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        required
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              {/* Submit Button */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  disabled={isLoading || fetchLoading}
-                  sx={{ 
-                    px: 4, 
-                    py: 1.5, 
-                    width: '50%',
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    textTransform: 'uppercase',
-                    borderRadius: 2,
-                    boxShadow: theme.shadows[2],
-                    '&:hover': {
-                      boxShadow: theme.shadows[4],
-                    }
-                  }}
-                >
-                  {fetchLoading ? 'LOADING...' : isLoading ? 'SUBMITTING...' : 'SUBMIT REMARKS'}
-                </Button>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+            {/* Right Sidebar */}
+            <Grid item xs={12} lg={4}>
+              {/* Insurance Details */}
+              <Card 
+                elevation={0}
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0'
+                }}
+              >
+                <Box sx={{ 
+                  background: '#1976d2',
+                  color: '#1e293b',
+                  p: 2.5,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Avatar sx={{ bgcolor: 'rgba(30, 41, 59, 0.1)', mr: 2 }}>
+                    <SecurityIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight={600}>
+                    Insurance Details
+                  </Typography>
+                </Box>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Insurance Company
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {insuranceDetails.company}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Policy Number
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {insuranceDetails.number}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Policy Type
+                    </Typography>
+                    <Chip 
+                      label={insuranceDetails.type} 
+                      color="primary" 
+                      variant="outlined" 
+                      size="small"
+                    />
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Expiry Date
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {new Date(insuranceDetails.expiry).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Coverage Amount
+                    </Typography>
+                    <Typography variant="h6" color="success.main" fontWeight={600}>
+                      ₹{insuranceDetails.amount}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* Engineer Details */}
+              <Card 
+                elevation={0}
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0'
+                }}
+              >
+                <Box sx={{ 
+                  background: '#1976d2',
+                  color: '#1e293b',
+                  p: 2.5,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Avatar sx={{ bgcolor: 'rgba(30, 41, 59, 0.1)', mr: 2 }}>
+                    <EngineeringIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight={600}>
+                    Assigned Engineer
+                  </Typography>
+                </Box>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <Avatar 
+                      sx={{ 
+                        width: 56, 
+                        height: 56, 
+                        bgcolor: 'primary.main',
+                        mr: 2,
+                        fontSize: '1.5rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      {engineerDetails.fullName.split(' ').map(n => n[0]).join('')}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h6" fontWeight={600} color="#1e293b">
+                        {engineerDetails.fullName}
+                      </Typography>
+                      <Typography variant="body2" color="#64748b">
+                        Senior Technician
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                  <Box>
+                    <Typography variant="body2" color="#64748b" gutterBottom>
+                      Assigned Date & Time
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {new Date(engineerDetails.assignedDateTime).toLocaleString()}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+
+              {/* Summary Card */}
+              <Card 
+                elevation={0}
+                sx={{ 
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  background: '#1976d2',
+                  color: 'white'
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Job Summary
+                  </Typography>
+                  <Box sx={{ mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2">Total Parts:</Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {parts.filter(p => p.partName).length}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2">Labor Hours:</Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        {laborHours || '0'} hrs
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="body2">Parts Cost:</Typography>
+                      <Typography variant="body2" fontWeight={600}>
+                        ₹{parts.reduce((sum, part) => sum + (parseFloat(part.totalPrice) || 0), 0)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Submit Button */}
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              mt: 3, 
+              bgcolor: 'white',
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              textAlign: 'center'
+            }}
+          >
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              disabled={isLoading}
+              sx={{ 
+                px: 6, 
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                }
+              }}
+            >
+              {isLoading ? 'Updating...' : 'Submit Work Progress'}
+            </Button>
+          </Paper>
+        </form>
       </Container>
-      
-      {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleSnackbarClose} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 };

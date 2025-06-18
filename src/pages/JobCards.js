@@ -64,7 +64,6 @@ const VisuallyHiddenInput = styled('input')({
   whiteSpace: 'nowrap',
   width: 1,
 });
-
 const UploadButton = styled(Button)(({ theme }) => ({
   borderRadius: theme.shape.borderRadius,
   padding: '10px 15px',
@@ -85,47 +84,35 @@ const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
-
 const validatePhone = (phone) => {
   const phoneRegex = /^[0-9]{10,15}$/;
   return phoneRegex.test(phone.replace(/[\s-()]/g, ''));
 };
-
 const validateCarNumber = (carNumber) => {
-  // Basic car number validation - adjust based on your region's format
   const carNumberRegex = /^[A-Z0-9\s-]{4,15}$/i;
   return carNumberRegex.test(carNumber);
 };
-
 const validatePolicyNumber = (policyNumber) => {
-  // Basic policy number validation
   return policyNumber.length >= 5 && policyNumber.length <= 20;
 };
-
 const validateRegistrationNumber = (regNumber) => {
-  // Basic registration number validation
   return regNumber.length >= 5 && regNumber.length <= 20;
 };
-
 const validateExcessAmount = (amount) => {
   const numAmount = parseFloat(amount);
   return !isNaN(numAmount) && numAmount >= 0 && numAmount <= 1000000;
 };
-
 const validateKilometer = (km) => {
   const numKm = parseInt(km);
   return !isNaN(numKm) && numKm >= 0 && numKm <= 9999999;
 };
-
 const validateFileSize = (file, maxSizeMB) => {
   return file.size <= maxSizeMB * 1024 * 1024;
 };
-
 const validateImageFile = (file) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
   return allowedTypes.includes(file.type) && validateFileSize(file, 10);
 };
-
 const validateVideoFile = (file) => {
   const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm'];
   return allowedTypes.includes(file.type) && validateFileSize(file, 50);
@@ -145,7 +132,7 @@ const JobCards = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    customerNumber:'',
+    customerNumber: '',
     customerName: '',
     contactNumber: '',
     email: '',
@@ -160,6 +147,8 @@ const JobCards = () => {
     registrationNumber: '',
     type: '',
     excessAmount: '',
+    chesiNumber: '',
+    tyreCondition: '',
   });
 
   // Job Details Point-wise state
@@ -189,118 +178,79 @@ const JobCards = () => {
   // Real-time validation function
   const validateField = (name, value) => {
     let error = '';
-
     switch (name) {
       case 'customerName':
-        if (!value.trim()) {
-          error = 'Customer name is required';
-        } else if (value.trim().length < 2) {
-          error = 'Customer name must be at least 2 characters';
-        } else if (value.trim().length > 50) {
-          error = 'Customer name must be less than 50 characters';
-        }
+        if (!value.trim()) error = 'Customer name is required';
+        else if (value.trim().length < 2) error = 'At least 2 characters';
+        else if (value.trim().length > 50) error = 'Max 50 characters allowed';
         break;
-
       case 'contactNumber':
-        if (!value.trim()) {
-          error = 'Contact number is required';
-        } else if (!validatePhone(value)) {
-          error = 'Please enter a valid phone number (10-15 digits)';
-        }
+        if (!value.trim()) error = 'Contact number is required';
+        else if (!validatePhone(value)) error = 'Enter valid phone number';
         break;
-
       case 'email':
-        if (value.trim() && !validateEmail(value)) {
-          error = 'Please enter a valid email address';
-        }
+        if (value.trim() && !validateEmail(value)) error = 'Enter valid email';
         break;
-
       case 'carNumber':
-        if (!value.trim()) {
-          error = 'Car number is required';
-        } else if (!validateCarNumber(value)) {
-          error = 'Please enter a valid car number';
-        }
+        if (!value.trim()) error = 'Car number is required';
+        else if (!validateCarNumber(value)) error = 'Enter valid car number';
         break;
-
       case 'model':
-        if (!value.trim()) {
-          error = 'Car model is required';
-        } else if (value.trim().length < 2) {
-          error = 'Model must be at least 2 characters';
-        }
+        if (!value.trim()) error = 'Car model is required';
+        else if (value.trim().length < 2) error = 'Model must be at least 2 characters';
         break;
-
       case 'company':
-        if (value.trim() && value.trim().length < 2) {
-          error = 'Company name must be at least 2 characters';
-        }
+        if (value.trim() && value.trim().length < 2) error = 'Company must be at least 2 characters';
         break;
-
       case 'kilometer':
-        if (value && !validateKilometer(value)) {
-          error = 'Please enter a valid kilometer reading (0-9,999,999)';
-        }
+        if (value && !validateKilometer(value)) error = 'Valid kilometer reading required';
         break;
-
       case 'insuranceProvider':
-        if (value.trim() && value.trim().length < 2) {
-          error = 'Insurance provider must be at least 2 characters';
-        }
+        if (value.trim() && value.trim().length < 2) error = 'Insurance provider must be at least 2 characters';
         break;
-
       case 'expiryDate':
         if (value) {
           const selectedDate = new Date(value);
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          if (selectedDate < today) {
-            error = 'Expiry date cannot be in the past';
-          }
+          if (selectedDate < today) error = 'Expiry date cannot be in the past';
         }
         break;
-
       case 'policyNumber':
-        if (value.trim() && !validatePolicyNumber(value)) {
-          error = 'Policy number must be 5-20 characters';
-        }
+        if (value.trim() && !validatePolicyNumber(value)) error = 'Policy number must be 5–20 characters';
         break;
-
       case 'registrationNumber':
-        if (value.trim() && !validateRegistrationNumber(value)) {
-          error = 'Registration number must be 5-20 characters';
-        }
+        if (value.trim() && !validateRegistrationNumber(value)) error = 'Must be 5–20 characters';
         break;
-
       case 'excessAmount':
-        if (value && !validateExcessAmount(value)) {
-          error = 'Please enter a valid amount (0-1,000,000)';
-        }
+        if (value && !validateExcessAmount(value)) error = 'Enter a valid amount (0–1,000,000)';
         break;
-
       default:
         break;
     }
-
     return error;
   };
 
-  // Handle form field changes with validation
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Update form data
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Mark field as touched
+
+    let updatedValue = value;
+
+    if (name === 'carNumber') {
+      updatedValue = value.toUpperCase();
+    }
+
+    if (name === 'email') {
+      updatedValue = value.trim().toLowerCase();
+    }
+
+    setFormData(prev => ({ ...prev, [name]: updatedValue }));
     setTouched(prev => ({ ...prev, [name]: true }));
-    
-    // Validate field
-    const error = validateField(name, value);
+
+    const error = validateField(name, updatedValue);
     setErrors(prev => ({ ...prev, [name]: error }));
   };
 
-  // Handle field blur events
   const handleBlur = (e) => {
     const { name, value } = e.target;
     setTouched(prev => ({ ...prev, [name]: true }));
@@ -335,64 +285,47 @@ const JobCards = () => {
     }
   };
 
-  // Convert job points to single string for API
   const getJobDetailsForAPI = () => {
     const validPoints = jobPoints.filter(point => point.trim());
     return validPoints.map((point, index) => `${index + 1}. ${point}`).join('\n');
   };
 
-  // Validate all form fields
   const validateAllFields = () => {
     const newErrors = {};
     const newTouched = {};
-
     Object.keys(formData).forEach(key => {
       newTouched[key] = true;
       const error = validateField(key, formData[key]);
-      if (error) {
-        newErrors[key] = error;
-      }
+      if (error) newErrors[key] = error;
     });
-
     setTouched(newTouched);
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
 
   const handleImageUpload = (view, file) => {
     if (!file) return;
-
     const newFileErrors = { ...fileErrors };
-    
     if (!validateImageFile(file)) {
       newFileErrors[view] = 'Please upload a valid image file (JPEG, PNG, WebP) under 10MB';
       setFileErrors(newFileErrors);
       return;
     }
-
-    // Clear any previous error for this view
     delete newFileErrors[view];
     setFileErrors(newFileErrors);
-    
     setCarImages(prev => ({ ...prev, [view]: file }));
   };
 
   const handleVideoUpload = (file) => {
     if (!file) return;
-
     const newFileErrors = { ...fileErrors };
-    
     if (!validateVideoFile(file)) {
       newFileErrors.video = 'Please upload a valid video file (MP4, AVI, MOV, WMV, WebM) under 50MB';
       setFileErrors(newFileErrors);
       return;
     }
-
-    // Clear any previous error
     delete newFileErrors.video;
     setFileErrors(newFileErrors);
-    
     setVideoFile(file);
   };
 
@@ -402,12 +335,9 @@ const JobCards = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate all fields before submission
     const isFormValid = validateAllFields();
     const hasFileErrors = Object.keys(fileErrors).length > 0;
-
-    if (!isFormValid) {
+    if (!isFormValid || hasFileErrors) {
       setSnackbar({
         open: true,
         message: 'Please fix all validation errors before submitting',
@@ -416,16 +346,6 @@ const JobCards = () => {
       return;
     }
 
-    if (hasFileErrors) {
-      setSnackbar({
-        open: true,
-        message: 'Please fix file upload errors before submitting',
-        severity: 'error'
-      });
-      return;
-    }
-
-    // Check if at least one image is uploaded (optional requirement)
     const hasImages = Object.values(carImages).some(image => image !== null);
     if (!hasImages) {
       setSnackbar({
@@ -436,38 +356,20 @@ const JobCards = () => {
       return;
     }
 
-    // Check if at least one job point is added
-    const validJobPoints = jobPoints.filter(point => point.trim());
-    // if (validJobPoints.length === 0) {
-    //   setSnackbar({
-    //     open: true,
-    //     message: 'Please add at least one job detail point',
-    //     severity: 'warning'
-    //   });
-    //   return;
-    // }
-
     setLoading(true);
-
     try {
       const formDataToSend = new FormData();
-      
-      // Append form data
       Object.entries(formData).forEach(([key, value]) => {
         if (value) formDataToSend.append(key, value);
       });
-      
-      // Append job details as concatenated string
       formDataToSend.append('jobDetails', getJobDetailsForAPI());
       formDataToSend.append('garageId', garageId);
       formDataToSend.append('fuelLevel', fuelLevel);
       formDataToSend.append('customerNumber', 1);
 
-      // Append files
       Object.entries(carImages).forEach(([view, file]) => {
         if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
       });
-      
       if (videoFile) {
         formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
       }
@@ -476,15 +378,15 @@ const JobCards = () => {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // 30 seconds timeout
+        timeout: 30000,
       };
 
       if (!garageId) {
         navigate("/login");
         return;
       }
-       
-      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
+
+      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com'; 
       const response = await axios.post(
         `${apiBaseUrl}/api/garage/jobCards/add`,
         formDataToSend,
@@ -497,19 +399,15 @@ const JobCards = () => {
         severity: 'success'
       });
 
-      // Navigate to Assign-Engineer with the job card ID
-      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard._id}`, { 
-        state: { jobCardId: response.data.jobCard._id } 
+      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard._id}`, {
+        state: { jobCardId: response.data.jobCard._id }
       }), 1500);
-      
+
     } catch (error) {
       console.error('API Error:', error);
-      
       let errorMessage = 'Failed to create job card';
       if (error.response) {
         errorMessage = error.response.data.message || errorMessage;
-        
-        // Handle validation errors from server
         if (error.response.status === 400 && error.response.data.errors) {
           const serverErrors = {};
           error.response.data.errors.forEach(err => {
@@ -528,7 +426,7 @@ const JobCards = () => {
         message: errorMessage,
         severity: 'error'
       });
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.warn('Development mode: Proceeding with mock data');
         setTimeout(() => navigate('/Assign-Engineer', { state: { jobCardId: 'mock-id' } }), 1500);
@@ -538,7 +436,6 @@ const JobCards = () => {
     }
   };
 
-  // Helper function to check if field has error
   const hasError = (fieldName) => {
     return touched[fieldName] && errors[fieldName];
   };
@@ -563,28 +460,27 @@ const JobCards = () => {
                 </Typography>
               </Box>
             </Box>
-            
             <Divider sx={{ my: 3 }} />
-            
+
             {/* Form */}
             <Box component="form" onSubmit={handleSubmit} noValidate>
               {loading && <LinearProgress sx={{ mb: 2 }} />}
-              
+
               {/* Customer & Car Details */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Customer & Car Details
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Customer & Car Details</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
                   <Grid container spacing={3}>
                     {[
                       { name: 'customerName', label: 'Customer Name', icon: <Person />, required: true },
                       { name: 'contactNumber', label: 'Contact Number', icon: <Phone />, required: true },
-                      { name: 'email', label: 'Email', icon: <Email />, type: 'email' },
+                      { name: 'email', label: 'Email', icon: <Email /> },
                       { name: 'carNumber', label: 'Car Number', icon: <DriveEta />, required: true },
                       { name: 'model', label: 'Model', icon: <DirectionsCar />, required: true },
                       { name: 'company', label: 'Company', icon: <LocalOffer /> },
                       { name: 'kilometer', label: 'Kilometer', icon: <Speed />, type: 'number' },
+                      { name: 'chesiNumber', label: 'CHESI Number', icon: <Numbers /> },
+                      { name: 'tyreCondition', label: 'Tyre Condition', icon: <LocalGasStation /> },
                     ].map((field) => (
                       <Grid item xs={12} md={4} key={field.name}>
                         <TextField
@@ -604,64 +500,26 @@ const JobCards = () => {
                                 {field.icon}
                               </InputAdornment>
                             ),
+                            sx: field.name === 'carNumber' ? { textTransform: 'uppercase' } : {}
                           }}
+                          inputProps={field.name === 'carNumber' ? { style: { textTransform: 'uppercase' } } : {}}
                         />
                       </Grid>
                     ))}
-                    
-                    <Grid item xs={12} md={4}>
-                      <FormControl component="fieldset">
-                        <Typography variant="subtitle2" gutterBottom>
-                          Fuel Type
-                        </Typography>
-                        <RadioGroup
-                          row
-                          name="fuelType"
-                          value={formData.fuelType}
-                          onChange={handleChange}
-                        >
-                          {['petrol', 'diesel', 'cng', 'electric'].map((type) => (
-                            <FormControlLabel 
-                              key={type}
-                              value={type} 
-                              control={<Radio />} 
-                              label={type.charAt(0).toUpperCase() + type.slice(1)} 
-                            />
-                          ))}
-                        </RadioGroup>
-                      </FormControl>
-                      <Grid item xs={12} md={4}>
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Fuel Level
-                        </Typography>
-                        <Rating
-                          name="fuelLevel"
-                          value={fuelLevel}
-                          max={4}
-                          onChange={(_, newValue) => setFuelLevel(newValue)}
-                          icon={<LocalGasStation color="primary" />}
-                          emptyIcon={<LocalGasStation />}
-                        />
-                      </Box>
-                      </Grid>
-                    </Grid>
                   </Grid>
                 </Paper>
               </Box>
 
               {/* Insurance Details */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Insurance Details
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Insurance Details</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
                   <Grid container spacing={3}>
                     {[
                       { name: 'insuranceProvider', label: 'Insurance Provider', icon: <Policy /> },
                       { name: 'expiryDate', label: 'Expiry Date', icon: <EventNote />, type: 'date', InputLabelProps: { shrink: true } },
                       { name: 'policyNumber', label: 'Policy Number', icon: <Numbers /> },
-                      { name: 'carNumber', label: 'Registration Number', icon: <Numbers /> },
+                      { name: 'carNumber', label: 'Car Number', icon: <Numbers /> },
                       { name: 'type', label: 'Type', icon: <LocalOffer /> },
                       { name: 'excessAmount', label: 'Excess Amount', icon: <AttachMoney />, type: 'number' },
                     ].map((field) => (
@@ -693,9 +551,7 @@ const JobCards = () => {
 
               {/* Job Details - Point-wise */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Job Details (Point-wise)
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details (Point-wise)</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
@@ -724,27 +580,17 @@ const JobCards = () => {
                           Add Point
                         </Button>
                       </Box>
-                      
-                      {/* Display added job points */}
+
                       {jobPoints.filter(point => point.trim()).length > 0 && (
                         <Box sx={{ mt: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom>
-                            Job Details Points:
-                          </Typography>
+                          <Typography variant="subtitle2" gutterBottom>Job Details Points:</Typography>
                           <List sx={{ bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1 }}>
                             {jobPoints.map((point, index) => (
                               point.trim() && (
                                 <ListItem key={index} divider>
-                                  <ListItemText 
-                                    primary={`${index + 1}. ${point}`}
-                                    sx={{ wordBreak: 'break-word' }}
-                                  />
+                                  <ListItemText primary={`${index + 1}. ${point}`} sx={{ wordBreak: 'break-word' }} />
                                   <ListItemSecondaryAction>
-                                    <IconButton 
-                                      edge="end" 
-                                      onClick={() => removeJobPoint(index)}
-                                      color="error"
-                                    >
+                                    <IconButton edge="end" onClick={() => removeJobPoint(index)} color="error">
                                       <DeleteIcon />
                                     </IconButton>
                                   </ListItemSecondaryAction>
@@ -754,13 +600,10 @@ const JobCards = () => {
                           </List>
                         </Box>
                       )}
-                      
-                      {/* Preview of what will be sent to API */}
+
                       {jobPoints.filter(point => point.trim()).length > 0 && (
                         <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>
-                            Preview (This will be sent to API):
-                          </Typography>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API):</Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
                             {getJobDetailsForAPI()}
                           </Typography>
@@ -773,13 +616,9 @@ const JobCards = () => {
 
               {/* Media Upload */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Car Images & Videos
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Car Images & Videos</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                    Upload Car Images (4 Sides) *
-                  </Typography>
+                  <Typography variant="subtitle1" sx={{ mb: 2 }}>Upload Car Images (4 Sides) *</Typography>
                   <Grid container spacing={2}>
                     {[
                       { view: 'frontView', label: 'Front View' },
@@ -818,10 +657,8 @@ const JobCards = () => {
                       </Grid>
                     ))}
                   </Grid>
-                  
-                  <Typography variant="subtitle1" sx={{ mt: 4, mb: 2 }}>
-                    Upload Video (Optional)
-                  </Typography>
+
+                  <Typography variant="subtitle1" sx={{ mt: 4, mb: 2 }}>Upload Video (Optional)</Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <UploadButton
@@ -835,9 +672,7 @@ const JobCards = () => {
                         }}
                       >
                         Drop video here or click to browse
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                          Max file size: 50MB
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>Max file size: 50MB</Typography>
                         <VisuallyHiddenInput 
                           type="file" 
                           accept="video/*"
@@ -867,14 +702,7 @@ const JobCards = () => {
                   size="large"
                   startIcon={<SaveIcon />}
                   disabled={loading}
-                  sx={{ 
-                    px: 6, 
-                    py: 1.5,
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    textTransform: 'none'
-                  }}
+                  sx={{ px: 6, py: 1.5, borderRadius: 2, fontWeight: 600, fontSize: '1rem', textTransform: 'none' }}
                 >
                   {loading ? 'Saving...' : 'Save Job Card'}
                 </Button>
@@ -883,7 +711,6 @@ const JobCards = () => {
           </CardContent>
         </Card>
       </Container>
-
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

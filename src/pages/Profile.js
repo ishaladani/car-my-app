@@ -31,6 +31,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import BusinessIcon from "@mui/icons-material/Business";
 import axios from "axios";
 
 const Profile = () => {
@@ -40,6 +41,7 @@ const Profile = () => {
     email: "N/A",
     phone: "N/A",
     address: "N/A",
+    gstNumber: "N/A", // Added GST number field
     subscriptionType: "Free",
     isSubscribed: false,
   });
@@ -84,6 +86,7 @@ const Profile = () => {
           email: data.email || "N/A",
           phone: data.phone || "N/A",
           address: data.address || "N/A",
+          gstNumber: data.gstNumber || "N/A", // Added GST number
           subscriptionType: data.subscriptionType || "Free",
           isSubscribed: data.isSubscribed || false,
         };
@@ -206,9 +209,9 @@ const Profile = () => {
       return;
     }
 
-    // Validate required fields
-    if (!editData.name || !editData.email) {
-      showSnackbar("Name and email are required fields", "error");
+    // Validate required fields (removed email from validation since it's not editable)
+    if (!editData.name) {
+      showSnackbar("Name is a required field", "error");
       return;
     }
 
@@ -225,9 +228,9 @@ const Profile = () => {
       // Prepare the data payload for the API
       const updatePayload = {
         name: editData.name,
-        email: editData.email,
         phone: editData.phone || "",
         address: editData.address || "",
+        gstNumber: editData.gstNumber || "", // Added GST number to payload
         subscriptionType: editData.subscriptionType,
         isSubscribed: editData.isSubscribed,
       };
@@ -355,13 +358,13 @@ const Profile = () => {
             {garageData.name}
           </Typography>
           <Typography>{garageData.email}</Typography>
-          {garageData.isSubscribed && (
+          {/* {garageData.isSubscribed && (
             <Chip
               label={`${garageData.subscriptionType.toUpperCase()} Plan`}
               color="success"
               sx={{ mt: 1 }}
             />
-          )}
+          )} */}
         </Box>
 
         {/* Details */}
@@ -381,6 +384,12 @@ const Profile = () => {
               <Box display="flex" alignItems="center" gap={1}>
                 <EmailIcon color="action" />
                 <Typography>{garageData.email}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Box display="flex" alignItems="center" gap={1}>
+                <BusinessIcon color="action" />
+                <Typography>GST: {garageData.gstNumber}</Typography>
               </Box>
             </Grid>
             <Grid item xs={12}>
@@ -459,15 +468,21 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* Email */}
+            {/* Email - Read Only */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Email"
                 type="email"
                 value={editData.email || ""}
-                onChange={(e) => handleInputChange("email", e.target.value)}
                 variant="outlined"
+                disabled
+                helperText="Email cannot be changed"
+                sx={{
+                  '& .MuiInputBase-input.Mui-disabled': {
+                    WebkitTextFillColor: 'rgba(0, 0, 0, 0.6)',
+                  },
+                }}
               />
             </Grid>
 
@@ -482,8 +497,22 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* Subscription Type */}
+            {/* GST Number */}
             <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="GST Number"
+                value={editData.gstNumber || ""}
+                onChange={(e) => handleInputChange("gstNumber", e.target.value.toUpperCase())}
+                variant="outlined"
+                placeholder="e.g., 27AAAPL1234C1Z5"
+                inputProps={{ maxLength: 15 }}
+                helperText="15-digit GST identification number"
+              />
+            </Grid>
+
+            {/* Subscription Type */}
+            {/* <Grid item xs={12} sm={6}>
               <FormControl fullWidth variant="outlined">
                 <InputLabel>Subscription Type</InputLabel>
                 <Select
@@ -497,7 +526,22 @@ const Profile = () => {
                   <MenuItem value="Enterprise">Enterprise</MenuItem>
                 </Select>
               </FormControl>
-            </Grid>
+            </Grid> */}
+
+            {/* Subscription Status */}
+            {/* <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={editData.isSubscribed || false}
+                    onChange={(e) => handleInputChange("isSubscribed", e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label="Active Subscription"
+                sx={{ mt: 2 }}
+              />
+            </Grid> */}
 
             {/* Address */}
             <Grid item xs={12}>
@@ -509,20 +553,6 @@ const Profile = () => {
                 value={editData.address || ""}
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 variant="outlined"
-              />
-            </Grid>
-
-            {/* Subscription Status */}
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={editData.isSubscribed || false}
-                    onChange={(e) => handleInputChange("isSubscribed", e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label="Active Subscription"
               />
             </Grid>
           </Grid>

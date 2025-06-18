@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, useLocation, Link } from "react-router-dom";
+import { Outlet, useLocation, Link, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Box,
@@ -36,13 +36,13 @@ import {
 } from "@mui/icons-material";
 import { useThemeContext } from "../Layout/ThemeContext";
 import ThemeToggle from "../Layout/ThemeToggle";
-import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const AppLayout = () => {
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const location = useLocation();
+  const navigate = useNavigate(); // Navigate hook to handle redirects
   const roll = localStorage.getItem("userType");
   const userId = localStorage.getItem("userId");
   const garageId = localStorage.getItem("garageId");
@@ -58,11 +58,13 @@ const AppLayout = () => {
     isSubscribed: false,
   });
 
-  // State for permissions and filtered nav items
-  const [userPermissions, setUserPermissions] = useState([]);
-  const [filteredNavItems, setFilteredNavItems] = useState([]);
+  const [userPermissions, setUserPermissions] = useState([]); // State for user permissions
+  const [filteredNavItems, setFilteredNavItems] = useState([]); // Filtered nav items
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  const [mobileOpen, setMobileOpen] = useState(false); // Declare mobileOpen state
+  const [userMenu, setUserMenu] = useState(null); // Declare userMenu state
 
   // All available nav items
   const allNavItems = [
@@ -148,7 +150,6 @@ const AppLayout = () => {
   const fetchUserPermissions = async () => {
     if (roll === "user") {
       const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
-      console.log("user", roll, token)
       try {
         const response = await axios.get(
           "https://garage-management-zi5z.onrender.com/api/garage/user/getpermission",
@@ -174,7 +175,6 @@ const AppLayout = () => {
         }
       } catch (error) {
         console.error("Error fetching user permissions:", error);
-        // On error, show empty navigation for security
         setFilteredNavItems([]);
       }
     } else {
@@ -195,6 +195,11 @@ const AppLayout = () => {
 
     loadInitialData();
 
+    // Redirect user to Dashboard if userType is 'user'
+    if (roll === "user") {
+      navigate("/");  // Default to the Dashboard page
+    }
+
     // Listen for storage changes (for backward compatibility)
     const handleStorageChange = () => {
       if (localStorage.getItem("profileUpdated") === "true") {
@@ -208,7 +213,7 @@ const AppLayout = () => {
     return () => {
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, [garageId, roll, userId]);
+  }, [garageId, roll, userId, navigate]);
 
   // Refresh permissions when role/userId changes
   useEffect(() => {
@@ -232,106 +237,6 @@ const AppLayout = () => {
     };
   }, [roll]);
 
-  // State for drawer and menus
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [userMenu, setUserMenu] = useState(null);
-
-  // Notification count
-  const [notificationCount] = useState(3);
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    console.log("=== LOGOUT BUTTON CLICKED ===");
-    
-    try {
-      // Get userId and token from localStorage
-      const storedUserId = localStorage.getItem("garageId");
-      const token = localStorage.getItem("token");
-      
-      console.log("Stored userId:", storedUserId);
-      console.log("Stored token:", token ? "Token exists" : "No token found");
-      
-      if (!storedUserId) {
-        console.error("No userId found in localStorage");
-        return;
-      }
-      
-      if (!token) {
-        console.error("No token found in localStorage");
-        return;
-      }
-      
-      console.log("Making API call to logout...");
-      
-      // Call the logout API with Authorization header
-      const response = await axios.post(
-        `https://garage-management-zi5z.onrender.com/api/garage/logout/${storedUserId}`,
-        {}, // Empty body since it's a POST request
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      console.log("Logout API response:", response.data);
-      console.log("Logout API called successfully");
-      
-    } catch (error) {
-      console.error("Error calling logout API:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
-      });
-      // Continue with logout even if API call fails
-    } finally {
-      console.log("Clearing localStorage and redirecting...");
-      
-      // Clear all items from localStorage regardless of API call result
-      localStorage.clear();
-      
-      // Navigate to login page
-      navigate("/login");
-    }
-  };
-
-  // Handlers
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
-  const handleUserMenuOpen = (event) => {
-    setUserMenu(event.currentTarget);
-  };
-
-  const handleUserMenuClose = () => {
-    setUserMenu(null);
-  };
-
-  // Check if path is active
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
-
-  // Get the current page title
-  const getPageTitle = () => {
-    return filteredNavItems.find((item) => isActive(item.path))?.text || "Dashboard";
-  };
-
-  const drawerWidth = 280;
-
-  // Show loading while data is loading
-  if (!permissionsLoaded || !profileLoaded) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-        <Typography>Loading...</Typography>
-      </Box>
-    );
-  }
-
   // Drawer content
   const drawerContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -349,12 +254,7 @@ const AppLayout = () => {
         <Avatar
           src={profileData.image}
           alt="Garage Logo"
-          sx={{ 
-            width: 40, 
-            height: 40, 
-            mr: 1,
-            bgcolor: profileData.image ? 'transparent' : 'primary.main'
-          }}
+          sx={{ width: 40, height: 40, mr: 1, bgcolor: profileData.image ? 'transparent' : 'primary.main' }}
         >
           {!profileData.image && profileData.name.charAt(0).toUpperCase()}
         </Avatar>
@@ -370,8 +270,6 @@ const AppLayout = () => {
         </Box>
       </Box>
 
-      
-
       {/* Navigation Items */}
       <Box sx={{ flexGrow: 1, p: 2, overflowY: "auto" }}>
         <List>
@@ -380,49 +278,32 @@ const AppLayout = () => {
               <ListItemButton
                 component={Link}
                 to={item.path}
-                selected={isActive(item.path)}
+                selected={location.pathname === item.path}
                 onClick={() => isMobile && setMobileOpen(false)}
                 sx={{
                   borderRadius: 2,
                   py: 1.5,
                 }}
               >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 40,
-                    color: isActive(item.path) ? "primary.main" : "inherit",
-                  }}
-                >
+                <ListItemIcon sx={{ minWidth: 40 }}>
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText
                   primary={item.text}
                   primaryTypographyProps={{
-                    fontWeight: isActive(item.path) ? 600 : 400,
+                    fontWeight: location.pathname === item.path ? 600 : 400,
                   }}
                 />
               </ListItemButton>
             </ListItem>
           ))}
         </List>
-
-        {/* Show message if user has no permissions */}
-        {roll === "user" && filteredNavItems.length === 0 && (
-          <Box sx={{ p: 2, textAlign: "center" }}>
-            <Typography variant="body2" color="text.secondary">
-              No menu permissions assigned
-            </Typography>
-          </Box>
-        )}
       </Box>
 
       {/* Bottom Actions - Logout */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
         <ListItemButton
-          onClick={() => {
-            console.log("Logout button clicked!");
-            handleLogout();
-          }}
+          // onClick={handleLogout}
           sx={{
             borderRadius: 2,
             py: 1.5,
@@ -434,7 +315,7 @@ const AppLayout = () => {
             },
           }}
         >
-          <ListItemIcon sx={{ minWidth: 40, color: "inherit" }}>
+          <ListItemIcon sx={{ minWidth: 40 }}>
             <LogoutIcon />
           </ListItemIcon>
           <ListItemText
@@ -453,8 +334,8 @@ const AppLayout = () => {
         position="fixed"
         color="default"
         sx={{
-          width: isMobile ? "100%" : `calc(100% - ${drawerWidth}px)`,
-          ml: isMobile ? 0 : `${drawerWidth}px`,
+          width: isMobile ? "100%" : `calc(100% - ${280}px)`,
+          ml: isMobile ? 0 : `280px`,
           boxShadow: 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid",
@@ -467,7 +348,7 @@ const AppLayout = () => {
             <IconButton
               color="inherit"
               edge="start"
-              onClick={handleDrawerToggle}
+              onClick={() => setMobileOpen(!mobileOpen)} // Toggle mobile drawer
               sx={{ mr: 2 }}
             >
               <MenuIcon />
@@ -476,26 +357,22 @@ const AppLayout = () => {
 
           {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {getPageTitle()}
+            {location.pathname === "/" ? "Dashboard" : "Other Page"}
           </Typography>
 
           {/* User Profile Section in App Bar */}
           <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
             <Tooltip title="User Profile">
               <IconButton
-                onClick={handleUserMenuOpen}
+                onClick={(event) => setUserMenu(event.currentTarget)} // Corrected event handling
                 sx={{ p: 0 }}
               >
                 <Avatar
                   src={profileData.image}
                   alt={profileData.name}
-                  sx={{ 
-                    width: 32, 
-                    height: 32,
-                    bgcolor: profileData.image ? 'transparent' : 'primary.main'
-                  }}
+                  sx={{ width: 32, height: 32 }}
                 >
-                  {!profileData.image && profileData.name.charAt(0).toUpperCase()}
+                  {profileData.name.charAt(0)}
                 </Avatar>
               </IconButton>
             </Tooltip>
@@ -505,72 +382,16 @@ const AppLayout = () => {
           <Menu
             anchorEl={userMenu}
             open={Boolean(userMenu)}
-            onClose={handleUserMenuClose}
-            onClick={handleUserMenuClose}
-            PaperProps={{
-              elevation: 0,
-              sx: {
-                overflow: 'visible',
-                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                mt: 1.5,
-                '& .MuiAvatar-root': {
-                  width: 32,
-                  height: 32,
-                  ml: -0.5,
-                  mr: 1,
-                },
-                '&:before': {
-                  content: '""',
-                  display: 'block',
-                  position: 'absolute',
-                  top: 0,
-                  right: 14,
-                  width: 10,
-                  height: 10,
-                  bgcolor: 'background.paper',
-                  transform: 'translateY(-50%) rotate(45deg)',
-                  zIndex: 0,
-                },
-              },
-            }}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            onClose={() => setUserMenu(null)}
+            onClick={() => setUserMenu(null)}
           >
-            <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                {profileData.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {profileData.email}
-              </Typography>
-              {profileData.isSubscribed && (
-                <Typography variant="caption" color="success.main" sx={{ fontWeight: 500 }}>
-                  {profileData.subscriptionType?.replace('_', ' ').toUpperCase()} Plan
-                </Typography>
-              )}
-            </Box>
-            <Divider />
-            <div onClick={() => navigate("/profile")}>
-            <MenuItem onClick={handleUserMenuClose}>
-              <ListItemIcon >
-                <PersonIcon fontSize="small" />
-              </ListItemIcon>
-              Profile
-            </MenuItem>
-            </div>
-            <Divider />
-            <MenuItem onClick={handleLogout}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
+            <MenuItem 
+            // onClick={handleLogout}
+            >
+              <LogoutIcon fontSize="small" />
               Logout
             </MenuItem>
           </Menu>
-
-          {/* Theme toggle */}
-          <Box sx={{ mx: 0.5 }}>
-            <ThemeToggle />
-          </Box>
         </Toolbar>
       </AppBar>
 
@@ -578,11 +399,11 @@ const AppLayout = () => {
       <Drawer
         variant="temporary"
         open={mobileOpen}
-        onClose={handleDrawerToggle}
+        onClose={() => setMobileOpen(false)}
         ModalProps={{ keepMounted: true }}
         sx={{
           display: isMobile ? "block" : "none",
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" },
+          "& .MuiDrawer-paper": { width: 280, boxSizing: "border-box" },
         }}
       >
         {drawerContent}
@@ -593,7 +414,7 @@ const AppLayout = () => {
         variant="permanent"
         sx={{
           display: isMobile ? "none" : "block",
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" },
+          "& .MuiDrawer-paper": { width: 280, boxSizing: "border-box" },
         }}
         open
       >
@@ -607,7 +428,7 @@ const AppLayout = () => {
           flexGrow: 1,
           px: { xs: 2, sm: 3 },
           py: { xs: 2, sm: 3 },
-          width: isMobile ? "100%" : `calc(100% - ${drawerWidth}px)`,
+          width: isMobile ? "100%" : `calc(100% - 280px)`,
           minHeight: "100vh",
           backgroundColor: "background.default",
           marginTop: "64px", // Height of AppBar

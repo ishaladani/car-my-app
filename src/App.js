@@ -22,6 +22,7 @@ import WaitingApprovalPage from './pages/WaitingApprovalPage';
 import RenewPlanPage from './pages/RenewPlanPage';
 import Profile from './pages/Profile';
 
+
 function App() {
   return (
     <ThemeProviderWrapper>
@@ -51,6 +52,7 @@ function App() {
              
             <Route path='AwaitingApproval' element={<AwaitingApproval/>}/>
             <Route path='/waiting-approval' element={<WaitingApprovalPage/>}/>
+
           {/* <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />

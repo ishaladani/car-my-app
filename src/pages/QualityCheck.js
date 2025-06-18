@@ -255,7 +255,7 @@ const QualityCheck = () => {
                       Assigned Engineer
                     </Typography>
                     <Typography variant="h6" fontWeight={600} color="primary">
-                      {jobCardData?.engineerId?.name || 'Not Assigned'}
+                      {jobCardData?.engineerId?.[0]?.name || 'Not Assigned'}
                     </Typography>
                   </Box>
                 </Box>

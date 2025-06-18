@@ -126,7 +126,7 @@ const AssignEngineer = () => {
   const [openEditTaskDialog, setOpenEditTaskDialog] = useState(false);
   const [newTask, setNewTask] = useState({
     taskName: "",
-    taskDuration: "",
+    taskDuration: "1",
     description: "",
     category: "general"
   });
@@ -397,32 +397,7 @@ const AssignEngineer = () => {
   };
 
   // Calculate total estimated duration for an assignment
-  const calculateTotalDuration = (tasks) => {
-    if (!tasks || tasks.length === 0) return '0 minutes';
-    
-    let totalMinutes = 0;
-    tasks.forEach(task => {
-      if (task.taskDuration) {
-        totalMinutes += parseInt(task.taskDuration);
-      } else if (task.duration) {
-        const duration = task.duration;
-        if (duration.includes('hour')) {
-          const hours = parseFloat(duration.match(/(\d+(?:\.\d+)?)/)[0]);
-          totalMinutes += hours * 60;
-        } else if (duration.includes('minute')) {
-          const minutes = parseFloat(duration.match(/(\d+(?:\.\d+)?)/)[0]);
-          totalMinutes += minutes;
-        }
-      }
-    });
-    
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    
-    if (hours === 0) return `${minutes} minutes`;
-    if (minutes === 0) return `${hours} hours`;
-    return `${hours}h ${minutes}m`;
-  };
+
 
   // Form Validation
   const validateForm = () => {
@@ -564,7 +539,7 @@ const AssignEngineer = () => {
             quantity: part.selectedQuantity || 1
           })),
           priority: assignment.priority,
-          estimatedDuration: calculateTotalDuration(assignment.tasks),
+          // estimatedDuration: calculateTotalDuration(assignment.tasks),
           notes: assignment.notes
         };
 
@@ -1123,7 +1098,7 @@ const AssignEngineer = () => {
                         </Grid>
 
                         {/* Estimated Duration Display */}
-                        <Grid item xs={12} md={3}>
+                        {/* <Grid item xs={12} md={3}>
                           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                             Total Duration
                           </Typography>
@@ -1141,7 +1116,7 @@ const AssignEngineer = () => {
                               {calculateTotalDuration(assignment.tasks)}
                             </Typography>
                           </Box>
-                        </Grid>
+                        </Grid> */}
 
                         {/* Task Selection */}
                         <Grid item xs={12}>
@@ -1159,7 +1134,7 @@ const AssignEngineer = () => {
                               fullWidth
                               options={availableTasks}
                               getOptionLabel={(option) => 
-                                `${option.name || option.taskName} (${option.duration || `${option.taskDuration} min`}) - ${option.category}`
+                                `${option.name || option.taskName}  - ${option.category}`
                               }
                               value={assignment.tasks}
                               onChange={(event, newValue) => {
@@ -1169,7 +1144,7 @@ const AssignEngineer = () => {
                                 value.map((option, index) => (
                                   <Chip
                                     variant="outlined"
-                                    label={`${option.name || option.taskName} (${option.duration || `${option.taskDuration} min`})`}
+                                    label={`${option.name || option.taskName}`}
                                     {...getTagProps({ index })}
                                     key={option.id || option.taskId}
                                   />
@@ -1179,11 +1154,11 @@ const AssignEngineer = () => {
                                 <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <Box>
                                     <Typography variant="body2">
-                                      {option.name || option.taskName} ({option.duration || `${option.taskDuration} min`})
+                                      {option.name || option.taskName} 
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
+                                    {/* <Typography variant="caption" color="text.secondary">
                                       {option.category} - {option.description}
-                                    </Typography>
+                                    </Typography> */}
                                   </Box>
                                   <IconButton
                                     size="small"
@@ -1325,137 +1300,124 @@ const AssignEngineer = () => {
                           )}
                           
                           {/* Enhanced Selected Parts with Price Details */}
-                          {assignment.parts.length > 0 && (
-                            <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                                Selected Parts with Details:
-                              </Typography>
-                              <List dense>
-                                {assignment.parts.map((part, partIndex) => {
-                                  const selectedQuantity = part.selectedQuantity || 1;
-                                  const unitPrice = part.pricePerUnit || 0;
-                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-                                  const totalPrice = unitPrice * selectedQuantity;
-                                  const gstAmount = (totalPrice * gstPercentage) / 100;
-                                  const finalPrice = totalPrice + gstAmount;
-                                  
-                                  return (
-                                    <ListItem 
-                                      key={part._id} 
-                                      sx={{ 
-                                        border: '1px solid', 
-                                        borderColor: 'divider', 
-                                        borderRadius: 1, 
-                                        mb: 1,
-                                        py: 1,
-                                        flexDirection: 'column',
-                                        alignItems: 'stretch'
-                                      }}
-                                    >
-                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" fontWeight={500}>
-                                            {part.partName}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                            Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                            Available Stock: {part.quantity}
-                                          </Typography>
-                                        </Box>
-                                        
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                          <TextField
-                                            size="small"
-                                            type="number"
-                                            label="Qty"
-                                            value={selectedQuantity}
-                                            onChange={(e) => {
-                                              const newQuantity = Math.max(1, Math.min(part.quantity, Number(e.target.value)));
-                                              const updatedParts = assignment.parts.map((p, idx) => 
-                                                idx === partIndex 
-                                                  ? { ...p, selectedQuantity: newQuantity }
-                                                  : p
-                                              );
-                                              updateTaskAssignment(assignment.id, 'parts', updatedParts);
-                                            }}
-                                            inputProps={{ 
-                                              min: 1, 
-                                              max: part.quantity,
-                                              style: { width: '60px' }
-                                            }}
-                                            sx={{ width: '80px' }}
-                                          />
-                                          <IconButton
-                                            size="small"
-                                            color="error"
-                                            onClick={() => {
-                                              const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-                                              updateTaskAssignment(assignment.id, 'parts', updatedParts);
-                                            }}
-                                          >
-                                            <DeleteIcon fontSize="small" />
-                                          </IconButton>
-                                        </Box>
-                                      </Box>
-                                      
-                                      {/* Price Details */}
-                                      <Box sx={{ mt: 1, p: 1, backgroundColor: 'action.hover', borderRadius: 1 }}>
-                                        <Grid container spacing={1} alignItems="center">
-                                          <Grid item xs={3}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              Price/Unit: ₹{unitPrice.toFixed(2)}
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={2}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              GST: {gstPercentage}%
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={3}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              Subtotal: ₹{totalPrice.toFixed(2)}
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={2}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              GST: ₹{gstAmount.toFixed(2)}
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={2}>
-                                            <Typography variant="caption" fontWeight={600} color="primary">
-                                              Total: ₹{finalPrice.toFixed(2)}
-                                            </Typography>
-                                          </Grid>
-                                        </Grid>
-                                      </Box>
-                                    </ListItem>
-                                  );
-                                })}
-                              </List>
-                              
-                              {/* Total Summary */}
-                              {(() => {
-                                const grandTotal = assignment.parts.reduce((total, part) => {
-                                  const selectedQuantity = part.selectedQuantity || 1;
-                                  const unitPrice = part.pricePerUnit || 0;
-                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-                                  const totalPrice = unitPrice * selectedQuantity;
-                                  const gstAmount = (totalPrice * gstPercentage) / 100;
-                                  return total + totalPrice + gstAmount;
-                                }, 0);
-                                
-                                return (
-                                  <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.light', borderRadius: 1 }}>
-                                    <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-                                      Assignment Total: ₹{grandTotal.toFixed(2)}
-                                    </Typography>
-                                  </Box>
-                                );
-                              })()}
-                            </Box>
-                          )}
+                          {/* Enhanced Selected Parts with Price Details */}
+{assignment.parts.length > 0 && (
+  <Box sx={{ mt: 2 }}>
+    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+      Selected Parts with Details:
+    </Typography>
+    <List dense>
+      {assignment.parts.map((part, partIndex) => {
+        const selectedQuantity = part.selectedQuantity || 1;
+        const unitPrice = part.pricePerUnit || 0;
+        const gstPercentage = part.gstPercentage || part.taxAmount || 0;
+        const totalPrice = unitPrice * selectedQuantity;
+        const gstAmount = (totalPrice * gstPercentage) / 100;
+        const finalPrice = totalPrice + gstAmount;
+
+        return (
+          <ListItem 
+            key={part._id} 
+            sx={{ 
+              border: '1px solid', 
+              borderColor: 'divider', 
+              borderRadius: 1, 
+              mb: 1,
+              py: 1,
+              flexDirection: 'column',
+              alignItems: 'stretch'
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="body2" fontWeight={500}>
+                  {part.partName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Available Stock: {part.quantity}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Qty"
+                  value={selectedQuantity}
+                  onChange={(e) => {
+                    const newQuantity = Math.max(1, Math.min(part.quantity, Number(e.target.value)));
+                    const updatedParts = assignment.parts.map((p, idx) => 
+                      idx === partIndex 
+                        ? { ...p, selectedQuantity: newQuantity }
+                        : p
+                    );
+                    updateTaskAssignment(assignment.id, 'parts', updatedParts);
+                  }}
+                  inputProps={{ 
+                    min: 1, 
+                    max: part.quantity,
+                    style: { width: '60px' }
+                  }}
+                  sx={{ width: '80px' }}
+                />
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => {
+                    const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
+                    updateTaskAssignment(assignment.id, 'parts', updatedParts);
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
+            {/* Price Details */}
+            <Box sx={{ mt: 1, p: 1, backgroundColor: 'action.hover', borderRadius: 1 }}>
+              <Grid container spacing={1} alignItems="center">
+                <Grid item xs={4}>
+                  <Typography variant="caption" color="text.secondary">
+                    Price/Unit: ₹{unitPrice.toFixed(2)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={3}>
+                  <Typography variant="caption" color="text.secondary">
+                    GST: {gstPercentage}%
+                  </Typography>
+                </Grid>
+                <Grid item xs={5}>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Total: ₹{finalPrice.toFixed(2)}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          </ListItem>
+        );
+      })}
+    </List>
+    {/* Total Summary */}
+    {(() => {
+      const grandTotal = assignment.parts.reduce((total, part) => {
+        const selectedQuantity = part.selectedQuantity || 1;
+        const unitPrice = part.pricePerUnit || 0;
+        const gstPercentage = part.gstPercentage || part.taxAmount || 0;
+        const totalPrice = unitPrice * selectedQuantity;
+        const gstAmount = (totalPrice * gstPercentage) / 100;
+        return total + totalPrice + gstAmount;
+      }, 0);
+      return (
+        <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.light', borderRadius: 1 }}>
+          <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
+            Assignment Total: ₹{grandTotal.toFixed(2)}
+          </Typography>
+        </Box>
+      );
+    })()}
+  </Box>
+)}
                         </Grid>
 
                         {/* Notes */}
@@ -1489,11 +1451,11 @@ const AssignEngineer = () => {
                                         <Typography variant="body2" fontWeight={500}>
                                           {task.name || task.taskName}
                                         </Typography>
-                                        <Chip 
+                                        {/* <Chip 
                                           label={task.duration || `${task.taskDuration} min`} 
                                           size="small" 
                                           variant="outlined"
-                                        />
+                                        /> */}
                                         <Chip 
                                           label={task.category} 
                                           size="small" 
@@ -1584,7 +1546,7 @@ const AssignEngineer = () => {
                   error={!newTask.taskName.trim() && !!taskError}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              {/* <Grid item xs={12} sm={6}>
                 <TextField 
                   fullWidth 
                   label="Duration (minutes) *" 
@@ -1598,7 +1560,7 @@ const AssignEngineer = () => {
                   inputProps={{ min: 1 }}
                   error={!newTask.taskDuration.trim() && !!taskError}
                 />
-              </Grid>
+              </Grid> */}
             </Grid>
           </DialogContent>
           <DialogActions>
