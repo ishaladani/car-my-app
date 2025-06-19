@@ -395,9 +395,23 @@ const RecordReport = () => {
 
             {/* Job Cards Table */}
             <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Completed Job Cards
-              </Typography>
+              {/* <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+  Completed Job Cards
+</Typography> */}
+<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+    Completed Job Cards
+  </Typography>
+  <Button
+    variant="contained"
+    color="primary"
+    onClick={() => navigate('/jobs')} // Redirect to Job Card creation page
+    sx={{ alignSelf: 'center' }} // Align button vertically
+  >
+    Add Job Card
+  </Button>
+</Box>
+
               
               {loading ? (
                 <Box display="flex" justifyContent="center" alignItems="center" py={4}>

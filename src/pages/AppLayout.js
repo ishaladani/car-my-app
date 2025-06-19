@@ -385,6 +385,10 @@ const AppLayout = () => {
             onClose={() => setUserMenu(null)}
             onClick={() => setUserMenu(null)}
           >
+            <MenuItem onClick={() => navigate('/profile')}>
+              <PersonIcon fontSize="small" />
+              Profile
+            </MenuItem>
             <MenuItem 
             // onClick={handleLogout}
             >

@@ -38,7 +38,7 @@ const AutoServeBilling = () => {
   const today = new Date().toISOString().split("T")[0];
 
   // State declarations
- const [garageDetails, setGarageDetails] = useState({
+  const [garageDetails, setGarageDetails] = useState({
     name: "",
     address: "",
     phone: "",
@@ -58,6 +58,10 @@ const AutoServeBilling = () => {
     message: '',
     severity: 'success'
   });
+
+  // NEW: Add state for bill generation status
+  const [billGenerated, setBillGenerated] = useState(false);
+  const [isBillAlreadyGenerated, setIsBillAlreadyGenerated] = useState(false);
 
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -136,6 +140,22 @@ const AutoServeBilling = () => {
     fontSize: isMobile ? "0.75rem" : "0.875rem",
   };
 
+  // NEW: Function to update bill status
+  const updateBillStatus = async (jobCardId) => {
+    try {
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`
+      );
+      
+      if (response.status === 200) {
+        console.log('Bill status updated successfully');
+        setBillGenerated(true);
+      }
+    } catch (error) {
+      console.error('Error updating bill status:', error);
+      // Don't show error to user as this is a background operation
+    }
+  };
   
   // Fetch garage data
   useEffect(() => {
@@ -163,7 +183,7 @@ const AutoServeBilling = () => {
     fetchGarageData();
   }, [garageId]);
 
-  // Fetch job card data
+  // UPDATED: Fetch job card data with bill status check
   useEffect(() => {
     const fetchJobCardData = async () => {
       if (!garageId) navigate("/login");
@@ -185,6 +205,20 @@ const AutoServeBilling = () => {
         
         const data = response.data;
         setJobCardData(data);
+        
+        // NEW: Check if bill is already generated
+        if (data.generateBill === true) {
+          setIsBillAlreadyGenerated(true);
+          setBillGenerated(true);
+          setShowThankYou(true);
+          
+          setSnackbar({
+            open: true,
+            message: 'Bill has already been generated for this job card',
+            severity: 'info'
+          });
+        }
+        
         const invoiceNo = data.invoiceNumber || `INV-${Date.now()}`;
 
         setCarDetails({
@@ -365,9 +399,20 @@ const AutoServeBilling = () => {
     return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount)}`;
   };
 
-  const generateBill = () => setShowPaymentModal(true);
+  // UPDATED: Check if bill is already generated before showing payment modal
+  const generateBill = () => {
+    if (isBillAlreadyGenerated || billGenerated) {
+      setSnackbar({
+        open: true,
+        message: 'Bill has already been generated for this job card',
+        severity: 'warning'
+      });
+      return;
+    }
+    setShowPaymentModal(true);
+  };
 
-  // MODIFIED: Payment method selection now directly processes payment
+  // UPDATED: Payment method selection now directly processes payment
   const selectPaymentMethod = async (method) => {
     setPaymentMethod(method);
     setShowPaymentModal(false);
@@ -380,7 +425,7 @@ const AutoServeBilling = () => {
     }
   };
 
-  // Payment processing functions
+  // UPDATED: Payment processing functions with bill status update
   const processPayment = async () => {
     if (!jobCardIdFromUrl) {
       setApiResponseMessage({
@@ -421,6 +466,9 @@ const AutoServeBilling = () => {
 
       const data = response.data;
       if (response.status === 200 || response.status === 201) {
+        // NEW: Update bill status after successful bill generation
+        await updateBillStatus(jobCardIdFromUrl);
+        
         setApiResponseMessage({
           type: "success",
           message: data.message || "Professional bill generated and payment processed successfully!",
@@ -504,6 +552,9 @@ const AutoServeBilling = () => {
       );
 
       if (paymentResponse.status === 200 || paymentResponse.status === 201) {
+        // NEW: Update bill status after successful online payment
+        await updateBillStatus(jobCardIdFromUrl);
+        
         setApiResponseMessage({
           type: "success",
           message: paymentResponse.data?.message || "Online payment processed successfully!",
@@ -581,494 +632,494 @@ const AutoServeBilling = () => {
   };
 
   // PDF and sharing functions
-// Complete PDF generation function for AutoServeBilling component
-const generateProfessionalPdfInvoice = () => {
-  try {
-    const doc = new jsPDF('p', 'pt', 'a4');
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 40;
-    const contentWidth = pageWidth - (margin * 2);
-    let currentY = 40;
+  // Complete PDF generation function for AutoServeBilling component
+  const generateProfessionalPdfInvoice = () => {
+    try {
+      const doc = new jsPDF('p', 'pt', 'a4');
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 40;
+      const contentWidth = pageWidth - (margin * 2);
+      let currentY = 40;
 
-    // Helper function to check if we need a new page
-    const checkPageBreak = (requiredSpace) => {
-      if (currentY + requiredSpace > pageHeight - margin) {
-        doc.addPage();
-        currentY = margin;
-        return true;
-      }
-      return false;
-    };
-
-    // Helper function to draw a horizontal line
-    const drawLine = (y, width = contentWidth) => {
-      doc.setLineWidth(1);
-      doc.line(margin, y, margin + width, y);
-    };
-
-    // Header Section
-    doc.setFontSize(20);
-    doc.setFont("helvetica", "bold");
-    doc.text(garageDetails.name.toUpperCase(), margin, currentY);
-    currentY += 30;
-
-    // Garage Details
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${garageDetails.address}`, margin, currentY);
-    currentY += 15;
-    doc.text(`Phone: ${garageDetails.phone} | Email: ${garageDetails.email}`, margin, currentY);
-    currentY += 15;
-    if (garageDetails.gstNumber) {
-      doc.text(`GST NO: ${garageDetails.gstNumber}`, margin, currentY);
-      currentY += 15;
-    }
-
-    // Draw header line
-    drawLine(currentY);
-    currentY += 20;
-
-    // Invoice title and details
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("INVOICE", margin, currentY);
-    
-    // Invoice details on the right
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    const invoiceDetailsX = pageWidth - margin - 150;
-    doc.text(`INVOICE DATE: ${carDetails.billingDate}`, invoiceDetailsX, currentY - 5);
-    doc.text(`INVOICE NO: ${carDetails.invoiceNo}`, invoiceDetailsX, currentY + 10);
-    currentY += 35;
-
-    // Customer and Vehicle Details Section
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("CUSTOMER DETAILS:", margin, currentY);
-    currentY += 20;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Name: ${carDetails.customerName}`, margin, currentY);
-    doc.text(`Contact: ${carDetails.contact}`, margin + 200, currentY);
-    currentY += 15;
-    doc.text(`Email: ${carDetails.email}`, margin, currentY);
-    currentY += 15;
-    if (carDetails.address) {
-      doc.text(`Address: ${carDetails.address}`, margin, currentY);
-      currentY += 15;
-    }
-    if (gstSettings.customerGstNumber) {
-      doc.text(`Customer GST: ${gstSettings.customerGstNumber}`, margin, currentY);
-      currentY += 15;
-    }
-
-    // Vehicle Details
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("VEHICLE DETAILS:", margin, currentY + 10);
-    currentY += 30;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Model: ${carDetails.company} ${carDetails.model}`, margin, currentY);
-    doc.text(`Registration No: ${carDetails.carNumber}`, margin + 250, currentY);
-    currentY += 25;
-
-    // Draw line before itemized section
-    drawLine(currentY);
-    currentY += 20;
-
-    // Parts Table Header
-    if (parts.length > 0) {
-      checkPageBreak(100);
-      
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("PARTS DETAILS:", margin, currentY);
-      currentY += 20;
-
-      // Table headers
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      
-      const colWidths = {
-        srNo: 40,
-        description: 250,
-        qty: 50,
-        rate: 80,
-        amount: 80
+      // Helper function to check if we need a new page
+      const checkPageBreak = (requiredSpace) => {
+        if (currentY + requiredSpace > pageHeight - margin) {
+          doc.addPage();
+          currentY = margin;
+          return true;
+        }
+        return false;
       };
-      
-      let colX = margin;
-      doc.text("Sr.No", colX, currentY);
-      colX += colWidths.srNo;
-      doc.text("Part Description", colX, currentY);
-      colX += colWidths.description;
-      doc.text("Qty", colX, currentY);
-      colX += colWidths.qty;
-      doc.text("Rate", colX, currentY);
-      colX += colWidths.rate;
-      doc.text("Amount", colX, currentY);
-      
-      currentY += 15;
-      drawLine(currentY - 5);
-      currentY += 10;
 
-      // Parts data
+      // Helper function to draw a horizontal line
+      const drawLine = (y, width = contentWidth) => {
+        doc.setLineWidth(1);
+        doc.line(margin, y, margin + width, y);
+      };
+
+      // Header Section
+      doc.setFontSize(20);
+      doc.setFont("helvetica", "bold");
+      doc.text(garageDetails.name.toUpperCase(), margin, currentY);
+      currentY += 30;
+
+      // Garage Details
+      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      parts.forEach((part, index) => {
-        checkPageBreak(20);
-        
-        colX = margin;
-        doc.text((index + 1).toString(), colX, currentY);
-        colX += colWidths.srNo;
-        
-        // Handle long part names
-        const partName = part.name.length > 35 ? part.name.substring(0, 35) + "..." : part.name;
-        doc.text(partName, colX, currentY);
-        colX += colWidths.description;
-        
-        doc.text(part.quantity.toString(), colX, currentY);
-        colX += colWidths.qty;
-        
-        doc.text(part.pricePerUnit.toFixed(2), colX, currentY);
-        colX += colWidths.rate;
-        
-        doc.text(part.total.toFixed(2), colX, currentY);
-        
-        currentY += 15;
-      });
-
-      // Parts subtotal
-      currentY += 5;
-      drawLine(currentY);
+      doc.text(`${garageDetails.address}`, margin, currentY);
       currentY += 15;
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("TOTAL PARTS AMOUNT:", margin + 290, currentY);
-      doc.text(summary.totalPartsCost.toFixed(2), margin + 450, currentY);
-      currentY += 25;
-    }
+      doc.text(`Phone: ${garageDetails.phone} | Email: ${garageDetails.email}`, margin, currentY);
+      currentY += 15;
+      if (garageDetails.gstNumber) {
+        doc.text(`GST NO: ${garageDetails.gstNumber}`, margin, currentY);
+        currentY += 15;
+      }
 
-    // Services Table
-    if (services.length > 0) {
-      checkPageBreak(100);
-      
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("SERVICES PROVIDED:", margin, currentY);
+      // Draw header line
+      drawLine(currentY);
       currentY += 20;
 
-      // Service table headers
-      doc.setFontSize(9);
+      // Invoice title and details
+      doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
+      doc.text("INVOICE", margin, currentY);
       
-      let colX = margin;
-      doc.text("Sr.No", colX, currentY);
-      colX += 40;
-      doc.text("Service Description", colX, currentY);
-      colX += 250;
-      doc.text("Engineer", colX, currentY);
-      colX += 100;
-      doc.text("Labor Cost", colX, currentY);
-      
-      currentY += 15;
-      drawLine(currentY - 5);
-      currentY += 10;
-
-      // Services data
+      // Invoice details on the right
+      doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      services.forEach((service, index) => {
-        checkPageBreak(20);
+      const invoiceDetailsX = pageWidth - margin - 150;
+      doc.text(`INVOICE DATE: ${carDetails.billingDate}`, invoiceDetailsX, currentY - 5);
+      doc.text(`INVOICE NO: ${carDetails.invoiceNo}`, invoiceDetailsX, currentY + 10);
+      currentY += 35;
+
+      // Customer and Vehicle Details Section
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("CUSTOMER DETAILS:", margin, currentY);
+      currentY += 20;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Name: ${carDetails.customerName}`, margin, currentY);
+      doc.text(`Contact: ${carDetails.contact}`, margin + 200, currentY);
+      currentY += 15;
+      doc.text(`Email: ${carDetails.email}`, margin, currentY);
+      currentY += 15;
+      if (carDetails.address) {
+        doc.text(`Address: ${carDetails.address}`, margin, currentY);
+        currentY += 15;
+      }
+      if (gstSettings.customerGstNumber) {
+        doc.text(`Customer GST: ${gstSettings.customerGstNumber}`, margin, currentY);
+        currentY += 15;
+      }
+
+      // Vehicle Details
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("VEHICLE DETAILS:", margin, currentY + 10);
+      currentY += 30;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Model: ${carDetails.company} ${carDetails.model}`, margin, currentY);
+      doc.text(`Registration No: ${carDetails.carNumber}`, margin + 250, currentY);
+      currentY += 25;
+
+      // Draw line before itemized section
+      drawLine(currentY);
+      currentY += 20;
+
+      // Parts Table Header
+      if (parts.length > 0) {
+        checkPageBreak(100);
         
-        colX = margin;
-        doc.text((index + 1).toString(), colX, currentY);
-        colX += 40;
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("PARTS DETAILS:", margin, currentY);
+        currentY += 20;
+
+        // Table headers
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
         
-        const serviceName = service.name.length > 30 ? service.name.substring(0, 30) + "..." : service.name;
-        doc.text(serviceName, colX, currentY);
-        colX += 250;
+        const colWidths = {
+          srNo: 40,
+          description: 250,
+          qty: 50,
+          rate: 80,
+          amount: 80
+        };
         
-        const engineerName = service.engineer.length > 15 ? service.engineer.substring(0, 15) + "..." : service.engineer;
-        doc.text(engineerName, colX, currentY);
-        colX += 100;
-        
-        doc.text(service.laborCost.toFixed(2), colX, currentY);
+        let colX = margin;
+        doc.text("Sr.No", colX, currentY);
+        colX += colWidths.srNo;
+        doc.text("Part Description", colX, currentY);
+        colX += colWidths.description;
+        doc.text("Qty", colX, currentY);
+        colX += colWidths.qty;
+        doc.text("Rate", colX, currentY);
+        colX += colWidths.rate;
+        doc.text("Amount", colX, currentY);
         
         currentY += 15;
-      });
+        drawLine(currentY - 5);
+        currentY += 10;
 
-      // Services subtotal
-      currentY += 5;
-      drawLine(currentY);
-      currentY += 15;
+        // Parts data
+        doc.setFont("helvetica", "normal");
+        parts.forEach((part, index) => {
+          checkPageBreak(20);
+          
+          colX = margin;
+          doc.text((index + 1).toString(), colX, currentY);
+          colX += colWidths.srNo;
+          
+          // Handle long part names
+          const partName = part.name.length > 35 ? part.name.substring(0, 35) + "..." : part.name;
+          doc.text(partName, colX, currentY);
+          colX += colWidths.description;
+          
+          doc.text(part.quantity.toString(), colX, currentY);
+          colX += colWidths.qty;
+          
+          doc.text(part.pricePerUnit.toFixed(2), colX, currentY);
+          colX += colWidths.rate;
+          
+          doc.text(part.total.toFixed(2), colX, currentY);
+          
+          currentY += 15;
+        });
+
+        // Parts subtotal
+        currentY += 5;
+        drawLine(currentY);
+        currentY += 15;
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("TOTAL PARTS AMOUNT:", margin + 290, currentY);
+        doc.text(summary.totalPartsCost.toFixed(2), margin + 450, currentY);
+        currentY += 25;
+      }
+
+      // Services Table
+      if (services.length > 0) {
+        checkPageBreak(100);
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("SERVICES PROVIDED:", margin, currentY);
+        currentY += 20;
+
+        // Service table headers
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        
+        let colX = margin;
+        doc.text("Sr.No", colX, currentY);
+        colX += 40;
+        doc.text("Service Description", colX, currentY);
+        colX += 250;
+        doc.text("Engineer", colX, currentY);
+        colX += 100;
+        doc.text("Labor Cost", colX, currentY);
+        
+        currentY += 15;
+        drawLine(currentY - 5);
+        currentY += 10;
+
+        // Services data
+        doc.setFont("helvetica", "normal");
+        services.forEach((service, index) => {
+          checkPageBreak(20);
+          
+          colX = margin;
+          doc.text((index + 1).toString(), colX, currentY);
+          colX += 40;
+          
+          const serviceName = service.name.length > 30 ? service.name.substring(0, 30) + "..." : service.name;
+          doc.text(serviceName, colX, currentY);
+          colX += 250;
+          
+          const engineerName = service.engineer.length > 15 ? service.engineer.substring(0, 15) + "..." : service.engineer;
+          doc.text(engineerName, colX, currentY);
+          colX += 100;
+          
+          doc.text(service.laborCost.toFixed(2), colX, currentY);
+          
+          currentY += 15;
+        });
+
+        // Services subtotal
+        currentY += 5;
+        drawLine(currentY);
+        currentY += 15;
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("TOTAL LABOR AMOUNT:", margin + 290, currentY);
+        doc.text(summary.totalLaborCost.toFixed(2), margin + 450, currentY);
+        currentY += 25;
+      }
+
+      // Final Inspection Notes
+      if (finalInspection) {
+        checkPageBreak(60);
+        
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("WORK DONE/REMARKS:", margin, currentY);
+        currentY += 20;
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const inspectionLines = doc.splitTextToSize(finalInspection, contentWidth - 20);
+        doc.text(inspectionLines, margin, currentY);
+        currentY += inspectionLines.length * 12 + 15;
+      }
+
+      // Bill Summary Section
+      checkPageBreak(150);
       
-      doc.setFont("helvetica", "bold");
-      doc.text("TOTAL LABOR AMOUNT:", margin + 290, currentY);
-      doc.text(summary.totalLaborCost.toFixed(2), margin + 450, currentY);
-      currentY += 25;
-    }
+      drawLine(currentY);
+      currentY += 20;
 
-    // Final Inspection Notes
-    if (finalInspection) {
+      // Summary calculations
+      const summaryX = pageWidth - margin - 200;
+      const labelX = summaryX - 100;
+      
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      
+      doc.text("Subtotal:", labelX, currentY);
+      doc.text(`₹${summary.subtotal.toFixed(2)}`, summaryX, currentY);
+      currentY += 18;
+
+      if (summary.discount > 0) {
+        doc.text("Discount:", labelX, currentY);
+        doc.text(`-₹${summary.discount.toFixed(2)}`, summaryX, currentY);
+        currentY += 18;
+      }
+
+      // GST Details
+      if (gstSettings.includeGst && summary.gstAmount > 0) {
+        if (gstSettings.isInterState) {
+          doc.text(`IGST (${gstSettings.gstPercentage}%):`, labelX, currentY);
+          doc.text(`₹${summary.gstAmount.toFixed(2)}`, summaryX, currentY);
+          currentY += 18;
+        } else {
+          doc.text(`CGST (${gstSettings.cgstPercentage}%):`, labelX, currentY);
+          doc.text(`₹${(summary.gstAmount / 2).toFixed(2)}`, summaryX, currentY);
+          currentY += 18;
+          
+          doc.text(`SGST (${gstSettings.sgstPercentage}%):`, labelX, currentY);
+          doc.text(`₹${(summary.gstAmount / 2).toFixed(2)}`, summaryX, currentY);
+          currentY += 18;
+        }
+      }
+
+      // Final Amount with proper spacing and alignment
+      currentY += 10;
+      drawLine(currentY - 5, contentWidth);
+      currentY += 25;
+      
+      // Calculate positions for final amount
+      const finalAmountLabelX = margin + 100;
+      const finalAmountValueX = pageWidth - margin - 120;
+      
+      // Create a box for the final amount to make it prominent
+      doc.setLineWidth(2);
+      // doc.rect(finalAmountLabelX - 20, currentY - 18, contentWidth - 160, 30);
+      
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("FINAL BILL AMOUNT:", finalAmountLabelX, currentY);
+      
+      // Display the amount with proper alignment
+      const finalAmountText = `RS.${summary.totalAmount.toFixed(2)}`;
+      doc.text(finalAmountText, finalAmountValueX, currentY);
+      
+      currentY += 45;
+
+      // Payment method if available
+      if (paymentMethod) {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Payment Method: ${paymentMethod}`, margin, currentY);
+        currentY += 20;
+      }
+
+      // Footer
       checkPageBreak(60);
       
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("WORK DONE/REMARKS:", margin, currentY);
-      currentY += 20;
-      
       doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.text("DELIVERY AGAINST CASH ONLY", margin, currentY);
+      currentY += 30;
+
+      // Thank you message
       doc.setFont("helvetica", "normal");
-      const inspectionLines = doc.splitTextToSize(finalInspection, contentWidth - 20);
-      doc.text(inspectionLines, margin, currentY);
-      currentY += inspectionLines.length * 12 + 15;
+      doc.text("Thank you for choosing our service!", margin, currentY);
+      
+      // Add timestamp
+      const timestamp = new Date().toLocaleString();
+      doc.setFontSize(8);
+      doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
+
+      return doc;
+      
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      throw new Error('Failed to generate PDF document: ' + error.message);
     }
+  };
 
-    // Bill Summary Section
-    checkPageBreak(150);
-    
-    drawLine(currentY);
-    currentY += 20;
-
-    // Summary calculations
-    const summaryX = pageWidth - margin - 200;
-    const labelX = summaryX - 100;
-    
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    
-    doc.text("Subtotal:", labelX, currentY);
-    doc.text(`₹${summary.subtotal.toFixed(2)}`, summaryX, currentY);
-    currentY += 18;
-
-    if (summary.discount > 0) {
-      doc.text("Discount:", labelX, currentY);
-      doc.text(`-₹${summary.discount.toFixed(2)}`, summaryX, currentY);
-      currentY += 18;
-    }
-
-    // GST Details
-    if (gstSettings.includeGst && summary.gstAmount > 0) {
-      if (gstSettings.isInterState) {
-        doc.text(`IGST (${gstSettings.gstPercentage}%):`, labelX, currentY);
-        doc.text(`₹${summary.gstAmount.toFixed(2)}`, summaryX, currentY);
-        currentY += 18;
-      } else {
-        doc.text(`CGST (${gstSettings.cgstPercentage}%):`, labelX, currentY);
-        doc.text(`₹${(summary.gstAmount / 2).toFixed(2)}`, summaryX, currentY);
-        currentY += 18;
-        
-        doc.text(`SGST (${gstSettings.sgstPercentage}%):`, labelX, currentY);
-        doc.text(`₹${(summary.gstAmount / 2).toFixed(2)}`, summaryX, currentY);
-        currentY += 18;
+  // Enhanced download function with better error handling
+  const downloadPdfBill = () => {
+    try {
+      // Validate required data
+      if (!carDetails.invoiceNo) {
+        setSnackbar({
+          open: true,
+          message: 'Invoice number is required to generate PDF',
+          severity: 'error'
+        });
+        return;
       }
-    }
 
-    // Final Amount with proper spacing and alignment
-    currentY += 10;
-    drawLine(currentY - 5, contentWidth);
-    currentY += 25;
-    
-    // Calculate positions for final amount
-    const finalAmountLabelX = margin + 100;
-    const finalAmountValueX = pageWidth - margin - 120;
-    
-    // Create a box for the final amount to make it prominent
-    doc.setLineWidth(2);
-    // doc.rect(finalAmountLabelX - 20, currentY - 18, contentWidth - 160, 30);
-    
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("FINAL BILL AMOUNT:", finalAmountLabelX, currentY);
-    
-    // Display the amount with proper alignment
-    const finalAmountText = `RS.${summary.totalAmount.toFixed(2)}`;
-    doc.text(finalAmountText, finalAmountValueX, currentY);
-    
-    currentY += 45;
+      if (!carDetails.customerName) {
+        setSnackbar({
+          open: true,
+          message: 'Customer name is required to generate PDF',
+          severity: 'error'
+        });
+        return;
+      }
 
-    // Payment method if available
-    if (paymentMethod) {
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Payment Method: ${paymentMethod}`, margin, currentY);
-      currentY += 20;
-    }
-
-    // Footer
-    checkPageBreak(60);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "italic");
-    doc.text("DELIVERY AGAINST CASH ONLY", margin, currentY);
-    currentY += 30;
-
-    // Thank you message
-    doc.setFont("helvetica", "normal");
-    doc.text("Thank you for choosing our service!", margin, currentY);
-    
-    // Add timestamp
-    const timestamp = new Date().toLocaleString();
-    doc.setFontSize(8);
-    doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
-
-    return doc;
-    
-  } catch (error) {
-    console.error('PDF Generation Error:', error);
-    throw new Error('Failed to generate PDF document: ' + error.message);
-  }
-};
-
-// Enhanced download function with better error handling
-const downloadPdfBill = () => {
-  try {
-    // Validate required data
-    if (!carDetails.invoiceNo) {
-      setSnackbar({
-        open: true,
-        message: 'Invoice number is required to generate PDF',
-        severity: 'error'
-      });
-      return;
-    }
-
-    if (!carDetails.customerName) {
-      setSnackbar({
-        open: true,
-        message: 'Customer name is required to generate PDF',
-        severity: 'error'
-      });
-      return;
-    }
-
-    const doc = generateProfessionalPdfInvoice();
-    const fileName = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-    
-    doc.save(fileName);
-    
-    setSnackbar({
-      open: true,
-      message: 'Professional invoice PDF downloaded successfully!',
-      severity: 'success'
-    });
-    
-  } catch (error) {
-    console.error('Download error:', error);
-    setSnackbar({
-      open: true,
-      message: `Failed to download PDF: ${error.message}`,
-      severity: 'error'
-    });
-  }
-};
-
-// Enhanced email function with PDF attachment
-const sendBillViaEmail = async () => {
-  try {
-    setSendingEmail(true);
-    
-    // Validate email recipient
-    if (!emailRecipient || !emailRecipient.includes('@')) {
-      setSnackbar({
-        open: true,
-        message: 'Please enter a valid email address',
-        severity: 'error'
-      });
-      return;
-    }
-
-    // Generate PDF
-    const doc = generateProfessionalPdfInvoice();
-    const pdfBlob = doc.output('blob');
-    
-    // Create download link for manual attachment
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    const downloadLink = document.createElement('a');
-    downloadLink.href = pdfUrl;
-    downloadLink.download = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-    downloadLink.click();
-    
-    // Prepare email
-    const subject = encodeURIComponent(emailSubject || `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`);
-    const body = encodeURIComponent(
-      emailMessage || 
-      `Dear ${carDetails.customerName},\n\nPlease find attached your invoice for vehicle ${carDetails.carNumber}.\n\nInvoice Details:\n- Invoice No: ${carDetails.invoiceNo}\n- Date: ${carDetails.billingDate}\n- Amount: ₹${summary.totalAmount}\n\nThank you for choosing ${garageDetails.name}.\n\nBest regards,\n${garageDetails.name}`
-    );
-    const recipient = encodeURIComponent(emailRecipient);
-
-    const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`;
-    window.open(mailtoLink, '_blank');
-
-    setSnackbar({
-      open: true,
-      message: 'Email client opened with invoice details. PDF has been downloaded for manual attachment.',
-      severity: 'success'
-    });
-
-    setShowEmailDialog(false);
-    
-    // Clean up URL
-    setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-    
-  } catch (error) {
-    console.error('Email send error:', error);
-    setSnackbar({
-      open: true,
-      message: `Failed to prepare email: ${error.message}`,
-      severity: 'error'
-    });
-  } finally {
-    setSendingEmail(false);
-  }
-};
-
-// Function to fetch and integrate API data for more comprehensive billing
-const fetchAdditionalJobCardData = async (jobCardId) => {
-  try {
-    const response = await axios.get(
-      `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardId}`
-    );
-    
-    const apiData = response.data;
-    
-    // Integrate additional data that might be missing
-    if (apiData.additionalCharges && apiData.additionalCharges.length > 0) {
-      const additionalServices = apiData.additionalCharges.map((charge, index) => ({
-        id: services.length + index + 1,
-        name: charge.description || 'Additional Charge',
-        engineer: 'Service Team',
-        progress: 100,
-        status: 'Completed',
-        laborCost: parseFloat(charge.amount) || 0
-      }));
+      const doc = generateProfessionalPdfInvoice();
+      const fileName = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
       
-      setServices(prev => [...prev, ...additionalServices]);
+      doc.save(fileName);
+      
+      setSnackbar({
+        open: true,
+        message: 'Professional invoice PDF downloaded successfully!',
+        severity: 'success'
+      });
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      setSnackbar({
+        open: true,
+        message: `Failed to download PDF: ${error.message}`,
+        severity: 'error'
+      });
     }
-    
-    // Update inspection notes if more detailed info is available
-    if (apiData.detailedRemarks && !finalInspection) {
-      setFinalInspection(apiData.detailedRemarks);
+  };
+
+  // Enhanced email function with PDF attachment
+  const sendBillViaEmail = async () => {
+    try {
+      setSendingEmail(true);
+      
+      // Validate email recipient
+      if (!emailRecipient || !emailRecipient.includes('@')) {
+        setSnackbar({
+          open: true,
+          message: 'Please enter a valid email address',
+          severity: 'error'
+        });
+        return;
+      }
+
+      // Generate PDF
+      const doc = generateProfessionalPdfInvoice();
+      const pdfBlob = doc.output('blob');
+      
+      // Create download link for manual attachment
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pdfUrl;
+      downloadLink.download = `Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      downloadLink.click();
+      
+      // Prepare email
+      const subject = encodeURIComponent(emailSubject || `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`);
+      const body = encodeURIComponent(
+        emailMessage || 
+        `Dear ${carDetails.customerName},\n\nPlease find attached your invoice for vehicle ${carDetails.carNumber}.\n\nInvoice Details:\n- Invoice No: ${carDetails.invoiceNo}\n- Date: ${carDetails.billingDate}\n- Amount: ₹${summary.totalAmount}\n\nThank you for choosing ${garageDetails.name}.\n\nBest regards,\n${garageDetails.name}`
+      );
+      const recipient = encodeURIComponent(emailRecipient);
+
+      const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`;
+      window.open(mailtoLink, '_blank');
+
+      setSnackbar({
+        open: true,
+        message: 'Email client opened with invoice details. PDF has been downloaded for manual attachment.',
+        severity: 'success'
+      });
+
+      setShowEmailDialog(false);
+      
+      // Clean up URL
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+      
+    } catch (error) {
+      console.error('Email send error:', error);
+      setSnackbar({
+        open: true,
+        message: `Failed to prepare email: ${error.message}`,
+        severity: 'error'
+      });
+    } finally {
+      setSendingEmail(false);
     }
-    
-    // Update GST settings based on API data
-    if (apiData.gstDetails) {
-      setGstSettings(prev => ({
-        ...prev,
-        ...apiData.gstDetails
-      }));
+  };
+
+  // Function to fetch and integrate API data for more comprehensive billing
+  const fetchAdditionalJobCardData = async (jobCardId) => {
+    try {
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardId}`
+      );
+      
+      const apiData = response.data;
+      
+      // Integrate additional data that might be missing
+      if (apiData.additionalCharges && apiData.additionalCharges.length > 0) {
+        const additionalServices = apiData.additionalCharges.map((charge, index) => ({
+          id: services.length + index + 1,
+          name: charge.description || 'Additional Charge',
+          engineer: 'Service Team',
+          progress: 100,
+          status: 'Completed',
+          laborCost: parseFloat(charge.amount) || 0
+        }));
+        
+        setServices(prev => [...prev, ...additionalServices]);
+      }
+      
+      // Update inspection notes if more detailed info is available
+      if (apiData.detailedRemarks && !finalInspection) {
+        setFinalInspection(apiData.detailedRemarks);
+      }
+      
+      // Update GST settings based on API data
+      if (apiData.gstDetails) {
+        setGstSettings(prev => ({
+          ...prev,
+          ...apiData.gstDetails
+        }));
+      }
+      
+      return apiData;
+      
+    } catch (error) {
+      console.error('Error fetching additional job card data:', error);
+      return null;
     }
-    
-    return apiData;
-    
-  } catch (error) {
-    console.error('Error fetching additional job card data:', error);
-    return null;
-  }
-};
+  };
 
   const generatePdfBase64 = () => {
     try {
@@ -1184,18 +1235,51 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
           <Typography variant="h4" color="primary" fontWeight="bold">
             Professional Billing System
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<ReceiptIcon />}
-            onClick={generateBill}
-            disabled={showThankYou}
-            fullWidth={isMobile}
-            size={isMobile ? "small" : "medium"}
-          >
-            Generate Professional Bill
-          </Button>
+          
+          {/* UPDATED: Button behavior based on bill status */}
+          {!isBillAlreadyGenerated && !billGenerated ? (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<ReceiptIcon />}
+              onClick={generateBill}
+              fullWidth={isMobile}
+              size={isMobile ? "small" : "medium"}
+            >
+              Generate Professional Bill
+            </Button>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+              <Button
+                variant="outlined"
+                color="success"
+                startIcon={<CheckIcon />}
+                disabled
+                fullWidth={isMobile}
+                size={isMobile ? "small" : "medium"}
+              >
+                Bill Generated ✓
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<DownloadIcon />}
+                onClick={downloadPdfBill}
+                fullWidth={isMobile}
+                size={isMobile ? "small" : "medium"}
+              >
+                Download PDF
+              </Button>
+            </Box>
+          )}
         </Box>
+
+        {/* UPDATED: Show bill generation warning if already generated */}
+        {isBillAlreadyGenerated && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            This bill has already been generated. You can download the PDF or share via WhatsApp/Email below.
+          </Alert>
+        )}
 
         {!showThankYou ? (
           <>
@@ -1205,6 +1289,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               handleInputChange={handleInputChange} 
               isMobile={isMobile} 
               today={today}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
             <GSTSettingsSection 
               gstSettings={gstSettings} 
@@ -1216,6 +1301,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               handleInterStateChange={handleInterStateChange}
               summary={summary}
               isMobile={isMobile}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
             <PartsSection 
               parts={parts} 
@@ -1224,6 +1310,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               setShowNewPartDialog={setShowNewPartDialog} 
               isMobile={isMobile}
               tableCellStyle={tableCellStyle}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
             <ServicesSection 
               services={services} 
@@ -1233,10 +1320,12 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               isMobile={isMobile}
               tableCellStyle={tableCellStyle}
               getStatusColor={getStatusColor}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
             <FinalInspectionSection 
               finalInspection={finalInspection} 
-              setFinalInspection={setFinalInspection} 
+              setFinalInspection={setFinalInspection}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
             <BillSummarySection 
               summary={summary} 
@@ -1245,6 +1334,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               paymentMethod={paymentMethod} 
               isMobile={isMobile}
               formatAmount={formatAmount}
+              disabled={isBillAlreadyGenerated} // NEW: Disable editing if bill is generated
             />
           </>
         ) : (
@@ -1268,7 +1358,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
         isMobile={isMobile} 
         selectPaymentMethod={selectPaymentMethod} 
       />
-      {/* REMOVED: ProcessingPaymentDialog is no longer needed */}
+      
       <EmailDialog 
         showEmailDialog={showEmailDialog} 
         setShowEmailDialog={setShowEmailDialog} 
@@ -1282,30 +1372,36 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
         sendBillViaEmail={sendBillViaEmail} 
         carDetails={carDetails} 
       />
-      <EditPriceDialog 
-        showEditPriceDialog={showEditPriceDialog} 
-        setShowEditPriceDialog={setShowEditPriceDialog} 
-        isMobile={isMobile} 
-        editItem={editItem} 
-        setEditItem={setEditItem} 
-        saveEditedPrice={saveEditedPrice} 
-      />
-      <AddPartDialog 
-        showNewPartDialog={showNewPartDialog} 
-        setShowNewPartDialog={setShowNewPartDialog} 
-        isMobile={isMobile} 
-        newPart={newPart} 
-        setNewPart={setNewPart} 
-        addNewPart={addNewPart} 
-      />
-      <AddServiceDialog 
-        showNewServiceDialog={showNewServiceDialog} 
-        setShowNewServiceDialog={setShowNewServiceDialog} 
-        isMobile={isMobile} 
-        newService={newService} 
-        setNewService={setNewService} 
-        addNewService={addNewService} 
-      />
+      
+      {/* UPDATED: Only show edit dialogs if bill is not generated */}
+      {!isBillAlreadyGenerated && (
+        <>
+          <EditPriceDialog 
+            showEditPriceDialog={showEditPriceDialog} 
+            setShowEditPriceDialog={setShowEditPriceDialog} 
+            isMobile={isMobile} 
+            editItem={editItem} 
+            setEditItem={setEditItem} 
+            saveEditedPrice={saveEditedPrice} 
+          />
+          <AddPartDialog 
+            showNewPartDialog={showNewPartDialog} 
+            setShowNewPartDialog={setShowNewPartDialog} 
+            isMobile={isMobile} 
+            newPart={newPart} 
+            setNewPart={setNewPart} 
+            addNewPart={addNewPart} 
+          />
+          <AddServiceDialog 
+            showNewServiceDialog={showNewServiceDialog} 
+            setShowNewServiceDialog={setShowNewServiceDialog} 
+            isMobile={isMobile} 
+            newService={newService} 
+            setNewService={setNewService} 
+            addNewService={addNewService} 
+          />
+        </>
+      )}
 
       <SnackbarAlert 
         showApiResponse={showApiResponse} 

@@ -158,6 +158,37 @@ const AssignEngineer = () => {
     }
   }, [garageToken]);
 
+  // UPDATED: Update Part Quantity using PUT API, DELETE only when qty = 0
+  const updatePartQuantity = useCallback(async (partId, newQuantity) => {
+    try {
+      console.log(`Updating part ${partId} to quantity: ${newQuantity}`);
+      
+      if (newQuantity === 0) {
+        // When quantity reaches 0, use DELETE API
+        await apiCall(`/garage/inventory/delete/${partId}`, {
+          method: 'DELETE'
+        });
+        console.log(`Part ${partId} deleted (quantity reached 0)`);
+      } else {
+        // Use PUT API to update quantity
+        await apiCall(`/garage/inventory/update/${partId}`, {
+          method: 'PUT',
+          data: { quantity: newQuantity }
+        });
+        console.log(`Part ${partId} updated to quantity: ${newQuantity}`);
+      }
+      
+      // Refresh inventory after updating
+      await fetchInventoryParts();
+      
+    } catch (err) {
+      console.error(`Failed to update quantity for part ${partId}:`, err);
+      throw new Error(`Failed to update part quantity: ${err.response?.data?.message || err.message}`);
+    }
+  }, [apiCall, fetchInventoryParts]);
+
+  // REMOVED: Old decreasePartQuantity function - replaced with updatePartQuantity
+
   // Initialize job card IDs
   useEffect(() => {
     const initialJobCardIds = [];
@@ -396,8 +427,151 @@ const AssignEngineer = () => {
     }
   };
 
-  // Calculate total estimated duration for an assignment
+  // UPDATED: Handle Part Selection with PUT API
+  const handlePartSelection = async (assignmentId, newParts, previousParts = []) => {
+    try {
+      // Find newly added parts
+      const addedParts = newParts.filter(newPart => 
+        !previousParts.some(prevPart => prevPart._id === newPart._id)
+      );
 
+      // Find removed parts - now we need to restore their quantity
+      const removedParts = previousParts.filter(prevPart => 
+        !newParts.some(newPart => newPart._id === prevPart._id)
+      );
+
+      // Process removed parts - restore their quantity
+      for (const removedPart of removedParts) {
+        const currentPart = inventoryParts.find(p => p._id === removedPart._id);
+        if (currentPart) {
+          const restoredQuantity = currentPart.quantity + (removedPart.selectedQuantity || 1);
+          await updatePartQuantity(removedPart._id, restoredQuantity);
+        }
+      }
+
+      // Process newly added parts
+      for (const addedPart of addedParts) {
+        // Check if part has sufficient quantity
+        if (addedPart.quantity < 1) {
+          setError(`Part "${addedPart.partName}" is out of stock!`);
+          return; // Don't update the selection
+        }
+
+        // Decrease quantity by updating the part
+        const newQuantity = addedPart.quantity - 1;
+        try {
+          await updatePartQuantity(addedPart._id, newQuantity);
+        } catch (err) {
+          setError(`Failed to allocate part "${addedPart.partName}": ${err.message}`);
+          return; // Don't update the selection
+        }
+      }
+
+      // Update the parts with selected quantity
+      const updatedParts = newParts.map(part => ({
+        ...part,
+        selectedQuantity: part.selectedQuantity || 1,
+        // Update available quantity (it should be refreshed from fetchInventoryParts)
+        availableQuantity: part.quantity
+      }));
+
+      // Update the assignment with new parts
+      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+
+    } catch (err) {
+      console.error('Error handling part selection:', err);
+      setError('Failed to update part allocation');
+    }
+  };
+
+  // UPDATED: Handle Part Quantity Change with PUT API
+  const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity, oldQuantity) => {
+    const assignment = taskAssignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+
+    const part = assignment.parts[partIndex];
+    if (!part) return;
+
+    try {
+      const quantityDiff = newQuantity - oldQuantity;
+      
+      // Find current available quantity from inventory
+      const currentPart = inventoryParts.find(p => p._id === part._id);
+      const availableQuantity = currentPart?.quantity || 0;
+      const maxSelectableQuantity = availableQuantity + oldQuantity;
+
+      // Validate maximum quantity
+      if (newQuantity > maxSelectableQuantity) {
+        setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${oldQuantity}`);
+        return;
+      }
+
+      // Calculate new inventory quantity
+      let newInventoryQuantity;
+      
+      if (quantityDiff > 0) {
+        // Increasing selection - decrease inventory
+        if (availableQuantity < quantityDiff) {
+          setError(`Insufficient stock for "${part.partName}". Available: ${availableQuantity}, Requested: ${quantityDiff}`);
+          return;
+        }
+        newInventoryQuantity = availableQuantity - quantityDiff;
+      } else {
+        // Decreasing selection - increase inventory
+        newInventoryQuantity = availableQuantity + Math.abs(quantityDiff);
+      }
+
+      // Update inventory using PUT API (or DELETE if quantity becomes 0)
+      await updatePartQuantity(part._id, newInventoryQuantity);
+
+      // Update the part quantity in the assignment
+      const updatedParts = assignment.parts.map((p, idx) => 
+        idx === partIndex 
+          ? { ...p, selectedQuantity: newQuantity }
+          : p
+      );
+      
+      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+
+      // Clear any previous errors
+      if (error && error.includes(part.partName)) {
+        setError(null);
+      }
+
+    } catch (err) {
+      console.error('Error updating part quantity:', err);
+      setError(`Failed to update quantity for "${part.partName}": ${err.message}`);
+    }
+  };
+
+  // UPDATED: Handle Part Removal with Quantity Restoration
+  const handlePartRemoval = async (assignmentId, partIndex) => {
+    const assignment = taskAssignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+
+    const part = assignment.parts[partIndex];
+    if (!part) return;
+
+    try {
+      // Restore the quantity back to inventory
+      const currentPart = inventoryParts.find(p => p._id === part._id);
+      if (currentPart) {
+        const selectedQuantity = part.selectedQuantity || 1;
+        const restoredQuantity = currentPart.quantity + selectedQuantity;
+        
+        console.log(`Restoring ${selectedQuantity} units of "${part.partName}" back to inventory`);
+        await updatePartQuantity(part._id, restoredQuantity);
+      }
+
+      // Remove part from assignment
+      const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
+      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+
+    } catch (err) {
+      console.error('Error removing part:', err);
+      setError(`Failed to remove part "${part.partName}": ${err.message}`);
+    }
+  };
 
   // Form Validation
   const validateForm = () => {
@@ -539,7 +713,6 @@ const AssignEngineer = () => {
             quantity: part.selectedQuantity || 1
           })),
           priority: assignment.priority,
-          // estimatedDuration: calculateTotalDuration(assignment.tasks),
           notes: assignment.notes
         };
 
@@ -982,6 +1155,15 @@ const AssignEngineer = () => {
                   <Typography variant="h6" fontWeight={600}>
                     Task Assignments
                   </Typography>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={addTaskAssignment}
+                    size="small"
+                  >
+                    Add Assignment
+                  </Button>
                 </Box>
 
                 {/* Task Assignments */}
@@ -1097,27 +1279,6 @@ const AssignEngineer = () => {
                           </FormControl>
                         </Grid>
 
-                        {/* Estimated Duration Display */}
-                        {/* <Grid item xs={12} md={3}>
-                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                            Total Duration
-                          </Typography>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            p: 1.5, 
-                            border: '1px solid', 
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            backgroundColor: 'action.hover'
-                          }}>
-                            <ScheduleIcon color="action" sx={{ mr: 1 }} />
-                            <Typography variant="body2">
-                              {calculateTotalDuration(assignment.tasks)}
-                            </Typography>
-                          </Box>
-                        </Grid> */}
-
                         {/* Task Selection */}
                         <Grid item xs={12}>
                           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
@@ -1134,7 +1295,7 @@ const AssignEngineer = () => {
                               fullWidth
                               options={availableTasks}
                               getOptionLabel={(option) => 
-                                `${option.name || option.taskName}  - ${option.category}`
+                                `${option.name || option.taskName} - ${option.category}`
                               }
                               value={assignment.tasks}
                               onChange={(event, newValue) => {
@@ -1156,9 +1317,6 @@ const AssignEngineer = () => {
                                     <Typography variant="body2">
                                       {option.name || option.taskName} 
                                     </Typography>
-                                    {/* <Typography variant="caption" color="text.secondary">
-                                      {option.category} - {option.description}
-                                    </Typography> */}
                                   </Box>
                                   <IconButton
                                     size="small"
@@ -1197,7 +1355,7 @@ const AssignEngineer = () => {
                           )}
                         </Grid>
 
-                        {/* Enhanced Parts Selection */}
+                        {/* UPDATED Parts Selection with Quantity Management */}
                         <Grid item xs={12}>
                           <Box sx={{ 
                             display: 'flex', 
@@ -1239,17 +1397,13 @@ const AssignEngineer = () => {
                             <Autocomplete
                               multiple
                               fullWidth
-                              options={inventoryParts}
+                              options={inventoryParts.filter(part => part.quantity > 0)}
                               getOptionLabel={(option) => 
                                 `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${option.quantity}`
                               }
                               value={assignment.parts}
                               onChange={(event, newValue) => {
-                                const updatedParts = newValue.map(part => ({
-                                  ...part,
-                                  selectedQuantity: part.selectedQuantity || 1
-                                }));
-                                updateTaskAssignment(assignment.id, 'parts', updatedParts);
+                                handlePartSelection(assignment.id, newValue, assignment.parts);
                               }}
                               renderTags={(value, getTagProps) =>
                                 value.map((option, index) => (
@@ -1295,129 +1449,206 @@ const AssignEngineer = () => {
                                   }}
                                 />
                               )}
-                              noOptionsText="No parts available"
+                              noOptionsText="No parts available in stock"
+                              filterOptions={(options, { inputValue }) => {
+                                return options.filter(option => 
+                                  option.quantity > 0 && (
+                                    option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
+                                    option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                                    option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                                    option.model?.toLowerCase().includes(inputValue.toLowerCase())
+                                  )
+                                );
+                              }}
                             />
                           )}
                           
-                          {/* Enhanced Selected Parts with Price Details */}
-                          {/* Enhanced Selected Parts with Price Details */}
-{assignment.parts.length > 0 && (
-  <Box sx={{ mt: 2 }}>
-    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-      Selected Parts with Details:
-    </Typography>
-    <List dense>
-      {assignment.parts.map((part, partIndex) => {
-        const selectedQuantity = part.selectedQuantity || 1;
-        const unitPrice = part.pricePerUnit || 0;
-        const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-        const totalPrice = unitPrice * selectedQuantity;
-        const gstAmount = (totalPrice * gstPercentage) / 100;
-        const finalPrice = totalPrice + gstAmount;
+                          {/* UPDATED Selected Parts with Enhanced Quantity Management */}
+                          {assignment.parts.length > 0 && (
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                                Selected Parts with Details:
+                              </Typography>
+                              <List dense>
+                                {assignment.parts.map((part, partIndex) => {
+                                  const selectedQuantity = part.selectedQuantity || 1;
+                                  const unitPrice = part.pricePerUnit || 0;
+                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
+                                  const totalPrice = unitPrice * selectedQuantity;
+                                  const gstAmount = (totalPrice * gstPercentage) / 100;
+                                  const finalPrice = totalPrice + gstAmount;
+                                  
+                                  // Find current available quantity from inventory
+                                  const currentPart = inventoryParts.find(p => p._id === part._id);
+                                  const availableQuantity = currentPart?.quantity || 0;
+                                  
+                                  // Calculate the maximum quantity user can select
+                                  // This is the current available quantity + already selected quantity
+                                  const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                  const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
 
-        return (
-          <ListItem 
-            key={part._id} 
-            sx={{ 
-              border: '1px solid', 
-              borderColor: 'divider', 
-              borderRadius: 1, 
-              mb: 1,
-              py: 1,
-              flexDirection: 'column',
-              alignItems: 'stretch'
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="body2" fontWeight={500}>
-                  {part.partName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Available Stock: {part.quantity}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TextField
-                  size="small"
-                  type="number"
-                  label="Qty"
-                  value={selectedQuantity}
-                  onChange={(e) => {
-                    const newQuantity = Math.max(1, Math.min(part.quantity, Number(e.target.value)));
-                    const updatedParts = assignment.parts.map((p, idx) => 
-                      idx === partIndex 
-                        ? { ...p, selectedQuantity: newQuantity }
-                        : p
-                    );
-                    updateTaskAssignment(assignment.id, 'parts', updatedParts);
-                  }}
-                  inputProps={{ 
-                    min: 1, 
-                    max: part.quantity,
-                    style: { width: '60px' }
-                  }}
-                  sx={{ width: '80px' }}
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => {
-                    const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-                    updateTaskAssignment(assignment.id, 'parts', updatedParts);
-                  }}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-            {/* Price Details */}
-            <Box sx={{ mt: 1, p: 1, backgroundColor: 'action.hover', borderRadius: 1 }}>
-              <Grid container spacing={1} alignItems="center">
-                <Grid item xs={4}>
-                  <Typography variant="caption" color="text.secondary">
-                    Price/Unit: ₹{unitPrice.toFixed(2)}
-                  </Typography>
-                </Grid>
-                <Grid item xs={3}>
-                  <Typography variant="caption" color="text.secondary">
-                    GST: {gstPercentage}%
-                  </Typography>
-                </Grid>
-                <Grid item xs={5}>
-                  <Typography variant="caption" fontWeight={600} color="primary">
-                    Total: ₹{finalPrice.toFixed(2)}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          </ListItem>
-        );
-      })}
-    </List>
-    {/* Total Summary */}
-    {(() => {
-      const grandTotal = assignment.parts.reduce((total, part) => {
-        const selectedQuantity = part.selectedQuantity || 1;
-        const unitPrice = part.pricePerUnit || 0;
-        const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-        const totalPrice = unitPrice * selectedQuantity;
-        const gstAmount = (totalPrice * gstPercentage) / 100;
-        return total + totalPrice + gstAmount;
-      }, 0);
-      return (
-        <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.light', borderRadius: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-            Assignment Total: ₹{grandTotal.toFixed(2)}
-          </Typography>
-        </Box>
-      );
-    })()}
-  </Box>
-)}
+                                  return (
+                                    <ListItem 
+                                      key={part._id} 
+                                      sx={{ 
+                                        border: '1px solid', 
+                                        borderColor: 'divider', 
+                                        borderRadius: 1, 
+                                        mb: 1,
+                                        py: 1,
+                                        flexDirection: 'column',
+                                        alignItems: 'stretch'
+                                      }}
+                                    >
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                                        <Box sx={{ flex: 1 }}>
+                                          <Typography variant="body2" fontWeight={500}>
+                                            {part.partName}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                            Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                          </Typography>
+                                          <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
+                                            Available Stock: {availableQuantity}
+                                          </Typography>
+                                          <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                                            Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                                          </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                const newQuantity = selectedQuantity - 1;
+                                                if (newQuantity >= 1) {
+                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                }
+                                              }}
+                                              disabled={selectedQuantity <= 1}
+                                              sx={{ 
+                                                minWidth: '24px', 
+                                                width: '24px', 
+                                                height: '24px',
+                                                border: '1px solid',
+                                                borderColor: 'divider'
+                                              }}
+                                            >
+                                              <Typography variant="caption" fontWeight="bold">-</Typography>
+                                            </IconButton>
+                                            <TextField
+                                              size="small"
+                                              type="number"
+                                              label="Qty"
+                                              value={selectedQuantity}
+                                              onChange={(e) => {
+                                                const newQuantity = parseInt(e.target.value) || 1;
+                                                const oldQuantity = selectedQuantity;
+                                                
+                                                // Validate quantity limits
+                                                if (newQuantity < 1) {
+                                                  return;
+                                                }
+                                                
+                                                if (newQuantity > maxSelectableQuantity) {
+                                                  setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                  return;
+                                                }
+
+                                                handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
+                                              }}
+                                              inputProps={{ 
+                                                min: 1, 
+                                                max: maxSelectableQuantity,
+                                                style: { width: '50px', textAlign: 'center' },
+                                                readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
+                                              }}
+                                              sx={{ 
+                                                width: '70px',
+                                                '& .MuiInputBase-input': {
+                                                  textAlign: 'center',
+                                                  fontSize: '0.875rem'
+                                                }
+                                              }}
+                                              error={availableQuantity === 0}
+                                              disabled={maxSelectableQuantity === 0}
+                                            />
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                const newQuantity = selectedQuantity + 1;
+                                                if (newQuantity <= maxSelectableQuantity) {
+                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                } else {
+                                                  setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                }
+                                              }}
+                                              disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
+                                              sx={{ 
+                                                minWidth: '24px', 
+                                                width: '24px', 
+                                                height: '24px',
+                                                border: '1px solid',
+                                                borderColor: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'divider',
+                                                color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                              }}
+                                            >
+                                              <Typography variant="caption" fontWeight="bold">+</Typography>
+                                            </IconButton>
+                                          </Box>
+                                          <IconButton
+                                            size="small"
+                                            color="error"
+                                            onClick={() => handlePartRemoval(assignment.id, partIndex)}
+                                          >
+                                            <DeleteIcon fontSize="small" />
+                                          </IconButton>
+                                        </Box>
+                                      </Box>
+                                      {/* Price Details */}
+                                      <Box sx={{ mt: 1, p: 1, backgroundColor: 'action.hover', borderRadius: 1 }}>
+                                        <Grid container spacing={1} alignItems="center">
+                                          <Grid item xs={4}>
+                                            <Typography variant="caption" color="text.secondary">
+                                              Price/Unit: ₹{unitPrice.toFixed(2)}
+                                            </Typography>
+                                          </Grid>
+                                          <Grid item xs={3}>
+                                            <Typography variant="caption" color="text.secondary">
+                                              GST: {gstPercentage}%
+                                            </Typography>
+                                          </Grid>
+                                          <Grid item xs={5}>
+                                            <Typography variant="caption" fontWeight={600} color="primary">
+                                              Total: ₹{finalPrice.toFixed(2)}
+                                            </Typography>
+                                          </Grid>
+                                        </Grid>
+                                      </Box>
+                                    </ListItem>
+                                  );
+                                })}
+                              </List>
+                              {/* Total Summary */}
+                              {(() => {
+                                const grandTotal = assignment.parts.reduce((total, part) => {
+                                  const selectedQuantity = part.selectedQuantity || 1;
+                                  const unitPrice = part.pricePerUnit || 0;
+                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
+                                  const totalPrice = unitPrice * selectedQuantity;
+                                  const gstAmount = (totalPrice * gstPercentage) / 100;
+                                  return total + totalPrice + gstAmount;
+                                }, 0);
+                                return (
+                                  <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.light', borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
+                                      Assignment Total: ₹{grandTotal.toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })()}
+                            </Box>
+                          )}
                         </Grid>
 
                         {/* Notes */}
@@ -1451,11 +1682,6 @@ const AssignEngineer = () => {
                                         <Typography variant="body2" fontWeight={500}>
                                           {task.name || task.taskName}
                                         </Typography>
-                                        {/* <Chip 
-                                          label={task.duration || `${task.taskDuration} min`} 
-                                          size="small" 
-                                          variant="outlined"
-                                        /> */}
                                         <Chip 
                                           label={task.category} 
                                           size="small" 
@@ -1546,21 +1772,6 @@ const AssignEngineer = () => {
                   error={!newTask.taskName.trim() && !!taskError}
                 />
               </Grid>
-              {/* <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Duration (minutes) *" 
-                  type="number"
-                  value={newTask.taskDuration} 
-                  onChange={(e) => {
-                    setNewTask(prev => ({ ...prev, taskDuration: e.target.value }));
-                    if (taskError) setTaskError(null);
-                  }}
-                  placeholder="e.g., 120"
-                  inputProps={{ min: 1 }}
-                  error={!newTask.taskDuration.trim() && !!taskError}
-                />
-              </Grid> */}
             </Grid>
           </DialogContent>
           <DialogActions>
@@ -1577,319 +1788,293 @@ const AssignEngineer = () => {
             <Button 
               onClick={handleAddTask} 
               variant="contained"
-              disabled={addingTask || !newTask.taskName.trim() || !newTask.taskDuration.trim()}
+              disabled={addingTask || !newTask.taskName.trim()}
               startIcon={addingTask ? <CircularProgress size={16} color="inherit" /> : null}
             >
               {addingTask ? 'Creating...' : 'Create Task'}
             </Button>
           </DialogActions>
         </Dialog>
-           <Dialog 
-                    open={openEditTaskDialog} 
-                    onClose={() => {
-                      setOpenEditTaskDialog(false);
-                      setTaskError(null);
-                      setEditingTask(null);
+
+        {/* Edit Task Dialog */}
+        <Dialog 
+          open={openEditTaskDialog} 
+          onClose={() => {
+            setOpenEditTaskDialog(false);
+            setTaskError(null);
+            setEditingTask(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Edit Task</DialogTitle>
+          <DialogContent>
+            {taskError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {taskError}
+              </Alert>
+            )}
+            
+            {editingTask && (
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12}>
+                  <TextField 
+                    fullWidth 
+                    label="Task Name *" 
+                    value={editingTask.taskName} 
+                    onChange={(e) => {
+                      setEditingTask(prev => ({ ...prev, taskName: e.target.value }));
+                      if (taskError) setTaskError(null);
                     }}
-                    maxWidth="sm"
-                    fullWidth
-                  >
-                    <DialogTitle>Edit Task</DialogTitle>
-                    <DialogContent>
-                      {taskError && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                          {taskError}
-                        </Alert>
-                      )}
-                      
-                      {editingTask && (
-                        <Grid container spacing={2} sx={{ mt: 1 }}>
-                          <Grid item xs={12}>
-                            <TextField 
-                              fullWidth 
-                              label="Task Name *" 
-                              value={editingTask.taskName} 
-                              onChange={(e) => {
-                                setEditingTask(prev => ({ ...prev, taskName: e.target.value }));
-                                if (taskError) setTaskError(null);
-                              }}
-                              error={!editingTask.taskName.trim() && !!taskError}
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField 
-                              fullWidth 
-                              label="Duration (minutes) *" 
-                              type="number"
-                              value={editingTask.taskDuration} 
-                              onChange={(e) => {
-                                setEditingTask(prev => ({ ...prev, taskDuration: e.target.value }));
-                                if (taskError) setTaskError(null);
-                              }}
-                              placeholder="e.g., 120"
-                              inputProps={{ min: 1 }}
-                              error={!editingTask.taskDuration.toString().trim() && !!taskError}
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <FormControl fullWidth>
-                              <InputLabel>Category</InputLabel>
-                              <Select
-                                value={editingTask.category || 'general'}
-                                label="Category"
-                                onChange={(e) => setEditingTask(prev => ({ ...prev, category: e.target.value }))}
-                              >
-                                <MenuItem value="general">General</MenuItem>
-                                <MenuItem value="engine">Engine</MenuItem>
-                                <MenuItem value="brakes">Brakes</MenuItem>
-                                <MenuItem value="maintenance">Maintenance</MenuItem>
-                                <MenuItem value="tires">Tires</MenuItem>
-                                <MenuItem value="hvac">HVAC</MenuItem>
-                                <MenuItem value="electrical">Electrical</MenuItem>
-                                <MenuItem value="transmission">Transmission</MenuItem>
-                                <MenuItem value="suspension">Suspension</MenuItem>
-                                <MenuItem value="exhaust">Exhaust</MenuItem>
-                                <MenuItem value="diagnostic">Diagnostic</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Grid>
-                          <Grid item xs={12}>
-                            <TextField 
-                              fullWidth 
-                              label="Description" 
-                              multiline
-                              rows={3}
-                              value={editingTask.description || ''} 
-                              onChange={(e) => setEditingTask(prev => ({ ...prev, description: e.target.value }))}
-                              placeholder="Describe the task in detail..."
-                            />
-                          </Grid>
-                        </Grid>
-                      )}
-                    </DialogContent>
-                    <DialogActions>
-                      <Button 
-                        onClick={() => {
-                          setOpenEditTaskDialog(false);
-                          setTaskError(null);
-                          setEditingTask(null);
-                        }}
-                        disabled={updatingTask}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleEditTask} 
-                        variant="contained"
-                        disabled={updatingTask || !editingTask?.taskName?.trim() || !editingTask?.taskDuration?.toString()?.trim()}
-                        startIcon={updatingTask ? <CircularProgress size={16} color="inherit" /> : null}
-                      >
-                        {updatingTask ? 'Updating...' : 'Update Task'}
-                      </Button>
-                    </DialogActions>
-                  </Dialog>
-          
-                  {/* Add Part Dialog */}
-                  <Dialog 
-                    open={openAddPartDialog} 
-                    onClose={handleCloseAddPartDialog}
-                    maxWidth="md"
-                    fullWidth
-                  >
-                    <DialogTitle>Add New Part</DialogTitle>
-                    <DialogContent>
-                      {partAddSuccess && (
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                          Part added successfully!
-                        </Alert>
-                      )}
-                      {partAddError && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                          {partAddError}
-                        </Alert>
-                      )}
-                      
-                      <Grid container spacing={2} sx={{ mt: 1 }}>
-                        {/* <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Car Name *" 
-                            value={newPart.carName} 
-                            onChange={(e) => handlePartInputChange('carName', e.target.value)}
-                            error={!newPart.carName.trim() && !!partAddError}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Model *" 
-                            value={newPart.model} 
-                            onChange={(e) => handlePartInputChange('model', e.target.value)}
-                            error={!newPart.model.trim() && !!partAddError}
-                          />
-                        </Grid> */}
-                        <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Part Number" 
-                            value={newPart.partNumber} 
-                            onChange={(e) => handlePartInputChange('partNumber', e.target.value)}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Part Name *" 
-                            value={newPart.partName} 
-                            onChange={(e) => handlePartInputChange('partName', e.target.value)}
-                            error={!newPart.partName.trim() && !!partAddError}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <TextField 
-                            fullWidth 
-                            label="Quantity *" 
-                            type="number" 
-                            value={newPart.quantity} 
-                            onChange={(e) => handlePartInputChange('quantity', Math.max(1, Number(e.target.value)))}
-                            inputProps={{ min: 1 }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <TextField 
-                            fullWidth 
-                            label="Price Per Unit" 
-                            type="number" 
-                            value={newPart.pricePerUnit} 
-                            onChange={(e) => handlePartInputChange('pricePerUnit', Math.max(0, Number(e.target.value)))}
-                            inputProps={{ min: 0, step: 0.01 }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-                          <TextField 
-                            fullWidth 
-                            label="Tax Amount" 
-                            type="number" 
-                            value={newPart.taxAmount} 
-                            onChange={(e) => handlePartInputChange('taxAmount', Math.max(0, Number(e.target.value)))}
-                            inputProps={{ min: 0, step: 0.01 }}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={4}>
-              <TextField 
-                fullWidth 
-                label="GST Percentage %" 
-                type="number" 
-                value={newPart.gstPercentage} 
-                onChange={(e) => handlePartInputChange('gstPercentage', Math.max(0, Math.min(100, Number(e.target.value))))}
-                inputProps={{ min: 0, max: 100, step: 0.01 }}
-                placeholder="e.g., 18"
-              />
+                    error={!editingTask.taskName.trim() && !!taskError}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField 
+                    fullWidth 
+                    label="Duration (minutes) *" 
+                    type="number"
+                    value={editingTask.taskDuration} 
+                    onChange={(e) => {
+                      setEditingTask(prev => ({ ...prev, taskDuration: e.target.value }));
+                      if (taskError) setTaskError(null);
+                    }}
+                    placeholder="e.g., 120"
+                    inputProps={{ min: 1 }}
+                    error={!editingTask.taskDuration.toString().trim() && !!taskError}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={editingTask.category || 'general'}
+                      label="Category"
+                      onChange={(e) => setEditingTask(prev => ({ ...prev, category: e.target.value }))}
+                    >
+                      <MenuItem value="general">General</MenuItem>
+                      <MenuItem value="engine">Engine</MenuItem>
+                      <MenuItem value="brakes">Brakes</MenuItem>
+                      <MenuItem value="maintenance">Maintenance</MenuItem>
+                      <MenuItem value="tires">Tires</MenuItem>
+                      <MenuItem value="hvac">HVAC</MenuItem>
+                      <MenuItem value="electrical">Electrical</MenuItem>
+                      <MenuItem value="transmission">Transmission</MenuItem>
+                      <MenuItem value="suspension">Suspension</MenuItem>
+                      <MenuItem value="exhaust">Exhaust</MenuItem>
+                      <MenuItem value="diagnostic">Diagnostic</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField 
+                    fullWidth 
+                    label="Description" 
+                    multiline
+                    rows={3}
+                    value={editingTask.description || ''} 
+                    onChange={(e) => setEditingTask(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe the task in detail..."
+                  />
+                </Grid>
+              </Grid>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => {
+                setOpenEditTaskDialog(false);
+                setTaskError(null);
+                setEditingTask(null);
+              }}
+              disabled={updatingTask}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleEditTask} 
+              variant="contained"
+              disabled={updatingTask || !editingTask?.taskName?.trim() || !editingTask?.taskDuration?.toString()?.trim()}
+              startIcon={updatingTask ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {updatingTask ? 'Updating...' : 'Update Task'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Add Part Dialog */}
+        <Dialog 
+          open={openAddPartDialog} 
+          onClose={handleCloseAddPartDialog}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Add New Part</DialogTitle>
+          <DialogContent>
+            {partAddSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Part added successfully!
+              </Alert>
+            )}
+            {partAddError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {partAddError}
+              </Alert>
+            )}
+            
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField 
+                  fullWidth 
+                  label="Part Number" 
+                  value={newPart.partNumber} 
+                  onChange={(e) => handlePartInputChange('partNumber', e.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField 
+                  fullWidth 
+                  label="Part Name *" 
+                  value={newPart.partName} 
+                  onChange={(e) => handlePartInputChange('partName', e.target.value)}
+                  error={!newPart.partName.trim() && !!partAddError}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField 
+                  fullWidth 
+                  label="Quantity *" 
+                  type="number" 
+                  value={newPart.quantity} 
+                  onChange={(e) => handlePartInputChange('quantity', Math.max(1, Number(e.target.value)))}
+                  inputProps={{ min: 1 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField 
+                  fullWidth 
+                  label="Price Per Unit" 
+                  type="number" 
+                  value={newPart.pricePerUnit} 
+                  onChange={(e) => handlePartInputChange('pricePerUnit', Math.max(0, Number(e.target.value)))}
+                  inputProps={{ min: 0, step: 0.01 }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={4}>
+                <TextField 
+                  fullWidth 
+                  label="GST Percentage %" 
+                  type="number" 
+                  value={newPart.gstPercentage} 
+                  onChange={(e) => handlePartInputChange('gstPercentage', Math.max(0, Math.min(100, Number(e.target.value))))}
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  placeholder="e.g., 18"
+                />
+              </Grid>
             </Grid>
-                      </Grid>
-                    </DialogContent>
-                    <DialogActions>
-                      <Button 
-                        onClick={handleCloseAddPartDialog}
-                        disabled={addingPart}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleAddPart} 
-                        disabled={addingPart} 
-                        variant="contained"
-                        startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
-                      >
-                        {addingPart ? 'Adding...' : 'Add Part'}
-                      </Button>
-                    </DialogActions>
-                  </Dialog>
-          
-                  {/* Add Engineer Dialog */}
-                  <Dialog 
-                    open={openAddEngineerDialog} 
-                    onClose={handleCloseAddEngineerDialog}
-                    maxWidth="sm"
-                    fullWidth
-                  >
-                    <DialogTitle>Add New Engineer</DialogTitle>
-                    <DialogContent>
-                      {engineerAddSuccess && (
-                        <Alert severity="success" sx={{ mb: 2 }}>
-                          Engineer added successfully!
-                        </Alert>
-                      )}
-                      {engineerAddError && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                          {engineerAddError}
-                        </Alert>
-                      )}
-                      
-                      <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={12}>
-                          <TextField 
-                            fullWidth 
-                            label="Name *" 
-                            value={newEngineer.name} 
-                            onChange={(e) => handleEngineerInputChange('name', e.target.value)}
-                            error={!newEngineer.name.trim() && !!engineerAddError}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Email *" 
-                            type="email" 
-                            value={newEngineer.email} 
-                            onChange={(e) => handleEngineerInputChange('email', e.target.value)}
-                            error={!newEngineer.email.trim() && !!engineerAddError}
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField 
-                            fullWidth 
-                            label="Phone *" 
-                            value={newEngineer.phone} 
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                              handleEngineerInputChange('phone', value);
-                            }}
-                            error={!newEngineer.phone.trim() && !!engineerAddError}
-                            placeholder="10-digit phone number"
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField 
-                            fullWidth 
-                            label="Specialty" 
-                            value={newEngineer.specialty} 
-                            onChange={(e) => handleEngineerInputChange('specialty', e.target.value)}
-                            placeholder="e.g., Engine Specialist, Brake Expert"
-                          />
-                        </Grid>
-                      </Grid>
-                    </DialogContent>
-                    <DialogActions>
-                      <Button 
-                        onClick={handleCloseAddEngineerDialog}
-                        disabled={addingEngineer}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        onClick={handleAddEngineer} 
-                        disabled={addingEngineer} 
-                        variant="contained"
-                        startIcon={addingEngineer ? <CircularProgress size={16} color="inherit" /> : null}
-                      >
-                        {addingEngineer ? 'Adding...' : 'Add Engineer'}
-                      </Button>
-                    </DialogActions>
-                  </Dialog>
-                </Box>
-              </>
-            );
-          };
-          
-          export default AssignEngineer;
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={handleCloseAddPartDialog}
+              disabled={addingPart}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddPart} 
+              disabled={addingPart} 
+              variant="contained"
+              startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {addingPart ? 'Adding...' : 'Add Part'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Add Engineer Dialog */}
+        <Dialog 
+          open={openAddEngineerDialog} 
+          onClose={handleCloseAddEngineerDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Add New Engineer</DialogTitle>
+          <DialogContent>
+            {engineerAddSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Engineer added successfully!
+              </Alert>
+            )}
+            {engineerAddError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {engineerAddError}
+              </Alert>
+            )}
+            
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField 
+                  fullWidth 
+                  label="Name *" 
+                  value={newEngineer.name} 
+                  onChange={(e) => handleEngineerInputChange('name', e.target.value)}
+                  error={!newEngineer.name.trim() && !!engineerAddError}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField 
+                  fullWidth 
+                  label="Email *" 
+                  type="email" 
+                  value={newEngineer.email} 
+                  onChange={(e) => handleEngineerInputChange('email', e.target.value)}
+                  error={!newEngineer.email.trim() && !!engineerAddError}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField 
+                  fullWidth 
+                  label="Phone *" 
+                  value={newEngineer.phone} 
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    handleEngineerInputChange('phone', value);
+                  }}
+                  error={!newEngineer.phone.trim() && !!engineerAddError}
+                  placeholder="10-digit phone number"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField 
+                  fullWidth 
+                  label="Specialty" 
+                  value={newEngineer.specialty} 
+                  onChange={(e) => handleEngineerInputChange('specialty', e.target.value)}
+                  placeholder="e.g., Engine Specialist, Brake Expert"
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={handleCloseAddEngineerDialog}
+              disabled={addingEngineer}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddEngineer} 
+              disabled={addingEngineer} 
+              variant="contained"
+              startIcon={addingEngineer ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {addingEngineer ? 'Adding...' : 'Add Engineer'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
+    </>
+  );
+};
+
+export default AssignEngineer;

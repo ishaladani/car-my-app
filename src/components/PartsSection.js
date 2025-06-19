@@ -1,36 +1,38 @@
 import React from 'react';
-import { 
-  Box, Button, Card, CardContent, Chip, IconButton, 
-  Paper, Table, TableBody, TableCell, TableContainer, 
-  TableHead, TableRow, Typography 
+import {
+  Box, Button, Card, CardContent, Chip, IconButton,
+  Paper, Table, TableBody, TableCell, TableContainer,
+  TableHead, TableRow, Typography, Divider
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon
+} from '@mui/icons-material';
 
-const PartsSection = ({ 
-  parts, 
-  removePart, 
-  openEditPrice, 
-  setShowNewPartDialog, 
+const PartsSection = ({
+  parts,
+  removePart,
+  openEditPrice,
+  setShowNewPartDialog,
   isMobile,
   tableCellStyle
 }) => {
   return (
-    <Card sx={{ mb: 4, border: '1px solid #e0e0e0', borderRadius: 3 }}>
+    <Card sx={{ mb: 4, border: '1px solid #e0e0e0', borderRadius: 3, boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
       <CardContent>
         <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", mb: 2, gap: isMobile ? 2 : 0 }}>
           <Typography variant="h6" color="primary" sx={{ display: "flex", alignItems: "center" }}>
             Parts & Materials ({parts.length} items)
           </Typography>
-          <Button variant="contained" color="secondary" startIcon={<AddIcon />} onClick={() => setShowNewPartDialog(true)}>
+          <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={() => setShowNewPartDialog(true)}>
             Add Part
           </Button>
         </Box>
-        
+
         {parts.length > 0 ? (
           <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, overflowX: "auto", borderRadius: 2 }}>
             <Table size={isMobile ? "small" : "medium"}>
               <TableHead>
-                <TableRow sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)', '& .MuiTableCell-head': { color: 'white', fontWeight: 600 } }}>
+                <TableRow sx={{ background: '#1976d2', '& .MuiTableCell-head': { color: 'white', fontWeight: 600 } }}>
                   <TableCell>S.No</TableCell>
                   <TableCell>Part Description</TableCell>
                   <TableCell align="center">Quantity</TableCell>
@@ -41,7 +43,7 @@ const PartsSection = ({
               </TableHead>
               <TableBody>
                 {parts.map((part, index) => (
-                  <TableRow key={part.id} hover>
+                  <TableRow key={part.id} hover sx={{ '&:hover': { backgroundColor: '#f5f5f5' } }}>
                     <TableCell sx={{ ...tableCellStyle, fontWeight: 500 }}>{index + 1}</TableCell>
                     <TableCell sx={tableCellStyle}>
                       <Typography variant="body2" fontWeight={500}>{part.name}</Typography>

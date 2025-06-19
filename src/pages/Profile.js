@@ -6,7 +6,6 @@ import {
   Avatar,
   Grid,
   Divider,
-  Chip,
   CircularProgress,
   Button,
   Dialog,
@@ -17,12 +16,6 @@ import {
   IconButton,
   Snackbar,
   Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormControlLabel,
-  Switch,
 } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import PhoneIcon from "@mui/icons-material/Phone";
@@ -57,9 +50,23 @@ const Profile = () => {
     severity: "success",
   });
 
+  const garageId = localStorage.getItem("garageId");
+
+  const showSnackbar = (message, severity = "success") => {
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  // Fetch garage profile data
   useEffect(() => {
     const fetchGarageProfile = async () => {
-      const garageId = localStorage.getItem("garageId");
       if (!garageId) {
         console.error("No garageId found in localStorage");
         setLoading(false);
@@ -129,18 +136,18 @@ const Profile = () => {
   };
 
   const handleInputChange = (field, value) => {
-    setEditData(prev => ({
+    setEditData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
   const compressImage = (file, maxWidth = 400, quality = 0.7) => {
     return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
       const img = new Image();
-      
+
       img.onload = () => {
         // Calculate new dimensions
         let { width, height } = img;
@@ -155,16 +162,16 @@ const Profile = () => {
             height = maxWidth;
           }
         }
-        
+
         canvas.width = width;
         canvas.height = height;
-        
+
         // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
         resolve(compressedDataUrl);
       };
-      
+
       img.src = URL.createObjectURL(file);
     });
   };
@@ -174,7 +181,7 @@ const Profile = () => {
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       showSnackbar("Please select a valid image file", "error");
       return;
     }
@@ -188,17 +195,58 @@ const Profile = () => {
     try {
       // Compress image
       const compressedImage = await compressImage(file);
-      
-      setEditData(prev => ({
+
+      setEditData((prev) => ({
         ...prev,
-        image: compressedImage
+        image: compressedImage,
       }));
-      
+
       setImageChanged(true); // Mark that image has been changed
       showSnackbar("Image uploaded successfully", "success");
     } catch (error) {
       console.error("Error processing image:", error);
       showSnackbar("Failed to process image", "error");
+    }
+  };
+
+  const handleLogoUpload = async () => {
+    const logoFile = document.getElementById("image-upload").files[0]; // Get the file from the input
+
+    if (!logoFile) {
+      showSnackbar("Please select an image to upload", "error");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("logo", logoFile); // Append the actual file to the form data
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = {
+        "Content-Type": "multipart/form-data",
+      };
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Send the logo to the server via PUT request
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/garage/updatelogo/${garageId}`,
+        formData,
+        { headers }
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        showSnackbar("Logo updated successfully!", "success");
+
+        // Update the state and localStorage with the new logo URL
+        setGarageData((prev) => ({ ...prev, image: response.data.logo }));
+        localStorage.setItem("garageLogo", response.data.logo);
+      }
+    } catch (error) {
+      console.error("Error updating logo:", error);
+      showSnackbar("Failed to update logo", "error");
     }
   };
 
@@ -209,17 +257,17 @@ const Profile = () => {
       return;
     }
 
-    // Validate required fields (removed email from validation since it's not editable)
-    if (!editData.name) {
-      showSnackbar("Name is a required field", "error");
-      return;
+    // Upload the logo if changed
+    if (imageChanged) {
+      await handleLogoUpload();
     }
 
+    // Proceed with saving other changes (like name, phone, etc.)
     setUpdating(true);
     try {
       const token = localStorage.getItem("token");
       const headers = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       };
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -253,7 +301,7 @@ const Profile = () => {
         // Update the local state with the new data
         const updatedGarageData = { ...editData };
         setGarageData(updatedGarageData);
-        
+
         // Update localStorage with the new values
         localStorage.setItem("garageName", editData.name);
         localStorage.setItem("garageLogo", editData.image || "");
@@ -261,7 +309,7 @@ const Profile = () => {
         // Reset flags
         setImageChanged(false);
         setEditDialogOpen(false);
-        
+
         showSnackbar("Profile updated successfully!", "success");
 
         // Optionally, you can force a page refresh to ensure all components reflect the new logo
@@ -269,7 +317,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error("Error updating garage data:", error);
-      
+
       if (error.response?.status === 413) {
         showSnackbar("Payload too large. Please use a smaller image or reduce other data.", "error");
       } else if (error.response?.status === 400) {
@@ -285,18 +333,6 @@ const Profile = () => {
     }
   };
 
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbar({
-      open: true,
-      message,
-      severity,
-    });
-  };
-
-  const handleSnackbarClose = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   if (loading) {
     return (
       <Box sx={{ textAlign: "center", mt: 10 }}>
@@ -307,12 +343,7 @@ const Profile = () => {
   }
 
   return (
-    <Box sx={{ 
-      flexGrow: 1,
-      mb: 4,
-      ml: { xs: 0, sm: 35 },
-      overflow: 'auto'
-    }}>
+    <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: "auto" }}>
       <Paper elevation={4} sx={{ borderRadius: 4, overflow: "hidden" }}>
         {/* Banner */}
         <Box
@@ -358,13 +389,6 @@ const Profile = () => {
             {garageData.name}
           </Typography>
           <Typography>{garageData.email}</Typography>
-          {/* {garageData.isSubscribed && (
-            <Chip
-              label={`${garageData.subscriptionType.toUpperCase()} Plan`}
-              color="success"
-              sx={{ mt: 1 }}
-            />
-          )} */}
         </Box>
 
         {/* Details */}
@@ -403,15 +427,8 @@ const Profile = () => {
       </Paper>
 
       {/* Edit Dialog */}
-      <Dialog 
-        open={editDialogOpen} 
-        onClose={handleEditClose}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          Edit Garage Profile
-        </DialogTitle>
+      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
+        <DialogTitle>Edit Garage Profile</DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* Profile Image */}
@@ -432,26 +449,21 @@ const Profile = () => {
               </Avatar>
               <input
                 accept="image/*"
-                style={{ display: 'none' }}
+                style={{ display: "none" }}
                 id="image-upload"
                 type="file"
                 onChange={handleImageUpload}
               />
               <label htmlFor="image-upload">
-                <Button
-                  variant="outlined"
-                  component="span"
-                  startIcon={<PhotoCameraIcon />}
-                  size="small"
-                >
+                <Button variant="outlined" component="span" startIcon={<PhotoCameraIcon />} size="small">
                   Change Logo
                 </Button>
               </label>
-              <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+              <Typography variant="caption" display="block" sx={{ mt: 1, color: "text.secondary" }}>
                 Max 5MB, recommended 400x400px
               </Typography>
               {imageChanged && (
-                <Typography variant="caption" display="block" sx={{ mt: 1, color: 'success.main' }}>
+                <Typography variant="caption" display="block" sx={{ mt: 1, color: "success.main" }}>
                   ✓ New image selected
                 </Typography>
               )}
@@ -479,8 +491,8 @@ const Profile = () => {
                 disabled
                 helperText="Email cannot be changed"
                 sx={{
-                  '& .MuiInputBase-input.Mui-disabled': {
-                    WebkitTextFillColor: 'rgba(0, 0, 0, 0.6)',
+                  "& .MuiInputBase-input.Mui-disabled": {
+                    WebkitTextFillColor: "rgba(0, 0, 0, 0.6)",
                   },
                 }}
               />
@@ -511,38 +523,6 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* Subscription Type */}
-            {/* <Grid item xs={12} sm={6}>
-              <FormControl fullWidth variant="outlined">
-                <InputLabel>Subscription Type</InputLabel>
-                <Select
-                  value={editData.subscriptionType || "Free"}
-                  onChange={(e) => handleInputChange("subscriptionType", e.target.value)}
-                  label="Subscription Type"
-                >
-                  <MenuItem value="Free">Free</MenuItem>
-                  <MenuItem value="Basic">Basic</MenuItem>
-                  <MenuItem value="Premium">Premium</MenuItem>
-                  <MenuItem value="Enterprise">Enterprise</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid> */}
-
-            {/* Subscription Status */}
-            {/* <Grid item xs={12} sm={6}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={editData.isSubscribed || false}
-                    onChange={(e) => handleInputChange("isSubscribed", e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label="Active Subscription"
-                sx={{ mt: 2 }}
-              />
-            </Grid> */}
-
             {/* Address */}
             <Grid item xs={12}>
               <TextField
@@ -558,36 +538,18 @@ const Profile = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button 
-            onClick={handleEditClose}
-            startIcon={<CancelIcon />}
-            disabled={updating}
-          >
+          <Button onClick={handleEditClose} startIcon={<CancelIcon />} disabled={updating}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSaveChanges}
-            variant="contained"
-            startIcon={<SaveIcon />}
-            disabled={updating}
-          >
+          <Button onClick={handleSaveChanges} variant="contained" startIcon={<SaveIcon />} disabled={updating}>
             {updating ? <CircularProgress size={20} /> : "Save Changes"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleSnackbarClose} 
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

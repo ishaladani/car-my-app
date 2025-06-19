@@ -43,6 +43,10 @@ import axios from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 
 const WorkInProgress = () => {
+  let garageId = localStorage.getItem("garageId");
+  if (!garageId) {
+    garageId = localStorage.getItem("garage_id");
+  }
   // Sample data - replace with your actual state management
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -54,40 +58,145 @@ const WorkInProgress = () => {
         severity: 'success'
       });
   
-  const [carDetails, setCarDetails] = useState({
-    company: 'Toyota',
-    model: 'Camry 2022',
-    carNo: 'GJ-01-AB-1234'
+const [carDetails, setCarDetails] = useState({
+    company: '',
+    model: '',
+    carNo: ''
   });
   
+  // Customer details state
   const [customerDetails, setCustomerDetails] = useState({
-    name: 'John Doe',
-    contactNo: '+91 98765 43210',
-    email: 'john.doe@email.com'
+    name: '',
+    contactNo: '',
+    email: ''
   });
   
+  // Insurance details state
   const [insuranceDetails, setInsuranceDetails] = useState({
-    company: 'HDFC ERGO',
-    number: 'POL123456789',
-    type: 'Comprehensive',
-    expiry: '2025-12-31',
-    regNo: 'REG987654321',
-    amount: '50000'
+    company: '',
+    number: '',
+    type: '',
+    expiry: '',
+    regNo: '',
+    amount: ''
   });
   
+  // Engineer details state
   const [engineerDetails, setEngineerDetails] = useState({
-    fullName: 'Mike Johnson',
-    assignedDateTime: '2025-06-18T09:30'
+    fullName: '',
+    assignedDateTime: ''
   });
   
-  const [parts, setParts] = useState([
-    { id: 1, partName: 'Brake Pads', qty: '2', totalPrice: '2500' },
-    { id: 2, partName: 'Oil Filter', qty: '1', totalPrice: '850' }
-  ]);
   
-  const [status, setStatus] = useState('Pending');
+  const [parts, setParts] = useState([]);
+  
+  const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [laborHours, setLaborHours] = useState('4');
+  const [laborHours, setLaborHours] = useState('');
+
+    useEffect(() => {
+      const fetchJobCardData = async () => {
+        if(!garageId){
+          navigate("/login")
+        }
+        try {
+          setFetchLoading(true);
+          
+          const response = await axios.get(
+            `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          const data = response.data;
+          
+          // Populate car details
+          setCarDetails({
+            company: data.company || '',
+            model: data.model || '',
+            carNo: data.carNumber || ''
+          });
+          
+          // Populate customer details
+          setCustomerDetails({
+            name: data.customerName || '',
+            contactNo: data.contactNumber || '',
+            email: data.email || ''
+          });
+          
+          // Populate insurance details
+          setInsuranceDetails({
+            company: data.insuranceProvider || '',
+            number: data.policyNumber || '',
+            type: data.type || '',
+            expiry: data.expiryDate ? data.expiryDate.split('T')[0] : '',
+            regNo: data.registrationNumber || '',
+            amount: data.excessAmount?.toString() || ''
+          });
+          
+          // Populate engineer details
+          setEngineerDetails({
+            fullName: data.engineerId && data.engineerId.length > 0 ? data.engineerId[0].name : '',
+            assignedDateTime: data.createdAt ? 
+              new Date(data.createdAt).toISOString().slice(0, 16) : ''
+          });
+          
+          // Populate parts if available
+          if (data.partsUsed && data.partsUsed.length > 0) {
+            const existingParts = data.partsUsed.map((part, index) => ({
+              id: index + 1,
+              partName: part.partName || '',
+              partNumber: '',
+              qty: part.quantity?.toString() || '',
+              pricePerPiece: part.pricePerPiece?.toString() || '',
+              gstPercent: '',
+              totalPrice: part.totalPrice?.toString() || ''
+            }));
+            
+            setParts(existingParts);
+          } else {
+            // Initialize with one empty row if no parts exist
+            setParts([{ 
+              id: 1, 
+              partName: '', 
+              partNumber: '', 
+              qty: '', 
+              pricePerPiece: '', 
+              gstPercent: '', 
+              totalPrice: '' 
+            }]);
+          }
+          
+          // Populate status, remarks, and labor hours
+          if (data.status) {
+            setStatus(data.status);
+          }
+          
+          if (data.engineerRemarks) {
+            setRemarks(data.engineerRemarks);
+          }
+          
+          if (data.laborHours !== undefined) {
+            setLaborHours(data.laborHours.toString());
+          }
+          
+        } catch (error) {
+          console.error('Error fetching job card data:', error);
+          setSnackbar({
+            open: true,
+            message: `Error: ${error.response?.data?.message || 'Failed to fetch job card data'}`,
+            severity: 'error'
+          });
+        } finally {
+          setFetchLoading(false);
+        }
+      };
+      
+      fetchJobCardData();
+    }, [id, garageId, navigate]);
 
   const handleAddRow = () => {
     const newId = parts.length > 0 ? Math.max(...parts.map(part => part.id)) + 1 : 1;
@@ -115,81 +224,81 @@ const WorkInProgress = () => {
     setParts(updatedParts);
   };
 
-   const handleSubmit = async (e) => {
-     e.preventDefault();
-     
-     try {
-       setIsLoading(true);
+     const handleSubmit = async (e) => {
+       e.preventDefault();
        
-       // Filter out empty parts - only check for fields that are actually used in the UI
-       const validParts = parts.filter(part => 
-         part.partName && 
-         part.partName.trim() !== '' && 
-         part.qty && 
-         part.qty.trim() !== '' &&
-         part.totalPrice && 
-         part.totalPrice.trim() !== ''
-       );
-       
-       console.log('Valid parts found:', validParts);
-       
-       // Prepare request data
-       const requestData = {
-         laborHours: parseInt(laborHours) || 0,
-         engineerRemarks: remarks,
-         status: status
-       };
-       
-       // Only include partsUsed if there are valid parts to send
-       if (validParts.length > 0) {
-         const formattedParts = validParts.map(part => ({
-           partName: part.partName,
-           quantity: parseInt(part.qty) || 1,
-           pricePerPiece: parseFloat(part.pricePerPiece) || 0,
-           totalPrice: parseFloat(part.totalPrice) || 0
-         }));
+       try {
+         setIsLoading(true);
          
-         requestData.partsUsed = formattedParts;
-         console.log('Sending parts data:', formattedParts);
-       } else {
-         console.log('No valid parts to send, keeping existing parts data');
-       }
-       
-       console.log("Submitting to job card ID:", id);
-       console.log("Request data:", requestData);
-       
-       const response = await axios.put(
-         `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
-         requestData,
-         {
-           headers: {
-             'Content-Type': 'application/json'
-           }
+         // Filter out empty parts - only check for fields that are actually used in the UI
+         const validParts = parts.filter(part => 
+           part.partName && 
+           part.partName.trim() !== '' && 
+           part.qty && 
+           part.qty.trim() !== '' &&
+           part.totalPrice && 
+           part.totalPrice.trim() !== ''
+         );
+         
+         console.log('Valid parts found:', validParts);
+         
+         // Prepare request data
+         const requestData = {
+           laborHours: parseInt(laborHours) || 0,
+           engineerRemarks: remarks,
+           status: status
+         };
+         
+         // Only include partsUsed if there are valid parts to send
+         if (validParts.length > 0) {
+           const formattedParts = validParts.map(part => ({
+             partName: part.partName,
+             quantity: parseInt(part.qty) || 1,
+             pricePerPiece: parseFloat(part.pricePerPiece) || 0,
+             totalPrice: parseFloat(part.totalPrice) || 0
+           }));
+           
+           requestData.partsUsed = formattedParts;
+           console.log('Sending parts data:', formattedParts);
+         } else {
+           console.log('No valid parts to send, keeping existing parts data');
          }
-       );
-       
-       setSnackbar({
-         open: true,
-         message: 'Work progress updated successfully!',
-         severity: 'success'
-       });
-       
-       // Navigate to Quality Check page after successful submission
-       setTimeout(() => {
-         navigate(`/Quality-Check/${id}`);
-       }, 1500);
-       
-     } catch (error) {
-       console.error('Error updating work progress:', error);
-       setSnackbar({
-         open: true,
-         message: `Error: ${error.response?.data?.message || 'Failed to update work progress'}`,
-         severity: 'error'
-       });
-     } finally {
-       setIsLoading(false);
-     }
-   };
+         
+         console.log("Submitting to job card ID:", id);
+         console.log("Request data:", requestData);
+         
+         const response = await axios.put(
+           `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
+           requestData,
+           {
+             headers: {
+               'Content-Type': 'application/json'
+             }
+           }
+         );
+         
+         setSnackbar({
+           open: true,
+           message: 'Work progress updated successfully!',
+           severity: 'success'
+         });
+         
+         // Navigate to Quality Check page after successful submission
+         setTimeout(() => {
+           navigate(`/Quality-Check/${id}`);
+         }, 1500);
+         
+       } catch (error) {
+         console.error('Error updating work progress:', error);
+         setSnackbar({
+           open: true,
+           message: `Error: ${error.response?.data?.message || 'Failed to update work progress'}`,
+           severity: 'error'
+         });
+       } finally {
+         setIsLoading(false);
+       }
+     };
 
   const getStatusColor = (status) => {
     switch (status) {

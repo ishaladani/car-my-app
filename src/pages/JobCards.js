@@ -84,9 +84,19 @@ const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
+// Validation helper functions
 const validatePhone = (phone) => {
-  const phoneRegex = /^[0-9]{10,15}$/;
-  return phoneRegex.test(phone.replace(/[\s-()]/g, ''));
+  // 10-digit phone number validation
+  const phoneRegex = /^[0-9]{10}$/;
+  return phoneRegex.test(phone);
+};
+
+const validateChassisNumber = (chassisNumber) => {
+  // 17-character alphanumeric chassis number validation
+  // Converts to uppercase automatically
+  const upperChassis = chassisNumber.toUpperCase();
+  const chassisRegex = /^[A-Z0-9]{17}$/;
+  return chassisRegex.test(upperChassis);
 };
 const validateCarNumber = (carNumber) => {
   const carNumberRegex = /^[A-Z0-9\s-]{4,15}$/i;
@@ -98,6 +108,7 @@ const validatePolicyNumber = (policyNumber) => {
 const validateRegistrationNumber = (regNumber) => {
   return regNumber.length >= 5 && regNumber.length <= 20;
 };
+
 const validateExcessAmount = (amount) => {
   const numAmount = parseFloat(amount);
   return !isNaN(numAmount) && numAmount >= 0 && numAmount <= 1000000;
@@ -147,7 +158,7 @@ const JobCards = () => {
     registrationNumber: '',
     type: '',
     excessAmount: '',
-    chesiNumber: '',
+    chesiNumber: '', // Note: keeping original field name for API compatibility
     tyreCondition: '',
   });
 
@@ -174,6 +185,15 @@ const JobCards = () => {
       navigate("/login");
     }
   }, []);
+
+  // Fields that should be converted to uppercase
+  const uppercaseFields = [
+    'carNumber',
+    'chesiNumber', // Chassis number
+    'policyNumber',
+    'registrationNumber',
+    'type' // Insurance type
+  ];
 
   // Real-time validation function
   const validateField = (name, value) => {
@@ -222,6 +242,9 @@ const JobCards = () => {
       case 'registrationNumber':
         if (value.trim() && !validateRegistrationNumber(value)) error = 'Must be 5–20 characters';
         break;
+      case 'chesiNumber':
+        if (value.trim() && !validateChassisNumber(value)) error = 'Chassis number must be 10–20 characters';
+        break;
       case 'excessAmount':
         if (value && !validateExcessAmount(value)) error = 'Enter a valid amount (0–1,000,000)';
         break;
@@ -236,12 +259,24 @@ const JobCards = () => {
 
     let updatedValue = value;
 
-    if (name === 'carNumber') {
+    // Convert specific fields to uppercase
+    if (uppercaseFields.includes(name)) {
       updatedValue = value.toUpperCase();
     }
 
+    // Special handling for email (lowercase)
     if (name === 'email') {
       updatedValue = value.trim().toLowerCase();
+    }
+
+    // Special handling for chassis number - remove spaces and convert to uppercase
+    if (name === 'chesiNumber') {
+      updatedValue = value.replace(/\s/g, '').toUpperCase();
+    }
+
+    // Special handling for policy number - remove spaces and convert to uppercase
+    if (name === 'policyNumber') {
+      updatedValue = value.replace(/\s/g, '').toUpperCase();
     }
 
     setFormData(prev => ({ ...prev, [name]: updatedValue }));
@@ -440,6 +475,14 @@ const JobCards = () => {
     return touched[fieldName] && errors[fieldName];
   };
 
+  // Helper function to determine if field should show uppercase styling
+  const getFieldStyling = (fieldName) => {
+    if (uppercaseFields.includes(fieldName)) {
+      return { textTransform: 'uppercase' };
+    }
+    return {};
+  };
+
   return (
     <Box sx={{ 
       flexGrow: 1,
@@ -479,7 +522,7 @@ const JobCards = () => {
                       { name: 'model', label: 'Model', icon: <DirectionsCar />, required: true },
                       { name: 'company', label: 'Company', icon: <LocalOffer /> },
                       { name: 'kilometer', label: 'Kilometer', icon: <Speed />, type: 'number' },
-                      { name: 'chesiNumber', label: 'CHESI Number', icon: <Numbers /> },
+                      { name: 'chesiNumber', label: 'Chassis Number', icon: <Numbers />, helperText: 'Vehicle Identification Number (VIN)' },
                       { name: 'tyreCondition', label: 'Tyre Condition', icon: <LocalGasStation /> },
                     ].map((field) => (
                       <Grid item xs={12} md={4} key={field.name}>
@@ -493,16 +536,19 @@ const JobCards = () => {
                           type={field.type || 'text'}
                           required={field.required || false}
                           error={hasError(field.name)}
-                          helperText={hasError(field.name) ? errors[field.name] : ''}
+                          helperText={hasError(field.name) ? errors[field.name] : (field.helperText || '')}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
                                 {field.icon}
                               </InputAdornment>
                             ),
-                            sx: field.name === 'carNumber' ? { textTransform: 'uppercase' } : {}
+                            sx: getFieldStyling(field.name)
                           }}
-                          inputProps={field.name === 'carNumber' ? { style: { textTransform: 'uppercase' } } : {}}
+                          inputProps={{ 
+                            style: getFieldStyling(field.name),
+                            ...(field.name === 'chesiNumber' && { placeholder: 'Enter chassis/VIN number' })
+                          }}
                         />
                       </Grid>
                     ))}
@@ -518,9 +564,9 @@ const JobCards = () => {
                     {[
                       { name: 'insuranceProvider', label: 'Insurance Provider', icon: <Policy /> },
                       { name: 'expiryDate', label: 'Expiry Date', icon: <EventNote />, type: 'date', InputLabelProps: { shrink: true } },
-                      { name: 'policyNumber', label: 'Policy Number', icon: <Numbers /> },
-                      { name: 'carNumber', label: 'Car Number', icon: <Numbers /> },
-                      { name: 'type', label: 'Type', icon: <LocalOffer /> },
+                      { name: 'policyNumber', label: 'Policy Number', icon: <Numbers />, helperText: 'Insurance policy reference number' },
+                      { name: 'registrationNumber', label: 'Registration Number', icon: <Numbers />, helperText: 'Vehicle registration certificate number' },
+                      { name: 'type', label: 'Insurance Type', icon: <LocalOffer />, helperText: 'e.g., Comprehensive, Third Party' },
                       { name: 'excessAmount', label: 'Excess Amount', icon: <AttachMoney />, type: 'number' },
                     ].map((field) => (
                       <Grid item xs={12} md={4} key={field.name}>
@@ -533,7 +579,7 @@ const JobCards = () => {
                           onBlur={handleBlur}
                           type={field.type || 'text'}
                           error={hasError(field.name)}
-                          helperText={hasError(field.name) ? errors[field.name] : ''}
+                          helperText={hasError(field.name) ? errors[field.name] : (field.helperText || '')}
                           InputLabelProps={field.InputLabelProps}
                           InputProps={{
                             startAdornment: (
@@ -541,6 +587,13 @@ const JobCards = () => {
                                 {field.icon}
                               </InputAdornment>
                             ),
+                            sx: getFieldStyling(field.name)
+                          }}
+                          inputProps={{ 
+                            style: getFieldStyling(field.name),
+                            ...(field.name === 'policyNumber' && { placeholder: 'Enter policy number' }),
+                            ...(field.name === 'registrationNumber' && { placeholder: 'Enter registration number' }),
+                            ...(field.name === 'type' && { placeholder: 'Enter insurance type' })
                           }}
                         />
                       </Grid>
@@ -730,4 +783,4 @@ const JobCards = () => {
   );
 };
 
-export default JobCards;
+export default JobCards;// Validation helper functions
