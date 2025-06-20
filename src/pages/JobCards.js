@@ -26,7 +26,12 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  CircularProgress,
+  MenuItem,
+  Select,
+  InputLabel,
+  Chip
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -46,11 +51,15 @@ import {
   LocalOffer,
   AttachMoney,
   Add as AddIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  Assignment as AssignmentIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useParams } from 'react-router-dom';
 
 // Styled components
 const VisuallyHiddenInput = styled('input')({
@@ -64,6 +73,7 @@ const VisuallyHiddenInput = styled('input')({
   whiteSpace: 'nowrap',
   width: 1,
 });
+
 const UploadButton = styled(Button)(({ theme }) => ({
   borderRadius: theme.shape.borderRadius,
   padding: '10px 15px',
@@ -79,32 +89,42 @@ const UploadButton = styled(Button)(({ theme }) => ({
   },
 }));
 
+// Status options for dropdown
+const statusOptions = [
+  { value: 'pending', label: 'Pending', color: 'warning' },
+  { value: 'in_progress', label: 'In Progress', color: 'info' },
+  { value: 'completed', label: 'Completed', color: 'success' },
+  { value: 'cancelled', label: 'Cancelled', color: 'error' },
+  { value: 'on_hold', label: 'On Hold', color: 'default' }
+];
+
 // Validation helper functions
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
-// Validation helper functions
+
 const validatePhone = (phone) => {
-  // 10-digit phone number validation
   const phoneRegex = /^[0-9]{10}$/;
   return phoneRegex.test(phone);
 };
 
 const validateChassisNumber = (chassisNumber) => {
-  // 17-character alphanumeric chassis number validation
-  // Converts to uppercase automatically
   const upperChassis = chassisNumber.toUpperCase();
   const chassisRegex = /^[A-Z0-9]{17}$/;
   return chassisRegex.test(upperChassis);
 };
+
 const validateCarNumber = (carNumber) => {
   const carNumberRegex = /^[A-Z0-9\s-]{4,15}$/i;
-  return carNumberRegex.test(carNumber);
+  // return carNumberRegex.test(carNumber);
+  return carNumberRegex.length >= 5 && carNumberRegex.length <= 20;
 };
+
 const validatePolicyNumber = (policyNumber) => {
   return policyNumber.length >= 5 && policyNumber.length <= 20;
 };
+
 const validateRegistrationNumber = (regNumber) => {
   return regNumber.length >= 5 && regNumber.length <= 20;
 };
@@ -113,35 +133,43 @@ const validateExcessAmount = (amount) => {
   const numAmount = parseFloat(amount);
   return !isNaN(numAmount) && numAmount >= 0 && numAmount <= 1000000;
 };
+
 const validateKilometer = (km) => {
   const numKm = parseInt(km);
   return !isNaN(numKm) && numKm >= 0 && numKm <= 9999999;
 };
+
 const validateFileSize = (file, maxSizeMB) => {
   return file.size <= maxSizeMB * 1024 * 1024;
 };
+
 const validateImageFile = (file) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
   return allowedTypes.includes(file.type) && validateFileSize(file, 10);
 };
+
 const validateVideoFile = (file) => {
   const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm'];
   return allowedTypes.includes(file.type) && validateFileSize(file, 50);
 };
 
 const JobCards = () => {
+  const { id } = useParams();
   const theme = useTheme();
   const navigate = useNavigate();
   const [fuelLevel, setFuelLevel] = useState(2);
   const [loading, setLoading] = useState(false);
+  const [fetchingData, setFetchingData] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
+
   const garageId = localStorage.getItem('garageId');
 
-  // Form state
+  // Form state with status field added
   const [formData, setFormData] = useState({
     customerNumber: '',
     customerName: '',
@@ -158,8 +186,9 @@ const JobCards = () => {
     registrationNumber: '',
     type: '',
     excessAmount: '',
-    chesiNumber: '', // Note: keeping original field name for API compatibility
+    chesiNumber: '',
     tyreCondition: '',
+    status: 'pending'
   });
 
   // Job Details Point-wise state
@@ -180,19 +209,111 @@ const JobCards = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [fileErrors, setFileErrors] = useState({});
 
+  // Existing Images URLs (for edit mode)
+  const [existingImages, setExistingImages] = useState({
+    frontView: null,
+    rearView: null,
+    leftSide: null,
+    rightSide: null
+  });
+  const [existingVideo, setExistingVideo] = useState(null);
+
   useEffect(() => {
     if (!garageId) {
       navigate("/login");
     }
   }, []);
 
+  // Fetch job card data when id is present
+  useEffect(() => {
+    const fetchJobCardData = async () => {
+      if (!id) return;
+      setFetchingData(true);
+      setIsEditMode(true);
+      try {
+        const response = await axios.get(
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, 
+          {
+            headers: {
+              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+            }
+          }
+        );
+        const jobCardData = response.data;
+
+        console.log('Fetched Job Card Data:', jobCardData);
+
+        setFormData({
+          customerNumber: jobCardData.customerNumber || '',
+          customerName: jobCardData.customerName || '',
+          contactNumber: jobCardData.contactNumber || '',
+          email: jobCardData.email || '',
+          carNumber: jobCardData.carNumber || '',
+          model: jobCardData.model || '',
+          company: jobCardData.company || '',
+          kilometer: jobCardData.kilometer?.toString() || '',
+          fuelType: jobCardData.fuelType || 'petrol',
+          insuranceProvider: jobCardData.insuranceProvider || '',
+          expiryDate: jobCardData.expiryDate ? new Date(jobCardData.expiryDate).toISOString().split('T')[0] : '',
+          policyNumber: jobCardData.policyNumber || '',
+          registrationNumber: jobCardData.carNumber || '',
+          type: jobCardData.type || '',
+          excessAmount: jobCardData.excessAmount?.toString() || '',
+          chesiNumber: jobCardData.chesiNumber || '',
+          tyreCondition: jobCardData.tyreCondition || '',
+          status: jobCardData.status || 'pending'
+        });
+
+        if (jobCardData.fuelLevel !== undefined) {
+          setFuelLevel(jobCardData.fuelLevel);
+        }
+
+        if (jobCardData.jobDetails) {
+          const lines = jobCardData.jobDetails.split('\n');
+          setJobPoints(lines.filter(line => line.trim()));
+        }
+
+        if (jobCardData.images && Array.isArray(jobCardData.images)) {
+          const imagesByView = {
+            frontView: jobCardData.images[0],
+            rearView: jobCardData.images[1],
+            leftSide: jobCardData.images[2],
+            rightSide: jobCardData.images[3],
+          };
+          setExistingImages(imagesByView);
+        }
+
+        if (jobCardData.video) {
+          setExistingVideo(jobCardData.video);
+        }
+
+        setSnackbar({
+          open: true,
+          message: 'Job card data loaded successfully!',
+          severity: 'success'
+        });
+      } catch (error) {
+        console.error('Error fetching job card data:', error);
+        setSnackbar({
+          open: true,
+          message: 'Failed to load job card data: ' + (error.response?.data?.message || error.message),
+          severity: 'error'
+        });
+      } finally {
+        setFetchingData(false);
+      }
+    };
+
+    fetchJobCardData();
+  }, [id]);
+
   // Fields that should be converted to uppercase
   const uppercaseFields = [
     'carNumber',
-    'chesiNumber', // Chassis number
+    'chesiNumber',
     'policyNumber',
     'registrationNumber',
-    'type' // Insurance type
+    'type'
   ];
 
   // Real-time validation function
@@ -248,6 +369,9 @@ const JobCards = () => {
       case 'excessAmount':
         if (value && !validateExcessAmount(value)) error = 'Enter a valid amount (0–1,000,000)';
         break;
+      case 'status':
+        if (!value) error = 'Status is required';
+        break;
       default:
         break;
     }
@@ -256,32 +380,26 @@ const JobCards = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
     let updatedValue = value;
 
-    // Convert specific fields to uppercase
     if (uppercaseFields.includes(name)) {
       updatedValue = value.toUpperCase();
     }
 
-    // Special handling for email (lowercase)
     if (name === 'email') {
       updatedValue = value.trim().toLowerCase();
     }
 
-    // Special handling for chassis number - remove spaces and convert to uppercase
     if (name === 'chesiNumber') {
       updatedValue = value.replace(/\s/g, '').toUpperCase();
     }
 
-    // Special handling for policy number - remove spaces and convert to uppercase
     if (name === 'policyNumber') {
       updatedValue = value.replace(/\s/g, '').toUpperCase();
     }
 
     setFormData(prev => ({ ...prev, [name]: updatedValue }));
     setTouched(prev => ({ ...prev, [name]: true }));
-
     const error = validateField(name, updatedValue);
     setErrors(prev => ({ ...prev, [name]: error }));
   };
@@ -291,6 +409,38 @@ const JobCards = () => {
     setTouched(prev => ({ ...prev, [name]: true }));
     const error = validateField(name, value);
     setErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const updateJobCardStatus = async (newStatus) => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, 
+        { status: newStatus },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+          }
+        }
+      );
+      setFormData(prev => ({ ...prev, status: newStatus }));
+      setSnackbar({
+        open: true,
+        message: `Job card status updated to ${newStatus}!`,
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update status: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Job Points Management
@@ -349,6 +499,8 @@ const JobCards = () => {
     delete newFileErrors[view];
     setFileErrors(newFileErrors);
     setCarImages(prev => ({ ...prev, [view]: file }));
+    // Clear existing image when new one is uploaded
+    setExistingImages(prev => ({ ...prev, [view]: null }));
   };
 
   const handleVideoUpload = (file) => {
@@ -362,6 +514,26 @@ const JobCards = () => {
     delete newFileErrors.video;
     setFileErrors(newFileErrors);
     setVideoFile(file);
+    // Clear existing video when new one is uploaded
+    setExistingVideo(null);
+  };
+
+  const removeUploadedImage = (view) => {
+    setCarImages(prev => ({ ...prev, [view]: null }));
+    setSnackbar({
+      open: true,
+      message: 'Image removed. Upload a new one or keep existing images.',
+      severity: 'info'
+    });
+  };
+
+  const removeUploadedVideo = () => {
+    setVideoFile(null);
+    setSnackbar({
+      open: true,
+      message: 'Video removed. Upload a new one if needed.',
+      severity: 'info'
+    });
   };
 
   const handleCloseSnackbar = () => {
@@ -370,8 +542,11 @@ const JobCards = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate all fields before submission
     const isFormValid = validateAllFields();
     const hasFileErrors = Object.keys(fileErrors).length > 0;
+
     if (!isFormValid || hasFileErrors) {
       setSnackbar({
         open: true,
@@ -381,8 +556,13 @@ const JobCards = () => {
       return;
     }
 
-    const hasImages = Object.values(carImages).some(image => image !== null);
-    if (!hasImages) {
+    // Check for images - required for both create and update
+    const hasNewImages = Object.values(carImages).some(image => image !== null);
+    const hasExistingImages = Object.values(existingImages).some(imageUrl => imageUrl !== null);
+    const totalImagesCount = Object.values(carImages).filter(img => img !== null).length + 
+                           Object.values(existingImages).filter(img => img !== null).length;
+
+    if (!hasNewImages && !hasExistingImages) {
       setSnackbar({
         open: true,
         message: 'Please upload at least one car image',
@@ -392,55 +572,164 @@ const JobCards = () => {
     }
 
     setLoading(true);
+
     try {
-      const formDataToSend = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value) formDataToSend.append(key, value);
-      });
-      formDataToSend.append('jobDetails', getJobDetailsForAPI());
-      formDataToSend.append('garageId', garageId);
-      formDataToSend.append('fuelLevel', fuelLevel);
-      formDataToSend.append('customerNumber', 1);
-
-      Object.entries(carImages).forEach(([view, file]) => {
-        if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
-      });
-      if (videoFile) {
-        formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
-      }
-
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000,
-      };
+      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
 
       if (!garageId) {
         navigate("/login");
         return;
       }
 
-      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com'; 
-      const response = await axios.post(
-        `${apiBaseUrl}/api/garage/jobCards/add`,
-        formDataToSend,
-        config
-      );
+      let response;
+
+      if (isEditMode && id) {
+        // For updates, handle images/video separately if there are new files
+        const hasNewFiles = hasNewImages || videoFile;
+
+        if (hasNewFiles) {
+          // Use FormData for file uploads in edit mode
+          const formDataToSend = new FormData();
+
+          // Add all form fields
+          Object.entries(formData).forEach(([key, value]) => {
+            if (value) formDataToSend.append(key, value);
+          });
+
+          // Add additional fields
+          formDataToSend.append('jobDetails', getJobDetailsForAPI());
+          formDataToSend.append('garageId', garageId);
+          formDataToSend.append('fuelLevel', fuelLevel);
+
+          // Add information about which existing images to keep
+          const imagesToKeep = Object.entries(existingImages)
+            .filter(([key, value]) => value !== null)
+            .map(([key]) => key);
+          formDataToSend.append('keepExistingImages', JSON.stringify(imagesToKeep));
+
+          // Add information about video removal
+          if (!existingVideo && !videoFile) {
+            formDataToSend.append('removeVideo', 'true');
+          }
+
+          // Add image files
+          Object.entries(carImages).forEach(([view, file]) => {
+            if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
+          });
+
+          // Add video file
+          if (videoFile) {
+            formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
+          }
+
+          const configWithFiles = {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+            },
+            timeout: 60000, // Increased timeout for file uploads
+          };
+
+          response = await axios.put(
+            `${apiBaseUrl}/api/garage/jobCards/${id}`,
+            formDataToSend,
+            configWithFiles
+          );
+        } else {
+          // Use JSON for updates without new files
+          const jobCardPayload = {
+            contactNumber: formData.contactNumber,
+            customerName: formData.customerName,
+            email: formData.email,
+            carNumber: formData.carNumber,
+            model: formData.model,
+            company: formData.company,
+            kilometer: formData.kilometer,
+            fuelType: formData.fuelType,
+            insuranceProvider: formData.insuranceProvider,
+            expiryDate: formData.expiryDate,
+            policyNumber: formData.policyNumber,
+            registrationNumber: formData.carNumber,
+            type: formData.type,
+            excessAmount: formData.excessAmount,
+            chesiNumber: formData.chesiNumber,
+            tyreCondition: formData.tyreCondition,
+            status: formData.status,
+            jobDetails: getJobDetailsForAPI(),
+            fuelLevel: fuelLevel,
+            // Add information about which existing images/video to keep
+            keepExistingImages: Object.entries(existingImages)
+              .filter(([key, value]) => value !== null)
+              .map(([key]) => key),
+            keepExistingVideo: existingVideo !== null,
+          };
+
+          const config = {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+            },
+          };
+
+          response = await axios.put(
+            `${apiBaseUrl}/api/garage/jobCards/${id}`,
+            jobCardPayload,
+            config
+          );
+        }
+      } else {
+        // Create new job card - always use FormData
+        const formDataToSend = new FormData();
+
+        // Add all form fields
+        Object.entries(formData).forEach(([key, value]) => {
+          if (value) formDataToSend.append(key, value);
+        });
+
+        // Add additional fields
+        formDataToSend.append('jobDetails', getJobDetailsForAPI());
+        formDataToSend.append('garageId', garageId);
+        formDataToSend.append('fuelLevel', fuelLevel);
+        formDataToSend.append('customerNumber', 1);
+
+        // Add image files
+        Object.entries(carImages).forEach(([view, file]) => {
+          if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
+        });
+
+        // Add video file
+        if (videoFile) {
+          formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
+        }
+
+        const config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+          },
+          timeout: 60000,
+        };
+
+        response = await axios.post(
+          `${apiBaseUrl}/api/garage/jobCards/add`,
+          formDataToSend,
+          config
+        );
+      }
 
       setSnackbar({
         open: true,
-        message: 'Job card created successfully!',
+        message: `Job card ${isEditMode ? 'updated' : 'created'} successfully!`,
         severity: 'success'
       });
 
-      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard._id}`, {
-        state: { jobCardId: response.data.jobCard._id }
+      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard?._id || response.data._id || id}`, {
+        state: { jobCardId: response.data.jobCard?._id || response.data._id || id }
       }), 1500);
 
     } catch (error) {
       console.error('API Error:', error);
-      let errorMessage = 'Failed to create job card';
+      let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} job card`;
       if (error.response) {
         errorMessage = error.response.data.message || errorMessage;
         if (error.response.status === 400 && error.response.data.errors) {
@@ -462,10 +751,6 @@ const JobCards = () => {
         severity: 'error'
       });
 
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Development mode: Proceeding with mock data');
-        setTimeout(() => navigate('/Assign-Engineer', { state: { jobCardId: 'mock-id' } }), 1500);
-      }
     } finally {
       setLoading(false);
     }
@@ -475,13 +760,28 @@ const JobCards = () => {
     return touched[fieldName] && errors[fieldName];
   };
 
-  // Helper function to determine if field should show uppercase styling
   const getFieldStyling = (fieldName) => {
     if (uppercaseFields.includes(fieldName)) {
       return { textTransform: 'uppercase' };
     }
     return {};
   };
+
+  const getStatusColor = (status) => {
+    const statusOption = statusOptions.find(option => option.value === status);
+    return statusOption ? statusOption.color : 'default';
+  };
+
+  if (fetchingData) {
+    return (
+      <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6" sx={{ mt: 2 }}>Loading Job Card Data...</Typography>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 
@@ -497,10 +797,24 @@ const JobCards = () => {
             {/* Header Section */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Box display="flex" alignItems="center">
-                <DirectionsCar fontSize="large" color="primary" sx={{ mr: 2 }} />
+                {isEditMode ? <EditIcon fontSize="large" color="primary" sx={{ mr: 2 }} /> : <DirectionsCar fontSize="large" color="primary" sx={{ mr: 2 }} />}
                 <Typography variant="h5" color="primary">
-                  Create Job Card
+                  {isEditMode ? `Edit Job Card ${id}` : 'Create Job Card'}
                 </Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={2}>
+                {isEditMode && (
+                  <Chip 
+                    label={`Status: ${formData.status.replace('_', ' ').toUpperCase()}`}
+                    color={getStatusColor(formData.status)}
+                    variant="outlined"
+                  />
+                )}
+                {isEditMode && (
+                  <Typography variant="body2" color="text.secondary">
+                    Job Card ID: {id}
+                  </Typography>
+                )}
               </Box>
             </Box>
             <Divider sx={{ my: 3 }} />
@@ -508,6 +822,60 @@ const JobCards = () => {
             {/* Form */}
             <Box component="form" onSubmit={handleSubmit} noValidate>
               {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+              {/* Status Section - Only shown in edit mode */}
+              {isEditMode && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Status</Typography>
+                  <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth>
+                          <InputLabel id="status-label">Status</InputLabel>
+                          <Select
+                            labelId="status-label"
+                            name="status"
+                            value={formData.status}
+                            onChange={handleChange}
+                            label="Status"
+                            startAdornment={
+                              <InputAdornment position="start">
+                                <AssignmentIcon />
+                              </InputAdornment>
+                            }
+                          >
+                            {statusOptions.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                <Chip 
+                                  label={option.label} 
+                                  color={option.color} 
+                                  size="small" 
+                                  sx={{ mr: 1 }}
+                                />
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <FormHelperText>
+                            Update the current status of this job card
+                          </FormHelperText>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => updateJobCardStatus(formData.status)}
+                          disabled={loading}
+                          startIcon={<SaveIcon />}
+                          sx={{ mt: 1 }}
+                        >
+                          Update Status Only
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Box>
+              )}
 
               {/* Customer & Car Details */}
               <Box sx={{ mb: 4 }}>
@@ -565,7 +933,7 @@ const JobCards = () => {
                       { name: 'insuranceProvider', label: 'Insurance Provider', icon: <Policy /> },
                       { name: 'expiryDate', label: 'Expiry Date', icon: <EventNote />, type: 'date', InputLabelProps: { shrink: true } },
                       { name: 'policyNumber', label: 'Policy Number', icon: <Numbers />, helperText: 'Insurance policy reference number' },
-                      { name: 'registrationNumber', label: 'Registration Number', icon: <Numbers />, helperText: 'Vehicle registration certificate number' },
+                      { name: 'carNumber', label: 'Car Number ', icon: <Numbers />, helperText: 'Vehicle registration certificate number' },
                       { name: 'type', label: 'Insurance Type', icon: <LocalOffer />, helperText: 'e.g., Comprehensive, Third Party' },
                       { name: 'excessAmount', label: 'Excess Amount', icon: <AttachMoney />, type: 'number' },
                     ].map((field) => (
@@ -598,6 +966,32 @@ const JobCards = () => {
                         />
                       </Grid>
                     ))}
+                  </Grid>
+                </Paper>
+              </Box>
+
+              {/* Fuel Level */}
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Fuel Level</Typography>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <Typography component="legend" sx={{ mb: 1 }}>Current Fuel Level</Typography>
+                      <Rating
+                        name="fuel-level"
+                        value={fuelLevel}
+                        onChange={(event, newValue) => {
+                          setFuelLevel(newValue);
+                        }}
+                        max={5}
+                        size="large"
+                        icon={<LocalGasStation fontSize="inherit" />}
+                        emptyIcon={<LocalGasStation fontSize="inherit" />}
+                      />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        {fuelLevel}/5 - {fuelLevel === 1 ? 'Very Low' : fuelLevel === 2 ? 'Low' : fuelLevel === 3 ? 'Medium' : fuelLevel === 4 ? 'High' : 'Full'}
+                      </Typography>
+                    </Grid>
                   </Grid>
                 </Paper>
               </Box>
@@ -667,83 +1061,228 @@ const JobCards = () => {
                 </Paper>
               </Box>
 
-              {/* Media Upload */}
+              {/* Car Images Upload/Display */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Car Images & Videos</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Car Images</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 2 }}>Upload Car Images (4 Sides) *</Typography>
-                  <Grid container spacing={2}>
+                  <Grid container spacing={3}>
                     {[
-                      { view: 'frontView', label: 'Front View' },
-                      { view: 'rearView', label: 'Rear View' },
-                      { view: 'leftSide', label: 'Left Side' },
-                      { view: 'rightSide', label: 'Right Side' },
-                    ].map((side) => (
-                      <Grid item xs={12} sm={6} md={3} key={side.view}>
-                        <UploadButton
-                          component="label"
-                          startIcon={<PhotoCamera />}
-                          fullWidth
-                          sx={{ 
-                            height: '100px', 
-                            flexDirection: 'column',
-                            borderColor: fileErrors[side.view] ? theme.palette.error.main : undefined
-                          }}
-                        >
-                          {side.label}
-                          <VisuallyHiddenInput 
-                            type="file" 
-                            accept="image/*"
-                            onChange={(e) => handleImageUpload(side.view, e.target.files[0])}
-                          />
-                          {carImages[side.view] && (
-                            <Typography variant="caption" color="primary" sx={{ mt: 1 }}>
-                              {carImages[side.view].name}
+                      { key: 'frontView', label: 'Front View' },
+                      { key: 'rearView', label: 'Rear View' },
+                      { key: 'leftSide', label: 'Left Side' },
+                      { key: 'rightSide', label: 'Right Side' },
+                    ].map((imageType) => (
+                      <Grid item xs={12} sm={6} md={3} key={imageType.key}>
+                        <Box sx={{ textAlign: 'center' }}>
+                          <Typography variant="subtitle1" sx={{ mb: 2 }}>{imageType.label}</Typography>
+                          
+                          {/* Display existing image if available */}
+                          {existingImages[imageType.key] && !carImages[imageType.key] && (
+                            <Box sx={{ mb: 2, position: 'relative' }}>
+                              <img 
+                                src={existingImages[imageType.key]} 
+                                alt={imageType.label}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '150px', 
+                                  objectFit: 'cover', 
+                                  borderRadius: '8px', 
+                                  border: '1px solid #ddd' 
+                                }} 
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setExistingImages(prev => ({ ...prev, [imageType.key]: null }));
+                                  setSnackbar({
+                                    open: true,
+                                    message: `${imageType.label} will be removed when you save.`,
+                                    severity: 'warning'
+                                  });
+                                }}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 5,
+                                  right: 5,
+                                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" color="error" />
+                              </IconButton>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                Current Image
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* Display new uploaded image preview */}
+                          {carImages[imageType.key] && (
+                            <Box sx={{ mb: 2, position: 'relative' }}>
+                              <img 
+                                src={URL.createObjectURL(carImages[imageType.key])} 
+                                alt={imageType.label}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '150px', 
+                                  objectFit: 'cover', 
+                                  borderRadius: '8px', 
+                                  border: '2px solid #4caf50' 
+                                }} 
+                              />
+                              <IconButton
+                                size="small"
+                                onClick={() => removeUploadedImage(imageType.key)}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 5,
+                                  right: 5,
+                                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                                  '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.9)' }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" color="error" />
+                              </IconButton>
+                              <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1 }}>
+                                New Image Selected
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* Upload button */}
+                          <UploadButton
+                            component="label"
+                            variant="outlined"
+                            startIcon={<PhotoCamera />}
+                            fullWidth
+                          >
+                            {carImages[imageType.key] ? 'Change Image' : 
+                             existingImages[imageType.key] ? 'Replace Image' : 'Upload Image'}
+                            <VisuallyHiddenInput 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => handleImageUpload(imageType.key, e.target.files[0])}
+                            />
+                          </UploadButton>
+
+                          {/* Show file error if any */}
+                          {fileErrors[imageType.key] && (
+                            <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                              {fileErrors[imageType.key]}
                             </Typography>
                           )}
-                        </UploadButton>
-                        {fileErrors[side.view] && (
-                          <FormHelperText error sx={{ ml: 2 }}>
-                            {fileErrors[side.view]}
-                          </FormHelperText>
-                        )}
+
+                          {/* Show file name if uploaded */}
+                          {carImages[imageType.key] && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                              {carImages[imageType.key].name}
+                            </Typography>
+                          )}
+                        </Box>
                       </Grid>
                     ))}
                   </Grid>
 
-                  <Typography variant="subtitle1" sx={{ mt: 4, mb: 2 }}>Upload Video (Optional)</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <UploadButton
-                        component="label"
-                        startIcon={<Videocam />}
-                        fullWidth
-                        sx={{ 
-                          height: '100px', 
-                          flexDirection: 'column',
-                          borderColor: fileErrors.video ? theme.palette.error.main : undefined
-                        }}
-                      >
-                        Drop video here or click to browse
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>Max file size: 50MB</Typography>
-                        <VisuallyHiddenInput 
-                          type="file" 
-                          accept="video/*"
-                          onChange={(e) => handleVideoUpload(e.target.files[0])}
-                        />
-                        {videoFile && (
-                          <Typography variant="caption" color="primary" sx={{ mt: 1 }}>
-                            {videoFile.name}
-                          </Typography>
-                        )}
-                      </UploadButton>
-                      {fileErrors.video && (
-                        <FormHelperText error sx={{ ml: 2 }}>
-                          {fileErrors.video}
-                        </FormHelperText>
-                      )}
-                    </Grid>
-                  </Grid>
+                  {/* Video Upload Section */}
+                  <Box sx={{ mt: 4 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 2 }}>Video (Optional)</Typography>
+                    
+                    {/* Display existing video if available */}
+                    {existingVideo && !videoFile && (
+                      <Box sx={{ mb: 2, position: 'relative' }}>
+                        <video 
+                          controls 
+                          style={{ 
+                            width: '100%', 
+                            height: 'auto', 
+                            borderRadius: '8px' 
+                          }}
+                        >
+                          <source src={existingVideo} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setExistingVideo(null);
+                            setSnackbar({
+                              open: true,
+                              message: 'Video will be removed when you save.',
+                              severity: 'warning'
+                            });
+                          }}
+                          sx={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" color="error" />
+                        </IconButton>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                          Current Video
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* Display new uploaded video preview */}
+                    {videoFile && (
+                      <Box sx={{ mb: 2, position: 'relative' }}>
+                        <video 
+                          controls 
+                          style={{ 
+                            width: '100%', 
+                            height: 'auto', 
+                            borderRadius: '8px',
+                            border: '2px solid #4caf50'
+                          }}
+                        >
+                          <source src={URL.createObjectURL(videoFile)} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                        <IconButton
+                          size="small"
+                          onClick={removeUploadedVideo}
+                          sx={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': { backgroundColor: 'rgba(255, 255, 255, 1)' }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" color="error" />
+                        </IconButton>
+                        <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1 }}>
+                          New Video Selected: {videoFile.name}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {/* Video upload button */}
+                    <UploadButton
+                      component="label"
+                      variant="outlined"
+                      startIcon={<Videocam />}
+                    >
+                      {videoFile ? 'Change Video' : 
+                       existingVideo ? 'Replace Video' : 'Upload Video'}
+                      <VisuallyHiddenInput 
+                        type="file" 
+                        accept="video/*"
+                        onChange={(e) => handleVideoUpload(e.target.files[0])}
+                      />
+                    </UploadButton>
+
+                    {/* Show video file error if any */}
+                    {fileErrors.video && (
+                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                        {fileErrors.video}
+                      </Typography>
+                    )}
+                  </Box>
                 </Paper>
               </Box>
 
@@ -757,7 +1296,7 @@ const JobCards = () => {
                   disabled={loading}
                   sx={{ px: 6, py: 1.5, borderRadius: 2, fontWeight: 600, fontSize: '1rem', textTransform: 'none' }}
                 >
-                  {loading ? 'Saving...' : 'Save Job Card'}
+                  {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Job Card' : 'Save Job Card')}
                 </Button>
               </Box>
             </Box>
@@ -783,4 +1322,4 @@ const JobCards = () => {
   );
 };
 
-export default JobCards;// Validation helper functions
+export default JobCards;

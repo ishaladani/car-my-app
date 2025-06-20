@@ -20,6 +20,8 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -33,6 +35,10 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   Search as SearchIcon,
+  DarkMode,
+  LightMode,
+  Brightness4,
+  Brightness7,
 } from "@mui/icons-material";
 import { useThemeContext } from "../Layout/ThemeContext";
 import ThemeToggle from "../Layout/ThemeToggle";
@@ -40,12 +46,12 @@ import axios from "axios";
 
 const AppLayout = () => {
   const theme = useTheme();
-  const { darkMode } = useThemeContext();
   const location = useLocation();
   const navigate = useNavigate(); // Navigate hook to handle redirects
   const roll = localStorage.getItem("userType");
   const userId = localStorage.getItem("userId");
   const garageId = localStorage.getItem("garageId");
+  const { darkMode, toggleDarkMode } = useThemeContext();
 
   const isMobile = useMediaQuery("(max-width:599px)");
   const [profileData, setProfileData] = useState({
@@ -237,6 +243,127 @@ const AppLayout = () => {
     };
   }, [roll]);
 
+  // Modern Theme Toggle Component
+  const ThemeToggleSwitch = () => (
+    <Tooltip title={`Switch to ${darkMode ? 'Light' : 'Dark'} Mode`}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          px: 1.5,
+          py: 0.5,
+          borderRadius: 20,
+          backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+          border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'}`,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          cursor: 'pointer',
+          '&:hover': {
+            backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+            transform: 'translateY(-1px)',
+            boxShadow: darkMode 
+              ? '0 4px 12px rgba(255, 255, 255, 0.1)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
+          }
+        }}
+        onClick={toggleDarkMode}
+      >
+        {/* Light Mode Icon */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            backgroundColor: !darkMode ? '#FFA726' : 'transparent',
+            color: !darkMode ? '#fff' : theme.palette.text.secondary,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: !darkMode ? 'scale(1.1)' : 'scale(0.9)',
+          }}
+        >
+          <LightMode sx={{ fontSize: 14 }} />
+        </Box>
+
+        {/* Toggle Switch */}
+        <Box
+          sx={{
+            position: 'relative',
+            width: 32,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: darkMode ? '#3f51b5' : '#e0e0e0',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 2,
+              left: darkMode ? 18 : 2,
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              backgroundColor: '#fff',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+            }}
+          />
+        </Box>
+
+        {/* Dark Mode Icon */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            backgroundColor: darkMode ? '#3f51b5' : 'transparent',
+            color: darkMode ? '#fff' : theme.palette.text.secondary,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: darkMode ? 'scale(1.1)' : 'scale(0.9)',
+          }}
+        >
+          <DarkMode sx={{ fontSize: 14 }} />
+        </Box>
+      </Box>
+    </Tooltip>
+  );
+
+  // Alternative Compact Toggle for Mobile
+  const CompactThemeToggle = () => (
+    <Tooltip title={`${darkMode ? 'Light' : 'Dark'} Mode`}>
+      <IconButton
+        onClick={toggleDarkMode}
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: 2,
+          backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+          border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'}`,
+          color: darkMode ? '#3f51b5' : '#FFA726',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+            transform: 'translateY(-1px) scale(1.05)',
+            boxShadow: darkMode 
+              ? '0 4px 12px rgba(255, 255, 255, 0.1)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
+          }
+        }}
+      >
+        {darkMode ? (
+          <LightMode sx={{ fontSize: 20 }} />
+        ) : (
+          <DarkMode sx={{ fontSize: 20 }} />
+        )}
+      </IconButton>
+    </Tooltip>
+  );
+
   // Drawer content
   const drawerContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -300,8 +427,12 @@ const AppLayout = () => {
         </List>
       </Box>
 
-      {/* Bottom Actions - Logout */}
+      {/* Theme Toggle in Sidebar */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
+        {/* <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+          <ThemeToggleSwitch />
+        </Box> */}
+        
         <ListItemButton
           // onClick={handleLogout}
           sx={{
@@ -357,11 +488,25 @@ const AppLayout = () => {
 
           {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {location.pathname === "/" ? "Dashboard" : "Other Page"}
+            {location.pathname === "/" ? "Dashboard" :""}
           </Typography>
 
+          {/* Theme Toggle in App Bar (Mobile) */}
+          {isMobile && (
+            <Box sx={{ mr: 1 }}>
+              <CompactThemeToggle />
+            </Box>
+          )}
+
+          {/* Theme Toggle in App Bar (Desktop) */}
+          {!isMobile && (
+            <Box sx={{ mr: 2 }}>
+              <ThemeToggleSwitch />
+            </Box>
+          )}
+
           {/* User Profile Section in App Bar */}
-          <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
             <Tooltip title="User Profile">
               <IconButton
                 onClick={(event) => setUserMenu(event.currentTarget)} // Corrected event handling
@@ -384,16 +529,26 @@ const AppLayout = () => {
             open={Boolean(userMenu)}
             onClose={() => setUserMenu(null)}
             onClick={() => setUserMenu(null)}
+            PaperProps={{
+              sx: {
+                mt: 1,
+                borderRadius: 2,
+                minWidth: 180,
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+              }
+            }}
           >
-            <MenuItem onClick={() => navigate('/profile')}>
+            <MenuItem onClick={() => navigate('/profile')} sx={{ py: 1.5, gap: 1.5 }}>
               <PersonIcon fontSize="small" />
-              Profile
+              <Typography variant="body2">Profile</Typography>
             </MenuItem>
+            <Divider />
             <MenuItem 
-            // onClick={handleLogout}
+              // onClick={handleLogout}
+              sx={{ py: 1.5, gap: 1.5, color: 'error.main' }}
             >
               <LogoutIcon fontSize="small" />
-              Logout
+              <Typography variant="body2">Logout</Typography>
             </MenuItem>
           </Menu>
         </Toolbar>

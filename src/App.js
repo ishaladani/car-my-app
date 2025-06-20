@@ -35,6 +35,7 @@ function App() {
           <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="jobs" element={<JobCards />} />
+              <Route path="jobs/:id" element={<JobCards />} />
               <Route path="inventory" element={<InventoryManagement />} />
               <Route path="reports" element={<RecordReport />} />
               <Route path="assign-engineer/:id" element={<AssignEngineer />} />

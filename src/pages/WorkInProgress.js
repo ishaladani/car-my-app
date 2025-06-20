@@ -339,6 +339,7 @@ const [carDetails, setCarDetails] = useState({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <IconButton 
+              onClick={() => navigate(`/assign-engineer/${id}`)}
                 sx={{ 
                   mr: 2,
                   bgcolor: 'rgba(255,255,255,0.1)',

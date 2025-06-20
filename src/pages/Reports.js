@@ -402,14 +402,7 @@ const RecordReport = () => {
   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
     Completed Job Cards
   </Typography>
-  <Button
-    variant="contained"
-    color="primary"
-    onClick={() => navigate('/jobs')} // Redirect to Job Card creation page
-    sx={{ alignSelf: 'center' }} // Align button vertically
-  >
-    Add Job Card
-  </Button>
+  
 </Box>
 
               
@@ -520,6 +513,14 @@ const RecordReport = () => {
                               <TableCell>{formatDate(job.completedAt || job.updatedAt)}</TableCell>
                               <TableCell align="center">
                                 <Stack direction="row" spacing={1} justifyContent="center">
+                                  <Button
+    variant="contained"
+    color="primary"
+    onClick={() => navigate(`/jobs/${job._id}`)} // Redirect to Job Card creation page
+    sx={{ alignSelf: 'center' }} // Align button vertically
+  >
+     Job Card
+  </Button>
                                   <Button
                                     variant="outlined"
                                     size="small"
