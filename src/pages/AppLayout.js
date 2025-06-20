@@ -22,6 +22,7 @@ import {
   useTheme,
   Switch,
   FormControlLabel,
+  CircularProgress,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -71,6 +72,60 @@ const AppLayout = () => {
 
   const [mobileOpen, setMobileOpen] = useState(false); // Declare mobileOpen state
   const [userMenu, setUserMenu] = useState(null); // Declare userMenu state
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // Loading state for logout
+
+  // Handle logout function
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent multiple logout attempts
+    
+    try {
+      setIsLoggingOut(true);
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Call logout API - using userId from localStorage or fallback to hardcoded ID
+      const logoutUserId = userId || '665c3fabc1234567890def01';
+      
+      console.log('Logging out user:', logoutUserId);
+      
+      await axios.post(
+        `https://garage-management-zi5z.onrender.com/api/garage/logout/${logoutUserId}`,
+        {},
+        { 
+          headers,
+          timeout: 10000 // 10 second timeout
+        }
+      );
+      
+      console.log('Logout API call successful');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Continue with logout even if API call fails
+      // This ensures user can always logout even if network issues occur
+    } finally {
+      // Clear all localStorage data
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('garageId');
+      localStorage.removeItem('userType');
+      localStorage.removeItem('garageName');
+      localStorage.removeItem('garageLogo');
+      localStorage.removeItem('profileUpdated');
+      
+      // Close any open menus
+      setUserMenu(null);
+      setMobileOpen(false);
+      
+      // Navigate to login page
+      navigate('/login');
+      
+      setIsLoggingOut(false);
+    }
+  };
 
   // All available nav items
   const allNavItems = [
@@ -429,12 +484,11 @@ const AppLayout = () => {
 
       {/* Theme Toggle in Sidebar */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
-        {/* <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-          <ThemeToggleSwitch />
-        </Box> */}
+        
         
         <ListItemButton
-          // onClick={handleLogout}
+          onClick={handleLogout}
+          disabled={isLoggingOut}
           sx={{
             borderRadius: 2,
             py: 1.5,
@@ -444,13 +498,21 @@ const AppLayout = () => {
               bgcolor: "error.main",
               color: "white",
             },
+            "&.Mui-disabled": {
+              bgcolor: "action.disabledBackground",
+              color: "action.disabled",
+            },
           }}
         >
           <ListItemIcon sx={{ minWidth: 40 }}>
-            <LogoutIcon />
+            {isLoggingOut ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              <LogoutIcon />
+            )}
           </ListItemIcon>
           <ListItemText
-            primary="Logout"
+            primary={isLoggingOut ? "Logging out..." : "Logout"}
             primaryTypographyProps={{ fontWeight: 600 }}
           />
         </ListItemButton>
@@ -488,7 +550,7 @@ const AppLayout = () => {
 
           {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {location.pathname === "/" ? "Dashboard" :""}
+            {location.pathname === "/" ? "Dashboard" : "Other Page"}
           </Typography>
 
           {/* Theme Toggle in App Bar (Mobile) */}
@@ -544,11 +606,18 @@ const AppLayout = () => {
             </MenuItem>
             <Divider />
             <MenuItem 
-              // onClick={handleLogout}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
               sx={{ py: 1.5, gap: 1.5, color: 'error.main' }}
             >
-              <LogoutIcon fontSize="small" />
-              <Typography variant="body2">Logout</Typography>
+              {isLoggingOut ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <LogoutIcon fontSize="small" />
+              )}
+              <Typography variant="body2">
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </Typography>
             </MenuItem>
           </Menu>
         </Toolbar>
