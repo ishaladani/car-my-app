@@ -22,7 +22,12 @@ import {
   Divider,
   Alert,
   Fade,
-  Skeleton
+  Skeleton,
+   FormControl,
+   InputLabel,
+   Select,
+   useTheme,
+   MenuItem,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -36,7 +41,8 @@ import {
   Timer as TimerIcon,
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
-  Build as BuildIcon
+  Build as BuildIcon,
+  Assignment as AssignmentIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -48,6 +54,7 @@ const WorkInProgress = () => {
     garageId = localStorage.getItem("garage_id");
   }
   // Sample data - replace with your actual state management
+   const theme = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
   const navigate = useNavigate();
@@ -93,6 +100,14 @@ const [carDetails, setCarDetails] = useState({
   const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [laborHours, setLaborHours] = useState('');
+
+  const statusOptions = [
+  { value: 'pending', label: 'Pending', color: 'warning' },
+  { value: 'in_progress', label: 'In Progress', color: 'info' },
+  { value: 'completed', label: 'Completed', color: 'success' },
+  { value: 'cancelled', label: 'Cancelled', color: 'error' },
+  { value: 'on_hold', label: 'On Hold', color: 'default' }
+];
 
     useEffect(() => {
       const fetchJobCardData = async () => {
@@ -638,7 +653,7 @@ const [carDetails, setCarDetails] = useState({
                       />
                     </Grid>
                     <Grid item xs={12} md={6}>
-                      <TextField
+                      {/* <TextField
                         select
                         fullWidth
                         label="Work Status"
@@ -652,7 +667,56 @@ const [carDetails, setCarDetails] = useState({
                         <option value="">Select Status</option>
                         <option value="Pending">Pending</option>
                         <option value="Completed">Completed</option>
-                      </TextField>
+                      </TextField> */}
+                        <Box sx={{ mb: 4 }}>
+                                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Status</Typography>
+                                        <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                                          <Grid container spacing={3}>
+                                            <Grid item xs={12} md={6}>
+                                              <FormControl fullWidth>
+                                                <InputLabel id="status-label">Status</InputLabel>
+                                                <Select
+                                                  labelId="status-label"
+                                                  name="status"
+                                                  onChange={(e) => setStatus(e.target.value)}
+                                                  label="Status"
+                                                  startAdornment={
+                                                    <InputAdornment position="start">
+                                                      <AssignmentIcon />
+                                                    </InputAdornment>
+                                                  }
+                                                >
+                                                  {statusOptions.map((option) => (
+                                                    <MenuItem key={option.value} value={option.value}>
+                                                      <Chip 
+                                                        label={option.label} 
+                                                        color={option.color} 
+                                                        size="small" 
+                                                        sx={{ mr: 1 }}
+                                                      />
+                                                      {option.label}
+                                                    </MenuItem>
+                                                  ))}
+                                                </Select>
+                                                {/* <FormHelperText>
+                                                  Update the current status of this job card
+                                                </FormHelperText> */}
+                                              </FormControl>
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                              {/* <Button
+                                                variant="outlined"
+                                                onClick={() => updateJobCardStatus(formData.status)}
+                                                disabled={loading}
+                                                startIcon={<SaveIcon />}
+                                                sx={{ mt: 1 }}
+                                              >
+                                                Update Status Only
+                                              </Button> */}
+                                            </Grid>
+                                          </Grid>
+                                        </Paper>
+                                      </Box>
                     </Grid>
                     <Grid item xs={12}>
                       <TextField
@@ -846,37 +910,42 @@ const [carDetails, setCarDetails] = useState({
           </Grid>
 
           {/* Submit Button */}
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 3, 
-              mt: 3, 
-              bgcolor: 'white',
-              borderRadius: 3,
-              border: '1px solid #e2e8f0',
-              textAlign: 'center'
-            }}
-          >
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={isLoading}
-              sx={{ 
-                px: 6, 
-                py: 1.5,
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
-                }
-              }}
-            >
-              {isLoading ? 'Updating...' : 'Submit Work Progress'}
-            </Button>
-          </Paper>
+             {/* Submit Button */}
+                    <Paper 
+                      elevation={0} 
+                      sx={{ 
+                        p: 3, 
+                        mt: 3, 
+                        bgcolor: 'background.paper',
+                        borderRadius: 3,
+                        border: `1px solid ${theme.palette.divider}`,
+                        textAlign: 'center'
+                      }}
+                    >
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        size="large"
+                        disabled={isLoading}
+                        sx={{ 
+                          px: 6, 
+                          py: 1.5,
+                          fontSize: '1.1rem',
+                          fontWeight: 600,
+                          borderRadius: 2,
+                          background: theme.palette.mode === 'dark' 
+                            ? 'linear-gradient(135deg, #3f51b5 0%, #9c27b0 100%)'
+                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          '&:hover': {
+                            background: theme.palette.mode === 'dark'
+                              ? 'linear-gradient(135deg, #303f9f 0%, #7b1fa2 100%)'
+                              : 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                          }
+                        }}
+                      >
+                        {isLoading ? 'Updating...' : 'Submit Work Progress'}
+                      </Button>
+                    </Paper>
         </form>
       </Container>
     </Box>

@@ -34,23 +34,19 @@
 //   Accordion,
 //   AccordionSummary,
 //   AccordionDetails,
-//   Menu,
-//   ListItemIcon
+//   Paper
 // } from '@mui/material';
 // import {
 //   ArrowBack as ArrowBackIcon,
 //   Person as PersonIcon,
-//   Assignment as AssignmentIcon,
 //   Inventory as InventoryIcon,
 //   Send as SendIcon,
 //   Add as AddIcon,
 //   Delete as DeleteIcon,
 //   DragIndicator as DragIcon,
 //   ExpandMore as ExpandMoreIcon,
-//   Schedule as ScheduleIcon,
-//   Edit as EditIcon,
-//   MoreVert as MoreVertIcon,
-//   Refresh as RefreshIcon
+//   Description as DescriptionIcon,
+//   Save as SaveIcon
 // } from '@mui/icons-material';
 // import { useThemeContext } from '../Layout/ThemeContext';
 // import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -69,11 +65,10 @@
 
 //   // Main State
 //   const [engineers, setEngineers] = useState([]);
-//   const [taskAssignments, setTaskAssignments] = useState([
+//   const [assignments, setAssignments] = useState([
 //     {
 //       id: Date.now(),
 //       engineer: null,
-//       tasks: [],
 //       parts: [],
 //       priority: 'medium',
 //       estimatedDuration: '',
@@ -81,15 +76,17 @@
 //     }
 //   ]);
 //   const [inventoryParts, setInventoryParts] = useState([]);
-//   const [availableTasks, setAvailableTasks] = useState([]);
 //   const [jobCardIds, setJobCardIds] = useState([]);
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 //   const [isLoading, setIsLoading] = useState(true);
 //   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
-//   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 //   const [error, setError] = useState(null);
 //   const [success, setSuccess] = useState(false);
 //   const [formErrors, setFormErrors] = useState({});
+
+//   // Job Details Points State
+//   const [jobPoints, setJobPoints] = useState(['']);
+//   const [currentJobPoint, setCurrentJobPoint] = useState('');
 
 //   // Add Part Dialog States
 //   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -121,23 +118,40 @@
 //   const [engineerAddSuccess, setEngineerAddSuccess] = useState(false);
 //   const [engineerAddError, setEngineerAddError] = useState(null);
 
-//   // Add/Edit Task Dialog States
-//   const [openAddTaskDialog, setOpenAddTaskDialog] = useState(false);
-//   const [openEditTaskDialog, setOpenEditTaskDialog] = useState(false);
-//   const [newTask, setNewTask] = useState({
-//     taskName: "",
-//     taskDuration: "1",
-//     description: "",
-//     category: "general"
+//   // Form state
+//   const [formData, setFormData] = useState({
+//     customerNumber: '',
+//     customerName: '',
+//     contactNumber: '',
+//     email: '',
+//     carNumber: '',
+//     model: '',
+//     company: '',
+//     kilometer: '',
+//     fuelType: 'petrol',
+//     insuranceProvider: '',
+//     expiryDate: '',
+//     policyNumber: '',
+//     registrationNumber: '',
+//     type: '',
+//     excessAmount: '',
+//     chesiNumber: '',
+//     tyreCondition: '',
+//     status: 'pending'
 //   });
-//   const [editingTask, setEditingTask] = useState(null);
-//   const [addingTask, setAddingTask] = useState(false);
-//   const [updatingTask, setUpdatingTask] = useState(false);
-//   const [taskError, setTaskError] = useState(null);
 
-//   // Task Menu State
-//   const [taskMenuAnchor, setTaskMenuAnchor] = useState(null);
-//   const [selectedTaskForMenu, setSelectedTaskForMenu] = useState(null);
+//   const [fetchingData, setFetchingData] = useState(false);
+//   const [isEditMode, setIsEditMode] = useState(false);
+
+//   // Snackbar notification
+//   const [snackbar, setSnackbar] = useState({
+//     open: false,
+//     message: '',
+//     severity: 'success'
+//   });
+
+//   // State to store job card data temporarily until engineers and parts are loaded
+//   const [jobCardDataTemp, setJobCardDataTemp] = useState(null);
 
 //   // Utility API Call with Authorization
 //   const apiCall = useCallback(async (endpoint, options = {}) => {
@@ -158,7 +172,7 @@
 //     }
 //   }, [garageToken]);
 
-//   // Fetch Inventory Parts - MOVED BEFORE updatePartQuantity
+//   // Fetch Inventory Parts
 //   const fetchInventoryParts = useCallback(async () => {
 //     if (!garageId) {
 //       return;
@@ -183,7 +197,7 @@
 
 //     // Calculate total selected quantity across all assignments
 //     let totalSelected = 0;
-//     taskAssignments.forEach(assignment => {
+//     assignments.forEach(assignment => {
 //       assignment.parts.forEach(part => {
 //         if (part._id === partId) {
 //           totalSelected += part.selectedQuantity || 1;
@@ -238,150 +252,6 @@
 //     setJobCardIds(initialJobCardIds);
 //   }, [id, jobCardId]);
 
-//   // Fetch Tasks from API
-//   const fetchTasks = useCallback(async () => {
-//     if (!garageToken) {
-//       setError('No authentication token found');
-//       return;
-//     }
-    
-//     try {
-//       setIsLoadingTasks(true);
-//       setError(null);
-      
-//       const response = await apiCall('/garage/gettask', { method: 'GET' });
-      
-//       console.log('API Response:', response.data);
-      
-//       let tasks = [];
-      
-//       if (response.data && response.data.tasks && Array.isArray(response.data.tasks)) {
-//         tasks = response.data.tasks;
-//       } 
-//       else if (Array.isArray(response.data)) {
-//         tasks = response.data;
-//       }
-//       else {
-//         console.log('No tasks found in response:', response.data);
-//         tasks = [];
-//       }
-      
-//       const transformedTasks = tasks.map(task => ({
-//         id: task._id,
-//         taskId: task._id,
-//         name: task.taskName,
-//         taskName: task.taskName,
-//         duration: `${task.taskDuration} minutes`,
-//         taskDuration: task.taskDuration,
-//         category: task.category || 'general',
-//         description: task.description || `Task: ${task.taskName}`
-//       }));
-      
-//       setAvailableTasks(transformedTasks);
-      
-//       if (transformedTasks.length === 0) {
-//         console.log('No tasks available. You can create new tasks using the "Add Task" button.');
-//       }
-      
-//     } catch (err) {
-//       console.error('Failed to fetch tasks:', err);
-      
-//       if (err.response?.status === 401) {
-//         setError('Authentication failed. Please log in again.');
-//       } else if (err.response?.status === 404) {
-//         setError('Tasks endpoint not found. Please check the API configuration.');
-//       } else if (err.response?.status >= 500) {
-//         setError('Server error. Please try again later.');
-//       } else {
-//         setError(err.response?.data?.message || 'Failed to load tasks');
-//       }
-      
-//       setAvailableTasks([]);
-//     } finally {
-//       setIsLoadingTasks(false);
-//     }
-//   }, [garageToken, apiCall]);
-
-//   // Create New Task
-//   const createTask = async (taskData) => {
-//     try {
-//       setAddingTask(true);
-//       setTaskError(null);
-      
-//       const payload = {
-//         taskName: taskData.taskName,
-//         taskDuration: parseInt(taskData.taskDuration)
-//       };
-      
-//       const response = await apiCall('/garage/task/create', {
-//         method: 'POST',
-//         data: payload
-//       });
-      
-//       await fetchTasks();
-      
-//       setOpenAddTaskDialog(false);
-//       setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-      
-//       setSuccess(true);
-//       setTimeout(() => setSuccess(false), 3000);
-      
-//     } catch (err) {
-//       console.error('Create task error:', err);
-//       setTaskError(err.response?.data?.message || 'Failed to create task');
-//     } finally {
-//       setAddingTask(false);
-//     }
-//   };
-
-//   // Update Task
-//   const updateTask = async (taskId, taskData) => {
-//     try {
-//       setUpdatingTask(true);
-//       setTaskError(null);
-      
-//       const payload = {
-//         taskName: taskData.taskName,
-//         taskDuration: parseInt(taskData.taskDuration)
-//       };
-      
-//       await apiCall(`/garage/task/${taskId}`, {
-//         method: 'PUT',
-//         data: payload
-//       });
-      
-//       await fetchTasks();
-      
-//       setOpenEditTaskDialog(false);
-//       setEditingTask(null);
-      
-//       setSuccess(true);
-//       setTimeout(() => setSuccess(false), 3000);
-      
-//     } catch (err) {
-//       console.error('Update task error:', err);
-//       setTaskError(err.response?.data?.message || 'Failed to update task');
-//     } finally {
-//       setUpdatingTask(false);
-//     }
-//   };
-
-//   // Delete Task
-//   const deleteTask = async (taskId) => {
-//     try {
-//       await apiCall(`/garage/task/${taskId}`, { method: 'DELETE' });
-      
-//       await fetchTasks();
-      
-//       setSuccess(true);
-//       setTimeout(() => setSuccess(false), 3000);
-      
-//     } catch (err) {
-//       console.error('Delete task error:', err);
-//       setError(err.response?.data?.message || 'Failed to delete task');
-//     }
-//   };
-
 //   // Fetch Engineers
 //   const fetchEngineers = useCallback(async () => {
 //     if (!garageId) {
@@ -404,32 +274,214 @@
 //   useEffect(() => {
 //     fetchInventoryParts();
 //     fetchEngineers();
-//     fetchTasks();
-//   }, [fetchInventoryParts, fetchEngineers, fetchTasks]);
+//   }, [fetchInventoryParts, fetchEngineers]);
 
-//   // Add new task assignment
-//   const addTaskAssignment = () => {
-//     setTaskAssignments(prev => [...prev, {
-//       id: Date.now(),
-//       engineer: null,
-//       tasks: [],
-//       parts: [],
-//       priority: 'medium',
-//       estimatedDuration: '',
-//       notes: ''
-//     }]);
-//   };
+//   // Set assignments after engineers and inventory are loaded
+//   useEffect(() => {
+//     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
+//       console.log('🔄 Setting assignments with job card data:', jobCardDataTemp);
+      
+//       // Set engineer and parts in assignments if they exist
+//       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
+//         const assignedEngineer = jobCardDataTemp.engineerId[0]; // Get first engineer
+        
+//         // Find the full engineer object from the engineers list
+//         const fullEngineerData = engineers.find(eng => eng._id === assignedEngineer._id);
+        
+//         console.log('👤 Found assigned engineer:', assignedEngineer);
+//         console.log('👤 Full engineer data:', fullEngineerData);
+        
+//         if (fullEngineerData || assignedEngineer) {
+//           // Convert partsUsed from job card to format expected by the form
+//           let formattedParts = [];
+//           if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
+//             console.log('🔧 Processing parts used:', jobCardDataTemp.partsUsed);
+            
+//             formattedParts = jobCardDataTemp.partsUsed.map(usedPart => {
+//               // Find the part in inventory to get full details
+//               const inventoryPart = inventoryParts.find(invPart => 
+//                 invPart.partName === usedPart.partName || 
+//                 invPart._id === usedPart.partId ||
+//                 invPart._id === usedPart._id
+//               );
+              
+//               if (inventoryPart) {
+//                 console.log(`✅ Found part in inventory: ${usedPart.partName}`);
+//                 return {
+//                   ...inventoryPart,
+//                   selectedQuantity: usedPart.quantity || 1,
+//                   availableQuantity: inventoryPart.quantity
+//                 };
+//               } else {
+//                 // If part not found in inventory, create a mock part object
+//                 console.log(`⚠️ Part not found in inventory, creating mock: ${usedPart.partName}`);
+//                 return {
+//                   _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName}`,
+//                   partName: usedPart.partName || 'Unknown Part',
+//                   partNumber: usedPart.partNumber || '',
+//                   quantity: 0, // No stock available
+//                   selectedQuantity: usedPart.quantity || 1,
+//                   pricePerUnit: usedPart.totalPrice ? (usedPart.totalPrice / (usedPart.quantity || 1)) : 0,
+//                   gstPercentage: usedPart.gstPercentage || 0,
+//                   carName: usedPart.carName || '',
+//                   model: usedPart.model || '',
+//                   availableQuantity: 0
+//                 };
+//               }
+//             });
+//           }
 
-//   // Remove task assignment
-//   const removeTaskAssignment = (assignmentId) => {
-//     if (taskAssignments.length > 1) {
-//       setTaskAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
+//           // Update the first assignment with engineer and parts
+//           const newAssignment = {
+//             id: Date.now(),
+//             engineer: fullEngineerData || assignedEngineer,
+//             parts: formattedParts,
+//             priority: 'medium',
+//             estimatedDuration: jobCardDataTemp.laborHours ? `${jobCardDataTemp.laborHours} hours` : '',
+//             notes: jobCardDataTemp.engineerRemarks || ''
+//           };
+
+//           setAssignments([newAssignment]);
+
+//           console.log('✅ Successfully set engineer:', fullEngineerData || assignedEngineer);
+//           console.log('✅ Successfully set parts:', formattedParts);
+//           console.log('📋 Assignment created:', newAssignment);
+          
+//           // Clear temp data
+//           setJobCardDataTemp(null);
+          
+//           setSnackbar({
+//             open: true,
+//             message: `✅ Job card data populated! Engineer: ${assignedEngineer.name}, Parts: ${formattedParts.length} items`,
+//             severity: 'success'
+//           });
+//         }
+//       }
+//     }
+//   }, [jobCardDataTemp, engineers, inventoryParts, isLoading, isLoadingInventory]);
+
+//   // Fetch job card data on page load
+//   useEffect(() => {
+//     const fetchJobCardData = async () => {
+//       if (!id) return;
+//       setFetchingData(true);
+//       setIsEditMode(true);
+//       try {
+//         const response = await axios.get(
+//           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, 
+//           {
+//             headers: {
+//               Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+//             }
+//           }
+//         );
+
+//         const jobCardData = response.data;
+
+//         console.log('📋 Fetched Job Card Data:', jobCardData);
+//         console.log('👤 Engineer from Job Card:', jobCardData.engineerId);
+//         console.log('🔧 Parts Used from Job Card:', jobCardData.partsUsed);
+
+//         // Set form data with fallback to empty string if field is null
+//         setFormData({
+//           customerNumber: jobCardData.customerNumber || '',
+//           customerName: jobCardData.customerName || '',
+//           contactNumber: jobCardData.contactNumber || '',
+//           email: jobCardData.email || '',
+//           carNumber: jobCardData.carNumber || '',
+//           model: jobCardData.model || '',
+//           company: jobCardData.company || '',
+//           kilometer: jobCardData.kilometer?.toString() || '',
+//           fuelType: jobCardData.fuelType || 'petrol',
+//           insuranceProvider: jobCardData.insuranceProvider || '',
+//           expiryDate: jobCardData.expiryDate ? new Date(jobCardData.expiryDate).toISOString().split('T')[0] : '',
+//           policyNumber: jobCardData.policyNumber || '',
+//           registrationNumber: jobCardData.registrationNumber || '',
+//           type: jobCardData.type || '',
+//           excessAmount: jobCardData.excessAmount?.toString() || '',
+//           chesiNumber: jobCardData.chesiNumber || '',
+//           tyreCondition: jobCardData.tyreCondition || '',
+//           status: jobCardData.status || 'pending'
+//         });
+
+//         // Set job details points from job card
+//         if (jobCardData.jobDetails) {
+//           const lines = jobCardData.jobDetails.split('\n');
+//           const cleanLines = lines
+//             .map(line => line.replace(/^\d+\.\s*/, '').trim()) // Remove number prefix
+//             .filter(line => line.length > 0);
+//           setJobPoints(cleanLines.length > 0 ? cleanLines : ['']);
+//         } else {
+//           setJobPoints(['']);
+//         }
+
+//         // Store job card data temporarily to be processed when engineers and parts are loaded
+//         setJobCardDataTemp(jobCardData);
+
+//         setSnackbar({
+//           open: true,
+//           message: 'Job card data loaded successfully!',
+//           severity: 'success'
+//         });
+//       } catch (error) {
+//         console.error('Error fetching job card data:', error);
+//         setSnackbar({
+//           open: true,
+//           message: 'Failed to load job card data: ' + (error.response?.data?.message || error.message),
+//           severity: 'error'
+//         });
+//       } finally {
+//         setFetchingData(false);
+//       }
+//     };
+
+//     fetchJobCardData();
+//   }, [id]);
+
+//   // Job Points Management
+//   const addJobPoint = () => {
+//     if (currentJobPoint.trim()) {
+//       setJobPoints(prev => [...prev.filter(point => point.trim()), currentJobPoint.trim()]);
+//       setCurrentJobPoint('');
 //     }
 //   };
 
-//   // Update task assignment
-//   const updateTaskAssignment = (assignmentId, field, value) => {
-//     setTaskAssignments(prev => prev.map(assignment => 
+//   const removeJobPoint = (indexToRemove) => {
+//     setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
+//   };
+
+//   const updateJobPoint = (index, value) => {
+//     setJobPoints(prev => {
+//       const updated = [...prev];
+//       updated[index] = value;
+//       return updated;
+//     });
+//   };
+
+//   const handleJobPointKeyPress = (e) => {
+//     if (e.key === 'Enter') {
+//       e.preventDefault();
+//       addJobPoint();
+//     }
+//   };
+
+//   const getJobDetailsForAPI = () => {
+//     const validPoints = jobPoints.filter(point => point.trim());
+//     return validPoints.map((point, index) => `${index + 1}. ${point}`).join('\n');
+//   };
+
+ 
+
+//   // Remove assignment
+//   const removeAssignment = (assignmentId) => {
+//     if (assignments.length > 1) {
+//       setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
+//     }
+//   };
+
+//   // Update assignment
+//   const updateAssignment = (assignmentId, field, value) => {
+//     setAssignments(prev => prev.map(assignment => 
 //       assignment.id === assignmentId 
 //         ? { ...assignment, [field]: value }
 //         : assignment
@@ -469,7 +521,7 @@
 //       }));
 
 //       // Update the assignment with new parts (local state only)
-//       updateTaskAssignment(assignmentId, 'parts', updatedParts);
+//       updateAssignment(assignmentId, 'parts', updatedParts);
 
 //     } catch (err) {
 //       console.error('Error handling part selection:', err);
@@ -479,7 +531,7 @@
 
 //   // Handle Part Quantity Change (Local State Only)
 //   const handlePartQuantityChange = (assignmentId, partIndex, newQuantity, oldQuantity) => {
-//     const assignment = taskAssignments.find(a => a.id === assignmentId);
+//     const assignment = assignments.find(a => a.id === assignmentId);
 //     if (!assignment) return;
 
 //     const part = assignment.parts[partIndex];
@@ -509,7 +561,7 @@
 //           : p
 //       );
       
-//       updateTaskAssignment(assignmentId, 'parts', updatedParts);
+//       updateAssignment(assignmentId, 'parts', updatedParts);
 
 //       // Clear any previous errors
 //       if (error && error.includes(part.partName)) {
@@ -524,7 +576,7 @@
 
 //   // Handle Part Removal (Local State Only)
 //   const handlePartRemoval = (assignmentId, partIndex) => {
-//     const assignment = taskAssignments.find(a => a.id === assignmentId);
+//     const assignment = assignments.find(a => a.id === assignmentId);
 //     if (!assignment) return;
 
 //     const part = assignment.parts[partIndex];
@@ -533,7 +585,7 @@
 //     try {
 //       // Remove part from assignment (local state only)
 //       const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-//       updateTaskAssignment(assignmentId, 'parts', updatedParts);
+//       updateAssignment(assignmentId, 'parts', updatedParts);
 
 //     } catch (err) {
 //       console.error('Error removing part:', err);
@@ -545,15 +597,11 @@
 //   const validateForm = () => {
 //     const errors = {};
     
-//     taskAssignments.forEach((assignment, index) => {
+//     assignments.forEach((assignment, index) => {
 //       const assignmentKey = `assignment_${assignment.id}`;
       
 //       if (!assignment.engineer) {
 //         errors[`${assignmentKey}_engineer`] = 'Please select an engineer';
-//       }
-      
-//       if (!assignment.tasks || assignment.tasks.length === 0) {
-//         errors[`${assignmentKey}_tasks`] = 'Please select at least one task';
 //       }
 //     });
     
@@ -571,10 +619,10 @@
 //     return true;
 //   };
 
-//   // Update Job Card Parts Used
-//   const updateJobCardPartsUsed = async (jobCardId, partsUsed) => {
+//   // Update Job Card with Job Details and Parts Used
+//   const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
 //     try {
-//       console.log(`Updating job card ${jobCardId} with parts:`, partsUsed);
+//       console.log(`Updating job card ${jobCardId} with job details and parts:`, { jobDetails, partsUsed });
       
 //       // Validate parts data before sending
 //       const validatedParts = partsUsed.map(part => ({
@@ -591,6 +639,7 @@
 //       }));
   
 //       const updatePayload = {
+//         jobDetails: jobDetails,
 //         partsUsed: validatedParts
 //       };
   
@@ -614,299 +663,136 @@
 //       throw err;
 //     }
 //   };
-//   // Form state
-//     const [formData, setFormData] = useState({
-//       customerNumber: '',
-//       customerName: '',
-//       contactNumber: '',
-//       email: '',
-//       carNumber: '',
-//       model: '',
-//       company: '',
-//       kilometer: '',
-//       fuelType: 'petrol',
-//       insuranceProvider: '',
-//       expiryDate: '',
-//       policyNumber: '',
-//       registrationNumber: '',
-//       type: '',
-//       excessAmount: '',
-//       chesiNumber: '',
-//       tyreCondition: '',
-//       status: 'pending'
-//     });
-  
-//     const [fetchingData, setFetchingData] = useState(false);
-//     const [isEditMode, setIsEditMode] = useState(false);
-  
-//     // Snackbar notification
-//     const [snackbar, setSnackbar] = useState({
-//       open: false,
-//       message: '',
-//       severity: 'success'
-//     });
 
-// // Fetch job card data on page load
-//   useEffect(() => {
-//     const fetchJobCardData = async () => {
-//       if (!id) return;
-//       setFetchingData(true);
-//       setIsEditMode(true);
-//       try {
-//         const response = await axios.get(
-//           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, 
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+    
+//     if (!validateForm()) return;
+
+//     setIsSubmitting(true);
+//     setError(null);
+//     setFormErrors({});
+
+//     try {
+//       // Get job details for API
+//       const jobDetailsString = getJobDetailsForAPI();
+
+//       // Collect all parts used across all assignments with enhanced data
+//       const allPartsUsed = [];
+//       const partUpdates = []; // Track inventory updates needed
+
+//       assignments.forEach(assignment => {
+//         assignment.parts.forEach(part => {
+//           const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
+//           const selectedQuantity = part.selectedQuantity || 1;
+          
+//           if (existingPartIndex !== -1) {
+//             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+//           } else {
+//             allPartsUsed.push({
+//               partId: part._id,
+//               partName: part.partName,
+//               partNumber: part.partNumber || '',
+//               quantity: selectedQuantity,
+//               pricePerUnit: part.pricePerUnit || 0,
+//               gstPercentage: part.gstPercentage || part.taxAmount || 0,
+//               carName: part.carName || '',
+//               model: part.model || ''
+//             });
+//           }
+
+//           // Track inventory updates needed
+//           const existingUpdateIndex = partUpdates.findIndex(p => p.partId === part._id);
+//           if (existingUpdateIndex !== -1) {
+//             partUpdates[existingUpdateIndex].totalUsed += selectedQuantity;
+//           } else {
+//             partUpdates.push({
+//               partId: part._id,
+//               partName: part.partName,
+//               totalUsed: selectedQuantity,
+//               originalQuantity: part.quantity
+//             });
+//           }
+//         });
+//       });
+
+//       // Update inventory for all used parts
+//       console.log('Updating inventory for used parts...');
+//       for (const partUpdate of partUpdates) {
+//         const currentPart = inventoryParts.find(p => p._id === partUpdate.partId);
+//         if (currentPart) {
+//           const newQuantity = currentPart.quantity - partUpdate.totalUsed;
+//           if (newQuantity < 0) {
+//             throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
+//           }
+          
+//           console.log(`Updating ${partUpdate.partName}: ${currentPart.quantity} -> ${newQuantity}`);
+//           await updatePartQuantity(partUpdate.partId, newQuantity);
+//         }
+//       }
+
+//       // Update job card with job details and parts used
+//       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
+      
+//       const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
+//         if (jobCardId) {
+//           return updateJobCard(jobCardId, jobDetailsString, allPartsUsed);
+//         }
+//       }).filter(Boolean);
+
+//       // Process each assignment
+//       const assignmentPromises = assignments.map(async (assignment) => {
+//         const payload = {
+//           jobCardIds: targetJobCardIds,
+//           parts: assignment.parts.map(part => ({
+//             partId: part._id,
+//             partName: part.partName,
+//             quantity: part.selectedQuantity || 1
+//           })),
+//           priority: assignment.priority,
+//           notes: assignment.notes
+//         };
+
+//         console.log(`Assigning to engineer ${assignment.engineer._id}:`, payload);
+        
+//         return axios.put(
+//           `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
+//           payload,
 //           {
 //             headers: {
-//               Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+//               'Content-Type': 'application/json',
 //             }
 //           }
 //         );
+//       });
 
-//         const jobCardData = response.data;
-
-//         console.log('Fetched Job Card Data:', jobCardData);
-
-//         // Set form data with fallback to empty string if field is null
-//         setFormData({
-//           customerNumber: jobCardData.customerNumber || '',
-//           customerName: jobCardData.customerName || '',
-//           contactNumber: jobCardData.contactNumber || '',
-//           email: jobCardData.email || '',
-//           carNumber: jobCardData.carNumber || '',
-//           model: jobCardData.model || '',
-//           company: jobCardData.company || '',
-//           kilometer: jobCardData.kilometer?.toString() || '',
-//           fuelType: jobCardData.fuelType || 'petrol',
-//           insuranceProvider: jobCardData.insuranceProvider || '',
-//           expiryDate: jobCardData.expiryDate ? new Date(jobCardData.expiryDate).toISOString().split('T')[0] : '',
-//           policyNumber: jobCardData.policyNumber || '',
-//           registrationNumber: jobCardData.registrationNumber || '',
-//           type: jobCardData.type || '',
-//           excessAmount: jobCardData.excessAmount?.toString() || '',
-//           chesiNumber: jobCardData.chesiNumber || '',
-//           tyreCondition: jobCardData.tyreCondition || '',
-//           status: jobCardData.status || 'pending'
-//         });
-
-//         setSnackbar({
-//           open: true,
-//           message: 'Job card data loaded successfully!',
-//           severity: 'success'
-//         });
-//       } catch (error) {
-//         console.error('Error fetching job card data:', error);
-//         setSnackbar({
-//           open: true,
-//           message: 'Failed to load job card data: ' + (error.response?.data?.message || error.message),
-//           severity: 'error'
-//         });
-//       } finally {
-//         setFetchingData(false);
+//       // Execute job card updates first
+//       if (jobCardUpdatePromises.length > 0) {
+//         console.log('Updating job cards with job details and parts used...');
+//         await Promise.all(jobCardUpdatePromises);
+//         console.log('Job cards updated successfully');
 //       }
-//     };
 
-//     fetchJobCardData();
-//   }, [id]);
-  
-//    const handleSubmit = async (e) => {
-//       e.preventDefault();
+//       // Execute all assignments
+//       console.log('Assigning to engineers...');
+//       const results = await Promise.all(assignmentPromises);
       
-//       if (!validateForm()) return;
-  
-//       setIsSubmitting(true);
-//       setError(null);
-//       setFormErrors({});
-  
-//       try {
-//         // Collect all parts used across all assignments with enhanced data
-//         const allPartsUsed = [];
-//         const partUpdates = []; // Track inventory updates needed
-  
-//         taskAssignments.forEach(assignment => {
-//           assignment.parts.forEach(part => {
-//             const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
-//             const selectedQuantity = part.selectedQuantity || 1;
-            
-//             if (existingPartIndex !== -1) {
-//               allPartsUsed[existingPartIndex].quantity += selectedQuantity;
-//             } else {
-//               allPartsUsed.push({
-//                 partId: part._id,
-//                 partName: part.partName,
-//                 partNumber: part.partNumber || '',
-//                 quantity: selectedQuantity,
-//                 pricePerUnit: part.pricePerUnit || 0,
-//                 gstPercentage: part.gstPercentage || part.taxAmount || 0,
-//                 carName: part.carName || '',
-//                 model: part.model || ''
-//               });
-//             }
-  
-//             // Track inventory updates needed
-//             const existingUpdateIndex = partUpdates.findIndex(p => p.partId === part._id);
-//             if (existingUpdateIndex !== -1) {
-//               partUpdates[existingUpdateIndex].totalUsed += selectedQuantity;
-//             } else {
-//               partUpdates.push({
-//                 partId: part._id,
-//                 partName: part.partName,
-//                 totalUsed: selectedQuantity,
-//                 originalQuantity: part.quantity
-//               });
-//             }
-//           });
-//         });
-  
-//         // Update inventory for all used parts
-//         console.log('Updating inventory for used parts...');
-//         for (const partUpdate of partUpdates) {
-//           const currentPart = inventoryParts.find(p => p._id === partUpdate.partId);
-//           if (currentPart) {
-//             const newQuantity = currentPart.quantity - partUpdate.totalUsed;
-//             if (newQuantity < 0) {
-//               throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
-//             }
-            
-//             console.log(`Updating ${partUpdate.partName}: ${currentPart.quantity} -> ${newQuantity}`);
-//             await updatePartQuantity(partUpdate.partId, newQuantity);
-//           }
-//         }
-  
-//         // Update job cards with parts used
-//         const jobCardUpdatePromises = [];
-//         const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
-        
-//         if (allPartsUsed.length > 0) {
-//           targetJobCardIds.forEach(jobCardId => {
-//             if (jobCardId) {
-//               jobCardUpdatePromises.push(
-//                 updateJobCardPartsUsed(jobCardId, allPartsUsed)
-//               );
-//             }
-//           });
-//         }
-  
-//         // Process each task assignment
-//         const assignmentPromises = taskAssignments.map(async (assignment) => {
-//           const payload = {
-//             jobCardIds: targetJobCardIds,
-//             tasks: assignment.tasks.map(task => ({
-//               taskId: task.id || task.taskId,
-//               name: task.name || task.taskName,
-//               duration: task.duration || `${task.taskDuration} minutes`,
-//               category: task.category,
-//               description: task.description
-//             })),
-//             parts: assignment.parts.map(part => ({
-//               partId: part._id,
-//               partName: part.partName,
-//               quantity: part.selectedQuantity || 1
-//             })),
-//             priority: assignment.priority,
-//             notes: assignment.notes
-//           };
-  
-//           console.log(`Assigning to engineer ${assignment.engineer._id}:`, payload);
-          
-//           return axios.put(
-//             `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
-//             payload,
-//             {
-//               headers: {
-//                 'Content-Type': 'application/json',
-//               }
-//             }
-//           );
-//         });
-  
-//         // Execute job card updates first (if any parts are selected)
-//         if (jobCardUpdatePromises.length > 0) {
-//           console.log('Updating job cards with parts used...');
-//           await Promise.all(jobCardUpdatePromises);
-//           console.log('Job cards updated successfully');
-//         }
-  
-//         // Execute all task assignments
-//         console.log('Assigning tasks to engineers...');
-//         const results = await Promise.all(assignmentPromises);
-        
-//         console.log('All assignments completed:', results.map(r => r.data));
-//         console.log('Parts used in job cards:', allPartsUsed);
-//         console.log('Inventory updated for parts:', partUpdates);
-        
-//         setSuccess(true);
-//         setTimeout(() => {
-//           navigate(`/Work-In-Progress/${id}`);
-//         }, 2000);
-        
-//       } catch (err) {
-//         console.error('Assignment error:', err.response?.data || err.message);
-//         setError(err.response?.data?.message || err.message || 'Failed to assign tasks to engineers');
-//       } finally {
-//         setIsSubmitting(false);
-//       }
-//     };
-
-//   // Handle Add Task
-//   const handleAddTask = () => {
-//     if (!newTask.taskName.trim() || !newTask.taskDuration.trim()) {
-//       setTaskError('Please fill in task name and duration');
-//       return;
+//       console.log('All assignments completed:', results.map(r => r.data));
+//       console.log('Job details updated:', jobDetailsString);
+//       console.log('Parts used in job cards:', allPartsUsed);
+//       console.log('Inventory updated for parts:', partUpdates);
+      
+//       setSuccess(true);
+//       setTimeout(() => {
+//         navigate(`/Work-In-Progress/${id}`);
+//       }, 2000);
+      
+//     } catch (err) {
+//       console.error('Assignment error:', err.response?.data || err.message);
+//       setError(err.response?.data?.message || err.message || 'Failed to assign to engineers');
+//     } finally {
+//       setIsSubmitting(false);
 //     }
-
-//     if (isNaN(parseInt(newTask.taskDuration)) || parseInt(newTask.taskDuration) <= 0) {
-//       setTaskError('Duration must be a positive number in minutes');
-//       return;
-//     }
-
-//     createTask(newTask);
-//   };
-
-//   // Handle Edit Task
-//   const handleEditTask = () => {
-//     if (!editingTask.taskName.trim() || !editingTask.taskDuration.toString().trim()) {
-//       setTaskError('Please fill in task name and duration');
-//       return;
-//     }
-
-//     if (isNaN(parseInt(editingTask.taskDuration)) || parseInt(editingTask.taskDuration) <= 0) {
-//       setTaskError('Duration must be a positive number in minutes');
-//       return;
-//     }
-
-//     updateTask(editingTask.id || editingTask.taskId, editingTask);
-//   };
-
-  
-
-//   // Handle Task Menu Actions
-//   const handleTaskMenuOpen = (event, task) => {
-//     setTaskMenuAnchor(event.currentTarget);
-//     setSelectedTaskForMenu(task);
-//   };
-
-//   const handleTaskMenuClose = () => {
-//     setTaskMenuAnchor(null);
-//     setSelectedTaskForMenu(null);
-//   };
-
-//   const handleEditTaskClick = () => {
-//     setEditingTask({
-//       ...selectedTaskForMenu,
-//       taskName: selectedTaskForMenu.name || selectedTaskForMenu.taskName,
-//       taskDuration: selectedTaskForMenu.taskDuration || 
-//                    (selectedTaskForMenu.duration ? 
-//                     parseInt(selectedTaskForMenu.duration.match(/\d+/)[0]) : 60)
-//     });
-//     setOpenEditTaskDialog(true);
-//     handleTaskMenuClose();
-//   };
-
-//   const handleDeleteTaskClick = () => {
-//     if (window.confirm(`Are you sure you want to delete "${selectedTaskForMenu.name || selectedTaskForMenu.taskName}"?`)) {
-//       deleteTask(selectedTaskForMenu.id || selectedTaskForMenu.taskId);
-//     }
-//     handleTaskMenuClose();
 //   };
 
 //   // Add New Engineer
@@ -1005,6 +891,10 @@
 //     setFormErrors({});
 //   };
 
+//   const handleCloseSnackbar = () => {
+//     setSnackbar(prev => ({ ...prev, open: false }));
+//   };
+
 //   const handleCloseAddEngineerDialog = () => {
 //     setOpenAddEngineerDialog(false);
 //     setEngineerAddError(null);
@@ -1078,7 +968,24 @@
 //         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
 //       >
 //         <Alert severity="success" onClose={() => setSuccess(false)}>
-//           Tasks assigned successfully to engineers!
+//           Assignment completed successfully!
+//         </Alert>
+//       </Snackbar>
+
+//       {/* Form Data Snackbar */}
+//       <Snackbar
+//         open={snackbar.open}
+//         autoHideDuration={6000}
+//         onClose={handleCloseSnackbar}
+//         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+//       >
+//         <Alert
+//           onClose={handleCloseSnackbar}
+//           severity={snackbar.severity}
+//           variant="filled"
+//           sx={{ width: '100%' }}
+//         >
+//           {snackbar.message}
 //         </Alert>
 //       </Snackbar>
 
@@ -1104,36 +1011,33 @@
 //           }}>
 //             <Box sx={{ display: 'flex', alignItems: 'center' }}>
 //               <IconButton 
-//                 onClick={() => navigate(-1)} 
+//                 onClick={() => navigate(`/jobs/${id}`)} 
 //                 sx={{ mr: 2 }}
 //                 aria-label="Go back"
 //               >
 //                 <ArrowBackIcon />
 //               </IconButton>
 //               <Typography variant="h5" fontWeight={600}>
-//                 Assign Multiple Tasks to Engineers
+//                 Assign Engineer & Job Details
 //               </Typography>
+//               {fetchingData && (
+//                 <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+//                   <CircularProgress size={20} />
+//                   <Typography variant="body2" sx={{ ml: 1 }}>
+//                     Loading job card data...
+//                   </Typography>
+//                 </Box>
+//               )}
+//               {jobCardDataTemp && (
+//                 <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
+//                   <CircularProgress size={20} />
+//                   <Typography variant="body2" sx={{ ml: 1 }}>
+//                     Setting up engineer and parts...
+//                   </Typography>
+//                 </Box>
+//               )}
 //             </Box>
 //             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-//               <Button
-//                 variant="outlined"
-//                 color="primary"
-//                 startIcon={<RefreshIcon />}
-//                 onClick={fetchTasks}
-//                 size="small"
-//                 disabled={isLoadingTasks}
-//               >
-//                 Refresh Tasks
-//               </Button>
-//               <Button
-//                 variant="outlined"
-//                 color="primary"
-//                 startIcon={<AddIcon />}
-//                 onClick={() => setOpenAddTaskDialog(true)}
-//                 size="small"
-//               >
-//                 Add Task
-//               </Button>
 //               <Button
 //                 variant="contained"
 //                 color="primary"
@@ -1146,17 +1050,25 @@
 //             </Box>
 //           </Box>
 
-//           {/* Task Assignment Summary */}
+//           {/* Assignment Summary */}
 //           <Card sx={{ mb: 3, borderRadius: 2 }}>
 //             <CardContent>
 //               <Typography variant="h6" sx={{ mb: 2 }}>
 //                 Assignment Summary
+//                 {isEditMode && (
+//                   <Chip 
+//                     label="Editing Existing Job Card" 
+//                     color="info" 
+//                     size="small" 
+//                     sx={{ ml: 2 }}
+//                   />
+//                 )}
 //               </Typography>
 //               <Grid container spacing={2}>
 //                 <Grid item xs={12} sm={3}>
 //                   <Box sx={{ textAlign: 'center' }}>
 //                     <Typography variant="h4" color="primary">
-//                       {taskAssignments.length}
+//                       {assignments.length}
 //                     </Typography>
 //                     <Typography variant="body2" color="text.secondary">
 //                       Total Assignments
@@ -1166,17 +1078,17 @@
 //                 <Grid item xs={12} sm={3}>
 //                   <Box sx={{ textAlign: 'center' }}>
 //                     <Typography variant="h4" color="primary">
-//                       {taskAssignments.reduce((total, assignment) => total + assignment.tasks.length, 0)}
+//                       {jobPoints.filter(point => point.trim()).length}
 //                     </Typography>
 //                     <Typography variant="body2" color="text.secondary">
-//                       Total Tasks
+//                       Job Details Points
 //                     </Typography>
 //                   </Box>
 //                 </Grid>
 //                 <Grid item xs={12} sm={3}>
 //                   <Box sx={{ textAlign: 'center' }}>
 //                     <Typography variant="h4" color="primary">
-//                       {new Set(taskAssignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
+//                       {new Set(assignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
 //                     </Typography>
 //                     <Typography variant="body2" color="text.secondary">
 //                       Engineers Assigned
@@ -1186,19 +1098,49 @@
 //                 <Grid item xs={12} sm={3}>
 //                   <Box sx={{ textAlign: 'center' }}>
 //                     <Typography variant="h4" color="primary">
-//                       {availableTasks.length}
+//                       {assignments.reduce((total, assignment) => total + assignment.parts.length, 0)}
 //                     </Typography>
 //                     <Typography variant="body2" color="text.secondary">
-//                       Available Tasks
+//                       Parts Selected
 //                     </Typography>
 //                   </Box>
 //                 </Grid>
 //               </Grid>
               
+//               {/* Pre-loaded Engineer Info */}
+//               {isEditMode && assignments[0]?.engineer && (
+//                 <>
+//                   <Divider sx={{ my: 2 }} />
+//                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, color: 'info.main' }}>
+//                     📋 Pre-loaded from Job Card:
+//                   </Typography>
+//                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+//                     <Typography variant="body2" color="text.secondary">
+//                       👤 Engineer:
+//                     </Typography>
+//                     <Chip
+//                       label={assignments[0].engineer.name}
+//                       color="primary"
+//                       size="small"
+//                     />
+//                   </Box>
+//                   {assignments[0].notes && (
+//                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+//                       <Typography variant="body2" color="text.secondary">
+//                         💬 Engineer Remarks:
+//                       </Typography>
+//                       <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+//                         "{assignments[0].notes}"
+//                       </Typography>
+//                     </Box>
+//                   )}
+//                 </>
+//               )}
+              
 //               {/* Parts Summary */}
 //               {(() => {
 //                 const allPartsUsed = [];
-//                 taskAssignments.forEach(assignment => {
+//                 assignments.forEach(assignment => {
 //                   assignment.parts.forEach(part => {
 //                     const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
 //                     const selectedQuantity = part.selectedQuantity || 1;
@@ -1216,21 +1158,24 @@
 //                     <>
 //                       <Divider sx={{ my: 2 }} />
 //                       <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-//                         Parts to be Updated in Job Card{jobCardIds.length > 1 ? 's' : ''}:
+//                         {isEditMode ? '🔧 Parts from Job Card:' : '🔧 Parts to be Updated in Job Card:'}
 //                       </Typography>
 //                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
 //                         {allPartsUsed.map((part, index) => (
 //                           <Chip
 //                             key={index}
 //                             label={`${part.partName} (Qty: ${part.quantity})`}
-//                             color="info"
+//                             color={isEditMode ? "secondary" : "info"}
 //                             variant="outlined"
 //                             size="small"
 //                           />
 //                         ))}
 //                       </Box>
 //                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-//                         These parts will be added to the partsUsed field in job card{jobCardIds.length > 1 ? 's' : ''}: {(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}
+//                         {isEditMode 
+//                           ? `These parts were previously used in job card: ${id}`
+//                           : `These parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
+//                         }
 //                       </Typography>
 //                     </>
 //                   );
@@ -1240,27 +1185,94 @@
 //             </CardContent>
 //           </Card>
 
+//           {/* Job Details Section */}
+//           <Card sx={{ mb: 3, borderRadius: 2 }}>
+//             <CardContent>
+//               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details (Point-wise)</Typography>
+//               <Paper sx={{ p: 3, border: `1px solid`, borderColor: 'divider', borderRadius: 2 }}>
+//                 <Grid container spacing={3}>
+//                   <Grid item xs={12}>
+//                     <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+//                       <TextField
+//                         fullWidth
+//                         placeholder="Enter job detail point..."
+//                         value={currentJobPoint}
+//                         onChange={(e) => setCurrentJobPoint(e.target.value)}
+//                         onKeyPress={handleJobPointKeyPress}
+//                         InputProps={{
+//                           startAdornment: (
+//                             <InputAdornment position="start">
+//                               <DescriptionIcon />
+//                             </InputAdornment>
+//                           ),
+//                         }}
+//                       />
+//                       <Button
+//                         variant="contained"
+//                         onClick={addJobPoint}
+//                         disabled={!currentJobPoint.trim()}
+//                         startIcon={<AddIcon />}
+//                         sx={{ minWidth: 120 }}
+//                       >
+//                         Add Point
+//                       </Button>
+//                     </Box>
+
+//                     {jobPoints.filter(point => point.trim()).length > 0 && (
+//                       <Box sx={{ mt: 2 }}>
+//                         <Typography variant="subtitle2" gutterBottom>Job Details Points:</Typography>
+//                         <List sx={{ bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+//                           {jobPoints.map((point, index) => (
+//                             point.trim() && (
+//                               <ListItem key={index} divider>
+//                                 <ListItemText primary={`${index + 1}. ${point}`} sx={{ wordBreak: 'break-word' }} />
+//                                 <ListItemSecondaryAction>
+//                                   <IconButton edge="end" onClick={() => removeJobPoint(index)} color="error">
+//                                     <DeleteIcon />
+//                                   </IconButton>
+//                                 </ListItemSecondaryAction>
+//                               </ListItem>
+//                             )
+//                           ))}
+//                         </List>
+//                       </Box>
+//                     )}
+
+//                     {jobPoints.filter(point => point.trim()).length > 0 && (
+//                       <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+//                         <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API):</Typography>
+//                         <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
+//                           {getJobDetailsForAPI()}
+//                         </Typography>
+//                       </Box>
+//                     )}
+//                   </Grid>
+//                 </Grid>
+//               </Paper>
+//             </CardContent>
+//           </Card>
+
 //           {/* Main Form Card */}
 //           <Card sx={{ mb: 4, borderRadius: 2 }}>
 //             <CardContent>
 //               <form onSubmit={handleSubmit}>
 //                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 //                   <Typography variant="h6" fontWeight={600}>
-//                     Task Assignments
+//                     Engineer Assignments
 //                   </Typography>
-//                   <Button
+//                   {/* <Button
 //                     variant="outlined"
 //                     color="primary"
 //                     startIcon={<AddIcon />}
-//                     onClick={addTaskAssignment}
+//                     onClick={addAssignment}
 //                     size="small"
 //                   >
 //                     Add Assignment
-//                   </Button>
+//                   </Button> */}
 //                 </Box>
 
-//                 {/* Task Assignments */}
-//                 {taskAssignments.map((assignment, index) => (
+//                 {/* Assignments */}
+//                 {assignments.map((assignment, index) => (
 //                   <Accordion 
 //                     key={assignment.id} 
 //                     defaultExpanded 
@@ -1279,26 +1291,26 @@
 //                               color="primary"
 //                             />
 //                           )}
-//                           {assignment.tasks.length > 0 && (
-//                             <Chip 
-//                               label={`${assignment.tasks.length} tasks`} 
-//                               size="small" 
-//                               sx={{ ml: 1 }} 
-//                               color="secondary"
-//                             />
-//                           )}
 //                           <Chip 
 //                             label={assignment.priority} 
 //                             size="small" 
 //                             sx={{ ml: 1 }} 
 //                             color={getPriorityColor(assignment.priority)}
 //                           />
+//                           {assignment.parts.length > 0 && (
+//                             <Chip 
+//                               label={`${assignment.parts.length} parts`} 
+//                               size="small" 
+//                               sx={{ ml: 1 }} 
+//                               color="info"
+//                             />
+//                           )}
 //                         </Typography>
-//                         {taskAssignments.length > 1 && (
+//                         {assignments.length > 1 && (
 //                           <IconButton
 //                             onClick={(e) => {
 //                               e.stopPropagation();
-//                               removeTaskAssignment(assignment.id);
+//                               removeAssignment(assignment.id);
 //                             }}
 //                             size="small"
 //                             color="error"
@@ -1327,7 +1339,7 @@
 //                               getOptionLabel={(option) => option.name || ''}
 //                               value={assignment.engineer}
 //                               onChange={(event, newValue) => {
-//                                 updateTaskAssignment(assignment.id, 'engineer', newValue);
+//                                 updateAssignment(assignment.id, 'engineer', newValue);
 //                               }}
 //                               renderInput={(params) => (
 //                                 <TextField
@@ -1353,6 +1365,11 @@
 //                               noOptionsText="No engineers available"
 //                             />
 //                           )}
+//                           {assignment.engineer && isEditMode && (
+//                             <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
+//                               ✅ This engineer was pre-selected from the job card
+//                             </Typography>
+//                           )}
 //                         </Grid>
 
 //                         {/* Priority Selection */}
@@ -1363,89 +1380,13 @@
 //                           <FormControl fullWidth>
 //                             <Select
 //                               value={assignment.priority}
-//                               onChange={(e) => updateTaskAssignment(assignment.id, 'priority', e.target.value)}
+//                               onChange={(e) => updateAssignment(assignment.id, 'priority', e.target.value)}
 //                             >
 //                               <MenuItem value="low">Low</MenuItem>
 //                               <MenuItem value="medium">Medium</MenuItem>
 //                               <MenuItem value="high">High</MenuItem>
 //                             </Select>
 //                           </FormControl>
-//                         </Grid>
-
-//                         {/* Task Selection */}
-//                         <Grid item xs={12}>
-//                           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-//                             Select Tasks *
-//                           </Typography>
-//                           {isLoadingTasks ? (
-//                             <Box sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
-//                               <CircularProgress size={20} />
-//                               <Typography sx={{ ml: 1 }}>Loading tasks...</Typography>
-//                             </Box>
-//                           ) : (
-//                             <Autocomplete
-//                               multiple
-//                               fullWidth
-//                               options={availableTasks}
-//                               getOptionLabel={(option) => 
-//                                 `${option.name || option.taskName} - ${option.category}`
-//                               }
-//                               value={assignment.tasks}
-//                               onChange={(event, newValue) => {
-//                                 updateTaskAssignment(assignment.id, 'tasks', newValue);
-//                               }}
-//                               renderTags={(value, getTagProps) =>
-//                                 value.map((option, index) => (
-//                                   <Chip
-//                                     variant="outlined"
-//                                     label={`${option.name || option.taskName}`}
-//                                     {...getTagProps({ index })}
-//                                     key={option.id || option.taskId}
-//                                   />
-//                                 ))
-//                               }
-//                               renderOption={(props, option) => (
-//                                 <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-//                                   <Box>
-//                                     <Typography variant="body2">
-//                                       {option.name || option.taskName} 
-//                                     </Typography>
-//                                   </Box>
-//                                   <IconButton
-//                                     size="small"
-//                                     onClick={(e) => {
-//                                       e.stopPropagation();
-//                                       handleTaskMenuOpen(e, option);
-//                                     }}
-//                                   >
-//                                     <MoreVertIcon fontSize="small" />
-//                                   </IconButton>
-//                                 </Box>
-//                               )}
-//                               renderInput={(params) => (
-//                                 <TextField
-//                                   {...params}
-//                                   placeholder="Select multiple tasks"
-//                                   variant="outlined"
-//                                   error={!!formErrors[`assignment_${assignment.id}_tasks`]}
-//                                   helperText={formErrors[`assignment_${assignment.id}_tasks`]}
-//                                   InputProps={{
-//                                     ...params.InputProps,
-//                                     startAdornment: (
-//                                       <>
-//                                         <InputAdornment position="start">
-//                                           <AssignmentIcon color="action" />
-//                                         </InputAdornment>
-//                                         {params.InputProps.startAdornment}
-//                                       </>
-//                                     ),
-//                                   }}
-//                                 />
-//                               )}
-//                               groupBy={(option) => option.category}
-//                               noOptionsText="No tasks available"
-//                             />
-//                           )}
 //                         </Grid>
 
 //                         {/* Parts Selection with Quantity Management */}
@@ -1527,7 +1468,7 @@
 //                               renderInput={(params) => (
 //                                 <TextField
 //                                   {...params}
-//                                   placeholder="Select parts needed for these tasks"
+//                                   placeholder="Select parts needed"
 //                                   variant="outlined"
 //                                   InputProps={{
 //                                     ...params.InputProps,
@@ -1561,6 +1502,14 @@
 //                             <Box sx={{ mt: 2 }}>
 //                               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
 //                                 Selected Parts with Details:
+//                                 {isEditMode && (
+//                                   <Chip 
+//                                     label="Pre-loaded from Job Card" 
+//                                     size="small" 
+//                                     color="secondary" 
+//                                     sx={{ ml: 1 }}
+//                                   />
+//                                 )}
 //                               </Typography>
 //                               <List dense>
 //                                 {assignment.parts.map((part, partIndex) => {
@@ -1744,7 +1693,7 @@
 //                         </Grid>
 
 //                         {/* Notes */}
-//                         <Grid item xs={12}>
+//                         {/* <Grid item xs={12}>
 //                           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
 //                             Additional Notes
 //                           </Typography>
@@ -1754,40 +1703,14 @@
 //                             rows={3}
 //                             placeholder="Add any special instructions or notes for this assignment..."
 //                             value={assignment.notes}
-//                             onChange={(e) => updateTaskAssignment(assignment.id, 'notes', e.target.value)}
+//                             onChange={(e) => updateAssignment(assignment.id, 'notes', e.target.value)}
 //                           />
-//                         </Grid>
-
-//                         {/* Task Details Summary */}
-//                         {assignment.tasks.length > 0 && (
-//                           <Grid item xs={12}>
-//                             <Divider sx={{ my: 2 }} />
-//                             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-//                               Selected Tasks Details
+//                           {assignment.notes && isEditMode && (
+//                             <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
+//                               💬 Note: Pre-filled with engineer remarks from job card
 //                             </Typography>
-//                             <List dense>
-//                               {assignment.tasks.map((task, taskIndex) => (
-//                                 <ListItem key={task.id || task.taskId} sx={{ py: 0.5 }}>
-//                                   <ListItemText
-//                                     primary={
-//                                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-//                                         <Typography variant="body2" fontWeight={500}>
-//                                           {task.name || task.taskName}
-//                                         </Typography>
-//                                         <Chip 
-//                                           label={task.category} 
-//                                           size="small" 
-//                                           color="secondary"
-//                                         />
-//                                       </Box>
-//                                     }
-//                                     secondary={task.description}
-//                                   />
-//                                 </ListItem>
-//                               ))}
-//                             </List>
-//                           </Grid>
-//                         )}
+//                           )}
+//                         </Grid> */}
 //                       </Grid>
 //                     </AccordionDetails>
 //                   </Accordion>
@@ -1804,210 +1727,13 @@
 //                     disabled={isSubmitting || isLoading}
 //                     sx={{ px: 6, py: 1.5, textTransform: 'uppercase' }}
 //                   >
-//                     {isSubmitting ? 'Assigning Tasks...' : 'Assign All Tasks to Engineers'}
+//                     {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}
 //                   </Button>
 //                 </Box>
 //               </form>
 //             </CardContent>
 //           </Card>
 //         </Container>
-
-//         {/* Task Context Menu */}
-//         <Menu
-//           anchorEl={taskMenuAnchor}
-//           open={Boolean(taskMenuAnchor)}
-//           onClose={handleTaskMenuClose}
-//         >
-//           <MenuItem onClick={handleEditTaskClick}>
-//             <ListItemIcon>
-//               <EditIcon fontSize="small" />
-//             </ListItemIcon>
-//             Edit Task
-//           </MenuItem>
-//           <MenuItem onClick={handleDeleteTaskClick} sx={{ color: 'error.main' }}>
-//             <ListItemIcon>
-//               <DeleteIcon fontSize="small" color="error" />
-//             </ListItemIcon>
-//             Delete Task
-//           </MenuItem>
-//         </Menu>
-
-//         {/* Add Task Dialog */}
-//         <Dialog 
-//           open={openAddTaskDialog} 
-//           onClose={() => {
-//             setOpenAddTaskDialog(false);
-//             setTaskError(null);
-//             setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-//           }}
-//           maxWidth="sm"
-//           fullWidth
-//         >
-//           <DialogTitle>Add New Task</DialogTitle>
-//           <DialogContent>
-//             {taskError && (
-//               <Alert severity="error" sx={{ mb: 2 }}>
-//                 {taskError}
-//               </Alert>
-//             )}
-            
-//             <Grid container spacing={2} sx={{ mt: 1 }}>
-//               <Grid item xs={12}>
-//                 <TextField 
-//                   fullWidth 
-//                   label="Task Name *" 
-//                   value={newTask.taskName} 
-//                   onChange={(e) => {
-//                     setNewTask(prev => ({ ...prev, taskName: e.target.value }));
-//                     if (taskError) setTaskError(null);
-//                   }}
-//                   error={!newTask.taskName.trim() && !!taskError}
-//                 />
-//               </Grid>
-//               <Grid item xs={12}>
-//                 <TextField 
-//                   fullWidth 
-//                   label="Duration (minutes) *" 
-//                   type="number"
-//                   value={newTask.taskDuration} 
-//                   onChange={(e) => {
-//                     setNewTask(prev => ({ ...prev, taskDuration: e.target.value }));
-//                     if (taskError) setTaskError(null);
-//                   }}
-//                   placeholder="e.g., 120"
-//                   inputProps={{ min: 1 }}
-//                   error={!newTask.taskDuration.trim() && !!taskError}
-//                 />
-//               </Grid>
-//             </Grid>
-//           </DialogContent>
-//           <DialogActions>
-//             <Button 
-//               onClick={() => {
-//                 setOpenAddTaskDialog(false);
-//                 setTaskError(null);
-//                 setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-//               }}
-//               disabled={addingTask}
-//             >
-//               Cancel
-//             </Button>
-//             <Button 
-//               onClick={handleAddTask} 
-//               variant="contained"
-//               disabled={addingTask || !newTask.taskName.trim()}
-//               startIcon={addingTask ? <CircularProgress size={16} color="inherit" /> : null}
-//             >
-//               {addingTask ? 'Creating...' : 'Create Task'}
-//             </Button>
-//           </DialogActions>
-//         </Dialog>
-
-//         {/* Edit Task Dialog */}
-//         <Dialog 
-//           open={openEditTaskDialog} 
-//           onClose={() => {
-//             setOpenEditTaskDialog(false);
-//             setTaskError(null);
-//             setEditingTask(null);
-//           }}
-//           maxWidth="sm"
-//           fullWidth
-//         >
-//           <DialogTitle>Edit Task</DialogTitle>
-//           <DialogContent>
-//             {taskError && (
-//               <Alert severity="error" sx={{ mb: 2 }}>
-//                 {taskError}
-//               </Alert>
-//             )}
-            
-//             {editingTask && (
-//               <Grid container spacing={2} sx={{ mt: 1 }}>
-//                 <Grid item xs={12}>
-//                   <TextField 
-//                     fullWidth 
-//                     label="Task Name *" 
-//                     value={editingTask.taskName} 
-//                     onChange={(e) => {
-//                       setEditingTask(prev => ({ ...prev, taskName: e.target.value }));
-//                       if (taskError) setTaskError(null);
-//                     }}
-//                     error={!editingTask.taskName.trim() && !!taskError}
-//                   />
-//                 </Grid>
-//                 <Grid item xs={12} sm={6}>
-//                   <TextField 
-//                     fullWidth 
-//                     label="Duration (minutes) *" 
-//                     type="number"
-//                     value={editingTask.taskDuration} 
-//                     onChange={(e) => {
-//                       setEditingTask(prev => ({ ...prev, taskDuration: e.target.value }));
-//                       if (taskError) setTaskError(null);
-//                     }}
-//                     placeholder="e.g., 120"
-//                     inputProps={{ min: 1 }}
-//                     error={!editingTask.taskDuration.toString().trim() && !!taskError}
-//                   />
-//                 </Grid>
-//                 <Grid item xs={12} sm={6}>
-//                   <FormControl fullWidth>
-//                     <InputLabel>Category</InputLabel>
-//                     <Select
-//                       value={editingTask.category || 'general'}
-//                       label="Category"
-//                       onChange={(e) => setEditingTask(prev => ({ ...prev, category: e.target.value }))}
-//                     >
-//                       <MenuItem value="general">General</MenuItem>
-//                       <MenuItem value="engine">Engine</MenuItem>
-//                       <MenuItem value="brakes">Brakes</MenuItem>
-//                       <MenuItem value="maintenance">Maintenance</MenuItem>
-//                       <MenuItem value="tires">Tires</MenuItem>
-//                       <MenuItem value="hvac">HVAC</MenuItem>
-//                       <MenuItem value="electrical">Electrical</MenuItem>
-//                       <MenuItem value="transmission">Transmission</MenuItem>
-//                       <MenuItem value="suspension">Suspension</MenuItem>
-//                       <MenuItem value="exhaust">Exhaust</MenuItem>
-//                       <MenuItem value="diagnostic">Diagnostic</MenuItem>
-//                     </Select>
-//                   </FormControl>
-//                 </Grid>
-//                 <Grid item xs={12}>
-//                   <TextField 
-//                     fullWidth 
-//                     label="Description" 
-//                     multiline
-//                     rows={3}
-//                     value={editingTask.description || ''} 
-//                     onChange={(e) => setEditingTask(prev => ({ ...prev, description: e.target.value }))}
-//                     placeholder="Describe the task in detail..."
-//                   />
-//                 </Grid>
-//               </Grid>
-//             )}
-//           </DialogContent>
-//           <DialogActions>
-//             <Button 
-//               onClick={() => {
-//                 setOpenEditTaskDialog(false);
-//                 setTaskError(null);
-//                 setEditingTask(null);
-//               }}
-//               disabled={updatingTask}
-//             >
-//               Cancel
-//             </Button>
-//             <Button 
-//               onClick={handleEditTask} 
-//               variant="contained"
-//               disabled={updatingTask || !editingTask?.taskName?.trim() || !editingTask?.taskDuration?.toString()?.trim()}
-//               startIcon={updatingTask ? <CircularProgress size={16} color="inherit" /> : null}
-//             >
-//               {updatingTask ? 'Updating...' : 'Update Task'}
-//             </Button>
-//           </DialogActions>
-//         </Dialog>
 
 //         {/* Add Part Dialog */}
 //         <Dialog 
@@ -2237,23 +1963,20 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Menu,
-  ListItemIcon
+  Paper,
+  useTheme
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Person as PersonIcon,
-  Assignment as AssignmentIcon,
   Inventory as InventoryIcon,
   Send as SendIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
   DragIndicator as DragIcon,
   ExpandMore as ExpandMoreIcon,
-  Schedule as ScheduleIcon,
-  Edit as EditIcon,
-  MoreVert as MoreVertIcon,
-  Refresh as RefreshIcon
+  Description as DescriptionIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -2262,6 +1985,7 @@ const API_BASE_URL = 'https://garage-management-zi5z.onrender.com/api';
 
 const AssignEngineer = () => {
   const { darkMode } = useThemeContext();
+  const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -2272,11 +1996,10 @@ const AssignEngineer = () => {
 
   // Main State
   const [engineers, setEngineers] = useState([]);
-  const [taskAssignments, setTaskAssignments] = useState([
+  const [assignments, setAssignments] = useState([
     {
       id: Date.now(),
       engineer: null,
-      tasks: [],
       parts: [],
       priority: 'medium',
       estimatedDuration: '',
@@ -2284,15 +2007,17 @@ const AssignEngineer = () => {
     }
   ]);
   const [inventoryParts, setInventoryParts] = useState([]);
-  const [availableTasks, setAvailableTasks] = useState([]);
   const [jobCardIds, setJobCardIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
-  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+
+  // Job Details Points State
+  const [jobPoints, setJobPoints] = useState(['']);
+  const [currentJobPoint, setCurrentJobPoint] = useState('');
 
   // Add Part Dialog States
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -2323,24 +2048,6 @@ const AssignEngineer = () => {
   const [addingEngineer, setAddingEngineer] = useState(false);
   const [engineerAddSuccess, setEngineerAddSuccess] = useState(false);
   const [engineerAddError, setEngineerAddError] = useState(null);
-
-  // Add/Edit Task Dialog States
-  const [openAddTaskDialog, setOpenAddTaskDialog] = useState(false);
-  const [openEditTaskDialog, setOpenEditTaskDialog] = useState(false);
-  const [newTask, setNewTask] = useState({
-    taskName: "",
-    taskDuration: "1",
-    description: "",
-    category: "general"
-  });
-  const [editingTask, setEditingTask] = useState(null);
-  const [addingTask, setAddingTask] = useState(false);
-  const [updatingTask, setUpdatingTask] = useState(false);
-  const [taskError, setTaskError] = useState(null);
-
-  // Task Menu State
-  const [taskMenuAnchor, setTaskMenuAnchor] = useState(null);
-  const [selectedTaskForMenu, setSelectedTaskForMenu] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -2421,7 +2128,7 @@ const AssignEngineer = () => {
 
     // Calculate total selected quantity across all assignments
     let totalSelected = 0;
-    taskAssignments.forEach(assignment => {
+    assignments.forEach(assignment => {
       assignment.parts.forEach(part => {
         if (part._id === partId) {
           totalSelected += part.selectedQuantity || 1;
@@ -2476,70 +2183,6 @@ const AssignEngineer = () => {
     setJobCardIds(initialJobCardIds);
   }, [id, jobCardId]);
 
-  // Fetch Tasks from API
-  const fetchTasks = useCallback(async () => {
-    if (!garageToken) {
-      setError('No authentication token found');
-      return;
-    }
-    
-    try {
-      setIsLoadingTasks(true);
-      setError(null);
-      
-      const response = await apiCall('/garage/gettask', { method: 'GET' });
-      
-      console.log('API Response:', response.data);
-      
-      let tasks = [];
-      
-      if (response.data && response.data.tasks && Array.isArray(response.data.tasks)) {
-        tasks = response.data.tasks;
-      } 
-      else if (Array.isArray(response.data)) {
-        tasks = response.data;
-      }
-      else {
-        console.log('No tasks found in response:', response.data);
-        tasks = [];
-      }
-      
-      const transformedTasks = tasks.map(task => ({
-        id: task._id,
-        taskId: task._id,
-        name: task.taskName,
-        taskName: task.taskName,
-        duration: `${task.taskDuration} minutes`,
-        taskDuration: task.taskDuration,
-        category: task.category || 'general',
-        description: task.description || `Task: ${task.taskName}`
-      }));
-      
-      setAvailableTasks(transformedTasks);
-      
-      if (transformedTasks.length === 0) {
-        console.log('No tasks available. You can create new tasks using the "Add Task" button.');
-      }
-      
-    } catch (err) {
-      console.error('Failed to fetch tasks:', err);
-      
-      if (err.response?.status === 401) {
-        setError('Authentication failed. Please log in again.');
-      } else if (err.response?.status === 404) {
-        setError('Tasks endpoint not found. Please check the API configuration.');
-      } else if (err.response?.status >= 500) {
-        setError('Server error. Please try again later.');
-      } else {
-        setError(err.response?.data?.message || 'Failed to load tasks');
-      }
-      
-      setAvailableTasks([]);
-    } finally {
-      setIsLoadingTasks(false);
-    }
-  }, [garageToken, apiCall]);
-
   // Fetch Engineers
   const fetchEngineers = useCallback(async () => {
     if (!garageId) {
@@ -2562,15 +2205,14 @@ const AssignEngineer = () => {
   useEffect(() => {
     fetchInventoryParts();
     fetchEngineers();
-    fetchTasks();
-  }, [fetchInventoryParts, fetchEngineers, fetchTasks]);
+  }, [fetchInventoryParts, fetchEngineers]);
 
-  // Set task assignments after engineers and inventory are loaded
+  // Set assignments after engineers and inventory are loaded
   useEffect(() => {
     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
-      console.log('🔄 Setting task assignments with job card data:', jobCardDataTemp);
+      console.log('🔄 Setting assignments with job card data:', jobCardDataTemp);
       
-      // Set engineer and parts in task assignments if they exist
+      // Set engineer and parts in assignments if they exist
       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
         const assignedEngineer = jobCardDataTemp.engineerId[0]; // Get first engineer
         
@@ -2620,22 +2262,21 @@ const AssignEngineer = () => {
             });
           }
 
-          // Update the first task assignment with engineer and parts
-          const newTaskAssignment = {
+          // Update the first assignment with engineer and parts
+          const newAssignment = {
             id: Date.now(),
             engineer: fullEngineerData || assignedEngineer,
-            tasks: [], // Tasks will be empty initially, user can add them
             parts: formattedParts,
             priority: 'medium',
             estimatedDuration: jobCardDataTemp.laborHours ? `${jobCardDataTemp.laborHours} hours` : '',
             notes: jobCardDataTemp.engineerRemarks || ''
           };
 
-          setTaskAssignments([newTaskAssignment]);
+          setAssignments([newAssignment]);
 
           console.log('✅ Successfully set engineer:', fullEngineerData || assignedEngineer);
           console.log('✅ Successfully set parts:', formattedParts);
-          console.log('📋 Task assignment created:', newTaskAssignment);
+          console.log('📋 Assignment created:', newAssignment);
           
           // Clear temp data
           setJobCardDataTemp(null);
@@ -2694,6 +2335,17 @@ const AssignEngineer = () => {
           status: jobCardData.status || 'pending'
         });
 
+        // Set job details points from job card
+        if (jobCardData.jobDetails) {
+          const lines = jobCardData.jobDetails.split('\n');
+          const cleanLines = lines
+            .map(line => line.replace(/^\d+\.\s*/, '').trim()) // Remove number prefix
+            .filter(line => line.length > 0);
+          setJobPoints(cleanLines.length > 0 ? cleanLines : ['']);
+        } else {
+          setJobPoints(['']);
+        }
+
         // Store job card data temporarily to be processed when engineers and parts are loaded
         setJobCardDataTemp(jobCardData);
 
@@ -2717,109 +2369,49 @@ const AssignEngineer = () => {
     fetchJobCardData();
   }, [id]);
 
-  // Create New Task
-  const createTask = async (taskData) => {
-    try {
-      setAddingTask(true);
-      setTaskError(null);
-      
-      const payload = {
-        taskName: taskData.taskName,
-        taskDuration: parseInt(taskData.taskDuration)
-      };
-      
-      const response = await apiCall('/garage/task/create', {
-        method: 'POST',
-        data: payload
-      });
-      
-      await fetchTasks();
-      
-      setOpenAddTaskDialog(false);
-      setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-    } catch (err) {
-      console.error('Create task error:', err);
-      setTaskError(err.response?.data?.message || 'Failed to create task');
-    } finally {
-      setAddingTask(false);
+  // Job Points Management
+  const addJobPoint = () => {
+    if (currentJobPoint.trim()) {
+      setJobPoints(prev => [...prev.filter(point => point.trim()), currentJobPoint.trim()]);
+      setCurrentJobPoint('');
     }
   };
 
-  // Update Task
-  const updateTask = async (taskId, taskData) => {
-    try {
-      setUpdatingTask(true);
-      setTaskError(null);
-      
-      const payload = {
-        taskName: taskData.taskName,
-        taskDuration: parseInt(taskData.taskDuration)
-      };
-      
-      await apiCall(`/garage/task/${taskId}`, {
-        method: 'PUT',
-        data: payload
-      });
-      
-      await fetchTasks();
-      
-      setOpenEditTaskDialog(false);
-      setEditingTask(null);
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-    } catch (err) {
-      console.error('Update task error:', err);
-      setTaskError(err.response?.data?.message || 'Failed to update task');
-    } finally {
-      setUpdatingTask(false);
+  const removeJobPoint = (indexToRemove) => {
+    setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const updateJobPoint = (index, value) => {
+    setJobPoints(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const handleJobPointKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addJobPoint();
     }
   };
 
-  // Delete Task
-  const deleteTask = async (taskId) => {
-    try {
-      await apiCall(`/garage/task/${taskId}`, { method: 'DELETE' });
-      
-      await fetchTasks();
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-    } catch (err) {
-      console.error('Delete task error:', err);
-      setError(err.response?.data?.message || 'Failed to delete task');
+  // FIXED: Only return raw values without index numbers
+  const getJobDetailsForAPI = () => {
+    const validPoints = jobPoints.filter(point => point.trim());
+    return validPoints.join('\n');
+  };
+
+  // Remove assignment
+  const removeAssignment = (assignmentId) => {
+    if (assignments.length > 1) {
+      setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
     }
   };
 
-  // Add new task assignment
-  const addTaskAssignment = () => {
-    setTaskAssignments(prev => [...prev, {
-      id: Date.now(),
-      engineer: null,
-      tasks: [],
-      parts: [],
-      priority: 'medium',
-      estimatedDuration: '',
-      notes: ''
-    }]);
-  };
-
-  // Remove task assignment
-  const removeTaskAssignment = (assignmentId) => {
-    if (taskAssignments.length > 1) {
-      setTaskAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
-    }
-  };
-
-  // Update task assignment
-  const updateTaskAssignment = (assignmentId, field, value) => {
-    setTaskAssignments(prev => prev.map(assignment => 
+  // Update assignment
+  const updateAssignment = (assignmentId, field, value) => {
+    setAssignments(prev => prev.map(assignment => 
       assignment.id === assignmentId 
         ? { ...assignment, [field]: value }
         : assignment
@@ -2859,7 +2451,7 @@ const AssignEngineer = () => {
       }));
 
       // Update the assignment with new parts (local state only)
-      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+      updateAssignment(assignmentId, 'parts', updatedParts);
 
     } catch (err) {
       console.error('Error handling part selection:', err);
@@ -2869,7 +2461,7 @@ const AssignEngineer = () => {
 
   // Handle Part Quantity Change (Local State Only)
   const handlePartQuantityChange = (assignmentId, partIndex, newQuantity, oldQuantity) => {
-    const assignment = taskAssignments.find(a => a.id === assignmentId);
+    const assignment = assignments.find(a => a.id === assignmentId);
     if (!assignment) return;
 
     const part = assignment.parts[partIndex];
@@ -2899,7 +2491,7 @@ const AssignEngineer = () => {
           : p
       );
       
-      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+      updateAssignment(assignmentId, 'parts', updatedParts);
 
       // Clear any previous errors
       if (error && error.includes(part.partName)) {
@@ -2914,7 +2506,7 @@ const AssignEngineer = () => {
 
   // Handle Part Removal (Local State Only)
   const handlePartRemoval = (assignmentId, partIndex) => {
-    const assignment = taskAssignments.find(a => a.id === assignmentId);
+    const assignment = assignments.find(a => a.id === assignmentId);
     if (!assignment) return;
 
     const part = assignment.parts[partIndex];
@@ -2923,7 +2515,7 @@ const AssignEngineer = () => {
     try {
       // Remove part from assignment (local state only)
       const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-      updateTaskAssignment(assignmentId, 'parts', updatedParts);
+      updateAssignment(assignmentId, 'parts', updatedParts);
 
     } catch (err) {
       console.error('Error removing part:', err);
@@ -2935,15 +2527,11 @@ const AssignEngineer = () => {
   const validateForm = () => {
     const errors = {};
     
-    taskAssignments.forEach((assignment, index) => {
+    assignments.forEach((assignment, index) => {
       const assignmentKey = `assignment_${assignment.id}`;
       
       if (!assignment.engineer) {
         errors[`${assignmentKey}_engineer`] = 'Please select an engineer';
-      }
-      
-      if (!assignment.tasks || assignment.tasks.length === 0) {
-        errors[`${assignmentKey}_tasks`] = 'Please select at least one task';
       }
     });
     
@@ -2961,10 +2549,10 @@ const AssignEngineer = () => {
     return true;
   };
 
-  // Update Job Card Parts Used
-  const updateJobCardPartsUsed = async (jobCardId, partsUsed) => {
+  // Update Job Card with Job Details and Parts Used
+  const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
     try {
-      console.log(`Updating job card ${jobCardId} with parts:`, partsUsed);
+      console.log(`Updating job card ${jobCardId} with job details and parts:`, { jobDetails, partsUsed });
       
       // Validate parts data before sending
       const validatedParts = partsUsed.map(part => ({
@@ -2981,6 +2569,7 @@ const AssignEngineer = () => {
       }));
   
       const updatePayload = {
+        jobDetails: jobDetails,
         partsUsed: validatedParts
       };
   
@@ -3015,11 +2604,14 @@ const AssignEngineer = () => {
     setFormErrors({});
 
     try {
+      // Get job details for API
+      const jobDetailsString = getJobDetailsForAPI();
+
       // Collect all parts used across all assignments with enhanced data
       const allPartsUsed = [];
       const partUpdates = []; // Track inventory updates needed
 
-      taskAssignments.forEach(assignment => {
+      assignments.forEach(assignment => {
         assignment.parts.forEach(part => {
           const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
           const selectedQuantity = part.selectedQuantity || 1;
@@ -3069,31 +2661,19 @@ const AssignEngineer = () => {
         }
       }
 
-      // Update job cards with parts used
-      const jobCardUpdatePromises = [];
+      // Update job card with job details and parts used
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
       
-      if (allPartsUsed.length > 0) {
-        targetJobCardIds.forEach(jobCardId => {
-          if (jobCardId) {
-            jobCardUpdatePromises.push(
-              updateJobCardPartsUsed(jobCardId, allPartsUsed)
-            );
-          }
-        });
-      }
+      const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
+        if (jobCardId) {
+          return updateJobCard(jobCardId, jobDetailsString, allPartsUsed);
+        }
+      }).filter(Boolean);
 
-      // Process each task assignment
-      const assignmentPromises = taskAssignments.map(async (assignment) => {
+      // Process each assignment
+      const assignmentPromises = assignments.map(async (assignment) => {
         const payload = {
           jobCardIds: targetJobCardIds,
-          tasks: assignment.tasks.map(task => ({
-            taskId: task.id || task.taskId,
-            name: task.name || task.taskName,
-            duration: task.duration || `${task.taskDuration} minutes`,
-            category: task.category,
-            description: task.description
-          })),
           parts: assignment.parts.map(part => ({
             partId: part._id,
             partName: part.partName,
@@ -3116,18 +2696,19 @@ const AssignEngineer = () => {
         );
       });
 
-      // Execute job card updates first (if any parts are selected)
+      // Execute job card updates first
       if (jobCardUpdatePromises.length > 0) {
-        console.log('Updating job cards with parts used...');
+        console.log('Updating job cards with job details and parts used...');
         await Promise.all(jobCardUpdatePromises);
         console.log('Job cards updated successfully');
       }
 
-      // Execute all task assignments
-      console.log('Assigning tasks to engineers...');
+      // Execute all assignments
+      console.log('Assigning to engineers...');
       const results = await Promise.all(assignmentPromises);
       
       console.log('All assignments completed:', results.map(r => r.data));
+      console.log('Job details updated:', jobDetailsString);
       console.log('Parts used in job cards:', allPartsUsed);
       console.log('Inventory updated for parts:', partUpdates);
       
@@ -3138,70 +2719,10 @@ const AssignEngineer = () => {
       
     } catch (err) {
       console.error('Assignment error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || err.message || 'Failed to assign tasks to engineers');
+      setError(err.response?.data?.message || err.message || 'Failed to assign to engineers');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Handle Add Task
-  const handleAddTask = () => {
-    if (!newTask.taskName.trim() || !newTask.taskDuration.trim()) {
-      setTaskError('Please fill in task name and duration');
-      return;
-    }
-
-    if (isNaN(parseInt(newTask.taskDuration)) || parseInt(newTask.taskDuration) <= 0) {
-      setTaskError('Duration must be a positive number in minutes');
-      return;
-    }
-
-    createTask(newTask);
-  };
-
-  // Handle Edit Task
-  const handleEditTask = () => {
-    if (!editingTask.taskName.trim() || !editingTask.taskDuration.toString().trim()) {
-      setTaskError('Please fill in task name and duration');
-      return;
-    }
-
-    if (isNaN(parseInt(editingTask.taskDuration)) || parseInt(editingTask.taskDuration) <= 0) {
-      setTaskError('Duration must be a positive number in minutes');
-      return;
-    }
-
-    updateTask(editingTask.id || editingTask.taskId, editingTask);
-  };
-
-  // Handle Task Menu Actions
-  const handleTaskMenuOpen = (event, task) => {
-    setTaskMenuAnchor(event.currentTarget);
-    setSelectedTaskForMenu(task);
-  };
-
-  const handleTaskMenuClose = () => {
-    setTaskMenuAnchor(null);
-    setSelectedTaskForMenu(null);
-  };
-
-  const handleEditTaskClick = () => {
-    setEditingTask({
-      ...selectedTaskForMenu,
-      taskName: selectedTaskForMenu.name || selectedTaskForMenu.taskName,
-      taskDuration: selectedTaskForMenu.taskDuration || 
-                   (selectedTaskForMenu.duration ? 
-                    parseInt(selectedTaskForMenu.duration.match(/\d+/)[0]) : 60)
-    });
-    setOpenEditTaskDialog(true);
-    handleTaskMenuClose();
-  };
-
-  const handleDeleteTaskClick = () => {
-    if (window.confirm(`Are you sure you want to delete "${selectedTaskForMenu.name || selectedTaskForMenu.taskName}"?`)) {
-      deleteTask(selectedTaskForMenu.id || selectedTaskForMenu.taskId);
-    }
-    handleTaskMenuClose();
   };
 
   // Add New Engineer
@@ -3377,7 +2898,7 @@ const AssignEngineer = () => {
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert severity="success" onClose={() => setSuccess(false)}>
-          Tasks assigned successfully to engineers!
+          Assignment completed successfully!
         </Alert>
       </Snackbar>
 
@@ -3420,14 +2941,14 @@ const AssignEngineer = () => {
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <IconButton 
-                onClick={() => navigate(-1)} 
+                onClick={() => navigate(`/jobs/${id}`)} 
                 sx={{ mr: 2 }}
                 aria-label="Go back"
               >
                 <ArrowBackIcon />
               </IconButton>
               <Typography variant="h5" fontWeight={600}>
-                Assign Multiple Tasks to Engineers
+                Assign Engineer & Job Details
               </Typography>
               {fetchingData && (
                 <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
@@ -3448,25 +2969,6 @@ const AssignEngineer = () => {
             </Box>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<RefreshIcon />}
-                onClick={fetchTasks}
-                size="small"
-                disabled={isLoadingTasks}
-              >
-                Refresh Tasks
-              </Button>
-              <Button
-                variant="outlined"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenAddTaskDialog(true)}
-                size="small"
-              >
-                Add Task
-              </Button>
-              <Button
                 variant="contained"
                 color="primary"
                 startIcon={<AddIcon />}
@@ -3478,8 +2980,8 @@ const AssignEngineer = () => {
             </Box>
           </Box>
 
-          {/* Task Assignment Summary */}
-          <Card sx={{ mb: 3, borderRadius: 2 }}>
+          {/* Assignment Summary */}
+          <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Assignment Summary
@@ -3496,7 +2998,7 @@ const AssignEngineer = () => {
                 <Grid item xs={12} sm={3}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h4" color="primary">
-                      {taskAssignments.length}
+                      {assignments.length}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Total Assignments
@@ -3506,17 +3008,17 @@ const AssignEngineer = () => {
                 <Grid item xs={12} sm={3}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h4" color="primary">
-                      {taskAssignments.reduce((total, assignment) => total + assignment.tasks.length, 0)}
+                      {jobPoints.filter(point => point.trim()).length}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Total Tasks
+                      Job Details Points
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} sm={3}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h4" color="primary">
-                      {new Set(taskAssignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
+                      {new Set(assignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Engineers Assigned
@@ -3526,17 +3028,17 @@ const AssignEngineer = () => {
                 <Grid item xs={12} sm={3}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h4" color="primary">
-                      {availableTasks.length}
+                      {assignments.reduce((total, assignment) => total + assignment.parts.length, 0)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Available Tasks
+                      Parts Selected
                     </Typography>
                   </Box>
                 </Grid>
               </Grid>
               
               {/* Pre-loaded Engineer Info */}
-              {isEditMode && taskAssignments[0]?.engineer && (
+              {isEditMode && assignments[0]?.engineer && (
                 <>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, color: 'info.main' }}>
@@ -3547,18 +3049,18 @@ const AssignEngineer = () => {
                       👤 Engineer:
                     </Typography>
                     <Chip
-                      label={taskAssignments[0].engineer.name}
+                      label={assignments[0].engineer.name}
                       color="primary"
                       size="small"
                     />
                   </Box>
-                  {taskAssignments[0].notes && (
+                  {assignments[0].notes && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">
                         💬 Engineer Remarks:
                       </Typography>
                       <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                        "{taskAssignments[0].notes}"
+                        "{assignments[0].notes}"
                       </Typography>
                     </Box>
                   )}
@@ -3568,7 +3070,7 @@ const AssignEngineer = () => {
               {/* Parts Summary */}
               {(() => {
                 const allPartsUsed = [];
-                taskAssignments.forEach(assignment => {
+                assignments.forEach(assignment => {
                   assignment.parts.forEach(part => {
                     const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
                     const selectedQuantity = part.selectedQuantity || 1;
@@ -3613,31 +3115,98 @@ const AssignEngineer = () => {
             </CardContent>
           </Card>
 
+          {/* Job Details Section */}
+          <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details (Point-wise)</Typography>
+              <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                      <TextField
+                        fullWidth
+                        placeholder="Enter job detail point..."
+                        value={currentJobPoint}
+                        onChange={(e) => setCurrentJobPoint(e.target.value)}
+                        onKeyPress={handleJobPointKeyPress}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <DescriptionIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={addJobPoint}
+                        disabled={!currentJobPoint.trim()}
+                        startIcon={<AddIcon />}
+                        sx={{ minWidth: 120 }}
+                      >
+                        Add Point
+                      </Button>
+                    </Box>
+
+                    {jobPoints.filter(point => point.trim()).length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>Job Details Points:</Typography>
+                        <List sx={{ bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                          {jobPoints.map((point, index) => (
+                            point.trim() && (
+                              <ListItem key={index} divider>
+                                <ListItemText primary={point} sx={{ wordBreak: 'break-word' }} />
+                                <ListItemSecondaryAction>
+                                  <IconButton edge="end" onClick={() => removeJobPoint(index)} color="error">
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </ListItemSecondaryAction>
+                              </ListItem>
+                            )
+                          ))}
+                        </List>
+                      </Box>
+                    )}
+
+                    {jobPoints.filter(point => point.trim()).length > 0 && (
+                      <Box sx={{ 
+                        mt: 2, 
+                        p: 2, 
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', 
+                        borderRadius: 1 
+                      }}>
+                        <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API - Raw Values Only):</Typography>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', color: 'text.primary' }}>
+                          {getJobDetailsForAPI()}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Grid>
+                </Grid>
+              </Paper>
+            </CardContent>
+          </Card>
+
           {/* Main Form Card */}
-          <Card sx={{ mb: 4, borderRadius: 2 }}>
+          <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
             <CardContent>
               <form onSubmit={handleSubmit}>
                 <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="h6" fontWeight={600}>
-                    Task Assignments
+                    Engineer Assignments
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={addTaskAssignment}
-                    size="small"
-                  >
-                    Add Assignment
-                  </Button>
                 </Box>
 
-                {/* Task Assignments */}
-                {taskAssignments.map((assignment, index) => (
+                {/* Assignments */}
+                {assignments.map((assignment, index) => (
                   <Accordion 
                     key={assignment.id} 
                     defaultExpanded 
-                    sx={{ mb: 2, border: '1px solid', borderColor: 'divider' }}
+                    sx={{ 
+                      mb: 2, 
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: 'background.paper'
+                    }}
                   >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                       <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
@@ -3650,14 +3219,6 @@ const AssignEngineer = () => {
                               size="small" 
                               sx={{ ml: 1 }} 
                               color="primary"
-                            />
-                          )}
-                          {assignment.tasks.length > 0 && (
-                            <Chip 
-                              label={`${assignment.tasks.length} tasks`} 
-                              size="small" 
-                              sx={{ ml: 1 }} 
-                              color="secondary"
                             />
                           )}
                           <Chip 
@@ -3675,11 +3236,11 @@ const AssignEngineer = () => {
                             />
                           )}
                         </Typography>
-                        {taskAssignments.length > 1 && (
+                        {assignments.length > 1 && (
                           <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeTaskAssignment(assignment.id);
+                              removeAssignment(assignment.id);
                             }}
                             size="small"
                             color="error"
@@ -3708,7 +3269,7 @@ const AssignEngineer = () => {
                               getOptionLabel={(option) => option.name || ''}
                               value={assignment.engineer}
                               onChange={(event, newValue) => {
-                                updateTaskAssignment(assignment.id, 'engineer', newValue);
+                                updateAssignment(assignment.id, 'engineer', newValue);
                               }}
                               renderInput={(params) => (
                                 <TextField
@@ -3749,89 +3310,13 @@ const AssignEngineer = () => {
                           <FormControl fullWidth>
                             <Select
                               value={assignment.priority}
-                              onChange={(e) => updateTaskAssignment(assignment.id, 'priority', e.target.value)}
+                              onChange={(e) => updateAssignment(assignment.id, 'priority', e.target.value)}
                             >
                               <MenuItem value="low">Low</MenuItem>
                               <MenuItem value="medium">Medium</MenuItem>
                               <MenuItem value="high">High</MenuItem>
                             </Select>
                           </FormControl>
-                        </Grid>
-
-                        {/* Task Selection */}
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                            Select Tasks *
-                          </Typography>
-                          {isLoadingTasks ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', py: 2 }}>
-                              <CircularProgress size={20} />
-                              <Typography sx={{ ml: 1 }}>Loading tasks...</Typography>
-                            </Box>
-                          ) : (
-                            <Autocomplete
-                              multiple
-                              fullWidth
-                              options={availableTasks}
-                              getOptionLabel={(option) => 
-                                `${option.name || option.taskName} - ${option.category}`
-                              }
-                              value={assignment.tasks}
-                              onChange={(event, newValue) => {
-                                updateTaskAssignment(assignment.id, 'tasks', newValue);
-                              }}
-                              renderTags={(value, getTagProps) =>
-                                value.map((option, index) => (
-                                  <Chip
-                                    variant="outlined"
-                                    label={`${option.name || option.taskName}`}
-                                    {...getTagProps({ index })}
-                                    key={option.id || option.taskId}
-                                  />
-                                ))
-                              }
-                              renderOption={(props, option) => (
-                                <Box component="li" {...props} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <Box>
-                                    <Typography variant="body2">
-                                      {option.name || option.taskName} 
-                                    </Typography>
-                                  </Box>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleTaskMenuOpen(e, option);
-                                    }}
-                                  >
-                                    <MoreVertIcon fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              )}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  placeholder="Select multiple tasks"
-                                  variant="outlined"
-                                  error={!!formErrors[`assignment_${assignment.id}_tasks`]}
-                                  helperText={formErrors[`assignment_${assignment.id}_tasks`]}
-                                  InputProps={{
-                                    ...params.InputProps,
-                                    startAdornment: (
-                                      <>
-                                        <InputAdornment position="start">
-                                          <AssignmentIcon color="action" />
-                                        </InputAdornment>
-                                        {params.InputProps.startAdornment}
-                                      </>
-                                    ),
-                                  }}
-                                />
-                              )}
-                              groupBy={(option) => option.category}
-                              noOptionsText="No tasks available"
-                            />
-                          )}
                         </Grid>
 
                         {/* Parts Selection with Quantity Management */}
@@ -3913,7 +3398,7 @@ const AssignEngineer = () => {
                               renderInput={(params) => (
                                 <TextField
                                   {...params}
-                                  placeholder="Select parts needed for these tasks"
+                                  placeholder="Select parts needed"
                                   variant="outlined"
                                   InputProps={{
                                     ...params.InputProps,
@@ -3977,13 +3462,13 @@ const AssignEngineer = () => {
                                     <ListItem 
                                       key={part._id} 
                                       sx={{ 
-                                        border: '1px solid', 
-                                        borderColor: 'divider', 
+                                        border: `1px solid ${theme.palette.divider}`, 
                                         borderRadius: 1, 
                                         mb: 1,
                                         py: 1,
                                         flexDirection: 'column',
-                                        alignItems: 'stretch'
+                                        alignItems: 'stretch',
+                                        bgcolor: 'background.paper'
                                       }}
                                     >
                                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
@@ -4016,8 +3501,7 @@ const AssignEngineer = () => {
                                                 minWidth: '24px', 
                                                 width: '24px', 
                                                 height: '24px',
-                                                border: '1px solid',
-                                                borderColor: 'divider'
+                                                border: `1px solid ${theme.palette.divider}`
                                               }}
                                             >
                                               <Typography variant="caption" fontWeight="bold">-</Typography>
@@ -4074,8 +3558,7 @@ const AssignEngineer = () => {
                                                 minWidth: '24px', 
                                                 width: '24px', 
                                                 height: '24px',
-                                                border: '1px solid',
-                                                borderColor: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'divider',
+                                                border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
                                                 color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
                                               }}
                                             >
@@ -4092,7 +3575,12 @@ const AssignEngineer = () => {
                                         </Box>
                                       </Box>
                                       {/* Price Details */}
-                                      <Box sx={{ mt: 1, p: 1, backgroundColor: 'action.hover', borderRadius: 1 }}>
+                                      <Box sx={{ 
+                                        mt: 1, 
+                                        p: 1, 
+                                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)', 
+                                        borderRadius: 1 
+                                      }}>
                                         <Grid container spacing={1} alignItems="center">
                                           <Grid item xs={4}>
                                             <Typography variant="caption" color="text.secondary">
@@ -4126,7 +3614,7 @@ const AssignEngineer = () => {
                                   return total + totalPrice + gstAmount;
                                 }, 0);
                                 return (
-                                  <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.light', borderRadius: 1 }}>
+                                  <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
                                     <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
                                       Assignment Total: ₹{grandTotal.toFixed(2)}
                                     </Typography>
@@ -4136,57 +3624,6 @@ const AssignEngineer = () => {
                             </Box>
                           )}
                         </Grid>
-
-                        {/* Notes */}
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                            Additional Notes
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            multiline
-                            rows={3}
-                            placeholder="Add any special instructions or notes for this assignment..."
-                            value={assignment.notes}
-                            onChange={(e) => updateTaskAssignment(assignment.id, 'notes', e.target.value)}
-                          />
-                          {assignment.notes && isEditMode && (
-                            <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
-                              💬 Note: Pre-filled with engineer remarks from job card
-                            </Typography>
-                          )}
-                        </Grid>
-
-                        {/* Task Details Summary */}
-                        {assignment.tasks.length > 0 && (
-                          <Grid item xs={12}>
-                            <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                              Selected Tasks Details
-                            </Typography>
-                            <List dense>
-                              {assignment.tasks.map((task, taskIndex) => (
-                                <ListItem key={task.id || task.taskId} sx={{ py: 0.5 }}>
-                                  <ListItemText
-                                    primary={
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Typography variant="body2" fontWeight={500}>
-                                          {task.name || task.taskName}
-                                        </Typography>
-                                        <Chip 
-                                          label={task.category} 
-                                          size="small" 
-                                          color="secondary"
-                                        />
-                                      </Box>
-                                    }
-                                    secondary={task.description}
-                                  />
-                                </ListItem>
-                              ))}
-                            </List>
-                          </Grid>
-                        )}
                       </Grid>
                     </AccordionDetails>
                   </Accordion>
@@ -4203,7 +3640,7 @@ const AssignEngineer = () => {
                     disabled={isSubmitting || isLoading}
                     sx={{ px: 6, py: 1.5, textTransform: 'uppercase' }}
                   >
-                    {isSubmitting ? 'Assigning Tasks...' : 'Assign All Tasks to Engineers'}
+                    {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}
                   </Button>
                 </Box>
               </form>
@@ -4211,209 +3648,15 @@ const AssignEngineer = () => {
           </Card>
         </Container>
 
-        {/* Task Context Menu */}
-        <Menu
-          anchorEl={taskMenuAnchor}
-          open={Boolean(taskMenuAnchor)}
-          onClose={handleTaskMenuClose}
-        >
-          <MenuItem onClick={handleEditTaskClick}>
-            <ListItemIcon>
-              <EditIcon fontSize="small" />
-            </ListItemIcon>
-            Edit Task
-          </MenuItem>
-          <MenuItem onClick={handleDeleteTaskClick} sx={{ color: 'error.main' }}>
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" color="error" />
-            </ListItemIcon>
-            Delete Task
-          </MenuItem>
-        </Menu>
-
-        {/* Add Task Dialog */}
-        <Dialog 
-          open={openAddTaskDialog} 
-          onClose={() => {
-            setOpenAddTaskDialog(false);
-            setTaskError(null);
-            setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-          }}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Add New Task</DialogTitle>
-          <DialogContent>
-            {taskError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {taskError}
-              </Alert>
-            )}
-            
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField 
-                  fullWidth 
-                  label="Task Name *" 
-                  value={newTask.taskName} 
-                  onChange={(e) => {
-                    setNewTask(prev => ({ ...prev, taskName: e.target.value }));
-                    if (taskError) setTaskError(null);
-                  }}
-                  error={!newTask.taskName.trim() && !!taskError}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField 
-                  fullWidth 
-                  label="Duration (minutes) *" 
-                  type="number"
-                  value={newTask.taskDuration} 
-                  onChange={(e) => {
-                    setNewTask(prev => ({ ...prev, taskDuration: e.target.value }));
-                    if (taskError) setTaskError(null);
-                  }}
-                  placeholder="e.g., 120"
-                  inputProps={{ min: 1 }}
-                  error={!newTask.taskDuration.trim() && !!taskError}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button 
-              onClick={() => {
-                setOpenAddTaskDialog(false);
-                setTaskError(null);
-                setNewTask({ taskName: "", taskDuration: "", description: "", category: "general" });
-              }}
-              disabled={addingTask}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddTask} 
-              variant="contained"
-              disabled={addingTask || !newTask.taskName.trim()}
-              startIcon={addingTask ? <CircularProgress size={16} color="inherit" /> : null}
-            >
-              {addingTask ? 'Creating...' : 'Create Task'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Edit Task Dialog */}
-        <Dialog 
-          open={openEditTaskDialog} 
-          onClose={() => {
-            setOpenEditTaskDialog(false);
-            setTaskError(null);
-            setEditingTask(null);
-          }}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Edit Task</DialogTitle>
-          <DialogContent>
-            {taskError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {taskError}
-              </Alert>
-            )}
-            
-            {editingTask && (
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12}>
-                  <TextField 
-                    fullWidth 
-                    label="Task Name *" 
-                    value={editingTask.taskName} 
-                    onChange={(e) => {
-                      setEditingTask(prev => ({ ...prev, taskName: e.target.value }));
-                      if (taskError) setTaskError(null);
-                    }}
-                    error={!editingTask.taskName.trim() && !!taskError}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField 
-                    fullWidth 
-                    label="Duration (minutes) *" 
-                    type="number"
-                    value={editingTask.taskDuration} 
-                    onChange={(e) => {
-                      setEditingTask(prev => ({ ...prev, taskDuration: e.target.value }));
-                      if (taskError) setTaskError(null);
-                    }}
-                    placeholder="e.g., 120"
-                    inputProps={{ min: 1 }}
-                    error={!editingTask.taskDuration.toString().trim() && !!taskError}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Category</InputLabel>
-                    <Select
-                      value={editingTask.category || 'general'}
-                      label="Category"
-                      onChange={(e) => setEditingTask(prev => ({ ...prev, category: e.target.value }))}
-                    >
-                      <MenuItem value="general">General</MenuItem>
-                      <MenuItem value="engine">Engine</MenuItem>
-                      <MenuItem value="brakes">Brakes</MenuItem>
-                      <MenuItem value="maintenance">Maintenance</MenuItem>
-                      <MenuItem value="tires">Tires</MenuItem>
-                      <MenuItem value="hvac">HVAC</MenuItem>
-                      <MenuItem value="electrical">Electrical</MenuItem>
-                      <MenuItem value="transmission">Transmission</MenuItem>
-                      <MenuItem value="suspension">Suspension</MenuItem>
-                      <MenuItem value="exhaust">Exhaust</MenuItem>
-                      <MenuItem value="diagnostic">Diagnostic</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField 
-                    fullWidth 
-                    label="Description" 
-                    multiline
-                    rows={3}
-                    value={editingTask.description || ''} 
-                    onChange={(e) => setEditingTask(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe the task in detail..."
-                  />
-                </Grid>
-              </Grid>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button 
-              onClick={() => {
-                setOpenEditTaskDialog(false);
-                setTaskError(null);
-                setEditingTask(null);
-              }}
-              disabled={updatingTask}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleEditTask} 
-              variant="contained"
-              disabled={updatingTask || !editingTask?.taskName?.trim() || !editingTask?.taskDuration?.toString()?.trim()}
-              startIcon={updatingTask ? <CircularProgress size={16} color="inherit" /> : null}
-            >
-              {updatingTask ? 'Updating...' : 'Update Task'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
         {/* Add Part Dialog */}
         <Dialog 
           open={openAddPartDialog} 
           onClose={handleCloseAddPartDialog}
           maxWidth="md"
           fullWidth
+          PaperProps={{
+            sx: { bgcolor: 'background.paper' }
+          }}
         >
           <DialogTitle>Add New Part</DialogTitle>
           <DialogContent>
@@ -4519,6 +3762,9 @@ const AssignEngineer = () => {
           onClose={handleCloseAddEngineerDialog}
           maxWidth="sm"
           fullWidth
+          PaperProps={{
+            sx: { bgcolor: 'background.paper' }
+          }}
         >
           <DialogTitle>Add New Engineer</DialogTitle>
           <DialogContent>

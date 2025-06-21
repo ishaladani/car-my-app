@@ -31,7 +31,15 @@ import {
   MenuItem,
   Select,
   InputLabel,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  Avatar,
+  CardMedia,
+  Stack
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -54,7 +62,12 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon,
   Assignment as AssignmentIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  Preview as PreviewIcon,
+  Close as CloseIcon,
+  Check as CheckIcon,
+  ArrowBack as ArrowBackIcon,
+  Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -89,6 +102,22 @@ const UploadButton = styled(Button)(({ theme }) => ({
   },
 }));
 
+const PreviewDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    borderRadius: 16,
+    maxWidth: '90vw',
+    maxHeight: '90vh',
+    margin: theme.spacing(2),
+  },
+}));
+
+const PreviewCard = styled(Card)(({ theme }) => ({
+  margin: theme.spacing(1, 0),
+  borderRadius: 12,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  border: `1px solid ${theme.palette.divider}`,
+}));
+
 // Status options for dropdown
 const statusOptions = [
   { value: 'pending', label: 'Pending', color: 'warning' },
@@ -119,7 +148,6 @@ const validateCarNumber = (carNumber) => {
   const carNumberRegex = /^[A-Z]{2}[-\s]?[0-9]{2}[-\s]?[A-Z]{1,3}[-\s]?[0-9]{4}$/i;
   return carNumberRegex.test(carNumber);
 };
-
 
 const validatePolicyNumber = (policyNumber) => {
   return policyNumber.length >= 5 && policyNumber.length <= 20;
@@ -161,6 +189,8 @@ const JobCards = () => {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -350,12 +380,12 @@ const JobCards = () => {
         if (value.trim() && value.trim().length < 2) error = 'Insurance provider must be at least 2 characters';
         break;
       case 'expiryDate':
-        if (value) {
-          const selectedDate = new Date(value);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (selectedDate < today) error = 'Expiry date cannot be in the past';
-        }
+        // if (value) {
+        //   const selectedDate = new Date(value);
+        //   const today = new Date();
+        //   today.setHours(0, 0, 0, 0);
+        //   if (selectedDate < today) error = 'Expiry date cannot be in the past';
+        // }
         break;
       case 'policyNumber':
         if (value.trim() && !validatePolicyNumber(value)) error = 'Policy number must be 5–20 characters';
@@ -470,9 +500,10 @@ const JobCards = () => {
     }
   };
 
+  // FIXED: Only return raw values without index numbers
   const getJobDetailsForAPI = () => {
     const validPoints = jobPoints.filter(point => point.trim());
-    return validPoints.map((point, index) => `${index + 1}. ${point}`).join('\n');
+    return validPoints.join('\n');
   };
 
   const validateAllFields = () => {
@@ -499,7 +530,6 @@ const JobCards = () => {
     delete newFileErrors[view];
     setFileErrors(newFileErrors);
     setCarImages(prev => ({ ...prev, [view]: file }));
-    // Clear existing image when new one is uploaded
     setExistingImages(prev => ({ ...prev, [view]: null }));
   };
 
@@ -514,7 +544,6 @@ const JobCards = () => {
     delete newFileErrors.video;
     setFileErrors(newFileErrors);
     setVideoFile(file);
-    // Clear existing video when new one is uploaded
     setExistingVideo(null);
   };
 
@@ -540,17 +569,18 @@ const JobCards = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const handleSubmit = async (e) => {
+  // NEW: Preview handler - shows preview instead of immediately submitting
+  const handlePreview = (e) => {
     e.preventDefault();
 
-    // Validate all fields before submission
+    // Validate all fields before showing preview
     const isFormValid = validateAllFields();
     const hasFileErrors = Object.keys(fileErrors).length > 0;
 
     if (!isFormValid || hasFileErrors) {
       setSnackbar({
         open: true,
-        message: 'Please fix all validation errors before submitting',
+        message: 'Please fix all validation errors before previewing',
         severity: 'error'
       });
       return;
@@ -559,8 +589,6 @@ const JobCards = () => {
     // Check for images - required for both create and update
     const hasNewImages = Object.values(carImages).some(image => image !== null);
     const hasExistingImages = Object.values(existingImages).some(imageUrl => imageUrl !== null);
-    const totalImagesCount = Object.values(carImages).filter(img => img !== null).length + 
-                           Object.values(existingImages).filter(img => img !== null).length;
 
     if (!hasNewImages && !hasExistingImages) {
       setSnackbar({
@@ -571,7 +599,13 @@ const JobCards = () => {
       return;
     }
 
+    setShowPreview(true);
+  };
+
+  // NEW: Actual submit handler - called after preview confirmation
+  const handleActualSubmit = async () => {
     setLoading(true);
+    setShowPreview(false);
 
     try {
       const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
@@ -585,6 +619,7 @@ const JobCards = () => {
 
       if (isEditMode && id) {
         // For updates, handle images/video separately if there are new files
+        const hasNewImages = Object.values(carImages).some(image => image !== null);
         const hasNewFiles = hasNewImages || videoFile;
 
         if (hasNewFiles) {
@@ -627,7 +662,7 @@ const JobCards = () => {
               'Content-Type': 'multipart/form-data',
               'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
             },
-            timeout: 60000, // Increased timeout for file uploads
+            timeout: 60000,
           };
 
           response = await axios.put(
@@ -657,7 +692,6 @@ const JobCards = () => {
             status: formData.status,
             jobDetails: getJobDetailsForAPI(),
             fuelLevel: fuelLevel,
-            // Add information about which existing images/video to keep
             keepExistingImages: Object.entries(existingImages)
               .filter(([key, value]) => value !== null)
               .map(([key]) => key),
@@ -772,6 +806,333 @@ const JobCards = () => {
     return statusOption ? statusOption.color : 'default';
   };
 
+  const getFuelLevelText = (level) => {
+    switch(level) {
+      case 1: return 'Very Low';
+      case 2: return 'Low';
+      case 3: return 'Medium';
+      case 4: return 'High';
+      case 5: return 'Full';
+      default: return 'Unknown';
+    }
+  };
+
+  // NEW: Preview Component
+  const PreviewModal = () => (
+    <PreviewDialog
+      open={showPreview}
+      onClose={() => setShowPreview(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        pb: 2
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <VisibilityIcon sx={{ mr: 1, color: 'primary.main' }} />
+          <Typography variant="h5" component="div">
+            Job Card Preview
+          </Typography>
+        </Box>
+        <IconButton onClick={() => setShowPreview(false)}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 3 }}>
+        <Box sx={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {/* Header Info */}
+          <PreviewCard>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" color="primary">
+                  {isEditMode ? `Job Card #${id}` : 'New Job Card'}
+                </Typography>
+                <Chip 
+                  label={`Status: ${formData.status.replace('_', ' ').toUpperCase()}`}
+                  color={getStatusColor(formData.status)}
+                  variant="outlined"
+                />
+              </Box>
+            </CardContent>
+          </PreviewCard>
+
+          {/* Customer Details */}
+          <PreviewCard>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <Person sx={{ mr: 1 }} />
+                Customer Details
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Customer Name:</Typography>
+                  <Typography variant="body1" fontWeight={500}>{formData.customerName}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Contact Number:</Typography>
+                  <Typography variant="body1" fontWeight={500}>{formData.contactNumber}</Typography>
+                </Grid>
+                {formData.email && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">Email:</Typography>
+                    <Typography variant="body1" fontWeight={500}>{formData.email}</Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </CardContent>
+          </PreviewCard>
+
+          {/* Vehicle Details */}
+          <PreviewCard>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <DirectionsCar sx={{ mr: 1 }} />
+                Vehicle Details
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Car Number:</Typography>
+                  <Typography variant="body1" fontWeight={500}>{formData.carNumber}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Model:</Typography>
+                  <Typography variant="body1" fontWeight={500}>{formData.model}</Typography>
+                </Grid>
+                {formData.company && (
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Company:</Typography>
+                    <Typography variant="body1" fontWeight={500}>{formData.company}</Typography>
+                  </Grid>
+                )}
+                {formData.kilometer && (
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Kilometer:</Typography>
+                    <Typography variant="body1" fontWeight={500}>{formData.kilometer} km</Typography>
+                  </Grid>
+                )}
+                {formData.chesiNumber && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">Chassis Number:</Typography>
+                    <Typography variant="body1" fontWeight={500}>{formData.chesiNumber}</Typography>
+                  </Grid>
+                )}
+                {formData.tyreCondition && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">Tyre Condition:</Typography>
+                    <Typography variant="body1" fontWeight={500}>{formData.tyreCondition}</Typography>
+                  </Grid>
+                )}
+              </Grid>
+            </CardContent>
+          </PreviewCard>
+
+          {/* Fuel Level */}
+          <PreviewCard>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <LocalGasStation sx={{ mr: 1 }} />
+                Fuel Level
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Rating
+                  value={fuelLevel}
+                  readOnly
+                  max={5}
+                  icon={<LocalGasStation fontSize="inherit" />}
+                  emptyIcon={<LocalGasStation fontSize="inherit" />}
+                />
+                <Typography variant="body1" fontWeight={500}>
+                  {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
+                </Typography>
+              </Box>
+            </CardContent>
+          </PreviewCard>
+
+          {/* Insurance Details */}
+          {(formData.insuranceProvider || formData.policyNumber || formData.expiryDate || formData.type || formData.excessAmount) && (
+            <PreviewCard>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Policy sx={{ mr: 1 }} />
+                  Insurance Details
+                </Typography>
+                <Grid container spacing={2}>
+                  {formData.insuranceProvider && (
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Insurance Provider:</Typography>
+                      <Typography variant="body1" fontWeight={500}>{formData.insuranceProvider}</Typography>
+                    </Grid>
+                  )}
+                  {formData.policyNumber && (
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Policy Number:</Typography>
+                      <Typography variant="body1" fontWeight={500}>{formData.policyNumber}</Typography>
+                    </Grid>
+                  )}
+                  {formData.expiryDate && (
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Expiry Date:</Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        {new Date(formData.expiryDate).toLocaleDateString()}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {formData.type && (
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Type:</Typography>
+                      <Typography variant="body1" fontWeight={500}>{formData.type}</Typography>
+                    </Grid>
+                  )}
+                  {formData.excessAmount && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">Excess Amount:</Typography>
+                      <Typography variant="body1" fontWeight={500}>₹{formData.excessAmount}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Job Details - Now showing raw values only */}
+          {jobPoints.filter(point => point.trim()).length > 0 && (
+            <PreviewCard>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Description sx={{ mr: 1 }} />
+                  Job Details
+                </Typography>
+                <List dense>
+                  {jobPoints.filter(point => point.trim()).map((point, index) => (
+                    <ListItem key={index} disablePadding>
+                      <ListItemText 
+                        primary={point}
+                        sx={{ wordBreak: 'break-word' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+                <Box sx={{ mt: 2, p: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API):</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
+                    {getJobDetailsForAPI()}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Images Preview */}
+          {(Object.values(carImages).some(img => img) || Object.values(existingImages).some(img => img)) && (
+            <PreviewCard>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <PhotoCamera sx={{ mr: 1 }} />
+                  Car Images
+                </Typography>
+                <Grid container spacing={2}>
+                  {[
+                    { key: 'frontView', label: 'Front View' },
+                    { key: 'rearView', label: 'Rear View' },
+                    { key: 'leftSide', label: 'Left Side' },
+                    { key: 'rightSide', label: 'Right Side' },
+                  ].map((imageType) => {
+                    const hasNewImage = carImages[imageType.key];
+                    const hasExistingImage = existingImages[imageType.key];
+                    
+                    if (hasNewImage || hasExistingImage) {
+                      return (
+                        <Grid item xs={6} sm={3} key={imageType.key}>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              {imageType.label}
+                            </Typography>
+                            <img 
+                              src={hasNewImage ? URL.createObjectURL(hasNewImage) : hasExistingImage} 
+                              alt={imageType.label}
+                              style={{ 
+                                width: '100%', 
+                                height: '120px', 
+                                objectFit: 'cover', 
+                                borderRadius: '8px',
+                                border: hasNewImage ? '2px solid #4caf50' : '1px solid #ddd'
+                              }} 
+                            />
+                            {hasNewImage && (
+                              <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 0.5 }}>
+                                New Image
+                              </Typography>
+                            )}
+                          </Box>
+                        </Grid>
+                      );
+                    }
+                    return null;
+                  })}
+                </Grid>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Video Preview */}
+          {(videoFile || existingVideo) && (
+            <PreviewCard>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Videocam sx={{ mr: 1 }} />
+                  Video
+                </Typography>
+                <Box sx={{ maxWidth: 400, mx: 'auto' }}>
+                  <video 
+                    controls 
+                    style={{ 
+                      width: '100%', 
+                      height: 'auto', 
+                      borderRadius: '8px',
+                      border: videoFile ? '2px solid #4caf50' : '1px solid #ddd'
+                    }}
+                  >
+                    <source src={videoFile ? URL.createObjectURL(videoFile) : existingVideo} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  {videoFile && (
+                    <Typography variant="caption" color="success.main" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                      New Video: {videoFile.name}
+                    </Typography>
+                  )}
+                </Box>
+              </CardContent>
+            </PreviewCard>
+          )}
+        </Box>
+      </DialogContent>
+      
+      <DialogActions sx={{ p: 3, borderTop: `1px solid ${theme.palette.divider}` }}>
+        <Button 
+          onClick={() => setShowPreview(false)} 
+          startIcon={<ArrowBackIcon />}
+          sx={{ mr: 2 }}
+        >
+          Back to Edit
+        </Button>
+        <Button 
+          onClick={handleActualSubmit}
+          variant="contained"
+          disabled={loading}
+          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
+          sx={{ px: 4 }}
+        >
+          {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Confirm Update' : 'Confirm Save')}
+        </Button>
+      </DialogActions>
+    </PreviewDialog>
+  );
+
   if (fetchingData) {
     return (
       <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -792,14 +1153,14 @@ const JobCards = () => {
     }}>
       <CssBaseline />
       <Container maxWidth="xl">
-        <Card sx={{ mb: 4, borderRadius: 2 }}>
+        <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
           <CardContent>
             {/* Header Section */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Box display="flex" alignItems="center">
                 {isEditMode ? <EditIcon fontSize="large" color="primary" sx={{ mr: 2 }} /> : <DirectionsCar fontSize="large" color="primary" sx={{ mr: 2 }} />}
                 <Typography variant="h5" color="primary">
-                  {isEditMode ? `Edit Job Card ${id}` : 'Create Job Card'}
+                  {isEditMode ? `Edit Job Card ` : 'Create Job Card'}
                 </Typography>
               </Box>
               <Box display="flex" alignItems="center" gap={2}>
@@ -810,24 +1171,19 @@ const JobCards = () => {
                     variant="outlined"
                   />
                 )}
-                {isEditMode && (
-                  <Typography variant="body2" color="text.secondary">
-                    Job Card ID: {id}
-                  </Typography>
-                )}
               </Box>
             </Box>
             <Divider sx={{ my: 3 }} />
 
             {/* Form */}
-            <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Box component="form" onSubmit={handlePreview} noValidate>
               {loading && <LinearProgress sx={{ mb: 2 }} />}
 
               {/* Status Section - Only shown in edit mode */}
               {isEditMode && (
                 <Box sx={{ mb: 4 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Status</Typography>
-                  <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                  <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                     <Grid container spacing={3}>
                       <Grid item xs={12} md={6}>
                         <FormControl fullWidth>
@@ -880,7 +1236,7 @@ const JobCards = () => {
               {/* Customer & Car Details */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Customer & Car Details</Typography>
-                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     {[
                       { name: 'customerName', label: 'Customer Name', icon: <Person />, required: true },
@@ -927,7 +1283,7 @@ const JobCards = () => {
               {/* Insurance Details */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Insurance Details</Typography>
-                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     {[
                       { name: 'insuranceProvider', label: 'Insurance Provider', icon: <Policy /> },
@@ -973,7 +1329,7 @@ const JobCards = () => {
               {/* Fuel Level */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Fuel Level</Typography>
-                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
                       <Typography component="legend" sx={{ mb: 1 }}>Current Fuel Level</Typography>
@@ -989,7 +1345,7 @@ const JobCards = () => {
                         emptyIcon={<LocalGasStation fontSize="inherit" />}
                       />
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {fuelLevel}/5 - {fuelLevel === 1 ? 'Very Low' : fuelLevel === 2 ? 'Low' : fuelLevel === 3 ? 'Medium' : fuelLevel === 4 ? 'High' : 'Full'}
+                        {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
                       </Typography>
                     </Grid>
                   </Grid>
@@ -999,7 +1355,7 @@ const JobCards = () => {
               {/* Job Details - Point-wise */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details (Point-wise)</Typography>
-                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
                       <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
@@ -1035,7 +1391,7 @@ const JobCards = () => {
                             {jobPoints.map((point, index) => (
                               point.trim() && (
                                 <ListItem key={index} divider>
-                                  <ListItemText primary={`${index + 1}. ${point}`} sx={{ wordBreak: 'break-word' }} />
+                                  <ListItemText primary={point} sx={{ wordBreak: 'break-word' }} />
                                   <ListItemSecondaryAction>
                                     <IconButton edge="end" onClick={() => removeJobPoint(index)} color="error">
                                       <DeleteIcon />
@@ -1049,9 +1405,14 @@ const JobCards = () => {
                       )}
 
                       {jobPoints.filter(point => point.trim()).length > 0 && (
-                        <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API):</Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
+                        <Box sx={{ 
+                          mt: 2, 
+                          p: 2, 
+                          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', 
+                          borderRadius: 1 
+                        }}>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API - Raw Values Only):</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', color: 'text.primary' }}>
                             {getJobDetailsForAPI()}
                           </Typography>
                         </Box>
@@ -1064,7 +1425,7 @@ const JobCards = () => {
               {/* Car Images Upload/Display */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Car Images</Typography>
-                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     {[
                       { key: 'frontView', label: 'Front View' },
@@ -1286,23 +1647,27 @@ const JobCards = () => {
                 </Paper>
               </Box>
 
-              {/* Submit Button */}
+              {/* Submit Button - Changed to Preview */}
               <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                 <Button
                   type="submit"
                   variant="contained"
                   size="large"
-                  startIcon={<SaveIcon />}
+                  startIcon={<PreviewIcon />}
                   disabled={loading}
                   sx={{ px: 6, py: 1.5, borderRadius: 2, fontWeight: 600, fontSize: '1rem', textTransform: 'none' }}
                 >
-                  {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Job Card' : 'Save Job Card')}
+                  Preview Job Card
                 </Button>
               </Box>
             </Box>
           </CardContent>
         </Card>
       </Container>
+
+      {/* Preview Modal */}
+      <PreviewModal />
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

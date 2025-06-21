@@ -207,7 +207,7 @@ const QualityCheck = () => {
           boxShadow: theme.shadows[2]
         }}>
           <IconButton 
-            onClick={() => navigate(-1)} 
+            onClick={() => navigate(`/work-in-progress/${id}`)} 
             sx={{ 
               mr: 2,
               backgroundColor: theme.palette.primary.main,
@@ -223,9 +223,9 @@ const QualityCheck = () => {
             <Typography variant="h4" component="h1" fontWeight={700} color="primary">
               Quality Check Report
             </Typography>
-            <Typography variant="subtitle1" color="text.secondary">
+            {/* <Typography variant="subtitle1" color="text.secondary">
               Job Card ID: {id}
-            </Typography>
+            </Typography> */}
           </Box>
           <Chip 
             icon={<CalendarIcon />}
@@ -493,7 +493,7 @@ const QualityCheck = () => {
                     >
                       Quantity
                     </TableCell>
-                    <TableCell 
+                    {/* <TableCell 
                       align="center" 
                       sx={{ 
                         bgcolor: 'primary.main',
@@ -502,7 +502,7 @@ const QualityCheck = () => {
                       }}
                     >
                       Price/Piece
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell 
                       align="center" 
                       sx={{ 
@@ -527,9 +527,9 @@ const QualityCheck = () => {
                       <TableCell align="center">
                         {part.qty}
                       </TableCell>
-                      <TableCell align="center">
+                      {/* <TableCell align="center">
                         ₹{part.pricePerPiece}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell align="center" sx={{ fontWeight: 500 }}>
                         ₹{part.totalPrice}
                       </TableCell>
