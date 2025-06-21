@@ -116,10 +116,10 @@ const validateChassisNumber = (chassisNumber) => {
 };
 
 const validateCarNumber = (carNumber) => {
-  const carNumberRegex = /^[A-Z0-9\s-]{4,15}$/i;
-  // return carNumberRegex.test(carNumber);
-  return carNumberRegex.length >= 5 && carNumberRegex.length <= 20;
+  const carNumberRegex = /^[A-Z]{2}[-\s]?[0-9]{2}[-\s]?[A-Z]{1,3}[-\s]?[0-9]{4}$/i;
+  return carNumberRegex.test(carNumber);
 };
+
 
 const validatePolicyNumber = (policyNumber) => {
   return policyNumber.length >= 5 && policyNumber.length <= 20;
