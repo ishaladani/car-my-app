@@ -60,15 +60,26 @@ const ServicesSection = ({
           >
             <Table size={isMobile ? "small" : "medium"}>
               <TableHead>
-                <TableRow sx={{ 
-                  background: theme.palette.mode === 'dark' 
-                    ? 'linear-gradient(45deg, #1976d2 30%, #1565c0 90%)' 
-                    : 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)', 
-                  '& .MuiTableCell-head': { 
-                    color: 'white', 
-                    fontWeight: 600 
-                  } 
-                }}>
+                <TableRow 
+                sx={{
+                    backgroundColor: theme.palette.primary.main,
+                    '& .MuiTableCell-head': {
+                      backgroundColor: theme.palette.primary.main,
+                      color: theme.palette.primary.contrastText,
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase',
+                      border: 'none',
+                      cursor: 'pointer',
+                      '&:first-of-type': {
+                        borderTopLeftRadius: theme.shape.borderRadius,
+                      },
+                      '&:last-of-type': {
+                        borderTopRightRadius: theme.shape.borderRadius,
+                      }
+                    }
+                  }}>
                   <TableCell>S.No</TableCell>
                   <TableCell>Service Description</TableCell>
                   <TableCell>Engineer</TableCell>

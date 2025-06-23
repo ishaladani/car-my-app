@@ -669,10 +669,10 @@ const [carDetails, setCarDetails] = useState({
                         <option value="Completed">Completed</option>
                       </TextField> */}
                         <Box sx={{ mb: 4 }}>
-                                        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Status</Typography>
-                                        <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+                                        {/* <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Status</Typography> */}
+                                        {/* <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}> */}
                                           <Grid container spacing={3}>
-                                            <Grid item xs={12} md={6}>
+                                            <Grid item xs={12} md={12}>
                                               <FormControl fullWidth>
                                                 <InputLabel id="status-label">Status</InputLabel>
                                                 <Select
@@ -715,7 +715,7 @@ const [carDetails, setCarDetails] = useState({
                                               </Button> */}
                                             </Grid>
                                           </Grid>
-                                        </Paper>
+                                        {/* </Paper> */}
                                       </Box>
                     </Grid>
                     <Grid item xs={12}>

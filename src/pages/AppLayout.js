@@ -76,51 +76,72 @@ const AppLayout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Handle logout function
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
+  // Handle logout function
+const handleLogout = async () => {
+  if (isLoggingOut) return;
+  
+  try {
+    setIsLoggingOut(true);
+    const token = localStorage.getItem('token');
+    const headers = {};
     
-    try {
-      setIsLoggingOut(true);
-      const token = localStorage.getItem('token');
-      const headers = {};
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const logoutUserId = userId;
-      
-      console.log('Logging out user:', logoutUserId);
-      
-      await axios.post(
-        `https://garage-management-zi5z.onrender.com/api/garage/logout/${logoutUserId}`,
-        {},
-        { 
-          headers,
-          timeout: 10000
-        }
-      );
-      
-      console.log('Logout API call successful');
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('garageId');
-      localStorage.removeItem('userType');
-      localStorage.removeItem('garageName');
-      localStorage.removeItem('garageLogo');
-      localStorage.removeItem('profileUpdated');
-      
-      setUserMenu(null);
-      setMobileOpen(false);
-      
-      navigate('/login');
-      
-      setIsLoggingOut(false);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
-  };
+
+    // Determine which ID to use based on usertype
+    let logoutId;
+    if (roll === "garage") {
+      logoutId = garageId;
+      console.log('Logging out garage:', logoutId);
+    } else if (roll === "user") {
+      logoutId = userId;
+      console.log('Logging out user:', logoutId);
+    } else {
+      // Fallback to userId if usertype is not explicitly "garage"
+      logoutId = userId;
+      console.log('Logging out (fallback to user):', logoutId);
+    }
+
+    // Check if we have a valid ID to logout
+    if (!logoutId) {
+      console.error('No valid ID found for logout');
+      throw new Error('Unable to determine user/garage ID for logout');
+    }
+    
+    await axios.post(
+      `https://garage-management-zi5z.onrender.com/api/garage/logout/${logoutId}`,
+      {},
+      { 
+        headers,
+        timeout: 10000
+      }
+    );
+    
+    console.log('Logout API call successful');
+  } catch (error) {
+    console.error('Error during logout:', error);
+    // Continue with local cleanup even if API call fails
+  } finally {
+    // Clear all localStorage items
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('garageId');
+    localStorage.removeItem('userType');
+    localStorage.removeItem('garageName');
+    localStorage.removeItem('garageLogo');
+    localStorage.removeItem('profileUpdated');
+    
+    // Close menus
+    setUserMenu(null);
+    setMobileOpen(false);
+    
+    // Navigate to login
+    navigate('/login');
+    
+    setIsLoggingOut(false);
+  }
+};
 
   // All available nav items with permission keys
   const allNavItems = [
@@ -135,7 +156,7 @@ const AppLayout = () => {
       permission: "Service Reminders"
     },
     { text: "Insurance", icon: <BuildIcon />, path: "/insurance", permission: "Insurance" },
-    { text: "User List", icon: <BuildIcon />, path: "/UserManagemt", permission: "User List" },
+    { text: "User List", icon: <PersonIcon />, path: "/UserManagemt", permission: "User List" },
   ];
 
   // Fetch garage profile data
