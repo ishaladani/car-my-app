@@ -406,17 +406,17 @@ const AutoServeBilling = () => {
   };
 
   // UPDATED: Check if bill is already generated before showing payment modal
-  const generateBill = () => {
-    if (isBillAlreadyGenerated || billGenerated) {
-      setSnackbar({
-        open: true,
-        message: 'Bill has already been generated for this job card',
-        severity: 'warning'
-      });
-      return;
-    }
-    setShowPaymentModal(true);
-  };
+  // const generateBill = () => {
+  //   if (isBillAlreadyGenerated || billGenerated) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: 'Bill has already been generated for this job card',
+  //       severity: 'warning'
+  //     });
+  //     return;
+  //   }
+  //   setShowPaymentModal(true);
+  // };
 
   // UPDATED: Payment method selection now directly processes payment
   const selectPaymentMethod = async (method) => {
@@ -432,76 +432,76 @@ const AutoServeBilling = () => {
   };
 
   // UPDATED: Payment processing functions with bill status update
-  const processPayment = async () => {
-    if (!jobCardIdFromUrl) {
-      setApiResponseMessage({
-        type: "error",
-        message: "No job card ID found in URL. Cannot process payment.",
-      });
-      setShowApiResponse(true);
-      return;
-    }
+  // const processPayment = async () => {
+  //   if (!jobCardIdFromUrl) {
+  //     setApiResponseMessage({
+  //       type: "error",
+  //       message: "No job card ID found in URL. Cannot process payment.",
+  //     });
+  //     setShowApiResponse(true);
+  //     return;
+  //   }
 
-    const apiData = {
-      parts: parts.map(part => ({
-        name: part.name,
-        quantity: part.quantity,
-        pricePerUnit: part.pricePerUnit,
-      })),
-      services: services.map(service => ({
-        description: service.name,
-        laborCost: service.laborCost,
-      })),
-      discount: summary.discount,
-      gstSettings: {
-        includeGst: gstSettings.includeGst,
-        gstType: gstSettings.gstType,
-        gstPercentage: gstSettings.gstPercentage,
-        gstAmount: gstSettings.gstAmount,
-        customerGstNumber: gstSettings.customerGstNumber,
-        isInterState: gstSettings.isInterState
-      },
-      gstPercentage: gstSettings.includeGst ? gstSettings.gstPercentage : 0,
-    };
+  //   const apiData = {
+  //     parts: parts.map(part => ({
+  //       name: part.name,
+  //       quantity: part.quantity,
+  //       pricePerUnit: part.pricePerUnit,
+  //     })),
+  //     services: services.map(service => ({
+  //       description: service.name,
+  //       laborCost: service.laborCost,
+  //     })),
+  //     discount: summary.discount,
+  //     gstSettings: {
+  //       includeGst: gstSettings.includeGst,
+  //       gstType: gstSettings.gstType,
+  //       gstPercentage: gstSettings.gstPercentage,
+  //       gstAmount: gstSettings.gstAmount,
+  //       customerGstNumber: gstSettings.customerGstNumber,
+  //       isInterState: gstSettings.isInterState
+  //     },
+  //     gstPercentage: gstSettings.includeGst ? gstSettings.gstPercentage : 0,
+  //   };
 
-    try {
-      const response = await axios.post(
-        `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
-        apiData
-      );
+  //   try {
+  //     const response = await axios.post(
+  //       `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
+  //       apiData
+  //     );
 
-      const data = response.data;
-      if (response.status === 200 || response.status === 201) {
-        // NEW: Update bill status after successful bill generation
-        await updateBillStatus(jobCardIdFromUrl);
+  //     const data = response.data;
+  //     if (response.status === 200 || response.status === 201) {
+  //       // NEW: Update bill status after successful bill generation
+  //       await updateBillStatus(jobCardIdFromUrl);
         
-        setApiResponseMessage({
-          type: "success",
-          message: data.message || "Professional bill generated and payment processed successfully!",
-        });
-        setShowThankYou(true);
+  //       setApiResponseMessage({
+  //         type: "success",
+  //         message: data.message || "Professional bill generated and payment processed successfully!",
+  //       });
+  //       setShowThankYou(true);
         
-        if (data.invoiceNumber) {
-          setCarDetails(prev => ({ ...prev, invoiceNo: data.invoiceNumber }));
-        }
-      } else {
-        setApiResponseMessage({
-          type: "error",
-          message: data.message || "Failed to generate bill",
-        });
-      }
-    } catch (error) {
-      console.error("API Error:", error);
-      setApiResponseMessage({
-        type: "error",
-        message: error.response?.data?.message || 
-               error.message || 
-               "Network error while processing payment",
-      });
-    }
+  //       if (data.invoiceNumber) {
+  //         setCarDetails(prev => ({ ...prev, invoiceNo: data.invoiceNumber }));
+  //       }
+  //     } else {
+  //       setApiResponseMessage({
+  //         type: "error",
+  //         message: data.message || "Failed to generate bill",
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error("API Error:", error);
+  //     setApiResponseMessage({
+  //       type: "error",
+  //       message: error.response?.data?.message || 
+  //              error.message || 
+  //              "Network error while processing payment",
+  //     });
+  //   }
 
-    setShowApiResponse(true);
-  };
+  //   setShowApiResponse(true);
+  // };
 
   const processOnlinePayment = async () => {
     if (!jobCardIdFromUrl) {
@@ -1179,6 +1179,270 @@ const AutoServeBilling = () => {
       throw new Error('Failed to generate PDF for email');
     }
   };
+
+
+  // UPDATED: Function to update bill status and job card status to completed
+const updateBillAndJobStatus = async (jobCardId) => {
+  try {
+    // Update bill generation status
+    const billStatusResponse = await axios.put(
+      `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`
+    );
+    
+    if (billStatusResponse.status === 200) {
+      console.log('Bill status updated successfully');
+      setBillGenerated(true);
+      
+      // Update job card status to completed
+      const statusUpdateResponse = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/jobcards/updatestatus/${jobCardId}`,
+        { status: 'Completed' }
+      );
+      
+      if (statusUpdateResponse.status === 200) {
+        console.log('Job card status updated to completed');
+        // Update local job card data if needed
+        if (jobCardData) {
+          setJobCardData(prev => ({ ...prev, status: 'Completed' }));
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error updating bill and job status:', error);
+    // Don't show error to user as this is a background operation
+  }
+};
+
+// Alternative: Single API call approach (if your backend supports it)
+const updateBillStatusAndComplete = async (jobCardId) => {
+  try {
+    const response = await axios.put(
+      `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`,
+      { 
+        generateBill: true,
+        status: 'Completed'
+      }
+    );
+    
+    if (response.status === 200) {
+      console.log('Bill status and job status updated successfully');
+      setBillGenerated(true);
+      
+      // Update local job card data
+      if (jobCardData) {
+        setJobCardData(prev => ({ 
+          ...prev, 
+          generateBill: true,
+          status: 'Completed' 
+        }));
+      }
+    }
+  } catch (error) {
+    console.error('Error updating bill and job status:', error);
+  }
+};
+
+// Additional: Status validation function
+const validateJobCompletion = () => {
+  const issues = [];
+  
+  if (parts.length === 0 && services.length === 0) {
+    issues.push("No parts or services added");
+  }
+  
+  if (!carDetails.customerName.trim()) {
+    issues.push("Customer name is required");
+  }
+  
+  if (!carDetails.contact.trim()) {
+    issues.push("Customer contact is required");
+  }
+  
+  if (!finalInspection.trim()) {
+    issues.push("Final inspection notes are required");
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    issues
+  };
+};
+
+// Updated generate bill function with validation
+const generateBill = () => {
+  if (isBillAlreadyGenerated || billGenerated) {
+    setSnackbar({
+      open: true,
+      message: 'Bill has already been generated for this job card',
+      severity: 'warning'
+    });
+    return;
+  }
+  
+  // Validate job completion before generating bill
+  const validation = validateJobCompletion();
+  if (!validation.isValid) {
+    setSnackbar({
+      open: true,
+      message: `Please complete: ${validation.issues.join(', ')}`,
+      severity: 'error'
+    });
+    return;
+  }
+  
+  setShowPaymentModal(true);
+};
+
+// UPDATED: Payment processing functions with status update
+const processPayment = async () => {
+  if (!jobCardIdFromUrl) {
+    setApiResponseMessage({
+      type: "error",
+      message: "No job card ID found in URL. Cannot process payment.",
+    });
+    setShowApiResponse(true);
+    return;
+  }
+
+  const apiData = {
+    parts: parts.map(part => ({
+      name: part.name,
+      quantity: part.quantity,
+      pricePerUnit: part.pricePerUnit,
+    })),
+    services: services.map(service => ({
+      description: service.name,
+      laborCost: service.laborCost,
+    })),
+    discount: summary.discount,
+    gstSettings: {
+      includeGst: gstSettings.includeGst,
+      gstType: gstSettings.gstType,
+      gstPercentage: gstSettings.gstPercentage,
+      gstAmount: gstSettings.gstAmount,
+      customerGstNumber: gstSettings.customerGstNumber,
+      isInterState: gstSettings.isInterState
+    },
+    gstPercentage: gstSettings.includeGst ? gstSettings.gstPercentage : 0,
+  };
+
+  try {
+    const response = await axios.post(
+      `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
+      apiData
+    );
+
+    const data = response.data;
+    if (response.status === 200 || response.status === 201) {
+      // NEW: Update both bill status and job status to completed
+      await updateBillAndJobStatus(jobCardIdFromUrl);
+      
+      setApiResponseMessage({
+        type: "success",
+        message: data.message || "Professional bill generated and payment processed successfully! Job completed.",
+      });
+      setShowThankYou(true);
+      
+      if (data.invoiceNumber) {
+        setCarDetails(prev => ({ ...prev, invoiceNo: data.invoiceNumber }));
+      }
+    } else {
+      setApiResponseMessage({
+        type: "error",
+        message: data.message || "Failed to generate bill",
+      });
+    }
+  } catch (error) {
+    console.error("API Error:", error);
+    setApiResponseMessage({
+      type: "error",
+      message: error.response?.data?.message || 
+             error.message || 
+             "Network error while processing payment",
+    });
+  }
+
+  setShowApiResponse(true);
+};
+
+// const processOnlinePayment = async () => {
+//   if (!jobCardIdFromUrl) {
+//     setApiResponseMessage({
+//       type: "error",
+//       message: "No job card ID found. Cannot process payment.",
+//     });
+//     setShowApiResponse(true);
+//     return;
+//   }
+
+//   try {
+//     const billResponse = await axios.post(
+//       `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`,
+//       {
+//         parts: parts.map(part => ({
+//           name: part.name,
+//           quantity: part.quantity,
+//           pricePerUnit: part.pricePerUnit,
+//         })),
+//         services: services.map(service => ({
+//           description: service.name,
+//           laborCost: service.laborCost,
+//         })),
+//         discount: summary.discount,
+//         gstSettings: {
+//           includeGst: gstSettings.includeGst,
+//           gstType: gstSettings.gstType,
+//           gstPercentage: gstSettings.gstPercentage,
+//           gstAmount: gstSettings.gstAmount,
+//           customerGstNumber: gstSettings.customerGstNumber,
+//           isInterState: gstSettings.isInterState
+//         },
+//         gstPercentage: gstSettings.includeGst ? gstSettings.gstPercentage : 0,
+//       }
+//     );
+
+//     const responseData = billResponse.data;
+//     if (!responseData.bill || !responseData.bill._id) {
+//       throw new Error("Invalid response structure - missing bill ID");
+//     }
+
+//     const billId = responseData.bill._id;
+//     const invoiceNo = responseData.bill.invoiceNo;
+
+//     setCarDetails(prev => ({ ...prev, invoiceNo: invoiceNo || prev.invoiceNo }));
+
+//     const paymentResponse = await axios.post(
+//       "https://garage-management-zi5z.onrender.com/api/garage/billing/pay",
+//       {
+//         billId: billId,
+//         paymentMethod: "Online Payment"
+//       }
+//     );
+
+//     if (paymentResponse.status === 200 || paymentResponse.status === 201) {
+//       // NEW: Update both bill status and job status to completed
+//       await updateBillAndJobStatus(jobCardIdFromUrl);
+      
+//       setApiResponseMessage({
+//         type: "success",
+//         message: paymentResponse.data?.message || "Online payment processed successfully! Job completed.",
+//       });
+//       setShowThankYou(true);
+//     } else {
+//       throw new Error(paymentResponse.data?.message || "Payment failed");
+//     }
+
+//   } catch (error) {
+//     console.error("Payment Error:", error);
+//     setApiResponseMessage({
+//       type: "error",
+//       message: error.response?.data?.message || 
+//              error.message || 
+//              "Failed to process online payment",
+//     });
+//   }
+//   setShowApiResponse(true);
+// };
 
   const sendBillViaWhatsApp = async () => {
     setSendingWhatsApp(true);

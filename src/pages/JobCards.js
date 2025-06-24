@@ -217,7 +217,7 @@ const JobCards = () => {
     type: '',
     excessAmount: '',
     chesiNumber: '',
-    tyreCondition: '',
+    // tyreCondition: '',
     status: 'pending'
   });
 
@@ -290,7 +290,7 @@ const JobCards = () => {
           type: jobCardData.type || '',
           excessAmount: jobCardData.excessAmount?.toString() || '',
           chesiNumber: jobCardData.chesiNumber || '',
-          tyreCondition: jobCardData.tyreCondition || '',
+          // tyreCondition: jobCardData.tyreCondition || '',
           status: jobCardData.status || 'pending'
         });
 
@@ -688,7 +688,7 @@ const JobCards = () => {
             type: formData.type,
             excessAmount: formData.excessAmount,
             chesiNumber: formData.chesiNumber,
-            tyreCondition: formData.tyreCondition,
+            // tyreCondition: formData.tyreCondition,
             status: formData.status,
             jobDetails: getJobDetailsForAPI(),
             fuelLevel: fuelLevel,
@@ -921,12 +921,12 @@ const JobCards = () => {
                     <Typography variant="body1" fontWeight={500}>{formData.chesiNumber}</Typography>
                   </Grid>
                 )}
-                {formData.tyreCondition && (
+                {/* {formData.tyreCondition && (
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">Tyre Condition:</Typography>
                     <Typography variant="body1" fontWeight={500}>{formData.tyreCondition}</Typography>
                   </Grid>
-                )}
+                )} */}
               </Grid>
             </CardContent>
           </PreviewCard>
@@ -1247,7 +1247,7 @@ const JobCards = () => {
                       { name: 'company', label: 'Company', icon: <LocalOffer /> },
                       { name: 'kilometer', label: 'Kilometer', icon: <Speed />, type: 'number' },
                       { name: 'chesiNumber', label: 'Chassis Number', icon: <Numbers />, helperText: 'Vehicle Identification Number (VIN)' },
-                      { name: 'tyreCondition', label: 'Tyre Condition', icon: <LocalGasStation /> },
+                      // { name: 'tyreCondition', label: 'Tyre Condition', icon: <LocalGasStation /> },
                     ].map((field) => (
                       <Grid item xs={12} md={4} key={field.name}>
                         <TextField

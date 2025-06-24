@@ -34,7 +34,7 @@ const Profile = () => {
     email: "N/A",
     phone: "N/A",
     address: "N/A",
-    gstNumber: "N/A", // Added GST number field
+    gstNum: "N/A", // CHANGED: from gstNumber to gstNum
     subscriptionType: "Free",
     isSubscribed: false,
   });
@@ -93,7 +93,7 @@ const Profile = () => {
           email: data.email || "N/A",
           phone: data.phone || "N/A",
           address: data.address || "N/A",
-          gstNumber: data.gstNumber || "N/A", // Added GST number
+          gstNum: data.gstNum || "N/A", // CHANGED: from gstNumber to gstNum
           subscriptionType: data.subscriptionType || "Free",
           isSubscribed: data.isSubscribed || false,
         };
@@ -278,7 +278,7 @@ const Profile = () => {
         name: editData.name,
         phone: editData.phone || "",
         address: editData.address || "",
-        gstNumber: editData.gstNumber || "", // Added GST number to payload
+        gstNum: editData.gstNum || "", // CHANGED: from gstNumber to gstNum
         subscriptionType: editData.subscriptionType,
         isSubscribed: editData.isSubscribed,
       };
@@ -290,6 +290,7 @@ const Profile = () => {
       console.log("Payload size:", JSON.stringify(updatePayload).length, "bytes");
       console.log("Logo included:", !!updatePayload.logo);
       console.log("Image changed:", imageChanged);
+      console.log("GST Number being sent:", updatePayload.gstNum); // CHANGED: from gstNumber to gstNum
 
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/allgarages/${garageId}`,
@@ -413,7 +414,7 @@ const Profile = () => {
             <Grid item xs={12} sm={6}>
               <Box display="flex" alignItems="center" gap={1}>
                 <BusinessIcon color="action" />
-                <Typography>GST: {garageData.gstNumber}</Typography>
+                <Typography>GST: {garageData.gstNum}</Typography> {/* CHANGED: from gstNumber to gstNum */}
               </Box>
             </Grid>
             <Grid item xs={12}>
@@ -514,8 +515,8 @@ const Profile = () => {
               <TextField
                 fullWidth
                 label="GST Number"
-                value={editData.gstNumber || ""}
-                onChange={(e) => handleInputChange("gstNumber", e.target.value.toUpperCase())}
+                value={editData.gstNum || ""}
+                onChange={(e) => handleInputChange("gstNum", e.target.value.toUpperCase())} 
                 variant="outlined"
                 placeholder="e.g., 27AAAPL1234C1Z5"
                 inputProps={{ maxLength: 15 }}

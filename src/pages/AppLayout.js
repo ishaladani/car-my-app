@@ -148,7 +148,7 @@ const handleLogout = async () => {
     { text: "Dashboard", icon: <DashboardIcon />, path: "/", permission: "Dashboard" },
     { text: "Create Job Cards", icon: <CarIcon />, path: "/jobs", permission: "Create Job Cards" },
     { text: "Manage Inventory", icon: <InventoryIcon />, path: "/inventory", permission: "Manage Inventory" },
-    { text: "Reports & Records", icon: <AssignmentIcon />, path: "/reports", permission: "Reports & Records" },
+    { text: "History", icon: <AssignmentIcon />, path: "/reports", permission: "Reports & Records" },
     {
       text: "Service Reminders",
       icon: <NotificationsIcon />,
