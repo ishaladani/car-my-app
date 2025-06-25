@@ -111,6 +111,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
     doc.setFontSize(10);
     doc.text(`Job ID: ${jobData._id}`, 14, 28);
 
+    const jobDetailsString = parsedJobDetails.map(d => `${d.description} - ₹${d.price}`).join(", ");
+
+    
     const tableData = [
       ['Customer Name', jobData.customerName || 'N/A'],
       ['Contact Number', jobData.contactNumber || 'N/A'],
@@ -126,7 +129,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       ['Expiry Date', formatDate(jobData.expiryDate)],
       ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A'],
       ['Job Type', jobData.type || 'N/A'],
-      ['Job Details', jobData.jobDetails || 'N/A'],
+      ['Job Details', jobDetailsString || 'N/A'],
       ['Engineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
       ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
       ['Status', jobData.status || 'N/A'],
@@ -145,6 +148,14 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
 
     doc.save(`JobCard_${jobData._id}.pdf`);
   };
+
+  const parsedJobDetails = (() => {
+    try {
+      return Array.isArray(JSON.parse(jobData.jobDetails)) ? JSON.parse(jobData.jobDetails) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   return (
     <>
@@ -311,7 +322,15 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">Job Details</Typography>
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
-                      {jobData.jobDetails || 'N/A'}
+                    <Box component="ul" sx={{ pl: 2 }}>
+              {parsedJobDetails.length > 0 ? (
+                parsedJobDetails.map((item, index) => (
+                  <li key={index}>{item.description} - ₹{item.price}</li>
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">No job details provided.</Typography>
+              )}
+            </Box>
                     </Typography>
                     <Typography variant="body2" color="text.secondary">Engineer</Typography>
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>

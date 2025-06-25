@@ -39,7 +39,13 @@ import {
   DialogContentText,
   Avatar,
   CardMedia,
-  Stack
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -67,7 +73,8 @@ import {
   Close as CloseIcon,
   Check as CheckIcon,
   ArrowBack as ArrowBackIcon,
-  Visibility as VisibilityIcon
+  Visibility as VisibilityIcon,
+  CurrencyRupee
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -167,6 +174,11 @@ const validateKilometer = (km) => {
   return !isNaN(numKm) && numKm >= 0 && numKm <= 9999999;
 };
 
+const validatePrice = (price) => {
+  const numPrice = parseFloat(price);
+  return !isNaN(numPrice) && numPrice >= 0 && numPrice <= 10000000;
+};
+
 const validateFileSize = (file, maxSizeMB) => {
   return file.size <= maxSizeMB * 1024 * 1024;
 };
@@ -221,9 +233,10 @@ const JobCards = () => {
     status: 'pending'
   });
 
-  // Job Details Point-wise state
-  const [jobPoints, setJobPoints] = useState(['']);
-  const [currentJobPoint, setCurrentJobPoint] = useState('');
+  // UPDATED: Job Details with price - changed from simple array to array of objects
+  const [jobPoints, setJobPoints] = useState([]);
+  const [currentJobDescription, setCurrentJobDescription] = useState('');
+  const [currentJobPrice, setCurrentJobPrice] = useState('');
 
   // Validation errors state
   const [errors, setErrors] = useState({});
@@ -298,9 +311,22 @@ const JobCards = () => {
           setFuelLevel(jobCardData.fuelLevel);
         }
 
+        // UPDATED: Parse job details with price information
         if (jobCardData.jobDetails) {
-          const lines = jobCardData.jobDetails.split('\n');
-          setJobPoints(lines.filter(line => line.trim()));
+          try {
+            // Try to parse as JSON first (new format with prices)
+            const parsedJobDetails = JSON.parse(jobCardData.jobDetails);
+            if (Array.isArray(parsedJobDetails)) {
+              setJobPoints(parsedJobDetails);
+            }
+          } catch (e) {
+            // Fallback to old format (plain text lines)
+            const lines = jobCardData.jobDetails.split('\n');
+            const oldFormatPoints = lines
+              .filter(line => line.trim())
+              .map(line => ({ description: line.trim(), price: '' }));
+            setJobPoints(oldFormatPoints);
+          }
         }
 
         if (jobCardData.images && Array.isArray(jobCardData.images)) {
@@ -473,11 +499,16 @@ const JobCards = () => {
     }
   };
 
-  // Job Points Management
+  // UPDATED: Job Points Management with price
   const addJobPoint = () => {
-    if (currentJobPoint.trim()) {
-      setJobPoints(prev => [...prev.filter(point => point.trim()), currentJobPoint.trim()]);
-      setCurrentJobPoint('');
+    if (currentJobDescription.trim()) {
+      const newJobPoint = {
+        description: currentJobDescription.trim(),
+        price: currentJobPrice.trim() || '0'
+      };
+      setJobPoints(prev => [...prev, newJobPoint]);
+      setCurrentJobDescription('');
+      setCurrentJobPrice('');
     }
   };
 
@@ -485,10 +516,10 @@ const JobCards = () => {
     setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  const updateJobPoint = (index, value) => {
+  const updateJobPoint = (index, field, value) => {
     setJobPoints(prev => {
       const updated = [...prev];
-      updated[index] = value;
+      updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
   };
@@ -500,10 +531,18 @@ const JobCards = () => {
     }
   };
 
-  // FIXED: Only return raw values without index numbers
+  // UPDATED: Return JSON format for API with price information
   const getJobDetailsForAPI = () => {
-    const validPoints = jobPoints.filter(point => point.trim());
-    return validPoints.join('\n');
+    const validPoints = jobPoints.filter(point => point.description && point.description.trim());
+    return JSON.stringify(validPoints);
+  };
+
+  // UPDATED: Calculate total job cost
+  const calculateTotalJobCost = () => {
+    return jobPoints.reduce((total, point) => {
+      const price = parseFloat(point.price) || 0;
+      return total + price;
+    }, 0);
   };
 
   const validateAllFields = () => {
@@ -921,12 +960,6 @@ const JobCards = () => {
                     <Typography variant="body1" fontWeight={500}>{formData.chesiNumber}</Typography>
                   </Grid>
                 )}
-                {/* {formData.tyreCondition && (
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">Tyre Condition:</Typography>
-                    <Typography variant="body1" fontWeight={500}>{formData.tyreCondition}</Typography>
-                  </Grid>
-                )} */}
               </Grid>
             </CardContent>
           </PreviewCard>
@@ -999,30 +1032,48 @@ const JobCards = () => {
             </PreviewCard>
           )}
 
-          {/* Job Details - Now showing raw values only */}
-          {jobPoints.filter(point => point.trim()).length > 0 && (
+          {/* UPDATED: Job Details with pricing table */}
+          {jobPoints.length > 0 && (
             <PreviewCard>
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
                   <Description sx={{ mr: 1 }} />
-                  Job Details
+                  Job Details & Pricing
                 </Typography>
-                <List dense>
-                  {jobPoints.filter(point => point.trim()).map((point, index) => (
-                    <ListItem key={index} disablePadding>
-                      <ListItemText 
-                        primary={point}
-                        sx={{ wordBreak: 'break-word' }}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-                <Box sx={{ mt: 2, p: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', borderRadius: 1 }}>
-                  <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API):</Typography>
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>S.No.</strong></TableCell>
+                        <TableCell><strong>Description</strong></TableCell>
+                        <TableCell align="right"><strong>Price (₹)</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {jobPoints.map((point, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell sx={{ wordBreak: 'break-word' }}>{point.description}</TableCell>
+                          <TableCell align="right">
+                            {point.price ? `₹${parseFloat(point.price).toLocaleString('en-IN')}` : '₹0'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
+                        <TableCell align="right">
+                          <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {/* <Box sx={{ mt: 2, p: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API - JSON Format):</Typography>
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
                     {getJobDetailsForAPI()}
                   </Typography>
-                </Box>
+                </Box> */}
               </CardContent>
             </PreviewCard>
           )}
@@ -1247,7 +1298,6 @@ const JobCards = () => {
                       { name: 'company', label: 'Company', icon: <LocalOffer /> },
                       { name: 'kilometer', label: 'Kilometer', icon: <Speed />, type: 'number' },
                       { name: 'chesiNumber', label: 'Chassis Number', icon: <Numbers />, helperText: 'Vehicle Identification Number (VIN)' },
-                      // { name: 'tyreCondition', label: 'Tyre Condition', icon: <LocalGasStation /> },
                     ].map((field) => (
                       <Grid item xs={12} md={4} key={field.name}>
                         <TextField
@@ -1352,18 +1402,18 @@ const JobCards = () => {
                 </Paper>
               </Box>
 
-              {/* Job Details - Point-wise */}
+              {/* UPDATED: Job Details with Price */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details (Point-wise)</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Job Details & Pricing</Typography>
                 <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Grid container spacing={3}>
                     <Grid item xs={12}>
                       <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
                         <TextField
                           fullWidth
-                          placeholder="Enter job detail point..."
-                          value={currentJobPoint}
-                          onChange={(e) => setCurrentJobPoint(e.target.value)}
+                          placeholder="Enter job description..."
+                          value={currentJobDescription}
+                          onChange={(e) => setCurrentJobDescription(e.target.value)}
                           onKeyPress={handleJobPointKeyPress}
                           InputProps={{
                             startAdornment: (
@@ -1373,50 +1423,120 @@ const JobCards = () => {
                             ),
                           }}
                         />
+                        <TextField
+                          placeholder="Price (₹)"
+                          value={currentJobPrice}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || (!isNaN(value) && parseFloat(value) >= 0)) {
+                              setCurrentJobPrice(value);
+                            }
+                          }}
+                          onKeyPress={handleJobPointKeyPress}
+                          type="number"
+                          sx={{ minWidth: 150 }}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <CurrencyRupee fontSize="small" />
+                              </InputAdornment>
+                            ),
+                          }}
+                        />
                         <Button
                           variant="contained"
                           onClick={addJobPoint}
-                          disabled={!currentJobPoint.trim()}
+                          disabled={!currentJobDescription.trim()}
                           startIcon={<AddIcon />}
                           sx={{ minWidth: 120 }}
                         >
-                          Add Point
+                          Add Item
                         </Button>
                       </Box>
 
-                      {jobPoints.filter(point => point.trim()).length > 0 && (
+                      {jobPoints.length > 0 && (
                         <Box sx={{ mt: 2 }}>
-                          <Typography variant="subtitle2" gutterBottom>Job Details Points:</Typography>
-                          <List sx={{ bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 1 }}>
-                            {jobPoints.map((point, index) => (
-                              point.trim() && (
-                                <ListItem key={index} divider>
-                                  <ListItemText primary={point} sx={{ wordBreak: 'break-word' }} />
-                                  <ListItemSecondaryAction>
-                                    <IconButton edge="end" onClick={() => removeJobPoint(index)} color="error">
-                                      <DeleteIcon />
-                                    </IconButton>
-                                  </ListItemSecondaryAction>
-                                </ListItem>
-                              )
-                            ))}
-                          </List>
+                          <Typography variant="subtitle2" gutterBottom>Job Items & Pricing:</Typography>
+                          <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell><strong>S.No.</strong></TableCell>
+                                  <TableCell><strong>Description</strong></TableCell>
+                                  <TableCell align="right"><strong>Price (₹)</strong></TableCell>
+                                  <TableCell align="center"><strong>Actions</strong></TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {jobPoints.map((point, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell sx={{ wordBreak: 'break-word' }}>
+                                      <TextField
+                                        value={point.description}
+                                        onChange={(e) => updateJobPoint(index, 'description', e.target.value)}
+                                        variant="standard"
+                                        fullWidth
+                                        multiline
+                                        InputProps={{ disableUnderline: false }}
+                                      />
+                                    </TableCell>
+                                    <TableCell align="right">
+                                      <TextField
+                                        value={point.price}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          if (value === '' || (!isNaN(value) && parseFloat(value) >= 0)) {
+                                            updateJobPoint(index, 'price', value);
+                                          }
+                                        }}
+                                        variant="standard"
+                                        type="number"
+                                        InputProps={{ 
+                                          disableUnderline: false,
+                                          startAdornment: <InputAdornment position="start">₹</InputAdornment>
+                                        }}
+                                      />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      <IconButton 
+                                        onClick={() => removeJobPoint(index)} 
+                                        color="error" 
+                                        size="small"
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                <TableRow>
+                                  <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
+                                  <TableCell align="right">
+                                    <Typography variant="h6" color="primary">
+                                      <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell></TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
                         </Box>
                       )}
 
-                      {jobPoints.filter(point => point.trim()).length > 0 && (
+                      {/* {jobPoints.length > 0 && (
                         <Box sx={{ 
                           mt: 2, 
                           p: 2, 
                           bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', 
                           borderRadius: 1 
                         }}>
-                          <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API - Raw Values Only):</Typography>
+                          <Typography variant="caption" color="text.secondary" gutterBottom>Preview (sent to API - JSON Format):</Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace', color: 'text.primary' }}>
                             {getJobDetailsForAPI()}
                           </Typography>
                         </Box>
-                      )}
+                      )} */}
                     </Grid>
                   </Grid>
                 </Paper>

@@ -872,10 +872,27 @@ const Dashboard = () => {
                                 </TableCell>
                                 <TableCell>{job.customerName || "N/A"}</TableCell>
                                 <TableCell>
-                                  {job.jobDetails ||
-                                    job.type ||
-                                    "General Service"}
-                                </TableCell>
+  {(() => {
+    try {
+      const details = JSON.parse(job.jobDetails);
+      if (Array.isArray(details)) {
+        return (
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            {details.map((item, index) => (
+              <li key={index}>
+                {item.description} - ₹{item.price}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+      return "N/A";
+    } catch (err) {
+      return job.jobDetails || job.type || "General Service";
+    }
+  })()}
+</TableCell>
+
                                 <TableCell>
                                   <Box
                                     sx={{
