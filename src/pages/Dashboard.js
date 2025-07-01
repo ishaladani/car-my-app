@@ -68,6 +68,141 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import JobDetailsModal from "./jobDetailsModal";
 
+// Job Details Component for better parsing and display
+const JobDetailsComponent = ({ 
+  jobDetails, 
+  maxItems = 2, 
+  showPrices = true,
+  compact = false 
+}) => {
+  const parseAndDisplayJobDetails = (jobDetailsString) => {
+    if (!jobDetailsString) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No details available
+        </Typography>
+      );
+    }
+
+    // If it's already a plain string (not JSON), display it directly
+    if (typeof jobDetailsString === 'string' && 
+        !jobDetailsString.trim().startsWith('[') && 
+        !jobDetailsString.trim().startsWith('{')) {
+      return (
+        <Typography variant="body2" sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}>
+          {jobDetailsString}
+        </Typography>
+      );
+    }
+
+    try {
+      const details = JSON.parse(jobDetailsString);
+      
+      if (Array.isArray(details) && details.length > 0) {
+        return (
+          <Box>
+            {details.slice(0, maxItems).map((item, index) => (
+              <Box key={index} sx={{ 
+                mb: compact ? 0.3 : 0.5, 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    flex: 1, 
+                    fontSize: compact ? '0.8rem' : '0.875rem',
+                    lineHeight: 1.2
+                  }}
+                >
+                  • {item.description || item.name || `Service ${index + 1}`}
+                </Typography>
+                {showPrices && item.price && (
+                  <Chip 
+                    label={`${item.price}`} 
+                    size="small" 
+                    variant="outlined"
+                    sx={{ 
+                      fontSize: '0.75rem',
+                      height: compact ? '18px' : '20px',
+                      fontWeight: 600,
+                      '& .MuiChip-label': {
+                        px: compact ? 0.5 : 1
+                      }
+                    }}
+                  />
+                )}
+              </Box>
+            ))}
+            {details.length > maxItems && (
+              <Typography 
+                variant="caption" 
+                color="text.secondary" 
+                sx={{ 
+                  fontStyle: 'italic',
+                  fontSize: compact ? '0.7rem' : '0.75rem'
+                }}
+              >
+                +{details.length - maxItems} more service{details.length - maxItems > 1 ? 's' : ''}
+              </Typography>
+            )}
+          </Box>
+        );
+      } else if (typeof details === 'object' && details !== null) {
+        // Handle single object case
+        return (
+          <Box>
+            {details.description && (
+              <Typography 
+                variant="body2" 
+                sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+              >
+                • {details.description}
+              </Typography>
+            )}
+            {showPrices && details.price && (
+              <Chip 
+                label={`${details.price}`} 
+                size="small" 
+                variant="outlined"
+                sx={{ 
+                  mt: 0.5, 
+                  fontWeight: 600,
+                  height: compact ? '18px' : '20px'
+                }}
+              />
+            )}
+          </Box>
+        );
+      } else {
+        return (
+          <Typography 
+            variant="body2" 
+            sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+          >
+            {String(details)}
+          </Typography>
+        );
+      }
+    } catch (error) {
+      console.warn('Failed to parse job details:', error);
+      // If JSON parsing fails, display the original string
+      return (
+        <Typography 
+          variant="body2" 
+          sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+        >
+          {jobDetailsString}
+        </Typography>
+      );
+    }
+  };
+
+  return parseAndDisplayJobDetails(jobDetails);
+};
+
 const Dashboard = () => {
   
   let garageId = localStorage.getItem("garageId");
@@ -872,27 +1007,13 @@ const Dashboard = () => {
                                 </TableCell>
                                 <TableCell>{job.customerName || "N/A"}</TableCell>
                                 <TableCell>
-  {(() => {
-    try {
-      const details = JSON.parse(job.jobDetails);
-      if (Array.isArray(details)) {
-        return (
-          <ul style={{ margin: 0, paddingLeft: 16 }}>
-            {details.map((item, index) => (
-              <li key={index}>
-                {item.description} - ₹{item.price}
-              </li>
-            ))}
-          </ul>
-        );
-      }
-      return "N/A";
-    } catch (err) {
-      return job.jobDetails || job.type || "General Service";
-    }
-  })()}
-</TableCell>
-
+                                  <JobDetailsComponent 
+                                    jobDetails={job.jobDetails} 
+                                    maxItems={2}
+                                    showPrices={true}
+                                    compact={true}
+                                  />
+                                </TableCell>
                                 <TableCell>
                                   <Box
                                     sx={{
@@ -1145,7 +1266,7 @@ const Dashboard = () => {
                                     />
                                   </TableCell>
                                   <TableCell align="right">
-                                    ₹{item.price.toLocaleString()}
+                                   {item.price.toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -1263,7 +1384,7 @@ const Dashboard = () => {
                                     />
                                   </TableCell>
                                   <TableCell align="right">
-                                    ₹{item.price.toLocaleString()}
+                                   {item.price.toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               ))}

@@ -751,432 +751,433 @@ const AutoServeBilling = () => {
   };
 
   // UPDATED: Professional GST PDF generation function
-  const generateProfessionalGSTInvoice = () => {
-    try {
-      const doc = new jsPDF('p', 'pt', 'a4');
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 30;
-      const contentWidth = pageWidth - (margin * 2);
-      let currentY = 40;
+ // UPDATED: Fixed Professional GST PDF generation function with proper table formatting
+const generateProfessionalGSTInvoice = () => {
+  try {
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 30;
+    const contentWidth = pageWidth - (margin * 2);
+    let currentY = 40;
 
-      // Helper function to convert number to words
-      const numberToWords = (num) => {
-        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-        const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-        
-        if (num === 0) return 'Zero';
-        
-        let words = '';
-        
-        // Handle crores
-        if (num >= 10000000) {
-          words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
-          num %= 10000000;
-        }
-        
-        // Handle lakhs
-        if (num >= 100000) {
-          words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
-          num %= 100000;
-        }
-        
-        // Handle thousands
-        if (num >= 1000) {
-          words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
-          num %= 1000;
-        }
-        
-        // Handle hundreds
-        if (num >= 100) {
-          words += ones[Math.floor(num / 100)] + ' Hundred ';
-          num %= 100;
-        }
-        
-        // Handle tens and ones
-        if (num >= 20) {
-          words += tens[Math.floor(num / 10)];
-          if (num % 10 !== 0) {
-            words += ' ' + ones[num % 10];
-          }
-        } else if (num >= 10) {
-          words += teens[num - 10];
-        } else if (num > 0) {
-          words += ones[num];
-        }
-        
-        return words.trim();
-      };
-
-      // Helper function to draw bordered rectangle
-      const drawBorderedRect = (x, y, width, height, fillColor = null) => {
-        if (fillColor) {
-          doc.setFillColor(fillColor);
-          doc.rect(x, y, width, height, 'F');
-        }
-        doc.setLineWidth(0.5);
-        doc.rect(x, y, width, height);
-      };
-
-      // Header Section with Border
-      drawBorderedRect(margin, currentY, contentWidth, 80);
+    // Helper function to convert number to words
+    const numberToWords = (num) => {
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
       
-      // Company Name
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      const companyName = garageDetails.name.toUpperCase();
-      const nameWidth = doc.getTextWidth(companyName);
-      doc.text(companyName, (pageWidth - nameWidth) / 2, currentY + 25);
+      if (num === 0) return 'Zero';
       
-      // Company Address
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      const addressLine = `${garageDetails.address}`;
-      const addressWidth = doc.getTextWidth(addressLine);
-      doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 45);
+      let words = '';
       
-      // GST Number
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      const gstLine = `GST No: ${garageDetails.gstNum || 'N/A'}`;
-      const gstWidth = doc.getTextWidth(gstLine);
-      doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 65);
-      
-      currentY += 100;
-
-      // Invoice Type Section
-      const docTypeY = currentY;
-      drawBorderedRect(margin, docTypeY, 100, 25);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Tax Invoice", margin + 10, docTypeY + 17);
-      
-      // Original/Duplicate
-      drawBorderedRect(pageWidth - margin - 80, docTypeY, 80, 25);
-      doc.text("Original", pageWidth - margin - 70, docTypeY + 17);
-      
-      currentY += 35;
-
-      // Bill To and Ship To Section
-      const billShipY = currentY;
-      const billToWidth = contentWidth / 2 - 5;
-      const shipToWidth = contentWidth / 2 - 5;
-      
-      // Bill To Section
-      drawBorderedRect(margin, billShipY, billToWidth, 120);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill to:", margin + 10, billShipY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Name: ${carDetails.customerName}`, margin + 10, billShipY + 40);
-      doc.text(`Contact: ${carDetails.contact}`, margin + 10, billShipY + 55);
-      if (carDetails.email) {
-        doc.text(`Email: ${carDetails.email}`, margin + 10, billShipY + 70);
-      }
-      if (gstSettings.customerGstNumber) {
-        doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, billShipY + 85);
+      // Handle crores
+      if (num >= 10000000) {
+        words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
+        num %= 10000000;
       }
       
-      // Ship To Section
-      drawBorderedRect(margin + billToWidth + 10, billShipY, shipToWidth, 120);
-      doc.setFont("helvetica", "bold");
-      doc.text("Ship to:", margin + billToWidth + 20, billShipY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Name: ${carDetails.customerName}`, margin + billToWidth + 20, billShipY + 40);
-      doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + billToWidth + 20, billShipY + 55);
-      doc.text(`Reg No: ${carDetails.carNumber}`, margin + billToWidth + 20, billShipY + 70);
+      // Handle lakhs
+      if (num >= 100000) {
+        words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
+        num %= 100000;
+      }
       
-      // Invoice Details on right side
-      const invoiceDetailsX = margin + billToWidth + 20;
-      doc.setFontSize(9);
-      doc.text(`Invoice No: ${carDetails.invoiceNo}`, invoiceDetailsX + 10, billShipY + 100);
-      doc.text(`Date: ${carDetails.billingDate}`, invoiceDetailsX + 10, billShipY + 115);
+      // Handle thousands
+      if (num >= 1000) {
+        words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
+        num %= 1000;
+      }
       
-      currentY = billShipY + 140;
+      // Handle hundreds
+      if (num >= 100) {
+        words += ones[Math.floor(num / 100)] + ' Hundred ';
+        num %= 100;
+      }
+      
+      // Handle tens and ones
+      if (num >= 20) {
+        words += tens[Math.floor(num / 10)];
+        if (num % 10 !== 0) {
+          words += ' ' + ones[num % 10];
+        }
+      } else if (num >= 10) {
+        words += teens[num - 10];
+      } else if (num > 0) {
+        words += ones[num];
+      }
+      
+      return words.trim();
+    };
 
-      // Items Table Header
-      const tableStartY = currentY;
-      const colWidths = {
-        srNo: 35,
-        productName: 200,
-        hsnSac: 60,
-        qty: 40,
-        unit: 35,
-        rate: 60,
-        gstPercent: 45,
-        amount: 70
-      };
-      
-      // Draw table header
-      let colX = margin;
-      drawBorderedRect(margin, tableStartY, contentWidth, 30, '#f0f0f0');
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      
-      // Header cells
-      doc.text("Sr.No", colX + 5, tableStartY + 20);
-      colX += colWidths.srNo;
-      doc.text("Product Name", colX + 5, tableStartY + 20);
-      colX += colWidths.productName;
-      doc.text("HSN/SAC", colX + 5, tableStartY + 20);
-      colX += colWidths.hsnSac;
-      doc.text("Qty", colX + 5, tableStartY + 20);
-      colX += colWidths.qty;
-      doc.text("Unit", colX + 5, tableStartY + 20);
-      colX += colWidths.unit;
-      doc.text("Rate", colX + 5, tableStartY + 20);
-      colX += colWidths.rate;
-      doc.text("GST%", colX + 5, tableStartY + 20);
-      colX += colWidths.gstPercent;
-      doc.text("Amount", colX + 5, tableStartY + 20);
-      
-      currentY = tableStartY + 30;
+    // Helper function to draw bordered rectangle
+    const drawBorderedRect = (x, y, width, height, fillColor = null) => {
+      if (fillColor) {
+        doc.setFillColor(fillColor);
+        doc.rect(x, y, width, height, 'F');
+      }
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(0, 0, 0); // Black border
+      doc.rect(x, y, width, height);
+    };
 
-      // Draw vertical lines for header
-      colX = margin;
-      Object.values(colWidths).forEach((width, index) => {
-        if (index < Object.values(colWidths).length) {
-          doc.line(colX + width, tableStartY, colX + width, tableStartY + 30);
-          colX += width;
+    // Helper function to wrap text in cell
+    const wrapText = (text, maxWidth, fontSize = 9) => {
+      doc.setFontSize(fontSize);
+      const words = text.toString().split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      words.forEach(word => {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = doc.getTextWidth(testLine);
+        
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
         }
       });
-
-      // Parts Data Rows
-      doc.setFont("helvetica", "normal");
-      let rowIndex = 1;
       
-      if (parts.length > 0) {
-        parts.forEach((part) => {
-          const rowHeight = 25;
-          
-          // Draw row border
-          drawBorderedRect(margin, currentY, contentWidth, rowHeight);
-          
-          // Draw vertical lines
-          colX = margin;
-          Object.values(colWidths).forEach((width, index) => {
-            if (index < Object.values(colWidths).length) {
-              doc.line(colX + width, currentY, colX + width, currentY + rowHeight);
-              colX += width;
-            }
-          });
-          
-          // Fill data
-          colX = margin;
-          doc.text(rowIndex.toString(), colX + 5, currentY + 17);
-          colX += colWidths.srNo;
-          
-          const partName = part.name.length > 25 ? part.name.substring(0, 25) + "..." : part.name;
-          doc.text(partName, colX + 5, currentY + 17);
-          colX += colWidths.productName;
-          
-          doc.text("8708", colX + 5, currentY + 17); // Default HSN code for auto parts
-          colX += colWidths.hsnSac;
-          
-          doc.text(part.quantity.toString(), colX + 5, currentY + 17);
-          colX += colWidths.qty;
-          
-          doc.text("Nos", colX + 5, currentY + 17);
-          colX += colWidths.unit;
-          
-          doc.text(part.pricePerUnit.toFixed(2), colX + 5, currentY + 17);
-          colX += colWidths.rate;
-          
-          doc.text(`${gstSettings.gstPercentage}%`, colX + 5, currentY + 17);
-          colX += colWidths.gstPercent;
-          
-          doc.text(part.total.toFixed(2), colX + 5, currentY + 17);
-          
-          currentY += rowHeight;
-          rowIndex++;
-        });
+      if (currentLine) {
+        lines.push(currentLine);
       }
+      
+      return lines;
+    };
 
-      // Services Data Rows
-      if (services.length > 0) {
-        services.forEach((service) => {
-          const rowHeight = 25;
-          
-          // Draw row border
-          drawBorderedRect(margin, currentY, contentWidth, rowHeight);
-          
-          // Draw vertical lines
-          colX = margin;
-          Object.values(colWidths).forEach((width, index) => {
-            if (index < Object.values(colWidths).length) {
-              doc.line(colX + width, currentY, colX + width, currentY + rowHeight);
-              colX += width;
-            }
-          });
-          
-          // Fill data
-          colX = margin;
-          doc.text(rowIndex.toString(), colX + 5, currentY + 17);
-          colX += colWidths.srNo;
-          
-          const serviceName = service.name.length > 25 ? service.name.substring(0, 25) + "..." : service.name;
-          doc.text(serviceName, colX + 5, currentY + 17);
-          colX += colWidths.productName;
-          
-          doc.text("9954", colX + 5, currentY + 17); // HSN code for repair services
-          colX += colWidths.hsnSac;
-          
-          doc.text("1", colX + 5, currentY + 17);
-          colX += colWidths.qty;
-          
-          doc.text("Nos", colX + 5, currentY + 17);
-          colX += colWidths.unit;
-          
-          doc.text(service.laborCost.toFixed(2), colX + 5, currentY + 17);
-          colX += colWidths.rate;
-          
-          doc.text(`${gstSettings.gstPercentage}%`, colX + 5, currentY + 17);
-          colX += colWidths.gstPercent;
-          
-          doc.text(service.laborCost.toFixed(2), colX + 5, currentY + 17);
-          
-          currentY += rowHeight;
-          rowIndex++;
-        });
+    // Header Section with Border
+    drawBorderedRect(margin, currentY, contentWidth, 80);
+    
+    // Company Name
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    const companyName = garageDetails.name.toUpperCase();
+    const nameWidth = doc.getTextWidth(companyName);
+    doc.text(companyName, (pageWidth - nameWidth) / 2, currentY + 25);
+    
+    // Company Address
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const addressLine = `${garageDetails.address}`;
+    const addressWidth = doc.getTextWidth(addressLine);
+    doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 45);
+    
+    // GST Number
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    const gstLine = `GST No: ${garageDetails.gstNum || 'N/A'}`;
+    const gstWidth = doc.getTextWidth(gstLine);
+    doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 65);
+    
+    currentY += 100;
+
+    // Invoice Type Section
+    const docTypeY = currentY;
+    drawBorderedRect(margin, docTypeY, 100, 25);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tax Invoice", margin + 10, docTypeY + 17);
+    
+    // Original/Duplicate
+    drawBorderedRect(pageWidth - margin - 80, docTypeY, 80, 25);
+    doc.text("Original", pageWidth - margin - 70, docTypeY + 17);
+    
+    currentY += 35;
+
+    // Bill To and Ship To Section
+    const billShipY = currentY;
+    const billToWidth = contentWidth / 2 - 5;
+    
+    // Bill To Section
+    drawBorderedRect(margin, billShipY, billToWidth, 120);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill to:", margin + 10, billShipY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${carDetails.customerName}`, margin + 10, billShipY + 40);
+    doc.text(`Contact: ${carDetails.contact}`, margin + 10, billShipY + 55);
+    if (carDetails.email) {
+      doc.text(`Email: ${carDetails.email}`, margin + 10, billShipY + 70);
+    }
+    if (gstSettings.customerGstNumber) {
+      doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, billShipY + 85);
+    }
+    
+    // Ship To Section
+    const shipToWidth = contentWidth / 2 - 5;
+    drawBorderedRect(margin + billToWidth + 10, billShipY, shipToWidth, 120);
+    doc.setFont("helvetica", "bold");
+    doc.text("Ship to:", margin + billToWidth + 20, billShipY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${carDetails.customerName}`, margin + billToWidth + 20, billShipY + 40);
+    doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + billToWidth + 20, billShipY + 55);
+    doc.text(`Reg No: ${carDetails.carNumber}`, margin + billToWidth + 20, billShipY + 70);
+    
+    // Invoice Details on right side
+    const invoiceDetailsX = margin + billToWidth + 20;
+    doc.setFontSize(9);
+    doc.text(`Invoice No: ${carDetails.invoiceNo}`, invoiceDetailsX, billShipY + 100);
+    doc.text(`Date: ${carDetails.billingDate}`, invoiceDetailsX, billShipY + 115);
+    
+    currentY = billShipY + 140;
+
+    // FIXED: Items Table with proper column widths and alignment
+    const tableStartY = currentY;
+    
+    // Adjusted column widths to fit content properly
+    const colWidths = {
+      srNo: 40,        // Serial number
+      productName: 180, // Product/Service name
+      hsnSac: 60,      // HSN/SAC code
+      qty: 35,         // Quantity
+      unit: 40,        // Unit
+      rate: 70,        // Rate per unit
+      gstPercent: 50,  // GST percentage
+      amount: 70       // Total amount
+    };
+    
+    const totalTableWidth = Object.values(colWidths).reduce((sum, width) => sum + width, 0);
+    
+    // Draw table header with proper borders
+    let headerY = tableStartY;
+    drawBorderedRect(margin, headerY, totalTableWidth, 30, '#f0f0f0');
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    
+    // Draw vertical lines and add header text
+    let colX = margin;
+    const headers = ["Sr.No", "Product/Service Name", "HSN/SAC", "Qty", "Unit", "Rate", "GST%", "Amount"];
+    const columnKeys = Object.keys(colWidths);
+    
+    headers.forEach((header, index) => {
+      const colWidth = colWidths[columnKeys[index]];
+      
+      // Add header text (centered)
+      const textWidth = doc.getTextWidth(header);
+      const textX = colX + (colWidth - textWidth) / 2;
+      doc.text(header, textX, headerY + 20);
+      
+      // Draw right border for column (except last column)
+      if (index < headers.length - 1) {
+        doc.line(colX + colWidth, headerY, colX + colWidth, headerY + 30);
       }
+      
+      colX += colWidth;
+    });
 
-      // Add empty rows if needed to maintain table structure
-      const minRows = 8;
-      const currentRows = parts.length + services.length;
-      if (currentRows < minRows) {
-        for (let i = currentRows; i < minRows; i++) {
-          const rowHeight = 25;
-          drawBorderedRect(margin, currentY, contentWidth, rowHeight);
-          
-          // Draw vertical lines
-          colX = margin;
-          Object.values(colWidths).forEach((width, index) => {
-            if (index < Object.values(colWidths).length) {
-              doc.line(colX + width, currentY, colX + width, currentY + rowHeight);
-              colX += width;
-            }
-          });
-          
-          currentY += rowHeight;
+    currentY = headerY + 30;
+
+    // FIXED: Data rows with proper text wrapping and alignment
+    doc.setFont("helvetica", "normal");
+    let rowIndex = 1;
+    
+    // Function to draw table row with proper formatting
+    const drawTableRow = (rowData, rowY) => {
+      const rowHeight = 25;
+      
+      // Draw row background
+      drawBorderedRect(margin, rowY, totalTableWidth, rowHeight);
+      
+      // Draw column content
+      colX = margin;
+      rowData.forEach((cellData, index) => {
+        const colWidth = colWidths[columnKeys[index]];
+        
+        // Handle text wrapping for long content
+        let displayText = cellData.toString();
+        if (index === 1 && displayText.length > 20) { // Product name column
+          displayText = displayText.substring(0, 18) + "...";
         }
-      }
-
-      currentY += 10;
-
-      // Summary Section
-      const summaryStartY = currentY;
-      const summaryWidth = 200;
-      const summaryX = pageWidth - margin - summaryWidth;
-      
-      // Sub Total
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "bold");
-      doc.text("Sub Total", summaryX + 10, currentY + 17);
-      doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-      currentY += 25;
-      
-      // Taxable Amount
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.text("Taxable Amount", summaryX + 10, currentY + 17);
-      doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-      currentY += 25;
-
-      // GST Details
-      if (gstSettings.includeGst && summary.gstAmount > 0) {
-        if (gstSettings.isInterState) {
-          // IGST
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text(summary.gstAmount.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
+        
+        // Right align numbers, left align text
+        if (index === 0 || index >= 3) { // Sr.No, Qty, Rate, GST%, Amount
+          const textWidth = doc.getTextWidth(displayText);
+          doc.text(displayText, colX + colWidth - textWidth - 5, rowY + 17);
         } else {
-          // CGST
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`CGST ${gstSettings.cgstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
-          
-          // SGST
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`SGST ${gstSettings.sgstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
+          doc.text(displayText, colX + 5, rowY + 17);
         }
-      }
+        
+        // Draw right border for column (except last column)
+        if (index < rowData.length - 1) {
+          doc.line(colX + colWidth, rowY, colX + colWidth, rowY + rowHeight);
+        }
+        
+        colX += colWidth;
+      });
+      
+      return rowHeight;
+    };
+    
+    // Parts Data Rows
+    if (parts.length > 0) {
+      parts.forEach((part) => {
+        const rowData = [
+          rowIndex.toString(),
+          part.name,
+          "8708", // Default HSN code for auto parts
+          part.quantity.toString(),
+          "Nos",
+          part.pricePerUnit.toFixed(2),
+          `${gstSettings.gstPercentage}%`,
+          part.total.toFixed(2)
+        ];
+        
+        const rowHeight = drawTableRow(rowData, currentY);
+        currentY += rowHeight;
+        rowIndex++;
+      });
+    }
 
-      // Round Off
-      const roundOff = Math.round(summary.totalAmount) - summary.totalAmount;
-      if (Math.abs(roundOff) > 0.01) {
+    // Services Data Rows
+    if (services.length > 0) {
+      services.forEach((service) => {
+        const rowData = [
+          rowIndex.toString(),
+          service.name,
+          "9954", // HSN code for repair services
+          "1",
+          "Nos",
+          service.laborCost.toFixed(2),
+          `${gstSettings.gstPercentage}%`,
+          service.laborCost.toFixed(2)
+        ];
+        
+        const rowHeight = drawTableRow(rowData, currentY);
+        currentY += rowHeight;
+        rowIndex++;
+      });
+    }
+
+    // Add empty rows if needed to maintain table structure
+    const minRows = 8;
+    const currentRows = parts.length + services.length;
+    if (currentRows < minRows) {
+      for (let i = currentRows; i < minRows; i++) {
+        const emptyRowData = ["", "", "", "", "", "", "", ""];
+        const rowHeight = drawTableRow(emptyRowData, currentY);
+        currentY += rowHeight;
+      }
+    }
+
+    currentY += 10;
+
+    // Summary Section (keeping your existing summary code)
+    const summaryStartY = currentY;
+    const summaryWidth = 200;
+    const summaryX = pageWidth - margin - summaryWidth;
+    
+    // Sub Total
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sub Total", summaryX + 10, currentY + 17);
+    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    currentY += 25;
+    
+    // Taxable Amount
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.text("Taxable Amount", summaryX + 10, currentY + 17);
+    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    currentY += 25;
+
+    // GST Details
+    if (gstSettings.includeGst && summary.gstAmount > 0) {
+      if (gstSettings.isInterState) {
+        // IGST
         drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.text("Round Off", summaryX + 10, currentY + 17);
-        doc.text(roundOff.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text(summary.gstAmount.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        currentY += 25;
+      } else {
+        // CGST
+        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+        doc.text(`CGST ${gstSettings.cgstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        currentY += 25;
+        
+        // SGST
+        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+        doc.text(`SGST ${gstSettings.sgstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
         currentY += 25;
       }
-
-      // Grand Total
-      drawBorderedRect(summaryX, currentY, summaryWidth, 30, '#f0f0f0');
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text("Grand Total", summaryX + 10, currentY + 20);
-      doc.text(Math.round(summary.totalAmount).toFixed(2), summaryX + summaryWidth - 80, currentY + 20);
-      currentY += 40;
-
-      // Amount in Words
-      const amountInWords = numberToWords(Math.round(summary.totalAmount)) + " Only";
-      drawBorderedRect(margin, currentY, contentWidth, 30);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill Amount:", margin + 10, currentY + 15);
-      doc.setFont("helvetica", "normal");
-      doc.text(amountInWords, margin + 80, currentY + 15);
-      currentY += 40;
-
-      // Bank Details Section
-      if (garageDetails.bankName || garageDetails.accountNumber) {
-        drawBorderedRect(margin, currentY, contentWidth / 2, 80);
-        doc.setFont("helvetica", "bold");
-        doc.text("Bank Details:", margin + 10, currentY + 20);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Bank Name: ${garageDetails.bankName || 'N/A'}`, margin + 10, currentY + 35);
-        doc.text(`A/c No: ${garageDetails.accountNumber || 'N/A'}`, margin + 10, currentY + 50);
-        doc.text(`IFSC: ${garageDetails.ifscCode || 'N/A'}`, margin + 10, currentY + 65);
-      }
-
-      // Terms & Conditions
-      const termsX = margin + (contentWidth / 2) + 10;
-      drawBorderedRect(termsX, currentY, contentWidth / 2 - 10, 80);
-      doc.setFont("helvetica", "bold");
-      doc.text("Terms & Conditions:", termsX + 10, currentY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text("1. Goods once sold will not be taken back.", termsX + 10, currentY + 35);
-      doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, currentY + 47);
-      doc.text("3. Subject to local jurisdiction only.", termsX + 10, currentY + 59);
-      doc.text("4. E. & O.E.", termsX + 10, currentY + 71);
-      
-      currentY += 100;
-
-      // Authorized Signatory
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      currentY += 40;
-      doc.text("(Authorized Signatory)", pageWidth - margin - 200, currentY);
-
-      // Footer with generated timestamp
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      const timestamp = new Date().toLocaleString();
-      doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
-
-      return doc;
-      
-    } catch (error) {
-      console.error('Professional GST PDF Generation Error:', error);
-      throw new Error('Failed to generate professional GST invoice: ' + error.message);
     }
-  };
+
+    // Round Off
+    const roundOff = Math.round(summary.totalAmount) - summary.totalAmount;
+    if (Math.abs(roundOff) > 0.01) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.text("Round Off", summaryX + 10, currentY + 17);
+      doc.text(roundOff.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+      currentY += 25;
+    }
+
+    // Grand Total
+    drawBorderedRect(summaryX, currentY, summaryWidth, 30, '#f0f0f0');
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Grand Total", summaryX + 10, currentY + 20);
+    doc.text(Math.round(summary.totalAmount).toFixed(2), summaryX + summaryWidth - 80, currentY + 20);
+    currentY += 40;
+
+    // Amount in Words
+    const amountInWords = numberToWords(Math.round(summary.totalAmount)) + " Only";
+    drawBorderedRect(margin, currentY, contentWidth, 30);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill Amount:", margin + 10, currentY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(amountInWords, margin + 80, currentY + 15);
+    currentY += 40;
+
+    // Bank Details Section
+    if (garageDetails.bankName || garageDetails.accountNumber) {
+      drawBorderedRect(margin, currentY, contentWidth / 2, 80);
+      doc.setFont("helvetica", "bold");
+      doc.text("Bank Details:", margin + 10, currentY + 20);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Bank Name: ${garageDetails.bankName || 'N/A'}`, margin + 10, currentY + 35);
+      doc.text(`A/c No: ${garageDetails.accountNumber || 'N/A'}`, margin + 10, currentY + 50);
+      doc.text(`IFSC: ${garageDetails.ifscCode || 'N/A'}`, margin + 10, currentY + 65);
+    }
+
+    // Terms & Conditions
+    const termsX = margin + (contentWidth / 2) + 10;
+    drawBorderedRect(termsX, currentY, contentWidth / 2 - 10, 80);
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms & Conditions:", termsX + 10, currentY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("1. Goods once sold will not be taken back.", termsX + 10, currentY + 35);
+    doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, currentY + 47);
+    doc.text("3. Subject to local jurisdiction only.", termsX + 10, currentY + 59);
+    doc.text("4. E. & O.E.", termsX + 10, currentY + 71);
+    
+    currentY += 100;
+
+    // Authorized Signatory
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    currentY += 40;
+    doc.text("(Authorized Signatory)", pageWidth - margin - 200, currentY);
+
+    // Footer with generated timestamp
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const timestamp = new Date().toLocaleString();
+    doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
+
+    return doc;
+    
+  } catch (error) {
+    console.error('Professional GST PDF Generation Error:', error);
+    throw new Error('Failed to generate professional GST invoice: ' + error.message);
+  }
+};
 
   // Enhanced download function with better error handling
   const downloadPdfBill = () => {

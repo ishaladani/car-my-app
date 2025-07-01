@@ -1531,7 +1531,7 @@ const AssignEngineer = () => {
                     )}
 
                     {/* API Preview */}
-                    {jobPoints.length > 0 && (
+                    {/* {jobPoints.length > 0 && (
                       <Box sx={{ 
                         mt: 2, 
                         p: 2, 
@@ -1553,7 +1553,7 @@ const AssignEngineer = () => {
                           {JSON.stringify(jobPoints, null, 2)}
                         </Typography>
                       </Box>
-                    )}
+                    )} */}
                   </Grid>
                 </Grid>
               </Paper>

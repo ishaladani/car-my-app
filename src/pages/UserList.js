@@ -659,8 +659,9 @@ const UserManagement = () => {
           </DialogTitle>
           <DialogContent sx={{ pt: 2, mt:2 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
+              <Grid item xs={12} sx={{ pt: 2, mt:2 }}>
                 <TextField 
+                
                   fullWidth 
                   label="Full Name" 
                   name="name" 
