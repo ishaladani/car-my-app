@@ -13,8 +13,7 @@ const GarageDetailsSection = ({ garageDetails }) => {
         <Typography variant="body2" color="text.secondary">Phone: {garageDetails.phone}</Typography>
         <Typography variant="body2" color="text.secondary">GST: {garageDetails.gstNumber}</Typography>
         <Typography variant="body2" color="text.secondary">Email: {garageDetails.email}</Typography>
-        <Typography variant="body2" color="text.secondary">Website: {garageDetails.website}</Typography>
-      </CardContent>
+            </CardContent>
     </Card>
   );
 };

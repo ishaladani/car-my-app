@@ -996,106 +996,118 @@ const WorkInProgress = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {allParts.map((part) => (
-                          <TableRow key={part.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                            <TableCell>
-                              <Chip 
-                                label={part.type === 'existing' ? 'Existing' : 'Inventory'} 
-                                color={part.type === 'existing' ? 'warning' : 'primary'}
-                                size="small" 
-                                icon={part.type === 'existing' ? <AssignmentIcon /> : <InventoryIcon />}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <Typography variant="body2" fontWeight={500}>
-                                  {part.partName}
-                                </Typography>
-                                {part.type === 'inventory' && (
-                                  <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
-                                    Available: {getAvailableQuantity(part.inventoryId) + (part.selectedQuantity || 1)}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    const newQuantity = (part.selectedQuantity || 1) - 1;
-                                    if (newQuantity >= 1) {
-                                      handleInventoryPartQuantityChange(part.id, newQuantity);
-                                    }
-                                  }}
-                                  disabled={(part.selectedQuantity || 1) <= 1}
-                                  sx={{ 
-                                    minWidth: '24px', 
-                                    width: '24px', 
-                                    height: '24px',
-                                    border: `1px solid ${theme.palette.divider}`
-                                  }}
-                                >
-                                  <Typography variant="caption" fontWeight="bold">-</Typography>
-                                </IconButton>
-                                <TextField
-                                  size="small"
-                                  type="number"
-                                  value={part.selectedQuantity || 1}
-                                  onChange={(e) => {
-                                    const newQuantity = parseInt(e.target.value) || 1;
-                                    handleInventoryPartQuantityChange(part.id, newQuantity);
-                                  }}
-                                  inputProps={{ 
-                                    min: 1,
-                                    style: { width: '50px', textAlign: 'center' }
-                                  }}
-                                  sx={{ 
-                                    width: '70px',
-                                    '& .MuiInputBase-input': {
-                                      textAlign: 'center',
-                                      fontSize: '0.875rem'
-                                    }
-                                  }}
-                                />
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    const newQuantity = (part.selectedQuantity || 1) + 1;
-                                    handleInventoryPartQuantityChange(part.id, newQuantity);
-                                  }}
-                                  sx={{ 
-                                    minWidth: '24px', 
-                                    width: '24px', 
-                                    height: '24px',
-                                    border: `1px solid ${theme.palette.divider}`
-                                  }}
-                                >
-                                  <Typography variant="caption" fontWeight="bold">+</Typography>
-                                </IconButton>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight={600} color="primary">
-                                ₹{calculatePartFinalPrice(part).toFixed(2)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <IconButton 
-                                color="error"
-                                onClick={() => removePartFromList(part.id)}
-                                sx={{ 
-                                  '&:hover': { 
-                                    bgcolor: 'rgba(239, 68, 68, 0.1)' 
-                                  }
-                                }}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+  {allParts.map((part) => (
+    <TableRow key={part.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+      <TableCell>
+        <Chip
+          label={part.type === 'existing' ? 'Existing' : 'Inventory'}
+          color={part.type === 'existing' ? 'warning' : 'primary'}
+          size="small"
+          icon={part.type === 'existing' ? <AssignmentIcon /> : <InventoryIcon />}
+        />
+      </TableCell>
+
+      <TableCell>
+        <Box>
+          <Typography variant="body2" fontWeight={500}>
+            {part.partName}
+          </Typography>
+          {part.type === 'inventory' && (
+            <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+              Available: {getAvailableQuantity(part.inventoryId) + (part.selectedQuantity || 1)}
+            </Typography>
+          )}
+        </Box>
+      </TableCell>
+
+      <TableCell>
+        {part.type === 'existing' ? (
+          <Typography variant="body2" color="text.secondary">
+            Quantity: {part.selectedQuantity || 1}
+          </Typography>
+        ) : (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <IconButton
+              size="small"
+              onClick={() => {
+                const newQuantity = (part.selectedQuantity || 1) - 1;
+                if (newQuantity >= 1) {
+                  handleInventoryPartQuantityChange(part.id, newQuantity);
+                }
+              }}
+              disabled={(part.selectedQuantity || 1) <= 1}
+              sx={{
+                minWidth: '24px',
+                width: '24px',
+                height: '24px',
+                border: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <Typography variant="caption" fontWeight="bold">-</Typography>
+            </IconButton>
+            <TextField
+              size="small"
+              type="number"
+              value={part.selectedQuantity || 1}
+              onChange={(e) => {
+                const newQuantity = parseInt(e.target.value) || 1;
+                handleInventoryPartQuantityChange(part.id, newQuantity);
+              }}
+              inputProps={{
+                min: 1,
+                style: { width: '50px', textAlign: 'center' }
+              }}
+              sx={{
+                width: '70px',
+                '& .MuiInputBase-input': {
+                  textAlign: 'center',
+                  fontSize: '0.875rem'
+                }
+              }}
+            />
+            <IconButton
+              size="small"
+              onClick={() => {
+                const newQuantity = (part.selectedQuantity || 1) + 1;
+                handleInventoryPartQuantityChange(part.id, newQuantity);
+              }}
+              sx={{
+                minWidth: '24px',
+                width: '24px',
+                height: '24px',
+                border: `1px solid ${theme.palette.divider}`
+              }}
+            >
+              <Typography variant="caption" fontWeight="bold">+</Typography>
+            </IconButton>
+          </Box>
+        )}
+      </TableCell>
+
+      <TableCell>
+        <Typography variant="body2" fontWeight={600} color="primary">
+          ₹{calculatePartFinalPrice(part).toFixed(2)}
+        </Typography>
+      </TableCell>
+
+      <TableCell>
+        <IconButton
+          color="error"
+          onClick={() => removePartFromList(part.id)}
+          disabled={part.type === 'existing'}
+          sx={{
+            '&:hover': {
+              bgcolor: part.type === 'existing' ? 'transparent' : 'rgba(239, 68, 68, 0.1)'
+            }
+          }}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
+
                     </Table>
                   </TableContainer>
                 )}

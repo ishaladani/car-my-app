@@ -77,7 +77,7 @@ const WorkInProgress = () => {
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
-  
+
   const theme = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -85,9 +85,9 @@ const WorkInProgress = () => {
   const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
   const navigate = useNavigate();
   const { id } = useParams();
-  
+
   const garageToken = localStorage.getItem('token');
-  
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -99,13 +99,13 @@ const WorkInProgress = () => {
     model: '',
     carNo: ''
   });
-  
+
   const [customerDetails, setCustomerDetails] = useState({
     name: '',
     contactNo: '',
     email: ''
   });
-  
+
   const [insuranceDetails, setInsuranceDetails] = useState({
     company: '',
     number: '',
@@ -114,18 +114,18 @@ const WorkInProgress = () => {
     regNo: '',
     amount: ''
   });
-  
+
   // Engineers state - MULTIPLE SELECTION
   const [engineers, setEngineers] = useState([]);
   const [assignedEngineers, setAssignedEngineers] = useState([]); // Changed to array for multiple selection
-  
+
   // Inventory parts state
   const [inventoryParts, setInventoryParts] = useState([]);
-  
+
   // COMBINED PARTS STATE - existing + new inventory parts
   const [allParts, setAllParts] = useState([]);
   const [partIdCounter, setPartIdCounter] = useState(1);
-  
+
   const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [laborHours, setLaborHours] = useState('');
@@ -216,7 +216,7 @@ const WorkInProgress = () => {
   // Fetch Engineers
   const fetchEngineers = useCallback(async () => {
     if (!garageId) return;
-    
+
     try {
       setIsLoadingEngineers(true);
       const res = await apiCall(`/garage/engineers/${garageId}`, { method: 'GET' });
@@ -236,7 +236,7 @@ const WorkInProgress = () => {
   // Fetch Inventory Parts
   const fetchInventoryParts = useCallback(async () => {
     if (!garageId) return;
-    
+
     try {
       setIsLoadingInventory(true);
       const res = await apiCall(`/garage/inventory/${garageId}`, { method: 'GET' });
@@ -273,7 +273,7 @@ const WorkInProgress = () => {
   const updatePartQuantity = useCallback(async (partId, newQuantity) => {
     try {
       console.log(`Updating part ${partId} to quantity: ${newQuantity}`);
-      
+
       if (newQuantity === 0) {
         await apiCall(`/garage/inventory/delete/${partId}`, {
           method: 'DELETE'
@@ -284,9 +284,9 @@ const WorkInProgress = () => {
           data: { quantity: newQuantity }
         });
       }
-      
+
       await fetchInventoryParts();
-      
+
     } catch (err) {
       console.error(`Failed to update quantity for part ${partId}:`, err);
       throw new Error(`Failed to update part quantity: ${err.response?.data?.message || err.message}`);
@@ -504,7 +504,7 @@ const WorkInProgress = () => {
     const fetchJobCardData = async () => {
       if (!id) return;
       setFetchLoading(true);
-      
+
       try {
         const response = await axios.get(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
@@ -515,23 +515,23 @@ const WorkInProgress = () => {
             }
           }
         );
-        
+
         const data = response.data;
-        
+
         // Populate car details
         setCarDetails({
           company: data.company || '',
           model: data.model || '',
           carNo: data.carNumber || ''
         });
-        
+
         // Populate customer details
         setCustomerDetails({
           name: data.customerName || '',
           contactNo: data.contactNumber || '',
           email: data.email || ''
         });
-        
+
         // Populate insurance details
         setInsuranceDetails({
           company: data.insuranceProvider || '',
@@ -541,7 +541,7 @@ const WorkInProgress = () => {
           regNo: data.registrationNumber || '',
           amount: data.excessAmount?.toString() || ''
         });
-        
+
         // Set assigned engineers - MULTIPLE SELECTION
         if (data.engineerId && data.engineerId.length > 0) {
           const checkEngineersLoaded = setInterval(() => {
@@ -554,7 +554,7 @@ const WorkInProgress = () => {
             }
           }, 100);
         }
-        
+
         // LOAD EXISTING PARTS from partsUsed
         if (data.partsUsed && data.partsUsed.length > 0) {
           const existingParts = data.partsUsed.map((part, index) => ({
@@ -571,7 +571,7 @@ const WorkInProgress = () => {
             isExisting: true,
             _id: part._id // Keep original ID for reference
           }));
-          
+
           setAllParts(existingParts);
           setPartIdCounter(existingParts.length + 1);
         } else {
@@ -579,26 +579,26 @@ const WorkInProgress = () => {
           setAllParts([]);
           setPartIdCounter(1);
         }
-        
+
         // Populate status, remarks, and labor hours
         if (data.status) {
           setStatus(data.status);
         }
-        
+
         if (data.engineerRemarks) {
           setRemarks(data.engineerRemarks);
         }
-        
+
         if (data.laborHours !== undefined) {
           setLaborHours(data.laborHours.toString());
         }
-        
+
         setSnackbar({
           open: true,
           message: 'Job card data loaded successfully!',
           severity: 'success'
         });
-        
+
       } catch (error) {
         console.error('Error fetching job card data:', error);
         setSnackbar({
@@ -610,7 +610,7 @@ const WorkInProgress = () => {
         setFetchLoading(false);
       }
     };
-    
+
     fetchJobCardData();
   }, [id, garageToken, isLoadingEngineers, engineers]);
 
@@ -620,7 +620,7 @@ const WorkInProgress = () => {
       navigate("/login");
       return;
     }
-    
+
     fetchInventoryParts();
     fetchEngineers();
   }, [fetchInventoryParts, fetchEngineers, garageId, navigate]);
@@ -628,13 +628,13 @@ const WorkInProgress = () => {
   // Enhanced submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       setIsLoading(true);
-      
+
       // Process all parts from the unified list
       const allPartsUsed = [];
-      
+
       // Separate parts by type
       const existingParts = allParts.filter(part => part.type === 'existing' && part.partName && part.partName.trim() !== '');
       const inventoryParts = allParts.filter(part => part.type === 'inventory' && part.partName && part.partName.trim() !== '');
@@ -657,7 +657,7 @@ const WorkInProgress = () => {
       // Add new inventory parts and update inventory quantities
       for (const part of inventoryParts) {
         const selectedQuantity = part.selectedQuantity || 1;
-        
+
         allPartsUsed.push({
           partId: part.inventoryId,
           partName: part.partName,
@@ -680,20 +680,20 @@ const WorkInProgress = () => {
           await updatePartQuantity(part.inventoryId, newQuantity);
         }
       }
-      
+
       const requestData = {
         laborHours: parseInt(laborHours) || 0,
         engineerRemarks: remarks,
         status: status,
         assignedEngineerId: assignedEngineers.map(eng => eng._id) // Multiple engineers
       };
-      
+
       if (allPartsUsed.length > 0) {
         requestData.partsUsed = allPartsUsed;
       }
-      
+
       console.log("Submitting work progress:", requestData);
-      
+
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
         requestData,
@@ -704,17 +704,17 @@ const WorkInProgress = () => {
           }
         }
       );
-      
+
       setSnackbar({
         open: true,
         message: `✅ Work progress updated! Engineers: ${assignedEngineers.map(e => e.name).join(', ')}, Parts: ${allPartsUsed.length} items`,
         severity: 'success'
       });
-      
+
       setTimeout(() => {
         navigate(`/Quality-Check/${id}`);
       }, 1500);
-      
+
     } catch (error) {
       console.error('Error updating work progress:', error);
       setSnackbar({
@@ -787,20 +787,20 @@ const WorkInProgress = () => {
   }
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       flexGrow: 1,
       mb: 4,
-      ml: {xs: 0, sm: 35},
+      ml: { xs: 0, sm: 35 },
       overflow: 'auto',
       pt: 3
     }}>
       <Container maxWidth="xl">
         {/* Header */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            mb: 3, 
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            mb: 3,
             bgcolor: '#1976d2',
             borderRadius: 3,
             border: '1px solid #e2e8f0'
@@ -808,9 +808,9 @@ const WorkInProgress = () => {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton 
+              <IconButton
                 onClick={() => navigate(`/assign-engineer/${id}`)}
-                sx={{ 
+                sx={{
                   mr: 2,
                   bgcolor: 'rgba(255,255,255,0.1)',
                   color: 'white',
@@ -828,7 +828,7 @@ const WorkInProgress = () => {
                 </Typography>
               </Box>
             </Box>
-            <Chip 
+            <Chip
               icon={getStatusIcon(status)}
               label={statusOptions.find(opt => opt.value === status)?.label || status}
               color={getStatusColor(status)}
@@ -841,20 +841,20 @@ const WorkInProgress = () => {
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             {/* Left Column */}
-            <Grid item xs={12} lg={8}>
+            <Grid item xs={12}>
               {/* Vehicle & Customer Info */}
               <Grid container spacing={3} sx={{ mb: 3 }}>
                 {/* Car Details */}
                 <Grid item xs={12} md={6}>
-                  <Card 
+                  <Card
                     elevation={0}
-                    sx={{ 
+                    sx={{
                       height: '100%',
                       borderRadius: 3,
                       border: '1px solid #e2e8f0'
                     }}
                   >
-                    <Box sx={{ 
+                    <Box sx={{
                       background: '#1976d2',
                       color: 'white',
                       p: 2.5,
@@ -869,24 +869,24 @@ const WorkInProgress = () => {
                       </Typography>
                     </Box>
                     <CardContent sx={{ p: 3 }}>
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Company"
                         variant="outlined"
                         value={carDetails.company}
                         InputProps={{ readOnly: true }}
                         sx={{ mb: 2 }}
                       />
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Model"
                         variant="outlined"
                         value={carDetails.model}
                         InputProps={{ readOnly: true }}
                         sx={{ mb: 2 }}
                       />
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Registration Number"
                         variant="outlined"
                         value={carDetails.carNo}
@@ -898,15 +898,15 @@ const WorkInProgress = () => {
 
                 {/* Customer Details */}
                 <Grid item xs={12} md={6}>
-                  <Card 
+                  <Card
                     elevation={0}
-                    sx={{ 
+                    sx={{
                       height: '100%',
                       borderRadius: 3,
                       border: '1px solid #e2e8f0'
                     }}
                   >
-                    <Box sx={{ 
+                    <Box sx={{
                       background: '#1976d2',
                       color: 'white',
                       p: 2.5,
@@ -921,24 +921,24 @@ const WorkInProgress = () => {
                       </Typography>
                     </Box>
                     <CardContent sx={{ p: 3 }}>
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Customer Name"
                         variant="outlined"
                         value={customerDetails.name}
                         InputProps={{ readOnly: true }}
                         sx={{ mb: 2 }}
                       />
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Contact Number"
                         variant="outlined"
                         value={customerDetails.contactNo}
                         InputProps={{ readOnly: true }}
                         sx={{ mb: 2 }}
                       />
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Email Address"
                         variant="outlined"
                         value={customerDetails.email}
@@ -950,15 +950,15 @@ const WorkInProgress = () => {
               </Grid>
 
               {/* Assigned Engineers Section - MULTIPLE SELECTION */}
-              <Card 
+              <Card
                 elevation={0}
-                sx={{ 
+                sx={{
                   mb: 3,
                   borderRadius: 3,
                   border: '1px solid #e2e8f0'
                 }}
               >
-                <Box sx={{ 
+                <Box sx={{
                   background: '#1976d2',
                   color: 'white',
                   p: 2.5,
@@ -1035,15 +1035,15 @@ const WorkInProgress = () => {
               </Card>
 
               {/* PARTS SECTION */}
-              <Card 
+              <Card
                 elevation={0}
-                sx={{ 
+                sx={{
                   mb: 3,
                   borderRadius: 3,
                   border: '1px solid #e2e8f0'
                 }}
               >
-                <Box sx={{ 
+                <Box sx={{
                   background: '#1976d2',
                   color: 'white',
                   p: 2.5,
@@ -1066,7 +1066,7 @@ const WorkInProgress = () => {
                         size="small"
                         onClick={() => setAddPartMode('inventory')}
                         startIcon={<InventoryIcon />}
-                        sx={{ 
+                        sx={{
                           bgcolor: 'rgba(255,255,255,0.2)',
                           '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
                         }}
@@ -1080,7 +1080,7 @@ const WorkInProgress = () => {
                         size="small"
                         onClick={() => setOpenAddPartDialog(true)}
                         startIcon={<LibraryAddIcon />}
-                        sx={{ 
+                        sx={{
                           bgcolor: 'rgba(255,255,255,0.2)',
                           '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
                         }}
@@ -1107,7 +1107,7 @@ const WorkInProgress = () => {
                           <Autocomplete
                             fullWidth
                             options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
-                            getOptionLabel={(option) => 
+                            getOptionLabel={(option) =>
                               `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | Available: ${getAvailableQuantity(option._id)}`
                             }
                             renderOption={(props, option) => (
@@ -1117,10 +1117,10 @@ const WorkInProgress = () => {
                                     {option.partName}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
-                                    Part #: {option.partNumber || 'N/A'} | 
-                                    Price: ₹{option.pricePerUnit || 0} | 
-                                    GST: {option.gstPercentage || option.taxAmount || 0}% | 
-                                    Available: {getAvailableQuantity(option._id)} | 
+                                    Part #: {option.partNumber || 'N/A'} |
+                                    Price: ₹{option.pricePerUnit || 0} |
+                                    GST: {option.gstPercentage || option.taxAmount || 0}% |
+                                    Available: {getAvailableQuantity(option._id)} |
                                     {option.carName} - {option.model}
                                   </Typography>
                                 </Box>
@@ -1153,7 +1153,7 @@ const WorkInProgress = () => {
                             }}
                             noOptionsText="No parts available in inventory"
                             filterOptions={(options, { inputValue }) => {
-                              return options.filter(option => 
+                              return options.filter(option =>
                                 getAvailableQuantity(option._id) > 0 && (
                                   option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
                                   option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -1180,7 +1180,7 @@ const WorkInProgress = () => {
                     <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
                       All Parts ({allParts.length})
                     </Typography>
-                    
+
                     {allParts.length === 0 ? (
                       <Box sx={{ textAlign: 'center', py: 4, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
                         <SourceIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
@@ -1208,21 +1208,19 @@ const WorkInProgress = () => {
                             {allParts.map((part) => (
                               <TableRow key={part.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
                                 <TableCell>
-                                  <Chip 
-                                    label={part.type === 'existing' ? 'Existing' : 'Inventory'} 
+                                  <Chip
+                                    label={part.type === 'existing' ? 'Existing' : 'Inventory'}
                                     color={part.type === 'existing' ? 'warning' : 'primary'}
-                                    size="small" 
+                                    size="small"
                                     icon={part.type === 'existing' ? <AssignmentIcon /> : <InventoryIcon />}
                                   />
                                 </TableCell>
+
                                 <TableCell>
                                   <Box>
                                     <Typography variant="body2" fontWeight={500}>
                                       {part.partName}
                                     </Typography>
-                                    {/* <Typography variant="caption" color="text.secondary">
-                                      Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                                    </Typography> */}
                                     {part.type === 'inventory' && (
                                       <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
                                         Available: {getAvailableQuantity(part.inventoryId) + (part.selectedQuantity || 1)}
@@ -1230,92 +1228,85 @@ const WorkInProgress = () => {
                                     )}
                                   </Box>
                                 </TableCell>
+
                                 <TableCell>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        const newQuantity = (part.selectedQuantity || 1) - 1;
-                                        if (newQuantity >= 1) {
-                                          handleInventoryPartQuantityChange(part.id, newQuantity);
-                                        }
-                                      }}
-                                      disabled={(part.selectedQuantity || 1) <= 1}
-                                      sx={{ 
-                                        minWidth: '24px', 
-                                        width: '24px', 
-                                        height: '24px',
-                                        border: `1px solid ${theme.palette.divider}`
-                                      }}
-                                    >
-                                      <Typography variant="caption" fontWeight="bold">-</Typography>
-                                    </IconButton>
-                                    <TextField
-                                      size="small"
-                                      type="number"
-                                      value={part.selectedQuantity || 1}
-                                      onChange={(e) => {
-                                        const newQuantity = parseInt(e.target.value) || 1;
-                                        handleInventoryPartQuantityChange(part.id, newQuantity);
-                                      }}
-                                      inputProps={{ 
-                                        min: 1,
-                                        style: { width: '50px', textAlign: 'center' }
-                                      }}
-                                      sx={{ 
-                                        width: '70px',
-                                        '& .MuiInputBase-input': {
-                                          textAlign: 'center',
-                                          fontSize: '0.875rem'
-                                        }
-                                      }}
-                                    />
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        const newQuantity = (part.selectedQuantity || 1) + 1;
-                                        handleInventoryPartQuantityChange(part.id, newQuantity);
-                                      }}
-                                      sx={{ 
-                                        minWidth: '24px', 
-                                        width: '24px', 
-                                        height: '24px',
-                                        border: `1px solid ${theme.palette.divider}`
-                                      }}
-                                    >
-                                      <Typography variant="caption" fontWeight="bold">+</Typography>
-                                    </IconButton>
-                                  </Box>
-                                </TableCell>
-                                {/* <TableCell>
-                                  <Box>
-                                    <Typography variant="body2">
-                                      ₹{(part.pricePerUnit || 0).toFixed(2)}/unit
+                                  {part.type === 'existing' ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Quantity: {part.selectedQuantity || 1}
                                     </Typography>
-                                    {part.type === 'inventory' && (
-                                      <Typography variant="caption" color="text.secondary">
-                                        GST: {part.gstPercentage || 0}%
-                                      </Typography>
-                                    )}
-                                    {part.type === 'existing' && part.totalPrice > 0 && (
-                                      <Typography variant="caption" color="text.secondary">
-                                        Total: ₹{part.totalPrice}
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </TableCell> */}
+                                  ) : (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          const newQuantity = (part.selectedQuantity || 1) - 1;
+                                          if (newQuantity >= 1) {
+                                            handleInventoryPartQuantityChange(part.id, newQuantity);
+                                          }
+                                        }}
+                                        disabled={(part.selectedQuantity || 1) <= 1}
+                                        sx={{
+                                          minWidth: '24px',
+                                          width: '24px',
+                                          height: '24px',
+                                          border: `1px solid ${theme.palette.divider}`
+                                        }}
+                                      >
+                                        <Typography variant="caption" fontWeight="bold">-</Typography>
+                                      </IconButton>
+                                      <TextField
+                                        size="small"
+                                        type="number"
+                                        value={part.selectedQuantity || 1}
+                                        onChange={(e) => {
+                                          const newQuantity = parseInt(e.target.value) || 1;
+                                          handleInventoryPartQuantityChange(part.id, newQuantity);
+                                        }}
+                                        inputProps={{
+                                          min: 1,
+                                          style: { width: '50px', textAlign: 'center' }
+                                        }}
+                                        sx={{
+                                          width: '70px',
+                                          '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontSize: '0.875rem'
+                                          }
+                                        }}
+                                      />
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          const newQuantity = (part.selectedQuantity || 1) + 1;
+                                          handleInventoryPartQuantityChange(part.id, newQuantity);
+                                        }}
+                                        sx={{
+                                          minWidth: '24px',
+                                          width: '24px',
+                                          height: '24px',
+                                          border: `1px solid ${theme.palette.divider}`
+                                        }}
+                                      >
+                                        <Typography variant="caption" fontWeight="bold">+</Typography>
+                                      </IconButton>
+                                    </Box>
+                                  )}
+                                </TableCell>
+
                                 <TableCell>
                                   <Typography variant="body2" fontWeight={600} color="primary">
                                     ₹{calculatePartFinalPrice(part).toFixed(2)}
                                   </Typography>
                                 </TableCell>
+
                                 <TableCell>
-                                  <IconButton 
+                                  <IconButton
                                     color="error"
                                     onClick={() => removePartFromList(part.id)}
-                                    sx={{ 
-                                      '&:hover': { 
-                                        bgcolor: 'rgba(239, 68, 68, 0.1)' 
+                                    disabled={part.type === 'existing'}
+                                    sx={{
+                                      '&:hover': {
+                                        bgcolor: part.type === 'existing' ? 'transparent' : 'rgba(239, 68, 68, 0.1)'
                                       }
                                     }}
                                   >
@@ -1325,6 +1316,7 @@ const WorkInProgress = () => {
                               </TableRow>
                             ))}
                           </TableBody>
+
                         </Table>
                       </TableContainer>
                     )}
@@ -1356,14 +1348,14 @@ const WorkInProgress = () => {
               </Card>
 
               {/* Work Details */}
-              <Card 
+              <Card
                 elevation={0}
-                sx={{ 
+                sx={{
                   borderRadius: 3,
                   border: '1px solid #e2e8f0'
                 }}
               >
-                <Box sx={{ 
+                <Box sx={{
                   background: '#1976d2',
                   color: 'white',
                   p: 2.5,
@@ -1380,8 +1372,8 @@ const WorkInProgress = () => {
                 <CardContent sx={{ p: 3 }}>
                   <Grid container spacing={3}>
                     <Grid item xs={12} md={6}>
-                      <TextField 
-                        fullWidth 
+                      <TextField
+                        fullWidth
                         label="Labor Hours"
                         type="number"
                         variant="outlined"
@@ -1412,10 +1404,10 @@ const WorkInProgress = () => {
                         >
                           {statusOptions.map((option) => (
                             <MenuItem key={option.value} value={option.value}>
-                              <Chip 
-                                label={option.label} 
-                                color={option.color} 
-                                size="small" 
+                              <Chip
+                                label={option.label}
+                                color={option.color}
+                                size="small"
                                 sx={{ mr: 1 }}
                               />
                               {option.label}
@@ -1443,405 +1435,227 @@ const WorkInProgress = () => {
             </Grid>
 
             {/* Right Sidebar */}
-            <Grid item xs={12} lg={4}>
+            <Grid item xs={12} lg={12}>
               {/* Insurance Details - Responsive Version */}
-<Card 
-  elevation={0}
-  sx={{ 
-    mb: 3,
-    borderRadius: 3,
-    border: '1px solid #e2e8f0',
-    overflow: 'hidden'
-  }}
->
-  <Box sx={{ 
-    background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-    color: 'white',
-    p: { xs: 2, sm: 2.5 },
-    display: 'flex',
-    alignItems: 'center'
-  }}>
-    <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', mr: 2 }}>
-      <SecurityIcon />
-    </Avatar>
-    <Typography variant="h6" fontWeight={600}>
-      Insurance Details
-    </Typography>
-  </Box>
-  
-  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-    <Grid container spacing={2}>
-      {/* Insurance Company */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: '#f8fafc', 
-          borderRadius: 2,
-          border: '1px solid #e2e8f0',
-          height: '100%'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <SecurityIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-            <Typography variant="body2" color="#64748b" fontWeight={500}>
-              Insurance Company
-            </Typography>
-          </Box>
-          <Typography variant="body1" fontWeight={600} color="#1e293b">
-            {insuranceDetails.company || 'Not specified'}
-          </Typography>
-        </Box>
-      </Grid>
+              <Card
+                elevation={0}
+                sx={{
+                  mb: 3,
+                  borderRadius: 3,
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden'
+                }}
+              >
+                <Box sx={{
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                  color: 'white',
+                  p: { xs: 2, sm: 2.5 },
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', mr: 2 }}>
+                    <SecurityIcon />
+                  </Avatar>
+                  <Typography variant="h6" fontWeight={600}>
+                    Insurance Details
+                  </Typography>
+                </Box>
 
-      {/* Policy Number */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: '#f8fafc', 
-          borderRadius: 2,
-          border: '1px solid #e2e8f0',
-          height: '100%'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <AssignmentIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-            <Typography variant="body2" color="#64748b" fontWeight={500}>
-              Policy Number
-            </Typography>
-          </Box>
-          <Typography variant="body1" fontWeight={600} color="#1e293b">
-            {insuranceDetails.number || 'Not specified'}
-          </Typography>
-        </Box>
-      </Grid>
+                <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                  <Grid container spacing={2}>
+                    {/* Insurance Company */}
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: '#f8fafc',
+                        borderRadius: 2,
+                        border: '1px solid #e2e8f0',
+                        height: '100%'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <SecurityIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
+                          <Typography variant="body2" color="#64748b" fontWeight={500}>
+                            Insurance Company
+                          </Typography>
+                        </Box>
+                        <Typography variant="body1" fontWeight={600} color="#1e293b">
+                          {insuranceDetails.company || 'Not specified'}
+                        </Typography>
+                      </Box>
+                    </Grid>
 
-      {/* Policy Type */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: '#f8fafc', 
-          borderRadius: 2,
-          border: '1px solid #e2e8f0',
-          height: '100%'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <InventoryIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-            <Typography variant="body2" color="#64748b" fontWeight={500}>
-              Policy Type
-            </Typography>
-          </Box>
-          {insuranceDetails.type ? (
-            <Chip 
-              label={insuranceDetails.type} 
-              color="primary" 
-              variant="outlined" 
-              size="small"
-              sx={{ fontWeight: 600 }}
-            />
-          ) : (
-            <Typography variant="body1" fontWeight={600} color="#64748b">
-              Not specified
-            </Typography>
-          )}
-        </Box>
-      </Grid>
+                    {/* Policy Number */}
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: '#f8fafc',
+                        borderRadius: 2,
+                        border: '1px solid #e2e8f0',
+                        height: '100%'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <AssignmentIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
+                          <Typography variant="body2" color="#64748b" fontWeight={500}>
+                            Policy Number
+                          </Typography>
+                        </Box>
+                        <Typography variant="body1" fontWeight={600} color="#1e293b">
+                          {insuranceDetails.number || 'Not specified'}
+                        </Typography>
+                      </Box>
+                    </Grid>
 
-      {/* Expiry Date */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: '#f8fafc', 
-          borderRadius: 2,
-          border: '1px solid #e2e8f0',
-          height: '100%'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <TimerIcon sx={{ fontSize: 18, color: '#f59e0b', mr: 1 }} />
-            <Typography variant="body2" color="#64748b" fontWeight={500}>
-              Expiry Date
-            </Typography>
-          </Box>
-          <Typography variant="body1" fontWeight={600} color="#1e293b">
-            {insuranceDetails.expiry ? new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            }) : 'Not specified'}
-          </Typography>
-          {insuranceDetails.expiry && (
-            <Typography variant="caption" color={
-              new Date(insuranceDetails.expiry) < new Date() ? 'error.main' : 
-              new Date(insuranceDetails.expiry) < new Date(Date.now() + 30*24*60*60*1000) ? 'warning.main' : 'success.main'
-            }>
-              {new Date(insuranceDetails.expiry) < new Date() ? '⚠️ Expired' : 
-               new Date(insuranceDetails.expiry) < new Date(Date.now() + 30*24*60*60*1000) ? '⚠️ Expires Soon' : '✅ Valid'}
-            </Typography>
-          )}
-        </Box>
-      </Grid>
+                    {/* Policy Type */}
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: '#f8fafc',
+                        borderRadius: 2,
+                        border: '1px solid #e2e8f0',
+                        height: '100%'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <InventoryIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
+                          <Typography variant="body2" color="#64748b" fontWeight={500}>
+                            Policy Type
+                          </Typography>
+                        </Box>
+                        {insuranceDetails.type ? (
+                          <Chip
+                            label={insuranceDetails.type}
+                            color="primary"
+                            variant="outlined"
+                            size="small"
+                            sx={{ fontWeight: 600 }}
+                          />
+                        ) : (
+                          <Typography variant="body1" fontWeight={600} color="#64748b">
+                            Not specified
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
 
-      {/* Registration Number */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: '#f8fafc', 
-          borderRadius: 2,
-          border: '1px solid #e2e8f0',
-          height: '100%'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <CarIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-            <Typography variant="body2" color="#64748b" fontWeight={500}>
-              Registration Number
-            </Typography>
-          </Box>
-          <Typography variant="body1" fontWeight={600} color="#1e293b">
-            {insuranceDetails.regNo || 'Not specified'}
-          </Typography>
-        </Box>
-      </Grid>
+                    {/* Expiry Date */}
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: '#f8fafc',
+                        borderRadius: 2,
+                        border: '1px solid #e2e8f0',
+                        height: '100%'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <TimerIcon sx={{ fontSize: 18, color: '#f59e0b', mr: 1 }} />
+                          <Typography variant="body2" color="#64748b" fontWeight={500}>
+                            Expiry Date
+                          </Typography>
+                        </Box>
+                        <Typography variant="body1" fontWeight={600} color="#1e293b">
+                          {insuranceDetails.expiry ? new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          }) : 'Not specified'}
+                        </Typography>
+                        {insuranceDetails.expiry && (
+                          <Typography variant="caption" color={
+                            new Date(insuranceDetails.expiry) < new Date() ? 'error.main' :
+                              new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'warning.main' : 'success.main'
+                          }>
+                            {new Date(insuranceDetails.expiry) < new Date() ? '⚠️ Expired' :
+                              new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? '⚠️ Expires Soon' : '✅ Valid'}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
 
-      {/* Coverage Amount */}
-      <Grid item xs={12} sm={6}>
-        <Box sx={{ 
-          p: 2, 
-          bgcolor: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-          borderRadius: 2,
-          border: '1px solid #10b981',
-          height: '100%',
-          color: 'white'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <ShoppingCartIcon sx={{ fontSize: 18, color: 'white', mr: 1 }} />
-            <Typography variant="body2" color="rgba(255,255,255,0.9)" fontWeight={500}>
-              Coverage Amount
-            </Typography>
-          </Box>
-          <Typography variant="h6" fontWeight={700} color="white">
-            ₹{insuranceDetails.amount ? 
-              new Intl.NumberFormat('en-IN').format(insuranceDetails.amount) : 
-              'Not specified'
-            }
-          </Typography>
-          {insuranceDetails.amount && (
-            <Typography variant="caption" color="rgba(255,255,255,0.8)">
-              Total Coverage
-            </Typography>
-          )}
-        </Box>
-      </Grid>
-    </Grid>
+                  
 
-    {/* Summary Section */}
-    {(insuranceDetails.company || insuranceDetails.number) && (
-      <Box sx={{ 
-        mt: 3, 
-        p: 2, 
-        bgcolor: '#eff6ff', 
-        borderRadius: 2,
-        border: '1px solid #bfdbfe'
-      }}>
-        <Typography variant="body2" color="#1976d2" fontWeight={600} gutterBottom>
-          📋 Insurance Summary
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {insuranceDetails.company && (
-            <Chip 
-              label={`Company: ${insuranceDetails.company}`} 
-              size="small" 
-              variant="outlined"
-              color="primary"
-            />
-          )}
-          {insuranceDetails.type && (
-            <Chip 
-              label={`Type: ${insuranceDetails.type}`} 
-              size="small" 
-              variant="outlined"
-              color="primary"
-            />
-          )}
-          {insuranceDetails.expiry && (
-            <Chip 
-              label={`Expires: ${new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`} 
-              size="small" 
-              variant="outlined"
-              color={new Date(insuranceDetails.expiry) < new Date() ? 'error' : 'primary'}
-            />
-          )}
-        </Box>
-      </Box>
-    )}
-  </CardContent>
-</Card>
+                    {/* Coverage Amount */}
+                    {/* <Grid item xs={12} sm={6}>
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: 2,
+                        border: '1px solid #10b981',
+                        height: '100%',
+                        color: 'white'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <ShoppingCartIcon sx={{ fontSize: 18, color: 'white', mr: 1 }} />
+                          <Typography variant="body2" color="rgba(255,255,255,0.9)" fontWeight={500}>
+                            Coverage Amount
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6" fontWeight={700} color="white">
+                          ₹{insuranceDetails.amount ?
+                            new Intl.NumberFormat('en-IN').format(insuranceDetails.amount) :
+                            'Not specified'
+                          }
+                        </Typography>
+                        {insuranceDetails.amount && (
+                          <Typography variant="caption" color="rgba(255,255,255,0.8)">
+                            Total Coverage
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid> */}
+                  </Grid>
 
-              {/* Summary Card - Improved Version */}
-<Card 
-  elevation={0}
-  sx={{ 
-    borderRadius: 3,
-    border: '1px solid #e2e8f0',
-    background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-    color: 'white'
-  }}
->
-  <CardContent sx={{ p: 2.5 }}>
-    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-      <AssignmentIcon sx={{ mr: 1.5, fontSize: 24 }} />
-      <Typography variant="h6" fontWeight={600}>
-        Work Summary
-      </Typography>
-    </Box>
+                  {/* Summary Section */}
+                  {(insuranceDetails.company || insuranceDetails.number) && (
+                    <Box sx={{
+                      mt: 3,
+                      p: 2,
+                      bgcolor: '#eff6ff',
+                      borderRadius: 2,
+                      border: '1px solid #bfdbfe'
+                    }}>
+                      <Typography variant="body2" color="#1976d2" fontWeight={600} gutterBottom>
+                        📋 Insurance Summary
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {insuranceDetails.company && (
+                          <Chip
+                            label={`Company: ${insuranceDetails.company}`}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        )}
+                        {insuranceDetails.type && (
+                          <Chip
+                            label={`Type: ${insuranceDetails.type}`}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        )}
+                        {insuranceDetails.expiry && (
+                          <Chip
+                            label={`Expires: ${new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`}
+                            size="small"
+                            variant="outlined"
+                            color={new Date(insuranceDetails.expiry) < new Date() ? 'error' : 'primary'}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
 
-    {/* Summary Stats Grid */}
-    <Grid container spacing={1.5}>
-      <Grid item xs={6}>
-        <Box sx={{ 
-          p: 1.5, 
-          bgcolor: 'rgba(255,255,255,0.15)', 
-          borderRadius: 2,
-          textAlign: 'center'
-        }}>
-          <Typography variant="h5" fontWeight={700}>
-            {allParts.filter(p => p.type === 'existing').length}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            Existing Parts
-          </Typography>
-        </Box>
-      </Grid>
-      <Grid item xs={6}>
-        <Box sx={{ 
-          p: 1.5, 
-          bgcolor: 'rgba(255,255,255,0.15)', 
-          borderRadius: 2,
-          textAlign: 'center'
-        }}>
-          <Typography variant="h5" fontWeight={700}>
-            {allParts.filter(p => p.type === 'inventory').length}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            Inventory Parts
-          </Typography>
-        </Box>
-      </Grid>
-      <Grid item xs={6}>
-        <Box sx={{ 
-          p: 1.5, 
-          bgcolor: 'rgba(255,255,255,0.15)', 
-          borderRadius: 2,
-          textAlign: 'center'
-        }}>
-          <Typography variant="h5" fontWeight={700}>
-            {laborHours || '0'}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            Labor Hours
-          </Typography>
-        </Box>
-      </Grid>
-      <Grid item xs={6}>
-        <Box sx={{ 
-          p: 1.5, 
-          bgcolor: 'rgba(255,255,255,0.2)', 
-          borderRadius: 2,
-          textAlign: 'center',
-          border: '1px solid rgba(255,255,255,0.3)'
-        }}>
-          <Typography variant="h6" fontWeight={700}>
-            ₹{allParts.reduce((total, part) => total + calculatePartFinalPrice(part), 0).toFixed(0)}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            Total Cost
-          </Typography>
-        </Box>
-      </Grid>
-    </Grid>
-
-    {/* Engineers Section */}
-    {assignedEngineers.length > 0 && (
-      <Box sx={{ 
-        mt: 2, 
-        p: 1.5, 
-        bgcolor: 'rgba(255,255,255,0.1)', 
-        borderRadius: 2,
-        border: '1px solid rgba(255,255,255,0.2)'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <PeopleIcon sx={{ fontSize: 16, mr: 1 }} />
-          <Typography variant="body2" fontWeight={600}>
-            Assigned Engineers ({assignedEngineers.length})
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {assignedEngineers.slice(0, 3).map((engineer, index) => (
-            <Chip
-              key={engineer._id}
-              label={engineer.name}
-              size="small"
-              sx={{
-                bgcolor: 'rgba(255,255,255,0.2)',
-                color: 'white',
-                fontWeight: 500,
-                fontSize: '0.75rem',
-                height: 24,
-                '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.3)'
-                }
-              }}
-            />
-          ))}
-          {assignedEngineers.length > 3 && (
-            <Chip
-              label={`+${assignedEngineers.length - 3} more`}
-              size="small"
-              sx={{
-                bgcolor: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                fontWeight: 500,
-                fontSize: '0.75rem',
-                height: 24
-              }}
-            />
-          )}
-        </Box>
-      </Box>
-    )}
-
-    {/* Status Section */}
-    {status && (
-      <Box sx={{ 
-        mt: 2, 
-        p: 1.5, 
-        bgcolor: 'rgba(255,255,255,0.1)', 
-        borderRadius: 2,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <Typography variant="body2" fontWeight={500}>
-          Current Status:
-        </Typography>
-        <Chip 
-          label={statusOptions.find(opt => opt.value === status)?.label || status}
-          size="small"
-          sx={{
-            bgcolor: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            fontWeight: 600
-          }}
-        />
-      </Box>
-    )}
-  </CardContent>
-</Card>
+             
             </Grid>
           </Grid>
 
           {/* Submit Button */}
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 3, 
-              mt: 3, 
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mt: 3,
               bgcolor: 'background.paper',
               borderRadius: 3,
               border: `1px solid ${theme.palette.divider}`,
@@ -1854,13 +1668,13 @@ const WorkInProgress = () => {
               size="large"
               disabled={isLoading}
               startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              sx={{ 
-                px: 6, 
+              sx={{
+                px: 6,
                 py: 1.5,
                 fontSize: '1.1rem',
                 fontWeight: 600,
                 borderRadius: 2,
-                background: theme.palette.mode === 'dark' 
+                background: theme.palette.mode === 'dark'
                   ? 'linear-gradient(135deg, #3f51b5 0%, #9c27b0 100%)'
                   : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 '&:hover': {
@@ -1877,8 +1691,8 @@ const WorkInProgress = () => {
       </Container>
 
       {/* Add Part Dialog - Same as before */}
-      <Dialog 
-        open={openAddPartDialog} 
+      <Dialog
+        open={openAddPartDialog}
         onClose={handleCloseAddPartDialog}
         maxWidth="md"
         fullWidth
@@ -1898,67 +1712,67 @@ const WorkInProgress = () => {
               {partAddError}
             </Alert>
           )}
-          
+
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Part Number" 
+              <TextField
+                fullWidth
+                label="Part Number"
                 name="partNumber"
-                value={newPart.partNumber} 
+                value={newPart.partNumber}
                 onChange={handlePartInputChange}
                 error={checkDuplicatePartNumber(newPart.partNumber)}
                 helperText={checkDuplicatePartNumber(newPart.partNumber) ? "Part number already exists" : ""}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Part Name *" 
+              <TextField
+                fullWidth
+                label="Part Name *"
                 name="partName"
-                value={newPart.partName} 
+                value={newPart.partName}
                 onChange={handlePartInputChange}
                 required
                 error={!newPart.partName.trim() && !!partAddError}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Car Name" 
+              <TextField
+                fullWidth
+                label="Car Name"
                 name="carName"
-                value={newPart.carName} 
+                value={newPart.carName}
                 onChange={handlePartInputChange}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Model" 
+              <TextField
+                fullWidth
+                label="Model"
                 name="model"
-                value={newPart.model} 
+                value={newPart.model}
                 onChange={handlePartInputChange}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Quantity *" 
+              <TextField
+                fullWidth
+                label="Quantity *"
                 name="quantity"
-                type="number" 
-                value={newPart.quantity} 
+                type="number"
+                value={newPart.quantity}
                 onChange={handlePartInputChange}
                 required
                 inputProps={{ min: 1 }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField 
-                fullWidth 
-                label="Price Per Unit" 
+              <TextField
+                fullWidth
+                label="Price Per Unit"
                 name="pricePerUnit"
-                type="number" 
-                value={newPart.pricePerUnit} 
+                type="number"
+                value={newPart.pricePerUnit}
                 onChange={handlePartInputChange}
                 inputProps={{ min: 0, step: 0.01 }}
               />
@@ -2091,15 +1905,15 @@ const WorkInProgress = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={handleCloseAddPartDialog}
             disabled={addingPart}
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleAddPart} 
-            disabled={addingPart || checkDuplicatePartNumber(newPart.partNumber)} 
+          <Button
+            onClick={handleAddPart}
+            disabled={addingPart || checkDuplicatePartNumber(newPart.partNumber)}
             variant="contained"
             startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
           >

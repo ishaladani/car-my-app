@@ -105,37 +105,35 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
   };
 
   const generatePDF = () => {
+    setIsGeneratingPDF(true);
     const doc = new jsPDF();
+  
     doc.setFontSize(16);
-    doc.text("JOB CARD DETAILS", 14, 20);
-    doc.setFontSize(10);
-    doc.text(`Job ID: ${jobData._id}`, 14, 28);
-
-    const jobDetailsString = parsedJobDetails.map(d => `${d.description} - ₹${d.price}`).join(", ");
-
-    
+    doc.text(" Job Card Details", 14, 20);
+    // doc.setFontSize(10);
+    // doc.text(`Job ID: ${jobData._id}`, 14, 28);
+  
     const tableData = [
       ['Customer Name', jobData.customerName || 'N/A'],
       ['Contact Number', jobData.contactNumber || 'N/A'],
       ['Email', jobData.email || 'N/A'],
       ['Company', jobData.company || 'N/A'],
       ['Car Number', jobData.carNumber || 'N/A'],
-      ['Registration Number', jobData.registrationNumber || 'N/A'],
+      // ['Registration Number', jobData.registrationNumber || 'N/A'],
       ['Model', jobData.model || 'N/A'],
       ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
       ['Fuel Type', jobData.fuelType || 'N/A'],
       ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
       ['Policy Number', jobData.policyNumber || 'N/A'],
       ['Expiry Date', formatDate(jobData.expiryDate)],
-      ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A'],
+      ['Excess Amount', jobData.excessAmount ? `RS.${jobData.excessAmount.toLocaleString()}` : 'N/A'],
       ['Job Type', jobData.type || 'N/A'],
-      ['Job Details', jobDetailsString || 'N/A'],
       ['Engineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
       ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
       ['Status', jobData.status || 'N/A'],
       ['Created Date', formatDate(jobData.createdAt)]
     ];
-
+  
     autoTable(doc, {
       startY: 35,
       head: [['Field', 'Value']],
@@ -145,9 +143,28 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       headStyles: { fillColor: [63, 81, 181] },
       margin: { left: 10, right: 10 },
     });
-
-    doc.save(`JobCard_${jobData._id}.pdf`);
+  
+    // Job Details Section (multi-line)
+    // let finalY = doc.lastAutoTable.finalY + 10;
+    // doc.setFontSize(12);
+    // doc.text("🔧 Job Details", 14, finalY);
+  
+    // finalY += 6;
+    // if (parsedJobDetails.length > 0) {
+    //   parsedJobDetails.forEach((item, index) => {
+    //     doc.setFontSize(10);
+    //     doc.text(`• ${item.description} - ₹${item.price}`, 14, finalY);
+    //     finalY += 6;
+    //   });
+    // } else {
+    //   doc.setFontSize(10);
+    //   doc.text("No job details provided.", 14, finalY);
+    // }
+  
+    doc.save(`JobCard.pdf`);
+    setIsGeneratingPDF(false);
   };
+  
 
   const parsedJobDetails = (() => {
     try {
@@ -184,9 +201,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 Job Card Details
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Job ID: {jobData._id}
               </Typography>
             </Box>
           </Box>
