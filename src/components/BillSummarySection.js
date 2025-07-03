@@ -133,15 +133,16 @@ const BillSummarySection = ({
                 </Box>
               )}
 
-              <Box sx={{ 
+              {/* Discount Section */}
+              {/* <Box sx={{ 
                 display: "flex", 
                 justifyContent: "space-between", 
                 alignItems: "center", 
                 py: 1.5, 
-                borderBottom: `1px dashed ${theme.palette.divider}`,
+                borderBottom: summary.discount > 0 ? `1px dashed ${theme.palette.divider}` : 'none',
                 mt: 2
               }}>
-                <Typography variant="body1" color="text.primary">💸 Discount Applied:</Typography>
+                <Typography variant="body1" color="text.primary">💸 Discount:</Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <TextField
                     size="small"
@@ -159,7 +160,67 @@ const BillSummarySection = ({
                     }}
                   />
                 </Box>
-              </Box>
+              </Box> */}
+
+              {/* Show discount amount if discount is applied */}
+              {summary.discount > 0 && (
+                <Box sx={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  py: 1.5, 
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(76, 175, 80, 0.1)' 
+                    : 'rgba(76, 175, 80, 0.05)',
+                  borderRadius: 1,
+                  px: 2,
+                  mx: -1
+                }}>
+                  <Typography 
+                    variant="body1" 
+                    color="success.main" 
+                    fontWeight={500}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  >
+                    🎉 Discount Applied:
+                  </Typography>
+                  <Typography 
+                    variant="body1" 
+                    fontWeight={600} 
+                    color="success.main"
+                  >
+                    - {formatAmount(summary.discount)}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Subtotal after discount and before tax */}
+              {summary.discount > 0 && (
+                <Box sx={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center", 
+                  py: 1.5, 
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                  mt: 1
+                }}>
+                  <Typography 
+                    variant="body1" 
+                    fontWeight={600}
+                    color="text.primary"
+                  >
+                    Subtotal (After Discount):
+                  </Typography>
+                  <Typography 
+                    variant="body1" 
+                    fontWeight={600} 
+                    color="primary.main"
+                  >
+                    {formatAmount(summary.subtotal - summary.discount)}
+                  </Typography>
+                </Box>
+              )}
             </Grid>
 
             <Grid item xs={12} md={4}>
@@ -179,10 +240,41 @@ const BillSummarySection = ({
                 <Typography variant="h4" fontWeight="bold">
                   {formatAmount(summary.totalAmount)}
                 </Typography>
+                {summary.discount > 0 && (
+                  <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
+                    💰 You saved: {formatAmount(summary.discount)}
+                  </Typography>
+                )}
                 <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
                   {paymentMethod && `Payment: ${paymentMethod}`}
                 </Typography>
               </Box>
+
+              {/* Discount Summary Box */}
+              {summary.discount > 0 && (
+                <Box sx={{ 
+                  mt: 2, 
+                  p: 2, 
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(76, 175, 80, 0.15)' 
+                    : 'rgba(76, 175, 80, 0.1)', 
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.success.main}30`
+                }}>
+                  <Typography variant="subtitle2" color="success.main" fontWeight={600} gutterBottom>
+                    💸 Discount Summary
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Original Amount: {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
+                  </Typography>
+                  <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
+                    Discount: -{formatAmount(summary.discount)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Final Amount: {formatAmount(summary.totalAmount)}
+                  </Typography>
+                </Box>
+              )}
 
               <Box sx={{ 
                 mt: 2, 

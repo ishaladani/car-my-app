@@ -121,6 +121,7 @@ const WorkInProgress = () => {
 
   // Inventory parts state
   const [inventoryParts, setInventoryParts] = useState([]);
+  const [selectedParts, setSelectedParts] = useState([]); // New state for selected parts
 
   // COMBINED PARTS STATE - existing + new inventory parts
   const [allParts, setAllParts] = useState([]);
@@ -129,6 +130,8 @@ const WorkInProgress = () => {
   const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
   const [laborHours, setLaborHours] = useState('');
+  const [error, setError] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Add Part Dialog states
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -150,6 +153,7 @@ const WorkInProgress = () => {
   const [addingPart, setAddingPart] = useState(false);
   const [partAddSuccess, setPartAddSuccess] = useState(false);
   const [partAddError, setPartAddError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
 
   // Parts addition mode
   const [addPartMode, setAddPartMode] = useState('');
@@ -161,6 +165,91 @@ const WorkInProgress = () => {
     { value: 'cancelled', label: 'Cancelled', color: 'error' },
     { value: 'on_hold', label: 'On Hold', color: 'default' }
   ];
+
+  const handlePartSelection = (newParts, previousParts = []) => {
+    try {
+      // Find newly added parts
+      const addedParts = newParts.filter(newPart => 
+        !previousParts.some(prevPart => prevPart._id === newPart._id)
+      );
+
+      // Process newly added parts - only validate, don't update API
+      for (const addedPart of addedParts) {
+        // Check if part has sufficient quantity available
+        const availableQuantity = getAvailableQuantity(addedPart._id);
+        if (availableQuantity < 1) {
+          setError(`Part "${addedPart.partName}" is out of stock!`);
+          return; // Don't update the selection
+        }
+      }
+
+      // Update the parts with selected quantity (local state only)
+      const updatedParts = newParts.map(part => ({
+        ...part,
+        selectedQuantity: part.selectedQuantity || 1,
+        availableQuantity: part.quantity
+      }));
+
+      // Update selected parts
+      setSelectedParts(updatedParts);
+
+    } catch (err) {
+      console.error('Error handling part selection:', err);
+      setError('Failed to update part selection');
+    }
+  };
+
+  const handlePartRemoval = (partIndex) => {
+    try {
+      // Remove part from selection (local state only)
+      const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
+      setSelectedParts(updatedParts);
+    } catch (err) {
+      console.error('Error removing part:', err);
+      setError(`Failed to remove part`);
+    }
+  };
+
+  const handlePartQuantityChange = (partIndex, newQuantity, oldQuantity) => {
+    const part = selectedParts[partIndex];
+    if (!part) return;
+
+    try {
+      // Get available quantity considering all current selections
+      const availableQuantity = getAvailableQuantity(part._id);
+      const currentlySelected = part.selectedQuantity || 1;
+      const maxSelectableQuantity = availableQuantity + currentlySelected;
+
+      // Validate maximum quantity
+      if (newQuantity > maxSelectableQuantity) {
+        setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`);
+        return;
+      }
+
+      if (newQuantity < 1) {
+        setError('Quantity must be at least 1');
+        return;
+      }
+
+      // Update the part quantity in the selection (local state only)
+      const updatedParts = selectedParts.map((p, idx) => 
+        idx === partIndex 
+          ? { ...p, selectedQuantity: newQuantity }
+          : p
+      );
+      
+      setSelectedParts(updatedParts);
+
+      // Clear any previous errors
+      if (error && error.includes(part.partName)) {
+        setError(null);
+      }
+
+    } catch (err) {
+      console.error('Error updating part quantity:', err);
+      setError(`Failed to update quantity for "${part.partName}"`);
+    }
+  };
 
   // Tax calculation functions
   const calculateTaxAmount = (pricePerUnit, quantity, percentage) => {
@@ -258,8 +347,15 @@ const WorkInProgress = () => {
     const originalPart = inventoryParts.find(p => p._id === inventoryPartId);
     if (!originalPart) return 0;
 
-    // Calculate total selected quantity from allParts
+    // Calculate total selected quantity from selectedParts
     let totalSelected = 0;
+    selectedParts.forEach(part => {
+      if (part._id === inventoryPartId) {
+        totalSelected += part.selectedQuantity || 1;
+      }
+    });
+
+    // Also consider allParts for inventory parts
     allParts.forEach(part => {
       if (part.type === 'inventory' && part.inventoryId === inventoryPartId) {
         totalSelected += part.selectedQuantity || 1;
@@ -388,25 +484,16 @@ const WorkInProgress = () => {
     }
   };
 
-  // Calculate final price for a part
   const calculatePartFinalPrice = (part) => {
-    if (part.type === 'existing') {
-      // For existing parts, use the totalPrice or calculate from pricePerUnit
-      if (part.totalPrice && part.totalPrice > 0) {
-        return parseFloat(part.totalPrice) * (part.selectedQuantity || 1);
-      }
-      return parseFloat(part.pricePerUnit || 0) * (part.selectedQuantity || 1);
-    } else if (part.type === 'inventory') {
-      const unitPrice = part.pricePerUnit || 0;
-      const quantity = part.selectedQuantity || 1;
-      const gstPercentage = part.gstPercentage || 0;
-      const totalPrice = unitPrice * quantity;
-      const gstAmount = (totalPrice * gstPercentage) / 100;
-      return totalPrice + gstAmount;
-    }
-    return 0;
-  };
+    const unitPrice = parseFloat(part.pricePerUnit) || 0;
+    const quantity = parseInt(part.selectedQuantity || 1);
+    const gstPercentage = parseFloat(part.gstPercentage) || 0;
 
+    const total = unitPrice * quantity;
+    const gstAmount = (total * gstPercentage) / 100;
+    return total + gstAmount;
+  };
+  
   // Add new part to inventory
   const handleAddPart = async () => {
     if (!newPart.partName?.trim()) {
@@ -638,6 +725,7 @@ const WorkInProgress = () => {
       // Separate parts by type
       const existingParts = allParts.filter(part => part.type === 'existing' && part.partName && part.partName.trim() !== '');
       const inventoryParts = allParts.filter(part => part.type === 'inventory' && part.partName && part.partName.trim() !== '');
+      const newSelectedParts = selectedParts.filter(part => part.partName && part.partName.trim() !== '');
 
       // Add existing parts (already used parts)
       existingParts.forEach(part => {
@@ -678,6 +766,33 @@ const WorkInProgress = () => {
             throw new Error(`Insufficient stock for "${part.partName}". Required: ${selectedQuantity}, Available: ${currentPart.quantity}`);
           }
           await updatePartQuantity(part.inventoryId, newQuantity);
+        }
+      }
+
+      // Add newly selected parts
+      for (const part of newSelectedParts) {
+        const selectedQuantity = part.selectedQuantity || 1;
+
+        allPartsUsed.push({
+          partId: part._id,
+          partName: part.partName,
+          partNumber: part.partNumber || '',
+          quantity: selectedQuantity,
+          pricePerUnit: part.pricePerUnit || 0,
+          gstPercentage: part.gstPercentage || part.taxAmount || 0,
+          totalPrice: calculatePartFinalPrice(part),
+          carName: part.carName || '',
+          model: part.model || ''
+        });
+
+        // Update inventory quantity
+        const currentPart = inventoryParts.find(p => p._id === part._id);
+        if (currentPart) {
+          const newQuantity = currentPart.quantity - selectedQuantity;
+          if (newQuantity < 0) {
+            throw new Error(`Insufficient stock for "${part.partName}". Required: ${selectedQuantity}, Available: ${currentPart.quantity}`);
+          }
+          await updatePartQuantity(part._id, newQuantity);
         }
       }
 
@@ -1060,20 +1175,6 @@ const WorkInProgress = () => {
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Add Part from Inventory">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() => setAddPartMode('inventory')}
-                        startIcon={<InventoryIcon />}
-                        sx={{
-                          bgcolor: 'rgba(255,255,255,0.2)',
-                          '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' }
-                        }}
-                      >
-                        From Inventory
-                      </Button>
-                    </Tooltip>
                     <Tooltip title="Add New Part to Inventory">
                       <Button
                         variant="contained"
@@ -1090,7 +1191,287 @@ const WorkInProgress = () => {
                     </Tooltip>
                   </Box>
                 </Box>
+
                 <CardContent sx={{ p: 3 }}>
+                  {/* Parts Selection */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                      Select Parts from Inventory (Optional)
+                    </Typography>
+                    
+                    {isLoadingInventory ? (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center',
+                        py: 2 
+                      }}>
+                        <CircularProgress size={20} />
+                        <Typography sx={{ ml: 2 }}>
+                          Loading parts...
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Autocomplete
+                        multiple
+                        fullWidth
+                        options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
+                        getOptionLabel={(option) => 
+                          `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+                        }
+                        value={selectedParts}
+                        onChange={(event, newValue) => {
+                          handlePartSelection(newValue, selectedParts);
+                        }}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              variant="outlined"
+                              label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
+                              {...getTagProps({ index })}
+                              key={option._id}
+                            />
+                          ))
+                        }
+                        renderOption={(props, option) => (
+                          <Box component="li" {...props}>
+                            <Box sx={{ width: '100%' }}>
+                              <Typography variant="body2" fontWeight={500}>
+                                {option.partName}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Part : {option.partNumber || 'N/A'} | 
+                                Price: ₹{option.pricePerUnit || 0} | 
+                                GST: {option.gstPercentage || option.taxAmount || 0}| 
+                                Available: {getAvailableQuantity(option._id)} | 
+                                {option.carName} - {option.model}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Select parts needed"
+                            variant="outlined"
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <>
+                                  <InputAdornment position="start">
+                                    <InventoryIcon color="action" />
+                                  </InputAdornment>
+                                  {params.InputProps.startAdornment}
+                                </>
+                              ),
+                            }}
+                          />
+                        )}
+                        noOptionsText="No parts available in stock"
+                        filterOptions={(options, { inputValue }) => {
+                          return options.filter(option => 
+                            getAvailableQuantity(option._id) > 0 && (
+                              option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
+                              option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                              option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
+                              option.model?.toLowerCase().includes(inputValue.toLowerCase())
+                            )
+                          );
+                        }}
+                      />
+                    )}
+
+                    {/* Selected Parts with Enhanced Quantity Management */}
+                    {selectedParts.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          Selected Parts with Details:
+                        </Typography>
+                        <List dense>
+                          {selectedParts.map((part, partIndex) => {
+                            const selectedQuantity = part.selectedQuantity || 1;
+                            const quantity= part.quantity;
+                            const unitPrice = part.pricePerUnit || 0;
+                            const gstPercentage = part.taxAmount || 0;
+                            const totalTax= (gstPercentage * selectedQuantity)/quantity;
+                            const totalPrice = unitPrice * selectedQuantity;
+                            const gstAmount = (totalPrice * gstPercentage) / 100;
+                            const finalPrice = totalPrice + totalTax;
+                            
+                            // Get available quantity considering all current selections
+                            const availableQuantity = getAvailableQuantity(part._id);
+                            
+                            // Calculate the maximum quantity user can select
+                            const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                            const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
+
+                            return (
+                              <ListItem 
+                                key={part._id} 
+                                sx={{ 
+                                  border: `1px solid ${theme.palette.divider}`, 
+                                  borderRadius: 1, 
+                                  mb: 1,
+                                  py: 1,
+                                  flexDirection: 'column',
+                                  alignItems: 'stretch',
+                                  bgcolor: 'background.paper'
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="body2" fontWeight={500}>
+                                      {part.partName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                      Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                    </Typography>
+                                    <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
+                                      Available Stock: {availableQuantity}
+                                    </Typography>
+                                    <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                                      Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          const newQuantity = selectedQuantity - 1;
+                                          if (newQuantity >= 1) {
+                                            handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
+                                          }
+                                        }}
+                                        disabled={selectedQuantity <= 1}
+                                        sx={{ 
+                                          minWidth: '24px', 
+                                          width: '24px', 
+                                          height: '24px',
+                                          border: `1px solid ${theme.palette.divider}`
+                                        }}
+                                      >
+                                        <Typography variant="caption" fontWeight="bold">-</Typography>
+                                      </IconButton>
+                                      <TextField
+                                        size="small"
+                                        type="number"
+                                        label="Qty"
+                                        value={selectedQuantity}
+                                        onChange={(e) => {
+                                          const newQuantity = parseInt(e.target.value) || 1;
+                                          const oldQuantity = selectedQuantity;
+                                          
+                                          // Validate quantity limits
+                                          if (newQuantity < 1) {
+                                            return;
+                                          }
+                                          
+                                          if (newQuantity > maxSelectableQuantity) {
+                                            setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                            return;
+                                          }
+
+                                          handlePartQuantityChange(partIndex, newQuantity, oldQuantity);
+                                        }}
+                                        inputProps={{ 
+                                          min: 1, 
+                                          max: maxSelectableQuantity,
+                                          style: { width: '50px', textAlign: 'center' },
+                                          readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
+                                        }}
+                                        sx={{ 
+                                          width: '70px',
+                                          '& .MuiInputBase-input': {
+                                            textAlign: 'center',
+                                            fontSize: '0.875rem'
+                                          }
+                                        }}
+                                        error={availableQuantity === 0}
+                                        disabled={maxSelectableQuantity === 0}
+                                      />
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          const newQuantity = selectedQuantity + 1;
+                                          if (newQuantity <= maxSelectableQuantity) {
+                                            handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
+                                          } else {
+                                            setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                          }
+                                        }}
+                                        disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
+                                        sx={{ 
+                                          minWidth: '24px', 
+                                          width: '24px', 
+                                          height: '24px',
+                                          border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                                          color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                        }}
+                                      >
+                                        <Typography variant="caption" fontWeight="bold">+</Typography>
+                                      </IconButton>
+                                    </Box>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handlePartRemoval(partIndex)}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                </Box>
+                                {/* Price Details */}
+                                <Box sx={{ 
+                                  mt: 1, 
+                                  p: 1, 
+                                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)', 
+                                  borderRadius: 1 
+                                }}>
+                                  <Grid container spacing={1} alignItems="center">
+                                    <Grid item xs={4}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Price/Unit: ₹{unitPrice.toFixed(2)}
+                                      </Typography>
+                                    </Grid>
+                                    <Grid item xs={3}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        GST: {gstPercentage}
+                                      </Typography>
+                                    </Grid>
+                                    <Grid item xs={5}>
+                                      <Typography variant="caption" fontWeight={600} color="primary">
+                                        Total: ₹{finalPrice.toFixed(2)}
+                                      </Typography>
+                                    </Grid>
+                                  </Grid>
+                                </Box>
+                              </ListItem>
+                            );
+                          })}
+                        </List>
+                        {/* Total Summary */}
+                        {(() => {
+                          const grandTotal = selectedParts.reduce((total, part) => {
+                            const selectedQuantity = part.selectedQuantity || 1;
+                            const unitPrice = part.pricePerUnit || 0;
+                            const gstPercentage = part.gstPercentage || part.taxAmount || 0;
+                            const totalPrice = unitPrice * selectedQuantity;
+                            const gstAmount = (totalPrice * gstPercentage) / 100;
+                            return total + totalPrice + gstAmount;
+                          }, 0);
+                          return (
+                            <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
+                              <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
+                                Selected Parts Total: ₹{grandTotal.toFixed(2)}
+                              </Typography>
+                            </Box>
+                          );
+                        })()}
+                      </Box>
+                    )}
+                  </Box>
+
                   {/* Add from Inventory Section */}
                   {addPartMode === 'inventory' && (
                     <Box sx={{ mb: 3, p: 2, border: 1, borderColor: 'primary.main', borderRadius: 1, bgcolor: 'primary.light', opacity: 0.1 }}>
@@ -1119,7 +1500,7 @@ const WorkInProgress = () => {
                                   <Typography variant="caption" color="text.secondary">
                                     Part #: {option.partNumber || 'N/A'} |
                                     Price: ₹{option.pricePerUnit || 0} |
-                                    GST: {option.gstPercentage || option.taxAmount || 0}% |
+                                    GST: {option.taxAmount || 0}% |
                                     Available: {getAvailableQuantity(option._id)} |
                                     {option.carName} - {option.model}
                                   </Typography>
@@ -1199,14 +1580,13 @@ const WorkInProgress = () => {
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Type</TableCell>
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Part Details</TableCell>
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Quantity</TableCell>
-                              {/* <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Price</TableCell> */}
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Total</TableCell>
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
                             {allParts.map((part) => (
-                              <TableRow key={part.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                              <TableRow key={part.id} >
                                 <TableCell>
                                   <Chip
                                     label={part.type === 'existing' ? 'Existing' : 'Inventory'}
@@ -1316,7 +1696,6 @@ const WorkInProgress = () => {
                               </TableRow>
                             ))}
                           </TableBody>
-
                         </Table>
                       </TableContainer>
                     )}
@@ -1462,191 +1841,163 @@ const WorkInProgress = () => {
                 </Box>
 
                 <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                  <Grid container spacing={2}>
-                    {/* Insurance Company */}
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{
-                        p: 2,
-                        bgcolor: '#f8fafc',
-                        borderRadius: 2,
-                        border: '1px solid #e2e8f0',
-                        height: '100%'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <SecurityIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-                          <Typography variant="body2" color="#64748b" fontWeight={500}>
-                            Insurance Company
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1" fontWeight={600} color="#1e293b">
-                          {insuranceDetails.company || 'Not specified'}
-                        </Typography>
-                      </Box>
-                    </Grid>
+  <Grid container spacing={2}>
+    {/* Insurance Company */}
+    <Grid item xs={12} sm={6}>
+      <Box sx={{
+        p: 2,
+        bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f8fafc',
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.mode === 'dark' ? '#333' : '#e2e8f0'}`,
+        height: '100%'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <SecurityIcon sx={{ fontSize: 18, color: theme.palette.primary.main, mr: 1 }} />
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            Insurance Company
+          </Typography>
+        </Box>
+        <Typography variant="body1" fontWeight={600} color="text.primary">
+          {insuranceDetails.company || 'Not specified'}
+        </Typography>
+      </Box>
+    </Grid>
 
-                    {/* Policy Number */}
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{
-                        p: 2,
-                        bgcolor: '#f8fafc',
-                        borderRadius: 2,
-                        border: '1px solid #e2e8f0',
-                        height: '100%'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <AssignmentIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-                          <Typography variant="body2" color="#64748b" fontWeight={500}>
-                            Policy Number
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1" fontWeight={600} color="#1e293b">
-                          {insuranceDetails.number || 'Not specified'}
-                        </Typography>
-                      </Box>
-                    </Grid>
+    {/* Policy Number */}
+    <Grid item xs={12} sm={6}>
+      <Box sx={{
+        p: 2,
+        bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f8fafc',
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.mode === 'dark' ? '#333' : '#e2e8f0'}`,
+        height: '100%'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <AssignmentIcon sx={{ fontSize: 18, color: theme.palette.primary.main, mr: 1 }} />
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            Policy Number
+          </Typography>
+        </Box>
+        <Typography variant="body1" fontWeight={600} color="text.primary">
+          {insuranceDetails.number || 'Not specified'}
+        </Typography>
+      </Box>
+    </Grid>
 
-                    {/* Policy Type */}
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{
-                        p: 2,
-                        bgcolor: '#f8fafc',
-                        borderRadius: 2,
-                        border: '1px solid #e2e8f0',
-                        height: '100%'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <InventoryIcon sx={{ fontSize: 18, color: '#1976d2', mr: 1 }} />
-                          <Typography variant="body2" color="#64748b" fontWeight={500}>
-                            Policy Type
-                          </Typography>
-                        </Box>
-                        {insuranceDetails.type ? (
-                          <Chip
-                            label={insuranceDetails.type}
-                            color="primary"
-                            variant="outlined"
-                            size="small"
-                            sx={{ fontWeight: 600 }}
-                          />
-                        ) : (
-                          <Typography variant="body1" fontWeight={600} color="#64748b">
-                            Not specified
-                          </Typography>
-                        )}
-                      </Box>
-                    </Grid>
+    {/* Policy Type */}
+    <Grid item xs={12} sm={6}>
+      <Box sx={{
+        p: 2,
+        bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f8fafc',
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.mode === 'dark' ? '#333' : '#e2e8f0'}`,
+        height: '100%'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <InventoryIcon sx={{ fontSize: 18, color: theme.palette.primary.main, mr: 1 }} />
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            Policy Type
+          </Typography>
+        </Box>
+        {insuranceDetails.type ? (
+          <Chip
+            label={insuranceDetails.type}
+            color="primary"
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 600 }}
+          />
+        ) : (
+          <Typography variant="body1" fontWeight={600} color="text.primary">
+            Not specified
+          </Typography>
+        )}
+      </Box>
+    </Grid>
 
-                    {/* Expiry Date */}
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{
-                        p: 2,
-                        bgcolor: '#f8fafc',
-                        borderRadius: 2,
-                        border: '1px solid #e2e8f0',
-                        height: '100%'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <TimerIcon sx={{ fontSize: 18, color: '#f59e0b', mr: 1 }} />
-                          <Typography variant="body2" color="#64748b" fontWeight={500}>
-                            Expiry Date
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1" fontWeight={600} color="#1e293b">
-                          {insuranceDetails.expiry ? new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          }) : 'Not specified'}
-                        </Typography>
-                        {insuranceDetails.expiry && (
-                          <Typography variant="caption" color={
-                            new Date(insuranceDetails.expiry) < new Date() ? 'error.main' :
-                              new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'warning.main' : 'success.main'
-                          }>
-                            {new Date(insuranceDetails.expiry) < new Date() ? '⚠️ Expired' :
-                              new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? '⚠️ Expires Soon' : '✅ Valid'}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Grid>
+    {/* Expiry Date */}
+    <Grid item xs={12} sm={6}>
+      <Box sx={{
+        p: 2,
+        bgcolor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f8fafc',
+        borderRadius: 2,
+        border: `1px solid ${theme.palette.mode === 'dark' ? '#333' : '#e2e8f0'}`,
+        height: '100%'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <TimerIcon sx={{ fontSize: 18, color: theme.palette.warning.main, mr: 1 }} />
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            Expiry Date
+          </Typography>
+        </Box>
+        <Typography variant="body1" fontWeight={600} color="text.primary">
+          {insuranceDetails.expiry ? new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          }) : 'Not specified'}
+        </Typography>
+        {insuranceDetails.expiry && (
+          <Typography variant="caption" color={
+            new Date(insuranceDetails.expiry) < new Date()
+              ? 'error.main'
+              : new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                ? 'warning.main'
+                : 'success.main'
+          }>
+            {new Date(insuranceDetails.expiry) < new Date()
+              ? '⚠ Expired'
+              : new Date(insuranceDetails.expiry) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                ? '⚠ Expires Soon'
+                : '✅ Valid'}
+          </Typography>
+        )}
+      </Box>
+    </Grid>
+  </Grid>
 
-                  
-
-                    {/* Coverage Amount */}
-                    {/* <Grid item xs={12} sm={6}>
-                      <Box sx={{
-                        p: 2,
-                        bgcolor: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: 2,
-                        border: '1px solid #10b981',
-                        height: '100%',
-                        color: 'white'
-                      }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <ShoppingCartIcon sx={{ fontSize: 18, color: 'white', mr: 1 }} />
-                          <Typography variant="body2" color="rgba(255,255,255,0.9)" fontWeight={500}>
-                            Coverage Amount
-                          </Typography>
-                        </Box>
-                        <Typography variant="h6" fontWeight={700} color="white">
-                          ₹{insuranceDetails.amount ?
-                            new Intl.NumberFormat('en-IN').format(insuranceDetails.amount) :
-                            'Not specified'
-                          }
-                        </Typography>
-                        {insuranceDetails.amount && (
-                          <Typography variant="caption" color="rgba(255,255,255,0.8)">
-                            Total Coverage
-                          </Typography>
-                        )}
-                      </Box>
-                    </Grid> */}
-                  </Grid>
-
-                  {/* Summary Section */}
-                  {(insuranceDetails.company || insuranceDetails.number) && (
-                    <Box sx={{
-                      mt: 3,
-                      p: 2,
-                      bgcolor: '#eff6ff',
-                      borderRadius: 2,
-                      border: '1px solid #bfdbfe'
-                    }}>
-                      <Typography variant="body2" color="#1976d2" fontWeight={600} gutterBottom>
-                        📋 Insurance Summary
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {insuranceDetails.company && (
-                          <Chip
-                            label={`Company: ${insuranceDetails.company}`}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        )}
-                        {insuranceDetails.type && (
-                          <Chip
-                            label={`Type: ${insuranceDetails.type}`}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                          />
-                        )}
-                        {insuranceDetails.expiry && (
-                          <Chip
-                            label={`Expires: ${new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`}
-                            size="small"
-                            variant="outlined"
-                            color={new Date(insuranceDetails.expiry) < new Date() ? 'error' : 'primary'}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  )}
-                </CardContent>
+  {/* Summary Section */}
+  {(insuranceDetails.company || insuranceDetails.number) && (
+    <Box sx={{
+      mt: 3,
+      p: 2,
+      bgcolor: theme.palette.mode === 'dark' ? '#2a2a2a' : '#eff6ff',
+      borderRadius: 2,
+      border: `1px solid ${theme.palette.mode === 'dark' ? '#444' : '#bfdbfe'}`
+    }}>
+      <Typography variant="body2" color="primary" fontWeight={600} gutterBottom>
+        📦 Insurance Summary
+      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        {insuranceDetails.company && (
+          <Chip
+            label={`Company: ${insuranceDetails.company}`}
+            size="small"
+            variant="outlined"
+            color="primary"
+          />
+        )}
+        {insuranceDetails.type && (
+          <Chip
+            label={`Type: ${insuranceDetails.type}`}
+            size="small"
+            variant="outlined"
+            color="primary"
+          />
+        )}
+        {insuranceDetails.expiry && (
+          <Chip
+            label={`Expires: ${new Date(insuranceDetails.expiry).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`}
+            size="small"
+            variant="outlined"
+            color={new Date(insuranceDetails.expiry) < new Date() ? 'error' : 'primary'}
+          />
+        )}
+      </Box>
+    </Box>
+  )}
+</CardContent>
               </Card>
-
-             
             </Grid>
           </Grid>
 
@@ -1674,13 +2025,9 @@ const WorkInProgress = () => {
                 fontSize: '1.1rem',
                 fontWeight: 600,
                 borderRadius: 2,
-                background: theme.palette.mode === 'dark'
-                  ? 'linear-gradient(135deg, #3f51b5 0%, #9c27b0 100%)'
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: '#1565c0',
                 '&:hover': {
-                  background: theme.palette.mode === 'dark'
-                    ? 'linear-gradient(135deg, #303f9f 0%, #7b1fa2 100%)'
-                    : 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)',
+                  background: '#1565c0',
                 }
               }}
             >
@@ -1690,7 +2037,7 @@ const WorkInProgress = () => {
         </form>
       </Container>
 
-      {/* Add Part Dialog - Same as before */}
+      {/* Add Part Dialog */}
       <Dialog
         open={openAddPartDialog}
         onClose={handleCloseAddPartDialog}
@@ -1779,7 +2126,7 @@ const WorkInProgress = () => {
             </Grid>
           </Grid>
 
-          {/* Tax Section - Same as before */}
+          {/* Tax Section */}
           <Box sx={{ mt: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>Tax Configuration</Typography>
 
@@ -1921,6 +2268,23 @@ const WorkInProgress = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            maxWidth: '400px'
+          }}
+          onClose={() => setError(null)}
+        >
+          {error}
+        </Alert>
+      )}
 
       {/* Snackbar */}
       <Snackbar

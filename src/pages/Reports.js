@@ -49,8 +49,6 @@ import axios from 'axios';
 import autoTable from 'jspdf-autotable';
 import jsPDF from 'jspdf';
 
-
-
 const RecordReport = () => {
   const navigate = useNavigate();
   let garageId = localStorage.getItem("garageId");
@@ -78,6 +76,15 @@ const RecordReport = () => {
   // Pagination States
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Sort data by completed date (most recent first)
+  const sortJobsByCompletedDate = (jobs) => {
+    return jobs.sort((a, b) => {
+      const dateA = new Date(a.completedAt || a.updatedAt || a.createdAt);
+      const dateB = new Date(b.completedAt || b.updatedAt || b.createdAt);
+      return dateB - dateA; // Descending order (most recent first)
+    });
+  };
 
   // Format date helper
   const formatDate = (dateString) => {
@@ -142,6 +149,45 @@ const RecordReport = () => {
     }
   };
 
+  const formatJobDetails = (jobDetailsString) => {
+    if (!jobDetailsString) return 'No details available';
+    
+    // If it's already a plain string (not JSON), return it directly
+    if (typeof jobDetailsString === 'string' && 
+        !jobDetailsString.trim().startsWith('[') && 
+        !jobDetailsString.trim().startsWith('{')) {
+      return jobDetailsString;
+    }
+
+    try {
+      const details = JSON.parse(jobDetailsString);
+      
+      if (Array.isArray(details) && details.length > 0) {
+        // Show first 2 items with prices
+        const displayItems = details.slice(0, 2).map(item => {
+          const description = item.description || item.name || 'Service';
+          const price = item.price ? ` (₹${item.price})` : '';
+          return `• ${description}${price}`;
+        }).join('\n');
+        
+        const moreCount = details.length - 2;
+        const moreText = moreCount > 0 ? `\n+${moreCount} more service${moreCount > 1 ? 's' : ''}` : '';
+        
+        return displayItems + moreText;
+      } else if (typeof details === 'object' && details !== null) {
+        // Handle single object case
+        const description = details.description || 'Service';
+        const price = details.price ? ` (₹${details.price})` : '';
+        return `• ${description}${price}`;
+      } else {
+        return String(details);
+      }
+    } catch (error) {
+      console.warn('Failed to parse job details:', error);
+      return jobDetailsString;
+    }
+  };
+
   // Handle Download PDF
   const handleDownloadPDF = (job) => {
     if (!job) return;
@@ -180,11 +226,15 @@ const RecordReport = () => {
           : [];
 
         const completedJobs = jobsData.filter(job => job.status === "Completed");
-        setJobsData(completedJobs);
-        setFilteredData(completedJobs);
+        
+        // Sort jobs by completed date (most recent first)
+        const sortedJobs = sortJobsByCompletedDate(completedJobs);
+        
+        setJobsData(sortedJobs);
+        setFilteredData(sortedJobs);
       } catch (error) {
         console.error("Error fetching jobs:", error);
-        setError(`Failed to load jobs  ${error.message}`);
+        setError(`Failed to load jobs: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -213,6 +263,7 @@ const RecordReport = () => {
     setStartDate(newStartDate);
     applyFilters(search, statusFilter, newStartDate, endDate);
   };
+  
   const handleEndDateChange = (e) => {
     const newEndDate = e.target.value;
     setEndDate(newEndDate);
@@ -243,7 +294,10 @@ const RecordReport = () => {
         return jobDate >= startDate && jobDate <= endDate;
       });
     }
-    setFilteredData(filtered);
+    
+    // Sort filtered data by completed date (most recent first)
+    const sortedFiltered = sortJobsByCompletedDate(filtered);
+    setFilteredData(sortedFiltered);
     setPage(0);
   };
 
@@ -406,14 +460,16 @@ const RecordReport = () => {
     setStatusFilter('Completed');
     setStartDate('');
     setEndDate('');
-    setFilteredData(jobsData);
+    // Re-sort the original data when clearing filters
+    const sortedJobs = sortJobsByCompletedDate([...jobsData]);
+    setFilteredData(sortedJobs);
     setPage(0);
   };
 
   // Handle update button click
   const handleUpdate = async (id) => {
     try {
-      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/ ${id}`); 
+      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`); 
       const jobCard = response.data;
       const { engineerId, laborHours, qualityCheck } = jobCard;
       if (!engineerId || engineerId.length === 0 || !engineerId[0]?._id) {
@@ -553,7 +609,7 @@ const RecordReport = () => {
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Completed Job Cards
+                  Completed Job Cards (Latest First)
                 </Typography>
               </Box>
               {loading ? (
@@ -632,12 +688,14 @@ const RecordReport = () => {
                               <TableCell>{job._id?.slice(-6) || 'N/A'}</TableCell>
                               <TableCell>{job.carNumber || job.registrationNumber || 'N/A'}</TableCell>
                               <TableCell>{job.customerName || 'N/A'}</TableCell>
-                              <JobDetailsComponent 
-                                    jobDetails={job.jobDetails} 
-                                    maxItems={2}
-                                    showPrices={true}
-                                    compact={true}
-                                  />
+                              <TableCell sx={{ 
+                                maxWidth: '300px',
+                                whiteSpace: 'pre-line',
+                                fontSize: '0.875rem',
+                                lineHeight: 1.4
+                              }}>
+                                {formatJobDetails(job.jobDetails)}
+                              </TableCell>
                               <TableCell>
                                 <Chip 
                                   label={job.status || 'Unknown'} 
@@ -655,6 +713,7 @@ const RecordReport = () => {
                                   <Button
                                     variant="contained"
                                     color="primary"
+                                    size="small"
                                     onClick={() => navigate(`/jobs/${job._id}`)}
                                   >
                                     Job Card
@@ -730,7 +789,7 @@ const RecordReport = () => {
               {/* Main Info Section */}
               <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} md={6}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
                         Job ID
@@ -740,7 +799,7 @@ const RecordReport = () => {
                       </Typography>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} md={4}>
+                  <Grid item xs={12} md={6}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
                         Status
@@ -758,7 +817,7 @@ const RecordReport = () => {
                       </Box>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} md={4}>
+                  {/* <Grid item xs={12} md={4}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
                         Total Cost
@@ -767,7 +826,7 @@ const RecordReport = () => {
                         ₹{selectedJob.totalCost?.toLocaleString() || '0'}
                       </Typography>
                     </Card>
-                  </Grid>
+                  </Grid> */}
                 </Grid>
               </Box>
               <Divider />
@@ -800,6 +859,14 @@ const RecordReport = () => {
                       </Typography>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>
                         {selectedJob.contactNumber || selectedJob.phone || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Job Details
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'pre-line' }}>
+                        {formatJobDetails(selectedJob.jobDetails)}
                       </Typography>
                     </Box>
                   </Grid>

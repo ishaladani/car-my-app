@@ -1092,7 +1092,7 @@ const AssignEngineer = () => {
         </Alert>
       </Snackbar>
       
-      <Snackbar 
+      {/* <Snackbar 
         open={success} 
         autoHideDuration={3000} 
         onClose={() => setSuccess(false)}
@@ -1101,7 +1101,7 @@ const AssignEngineer = () => {
         <Alert severity="success" onClose={() => setSuccess(false)}>
           Assignment completed successfully!
         </Alert>
-      </Snackbar>
+      </Snackbar> */}
 
       {/* Form Data Snackbar */}
       <Snackbar
@@ -1816,12 +1816,14 @@ const AssignEngineer = () => {
                               </Typography>
                               <List dense>
                                 {assignment.parts.map((part, partIndex) => {
-                                  const selectedQuantity = part.selectedQuantity || 1;
-                                  const unitPrice = part.pricePerUnit || 0;
-                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-                                  const totalPrice = unitPrice * selectedQuantity;
-                                  const gstAmount = (totalPrice * gstPercentage) / 100;
-                                  const finalPrice = totalPrice + gstAmount;
+                                   const selectedQuantity = part.selectedQuantity || 1;
+                                   const quantity= part.quantity;
+                                   const unitPrice = part.pricePerUnit || 0;
+                                   const gstPercentage = part.taxAmount || 0;
+                                   const totalTax= (gstPercentage * selectedQuantity)/quantity;
+                                   const totalPrice = unitPrice * selectedQuantity;
+                                   const gstAmount = (totalPrice * gstPercentage) / 100;
+                                   const finalPrice = totalPrice + totalTax;
                                   
                                   // Get available quantity considering all current selections
                                   const availableQuantity = getAvailableQuantity(part._id);
@@ -1962,7 +1964,7 @@ const AssignEngineer = () => {
                                           </Grid>
                                           <Grid item xs={3}>
                                             <Typography variant="caption" color="text.secondary">
-                                              GST: {gstPercentage}%
+                                              GST: ₹{gstPercentage}
                                             </Typography>
                                           </Grid>
                                           <Grid item xs={5}>
