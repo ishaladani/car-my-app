@@ -751,7 +751,7 @@ const AssignEngineer = () => {
               partNumber: part.partNumber || '',
               quantity: selectedQuantity,
               pricePerUnit: part.pricePerUnit || 0,
-              gstPercentage: part.gstPercentage || part.taxAmount || 0,
+              gstPercentage:  part.taxAmount || 0,
               carName: part.carName || '',
               model: part.model || ''
             });
@@ -803,7 +803,9 @@ const AssignEngineer = () => {
           parts: assignment.parts.map(part => ({
             partId: part._id,
             partName: part.partName,
-            quantity: part.selectedQuantity || 1
+            quantity: part.selectedQuantity || 1,
+            taxAmount: part.taxAmount || 0,
+
           })),
           priority: assignment.priority,
           notes: assignment.notes
@@ -1819,7 +1821,8 @@ const AssignEngineer = () => {
                                    const selectedQuantity = part.selectedQuantity || 1;
                                    const quantity= part.quantity;
                                    const unitPrice = part.pricePerUnit || 0;
-                                   const gstPercentage = part.taxAmount || 0;
+                                   const gstPercentage = part.taxAmount;
+                                   const gst = (part.taxAmount * selectedQuantity)/quantity;
                                    const totalTax= (gstPercentage * selectedQuantity)/quantity;
                                    const totalPrice = unitPrice * selectedQuantity;
                                    const gstAmount = (totalPrice * gstPercentage) / 100;
@@ -1964,7 +1967,7 @@ const AssignEngineer = () => {
                                           </Grid>
                                           <Grid item xs={3}>
                                             <Typography variant="caption" color="text.secondary">
-                                              GST: ₹{gstPercentage}
+                                              GST: ₹{gst}
                                             </Typography>
                                           </Grid>
                                           <Grid item xs={5}>
@@ -1989,11 +1992,12 @@ const AssignEngineer = () => {
                                   return total + totalPrice + gstAmount;
                                 }, 0);
                                 return (
-                                  <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
-                                    <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-                                      Assignment Parts Total: ₹{grandTotal.toFixed(2)}
-                                    </Typography>
-                                  </Box>
+                                  // <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
+                                  //   <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
+                                  //     Assignment Parts Total: ₹{grandTotal.toFixed(2)}
+                                  //   </Typography>
+                                  // </Box>
+                                  <></>
                                 );
                               })()}
                             </Box>

@@ -485,7 +485,7 @@ const WorkInProgress = () => {
   };
 
   const calculatePartFinalPrice = (part) => {
-    const unitPrice = parseFloat(part.pricePerUnit) || 0;
+    const unitPrice = parseFloat(part.pricePerUnit);
     const quantity = parseInt(part.selectedQuantity || 1);
     const gstPercentage = parseFloat(part.gstPercentage) || 0;
 
@@ -1583,7 +1583,7 @@ const WorkInProgress = () => {
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Part Details</TableCell>
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Quantity</TableCell>
                               <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Total</TableCell>
-                              <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell>
+                              {/* <TableCell sx={{ fontWeight: 600, color: '#475569' }}>Actions</TableCell> */}
                             </TableRow>
                           </TableHead>
                           <TableBody>
@@ -1676,12 +1676,12 @@ const WorkInProgress = () => {
                                 </TableCell>
 
                                 <TableCell>
-                                  <Typography variant="body2" fontWeight={600} color="primary">
-                                    ₹{calculatePartFinalPrice(part).toFixed(2)}
-                                  </Typography>
+                                <Typography variant="body2" fontWeight={500}>
+                                      {part.totalPrice}
+                                    </Typography>
                                 </TableCell>
 
-                                <TableCell>
+                                {/* <TableCell>
                                   <IconButton
                                     color="error"
                                     onClick={() => removePartFromList(part.id)}
@@ -1694,7 +1694,7 @@ const WorkInProgress = () => {
                                   >
                                     <DeleteIcon />
                                   </IconButton>
-                                </TableCell>
+                                </TableCell> */}
                               </TableRow>
                             ))}
                           </TableBody>
@@ -1703,7 +1703,7 @@ const WorkInProgress = () => {
                     )}
 
                     {/* Parts Total */}
-                    {allParts.length > 0 && (
+                    {/* {allParts.length > 0 && (
                       <Box sx={{ mt: 2, p: 2, bgcolor: 'success.main', borderRadius: 1 }}>
                         <Grid container spacing={2}>
                           <Grid item xs={12} sm={4}>
@@ -1723,7 +1723,7 @@ const WorkInProgress = () => {
                           </Grid>
                         </Grid>
                       </Box>
-                    )}
+                    )} */}
                   </Box>
                 </CardContent>
               </Card>

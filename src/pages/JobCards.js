@@ -1797,7 +1797,7 @@ const JobCards = () => {
                       { name: 'insuranceProvider', label: 'Insurance Provider', icon: <Policy /> },
                       { name: 'expiryDate', label: 'Expiry Date', icon: <EventNote />, type: 'date', InputLabelProps: { shrink: true } },
                       { name: 'policyNumber', label: 'Policy Number', icon: <Numbers />, helperText: 'Insurance policy reference number' },
-                      { name: 'registrationNumber', label: 'Registration Number', icon: <Numbers />, helperText: 'Vehicle registration certificate number' },
+                      { name: 'carNumber', label: 'Car Number', icon: <Numbers />, helperText: 'Vehicle registration certificate number' },
                       { name: 'type', label: 'Insurance Type', icon: <LocalOffer />, helperText: 'e.g., Comprehensive, Third Party' },
                       { name: 'excessAmount', label: 'Excess Amount', icon: <AttachMoney />, type: 'number' },
                     ].map((field) => (

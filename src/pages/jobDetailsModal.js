@@ -334,7 +334,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
                       {jobData.type || 'N/A'}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">Job Details</Typography>
+                    {/* <Typography variant="body2" color="text.secondary">Job Details</Typography> */}
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
                     <Box component="ul" sx={{ pl: 2 }}>
               {parsedJobDetails.length > 0 ? (
@@ -342,7 +342,8 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                   <li key={index}>{item.description} - ₹{item.price}</li>
                 ))
               ) : (
-                <Typography variant="body2" color="text.secondary">No job details provided.</Typography>
+               <></>
+                // <Typography variant="body2" color="text.secondary">No job details provided.</Typography>
               )}
             </Box>
                     </Typography>

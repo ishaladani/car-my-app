@@ -909,7 +909,7 @@ const generateProfessionalGSTInvoice = () => {
     const shipToWidth = contentWidth / 2 - 5;
     drawBorderedRect(margin + billToWidth + 10, billShipY, shipToWidth, 120);
     doc.setFont("helvetica", "bold");
-    doc.text("Ship to:", margin + billToWidth + 20, billShipY + 20);
+    doc.text("Insurance Details:", margin + billToWidth + 20, billShipY + 20);
     doc.setFont("helvetica", "normal");
     doc.text(`Name: ${carDetails.customerName}`, margin + billToWidth + 20, billShipY + 40);
     doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + billToWidth + 20, billShipY + 55);
