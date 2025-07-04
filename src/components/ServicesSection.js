@@ -84,7 +84,7 @@ const ServicesSection = ({
                   <TableCell>Service Description</TableCell>
                   <TableCell>Engineer</TableCell>
                   <TableCell align="center">Status</TableCell>
-                  <TableCell align="right">Labor Cost (₹)</TableCell>
+                  <TableCell align="right">Service Cost (₹)</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>

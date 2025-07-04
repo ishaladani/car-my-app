@@ -133,34 +133,6 @@ const BillSummarySection = ({
                 </Box>
               )}
 
-              {/* Discount Section */}
-              {/* <Box sx={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center", 
-                py: 1.5, 
-                borderBottom: summary.discount > 0 ? `1px dashed ${theme.palette.divider}` : 'none',
-                mt: 2
-              }}>
-                <Typography variant="body1" color="text.primary">💸 Discount:</Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <TextField
-                    size="small"
-                    type="number"
-                    value={summary.discount}
-                    onChange={handleDiscountChange}
-                    sx={{ 
-                      width: 100,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: 'background.paper'
-                      }
-                    }}
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                    }}
-                  />
-                </Box>
-              </Box> */}
 
               {/* Show discount amount if discount is applied */}
               {summary.discount > 0 && (

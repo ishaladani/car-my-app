@@ -18,14 +18,14 @@ const EditPriceDialog = ({
     >
       <DialogTitle>
         <Typography variant="h6" fontWeight="bold" color="primary">
-          Edit {editItem.field === "pricePerUnit" ? "Part Price" : "Labor Cost"}
+          Edit {editItem.field === "pricePerUnit" ? "Part Price" : "Servise Cost"}
         </Typography>
       </DialogTitle>
       <DialogContent sx={{ p: 3 }}>
         <TextField
           autoFocus
           margin="dense"
-          label={editItem.field === "pricePerUnit" ? "New Price per Unit" : "New Labor Cost"}
+          label={editItem.field === "pricePerUnit" ? "New Price per Unit" : "New Servise Cost"}
           type="number"
           fullWidth
           variant="outlined"

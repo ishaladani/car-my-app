@@ -1235,11 +1235,13 @@ const WorkInProgress = () => {
                             return total + totalPrice + gstAmount;
                           }, 0);
                           return (
-                            <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
-                              <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-                                Selected Parts Total: ₹{grandTotal.toFixed(2)}
-                              </Typography>
-                            </Box>
+                            // <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
+                            //   <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
+                            //     Selected Parts Total: ₹{grandTotal.toFixed(2)}
+                            //   </Typography>
+                            // </Box>
+                            <>
+                            </>
                           );
                         })()}
                       </Box>

@@ -44,7 +44,7 @@ const AddServiceDialog = ({
           </Grid>
           <Grid item xs={12}>
             <TextField
-              label="Labor Cost"
+              label="Service Cost"
               type="number"
               fullWidth
               variant="outlined"
