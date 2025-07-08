@@ -69,11 +69,11 @@ import { useNavigate } from "react-router-dom";
 import JobDetailsModal from "./jobDetailsModal";
 
 // Job Details Component for better parsing and display
-const JobDetailsComponent = ({ 
-  jobDetails, 
-  maxItems = 2, 
+const JobDetailsComponent = ({
+  jobDetails,
+  maxItems = 2,
   showPrices = true,
-  compact = false 
+  compact = false
 }) => {
   const parseAndDisplayJobDetails = (jobDetailsString) => {
     if (!jobDetailsString) {
@@ -85,9 +85,9 @@ const JobDetailsComponent = ({
     }
 
     // If it's already a plain string (not JSON), display it directly
-    if (typeof jobDetailsString === 'string' && 
-        !jobDetailsString.trim().startsWith('[') && 
-        !jobDetailsString.trim().startsWith('{')) {
+    if (typeof jobDetailsString === 'string' &&
+      !jobDetailsString.trim().startsWith('[') &&
+      !jobDetailsString.trim().startsWith('{')) {
       return (
         <Typography variant="body2" sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}>
           {jobDetailsString}
@@ -97,22 +97,22 @@ const JobDetailsComponent = ({
 
     try {
       const details = JSON.parse(jobDetailsString);
-      
+
       if (Array.isArray(details) && details.length > 0) {
         return (
           <Box>
             {details.slice(0, maxItems).map((item, index) => (
-              <Box key={index} sx={{ 
-                mb: compact ? 0.3 : 0.5, 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <Box key={index} sx={{
+                mb: compact ? 0.3 : 0.5,
+                display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: 1
               }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    flex: 1, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    flex: 1,
                     fontSize: compact ? '0.8rem' : '0.875rem',
                     lineHeight: 1.2
                   }}
@@ -120,11 +120,11 @@ const JobDetailsComponent = ({
                   • {item.description || item.name || `Service ${index + 1}`}
                 </Typography>
                 {showPrices && item.price && (
-                  <Chip 
-                    label={`${item.price}`} 
-                    size="small" 
+                  <Chip
+                    label={`${item.price}`}
+                    size="small"
                     variant="outlined"
-                    sx={{ 
+                    sx={{
                       fontSize: '0.75rem',
                       height: compact ? '18px' : '20px',
                       fontWeight: 600,
@@ -137,10 +137,10 @@ const JobDetailsComponent = ({
               </Box>
             ))}
             {details.length > maxItems && (
-              <Typography 
-                variant="caption" 
-                color="text.secondary" 
-                sx={{ 
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
                   fontStyle: 'italic',
                   fontSize: compact ? '0.7rem' : '0.75rem'
                 }}
@@ -155,20 +155,20 @@ const JobDetailsComponent = ({
         return (
           <Box>
             {details.description && (
-              <Typography 
-                variant="body2" 
+              <Typography
+                variant="body2"
                 sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
               >
                 • {details.description}
               </Typography>
             )}
             {showPrices && details.price && (
-              <Chip 
-                label={`${details.price}`} 
-                size="small" 
+              <Chip
+                label={`${details.price}`}
+                size="small"
                 variant="outlined"
-                sx={{ 
-                  mt: 0.5, 
+                sx={{
+                  mt: 0.5,
                   fontWeight: 600,
                   height: compact ? '18px' : '20px'
                 }}
@@ -178,8 +178,8 @@ const JobDetailsComponent = ({
         );
       } else {
         return (
-          <Typography 
-            variant="body2" 
+          <Typography
+            variant="body2"
             sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
           >
             {String(details)}
@@ -190,8 +190,8 @@ const JobDetailsComponent = ({
       console.warn('Failed to parse job details:', error);
       // If JSON parsing fails, display the original string
       return (
-        <Typography 
-          variant="body2" 
+        <Typography
+          variant="body2"
           sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
         >
           {jobDetailsString}
@@ -204,7 +204,7 @@ const JobDetailsComponent = ({
 };
 
 const Dashboard = () => {
-  
+
   let garageId = localStorage.getItem("garageId");
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
@@ -299,7 +299,7 @@ const Dashboard = () => {
 
   const handleUpdate = async (id) => {
     try {
-      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`); 
+      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`);
       const jobCard = response.data;
 
       const { engineerId, laborHours, qualityCheck } = jobCard;
@@ -360,10 +360,10 @@ const Dashboard = () => {
     // Apply search filter
     if (searchTerm.trim() !== '') {
       filtered = filtered.filter(
-        job => 
-          (job.carNumber && job.carNumber.toLowerCase().includes(searchTerm)) || 
-          (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) || 
-          (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) || 
+        job =>
+          (job.carNumber && job.carNumber.toLowerCase().includes(searchTerm)) ||
+          (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) ||
+          (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) ||
           (job.jobDetails && job.jobDetails.toLowerCase().includes(searchTerm)) ||
           (job.type && job.type.toLowerCase().includes(searchTerm))
       );
@@ -429,7 +429,7 @@ const Dashboard = () => {
 
   // Fetch job data from API
   useEffect(() => {
-    if(!garageId){
+    if (!garageId) {
       navigate("/login")
     }
     const fetchJobs = async () => {
@@ -464,13 +464,13 @@ const Dashboard = () => {
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
-          ? data.jobCards
-          : data.data
-          ? data.data
-          : [];
+            ? data.jobCards
+            : data.data
+              ? data.data
+              : [];
 
         // Filter out completed jobs - only show active jobs (Pending and In Progress)
-        const activeJobs = jobsData.filter(job => 
+        const activeJobs = jobsData.filter(job =>
           job.status === "Pending" || job.status === "In Progress"
         );
 
@@ -551,10 +551,10 @@ const Dashboard = () => {
         const inventoryData = Array.isArray(data)
           ? data
           : data.inventory
-          ? data.inventory
-          : data.data
-          ? data.data
-          : [];
+            ? data.inventory
+            : data.data
+              ? data.data
+              : [];
 
         // Sort inventory items into high and low stock based on quantity
         const highStock = [];
@@ -812,8 +812,8 @@ const Dashboard = () => {
                                   ? "rgba(22, 163, 74, 0.2)"
                                   : "rgba(220, 38, 38, 0.2)"
                                 : card.isIncrease
-                                ? "rgba(22, 163, 74, 0.1)"
-                                : "rgba(220, 38, 38, 0.1)",
+                                  ? "rgba(22, 163, 74, 0.1)"
+                                  : "rgba(220, 38, 38, 0.1)",
                               color: card.isIncrease
                                 ? theme.palette.success.main
                                 : theme.palette.error.main,
@@ -837,7 +837,7 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                   Active Jobs ({filteredJobs.length} of {currentJobs.length} total)
                 </Typography>
-                
+
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   {/* Search Bar */}
                   <Grid item xs={12} md={4}>
@@ -931,8 +931,8 @@ const Dashboard = () => {
                 {/* Filter Results Info */}
                 {(search || statusFilter !== 'All' || startDate || endDate) && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    {filteredJobs.length === 0 
-                      ? "No jobs match your search criteria" 
+                    {filteredJobs.length === 0
+                      ? "No jobs match your search criteria"
                       : `Showing ${filteredJobs.length} job(s) matching your criteria`}
                   </Alert>
                 )}
@@ -972,7 +972,7 @@ const Dashboard = () => {
                 ) : filteredJobs.length === 0 ? (
                   <Box sx={{ p: 4, textAlign: "center" }}>
                     <Typography variant="body1">
-                      {currentJobs.length === 0 
+                      {currentJobs.length === 0
                         ? "No active jobs found. Create your first job to get started."
                         : "No jobs match your search criteria. Try adjusting your filters."}
                     </Typography>
@@ -983,6 +983,7 @@ const Dashboard = () => {
                       <Table>
                         <TableHead>
                           <TableRow>
+                            <TableCell>No.</TableCell>
                             <TableCell>Vehicle No.</TableCell>
                             <TableCell>Customer</TableCell>
                             <TableCell>Service</TableCell>
@@ -994,21 +995,22 @@ const Dashboard = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {getPaginatedJobs().map((job) => {
+                          {getPaginatedJobs().map((job, index) => {
                             const progress = getJobProgress(job);
                             const progressColor = getProgressColor(progress);
-                            
+
                             return (
                               <TableRow key={job._id}>
                                 <TableCell sx={{ fontWeight: 500 }}>
-                                  {job.carNumber ||
-                                    job.registrationNumber ||
-                                    "N/A"}
+                                  {index + 1} {/* Display row number */}
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 500 }}>
+                                  {job.carNumber || job.registrationNumber || "N/A"}
                                 </TableCell>
                                 <TableCell>{job.customerName || "N/A"}</TableCell>
                                 <TableCell>
-                                  <JobDetailsComponent 
-                                    jobDetails={job.jobDetails} 
+                                  <JobDetailsComponent
+                                    jobDetails={job.jobDetails}
                                     maxItems={2}
                                     showPrices={true}
                                     compact={true}
@@ -1066,7 +1068,7 @@ const Dashboard = () => {
                                   })()}
                                 </TableCell>
                                 <TableCell>
-                                  <Button 
+                                  <Button
                                     variant="outlined"
                                     size="small"
                                     sx={{ mr: 1 }}
@@ -1089,8 +1091,9 @@ const Dashboard = () => {
                           })}
                         </TableBody>
                       </Table>
+
                     </TableContainer>
-                    
+
                     {/* Status Page Legend */}
                     <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="caption" color="text.secondary">
@@ -1123,7 +1126,7 @@ const Dashboard = () => {
                           )}{" "}
                           of {filteredJobs.length} jobs
                         </Typography>
-                        
+
                         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                           {/* Rows per page selector */}
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -1157,11 +1160,11 @@ const Dashboard = () => {
                             >
                               <NavigateBeforeIcon />
                             </IconButton>
-                            
+
                             <Typography variant="body2" sx={{ mx: 2 }}>
                               Page {jobsPage + 1} of {Math.ceil(filteredJobs.length / jobsRowsPerPage)}
                             </Typography>
-                            
+
                             <IconButton
                               onClick={(e) => handleJobsPageChange(e, jobsPage + 1)}
                               disabled={jobsPage >= Math.ceil(filteredJobs.length / jobsRowsPerPage) - 1}
@@ -1266,7 +1269,7 @@ const Dashboard = () => {
                                     />
                                   </TableCell>
                                   <TableCell align="right">
-                                   {item.price.toLocaleString()}
+                                    {item.price.toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -1289,8 +1292,8 @@ const Dashboard = () => {
                             sx={{ fontWeight: 600 }}
                             onClick={() => setShowAllLowStock(!showAllLowStock)}
                           >
-                            {showAllLowStock 
-                              ? `Show Less (${ITEMS_PER_PAGE} items)` 
+                            {showAllLowStock
+                              ? `Show Less (${ITEMS_PER_PAGE} items)`
                               : `Show More (${lowStockItems.length - ITEMS_PER_PAGE} more)`
                             }
                           </Button>
@@ -1384,7 +1387,7 @@ const Dashboard = () => {
                                     />
                                   </TableCell>
                                   <TableCell align="right">
-                                   {item.price.toLocaleString()}
+                                    {item.price.toLocaleString()}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -1407,8 +1410,8 @@ const Dashboard = () => {
                             sx={{ fontWeight: 600 }}
                             onClick={() => setShowAllHighStock(!showAllHighStock)}
                           >
-                            {showAllHighStock 
-                              ? `Show Less (${ITEMS_PER_PAGE} items)` 
+                            {showAllHighStock
+                              ? `Show Less (${ITEMS_PER_PAGE} items)`
                               : `Show More (${highStockItems.length - ITEMS_PER_PAGE} more)`
                             }
                           </Button>
@@ -1461,7 +1464,7 @@ const Dashboard = () => {
           <ListItemText primary="Cancel Job" />
         </MenuItem>
       </Menu>
-      
+
       <EditProfileModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}

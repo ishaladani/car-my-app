@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Button, LinearProgress, Paper,
-  useMediaQuery, useTheme, Snackbar, Alert
+  useMediaQuery, useTheme, Snackbar, Alert, IconButton
 } from "@mui/material";
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
   Receipt as ReceiptIcon, CreditCard as CreditCardIcon, AccountBalance as AccountBalanceIcon,
-  Check as CheckIcon, WhatsApp as WhatsAppIcon, Email as EmailIcon
+  Check as CheckIcon, WhatsApp as WhatsAppIcon, Email as EmailIcon, ArrowBack as ArrowBackIcon
 } from "@mui/icons-material";
 import { DownloadOutlined as DownloadIcon } from "@mui/icons-material";
 import axios from "axios";
@@ -33,6 +33,9 @@ import SnackbarAlert from "../components/SnackbarAlert";
 const AutoServeBilling = () => {
   const { id: jobCardIdFromUrl } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  
   let garageId = localStorage.getItem("garageId") || localStorage.getItem("garage_id");
   
   const today = new Date().toISOString().split("T")[0];
@@ -49,9 +52,6 @@ const AutoServeBilling = () => {
     accountNumber: "",
     ifscCode: "",
   });
-
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [isLoading, setIsLoading] = useState(true);
   const [jobCardData, setJobCardData] = useState(null);
@@ -141,6 +141,11 @@ const AutoServeBilling = () => {
     py: isMobile ? 1 : 2,
     px: isMobile ? 1 : 3,
     fontSize: isMobile ? "0.75rem" : "0.875rem",
+  };
+
+  // Handle back navigation
+  const handleGoBack = () => {
+    navigate(`/Quality-Check/${jobCardIdFromUrl}`); // Go back to previous page
   };
 
   // NEW: Function to update bill status
@@ -923,7 +928,7 @@ const generateProfessionalGSTInvoice = () => {
     
     currentY = billShipY + 140;
 
-    // FIXED: Items Table with proper column widths and alignment
+    // Items Table with proper column widths and alignment
     const tableStartY = currentY;
     
     // Adjusted column widths to fit content properly
@@ -972,7 +977,7 @@ const generateProfessionalGSTInvoice = () => {
 
     currentY = headerY + 30;
 
-    // FIXED: Data rows with proper text wrapping and alignment
+    // Data rows with proper text wrapping and alignment
     doc.setFont("helvetica", "normal");
     let rowIndex = 1;
     
@@ -1066,7 +1071,7 @@ const generateProfessionalGSTInvoice = () => {
 
     currentY += 10;
 
-    // Summary Section (keeping your existing summary code)
+    // Summary Section
     const summaryStartY = currentY;
     const summaryWidth = 200;
     const summaryX = pageWidth - margin - summaryWidth;
@@ -1382,12 +1387,34 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
   return (
     <Box sx={{ ml: { xs: 0, md: "280px" }, px: { xs: 2, md: 3 }, py: 4 }}>
       <Paper elevation={3} sx={{ mb: 4, p: isMobile ? 2 : 3, borderRadius: 2 }}>
-        <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", alignItems: isMobile ? "flex-start" : "center", mb: 3, gap: isMobile ? 2 : 0 }}>
-          <Typography variant="h4" color="primary" fontWeight="bold">
-            Professional GST Billing System
-          </Typography>
+        {/* Header with Back Button */}
+        <Box sx={{ 
+          display: "flex", 
+          flexDirection: isMobile ? "column" : "row", 
+          justifyContent: "space-between", 
+          alignItems: isMobile ? "flex-start" : "center", 
+          mb: 3, 
+          gap: isMobile ? 2 : 0 
+        }}>
+          {/* Back Button and Title */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton 
+              onClick={handleGoBack}
+              sx={{ 
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant={isMobile ? "h5" : "h4"} color="primary" fontWeight="bold">
+              Professional GST Billing System
+            </Typography>
+          </Box>
           
-          {/* UPDATED: Button behavior based on bill status */}
+          {/* Action Buttons */}
           {!isBillAlreadyGenerated && !billGenerated ? (
             <Button
               variant="contained"
@@ -1425,7 +1452,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
           )}
         </Box>
 
-        {/* UPDATED: Show bill generation warning if already generated */}
+        {/* Bill generation warning if already generated */}
         {isBillAlreadyGenerated && (
           <Alert severity="info" sx={{ mb: 3 }}>
             This GST invoice has already been generated. You can download the PDF or share via WhatsApp/Email below.
@@ -1524,7 +1551,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
         carDetails={carDetails} 
       />
       
-      {/* UPDATED: Only show edit dialogs if bill is not generated */}
+      {/* Only show edit dialogs if bill is not generated */}
       {!isBillAlreadyGenerated && (
         <>
           <EditPriceDialog 

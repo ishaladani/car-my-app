@@ -166,38 +166,350 @@ const WorkInProgress = () => {
     { value: 'on_hold', label: 'On Hold', color: 'default' }
   ];
 
+
   const handlePartSelection = (newParts, previousParts = []) => {
-    try {
-      // Find newly added parts
-      const addedParts = newParts.filter(newPart => 
-        !previousParts.some(prevPart => prevPart._id === newPart._id)
-      );
-
-      // Process newly added parts - only validate, don't update API
-      for (const addedPart of addedParts) {
-        // Check if part has sufficient quantity available
-        const availableQuantity = getAvailableQuantity(addedPart._id);
-        if (availableQuantity < 1) {
-          setError(`Part "${addedPart.partName}" is out of stock!`);
-          return; // Don't update the selection
+  try {
+    // Create a map to track parts by their ID for easier management
+    const partsMap = new Map();
+    
+    // First, add all previously selected parts to the map
+    previousParts.forEach(part => {
+      partsMap.set(part._id, { ...part });
+    });
+    
+    // Process the new selection
+    newParts.forEach(newPart => {
+      const existingPart = partsMap.get(newPart._id);
+      
+      if (existingPart) {
+        // Part already exists, increment quantity by 1
+        const currentQuantity = existingPart.selectedQuantity || 1;
+        const newQuantity = currentQuantity + 1;
+        
+        // Check if new quantity exceeds available stock
+        const availableQuantity = getAvailableQuantity(newPart._id);
+        const maxSelectableQuantity = availableQuantity + currentQuantity;
+        
+        if (newQuantity > maxSelectableQuantity) {
+          setError(`Cannot add more "${newPart.partName}". Maximum available: ${maxSelectableQuantity}, Current: ${currentQuantity}`);
+          return;
         }
+        
+        // Update the quantity
+        partsMap.set(newPart._id, {
+          ...existingPart,
+          selectedQuantity: newQuantity
+        });
+      } else {
+        // New part, check if it has sufficient quantity available
+        const availableQuantity = getAvailableQuantity(newPart._id);
+        if (availableQuantity < 1) {
+          setError(`Part "${newPart.partName}" is out of stock!`);
+          return;
+        }
+        
+        // Add new part with initial quantity of 1
+        partsMap.set(newPart._id, {
+          ...newPart,
+          selectedQuantity: 1,
+          availableQuantity: availableQuantity
+        });
       }
-
-      // Update the parts with selected quantity (local state only)
-      const updatedParts = newParts.map(part => ({
-        ...part,
-        selectedQuantity: part.selectedQuantity || 1,
-        availableQuantity: part.quantity
-      }));
-
-      // Update selected parts
-      setSelectedParts(updatedParts);
-
-    } catch (err) {
-      console.error('Error handling part selection:', err);
-      setError('Failed to update part selection');
+    });
+    
+    // Convert map back to array
+    const updatedParts = Array.from(partsMap.values());
+    
+    // Update selected parts
+    setSelectedParts(updatedParts);
+    
+    // Clear any previous errors
+    if (error) {
+      setError(null);
     }
+    
+  } catch (err) {
+    console.error('Error handling part selection:', err);
+    setError('Failed to update part selection');
+  }
+};
+
+
+// Alternative approach: Modified Autocomplete onChange handler
+const handleAutocompleteChange = (event, newValue, reason, details) => {
+  if (reason === 'selectOption' && details?.option) {
+    const selectedPart = details.option;
+    const existingPartIndex = selectedParts.findIndex(part => part._id === selectedPart._id);
+    
+    if (existingPartIndex !== -1) {
+      // Part already exists, increment quantity
+      const currentQuantity = selectedParts[existingPartIndex].selectedQuantity || 1;
+      const newQuantity = currentQuantity + 1;
+      
+      // Check availability
+      const availableQuantity = getAvailableQuantity(selectedPart._id);
+      const maxSelectableQuantity = availableQuantity + currentQuantity;
+      
+      if (newQuantity > maxSelectableQuantity) {
+        setError(`Cannot add more "${selectedPart.partName}". Maximum available: ${maxSelectableQuantity}`);
+        return;
+      }
+      
+      // Update quantity
+      const updatedParts = [...selectedParts];
+      updatedParts[existingPartIndex] = {
+        ...updatedParts[existingPartIndex],
+        selectedQuantity: newQuantity
+      };
+      setSelectedParts(updatedParts);
+      
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: `Increased quantity of "${selectedPart.partName}" to ${newQuantity}`,
+        severity: 'success'
+      });
+    } else {
+      // New part selection
+      const availableQuantity = getAvailableQuantity(selectedPart._id);
+      if (availableQuantity < 1) {
+        setError(`Part "${selectedPart.partName}" is out of stock!`);
+        return;
+      }
+      
+      const newPart = {
+        ...selectedPart,
+        selectedQuantity: 1,
+        availableQuantity: availableQuantity
+      };
+      
+      setSelectedParts(prev => [...prev, newPart]);
+      
+      setSnackbar({
+        open: true,
+        message: `Added "${selectedPart.partName}" to selection`,
+        severity: 'success'
+      });
+    }
+  } else if (reason === 'removeOption') {
+    // Handle removal normally
+    setSelectedParts(newValue);
+  }
+};
+
+// Updated Autocomplete component with custom onChange
+const AutocompleteWithQuantityUpdate = () => {
+  return (
+    <Autocomplete
+      multiple
+      fullWidth
+      options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
+      getOptionLabel={(option) => 
+        `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+      }
+      value={selectedParts}
+      onChange={handleAutocompleteChange}
+      // Disable tag removal to force using our custom logic
+      disableCloseOnSelect={true}
+      renderTags={(value, getTagProps) =>
+        value.map((option, index) => (
+          <Chip
+            variant="outlined"
+            label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
+            {...getTagProps({ index })}
+            key={option._id}
+            onDelete={() => {
+              // Custom delete handler
+              const updatedParts = selectedParts.filter((_, idx) => idx !== index);
+              setSelectedParts(updatedParts);
+            }}
+          />
+        ))
+      }
+      renderOption={(props, option) => (
+        <Box component="li" {...props}>
+          <Box sx={{ width: '100%' }}>
+            <Typography variant="body2" fontWeight={500}>
+              {option.partName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Part : {option.partNumber || 'N/A'} | 
+              Price: ₹{option.pricePerUnit || 0} | 
+              GST: {option.gstPercentage || option.taxAmount || 0}| 
+              Available: {getAvailableQuantity(option._id)} | 
+              {option.carName} - {option.model}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          placeholder="Select parts needed (selecting same part will increase quantity)"
+          variant="outlined"
+          InputProps={{
+            ...params.InputProps,
+            startAdornment: (
+              <>
+                <InputAdornment position="start">
+                  <InventoryIcon color="action" />
+                </InputAdornment>
+                {params.InputProps.startAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      noOptionsText="No parts available in stock"
+      filterOptions={(options, { inputValue }) => {
+        return options.filter(option => 
+          getAvailableQuantity(option._id) > 0 && (
+            option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.model?.toLowerCase().includes(inputValue.toLowerCase())
+          )
+        );
+      }}
+    />
+  );
+};
+
+// RECOMMENDED: Replace your existing Autocomplete with this implementation
+const ImprovedPartsSelection = () => {
+  const [selectedPart, setSelectedPart] = useState(null);
+  
+  const handleAddPart = () => {
+    if (!selectedPart) return;
+    
+    const existingPartIndex = selectedParts.findIndex(part => part._id === selectedPart._id);
+    
+    if (existingPartIndex !== -1) {
+      // Part exists, increment quantity
+      const currentQuantity = selectedParts[existingPartIndex].selectedQuantity || 1;
+      const newQuantity = currentQuantity + 1;
+      
+      // Check availability
+      const availableQuantity = getAvailableQuantity(selectedPart._id);
+      const maxSelectableQuantity = availableQuantity + currentQuantity;
+      
+      if (newQuantity > maxSelectableQuantity) {
+        setError(`Cannot add more "${selectedPart.partName}". Maximum available: ${maxSelectableQuantity}`);
+        return;
+      }
+      
+      // Update quantity
+      const updatedParts = [...selectedParts];
+      updatedParts[existingPartIndex] = {
+        ...updatedParts[existingPartIndex],
+        selectedQuantity: newQuantity
+      };
+      setSelectedParts(updatedParts);
+      
+      setSnackbar({
+        open: true,
+        message: `Increased "${selectedPart.partName}" quantity to ${newQuantity}`,
+        severity: 'success'
+      });
+    } else {
+      // Add new part
+      const availableQuantity = getAvailableQuantity(selectedPart._id);
+      if (availableQuantity < 1) {
+        setError(`Part "${selectedPart.partName}" is out of stock!`);
+        return;
+      }
+      
+      const newPart = {
+        ...selectedPart,
+        selectedQuantity: 1,
+        availableQuantity: availableQuantity
+      };
+      
+      setSelectedParts(prev => [...prev, newPart]);
+      
+      setSnackbar({
+        open: true,
+        message: `Added "${selectedPart.partName}" to selection`,
+        severity: 'success'
+      });
+    }
+    
+    // Clear selection
+    setSelectedPart(null);
   };
+  
+  return (
+    <Box sx={{ mb: 3 }}>
+      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+        Select Parts from Inventory (Optional)
+      </Typography>
+      
+      {isLoadingInventory ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
+          <CircularProgress size={20} />
+          <Typography sx={{ ml: 2 }}>Loading parts...</Typography>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+          <Autocomplete
+            fullWidth
+            options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
+            getOptionLabel={(option) => 
+              `${option.partName} (${option.partNumber || 'N/A'}) - Available: ${getAvailableQuantity(option._id)}`
+            }
+            value={selectedPart}
+            onChange={(event, newValue) => setSelectedPart(newValue)}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Box sx={{ width: '100%' }}>
+                  <Typography variant="body2" fontWeight={500}>
+                    {option.partName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Part: {option.partNumber || 'N/A'} | Price: ₹{option.pricePerUnit || 0} | Available: {getAvailableQuantity(option._id)}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search and select a part (can select same part multiple times)"
+                variant="outlined"
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <InputAdornment position="start">
+                        <InventoryIcon color="action" />
+                      </InputAdornment>
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            noOptionsText="No parts available"
+          />
+          <Button
+            variant="contained"
+            onClick={handleAddPart}
+            disabled={!selectedPart}
+            startIcon={<AddIcon />}
+            sx={{ minWidth: 100, height: 56 }}
+          >
+            Add
+          </Button>
+        </Box>
+      )}
+      
+      {/* Display message about how to use */}
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        💡 Tip: Select the same part multiple times to increase quantity, or use the quantity controls below
+      </Typography>
+    </Box>
+  );
+};
 
   const handlePartRemoval = (partIndex) => {
     try {

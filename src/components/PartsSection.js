@@ -968,285 +968,336 @@ const WorkInProgress = () => {
 
                 <CardContent sx={{ p: 3 }}>
                   {/* Parts Selection */}
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                      Select Parts from Inventory (Optional)
-                    </Typography>
-                    
-                    {isLoadingInventory ? (
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center',
-                        py: 2 
-                      }}>
-                        <CircularProgress size={20} />
-                        <Typography sx={{ ml: 2 }}>
-                          Loading parts...
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Autocomplete
-                        multiple
-                        fullWidth
-                        options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
-                        getOptionLabel={(option) => 
-                          `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+                 // Updated parts selection logic - Replace the existing Autocomplete section with this:
+
+{/* Parts Selection - Updated to prevent duplicate selection */}
+<Box sx={{ mb: 3 }}>
+  <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+    Select Parts from Inventory (Optional)
+  </Typography>
+  
+  {isLoadingInventory ? (
+    <Box sx={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      py: 2 
+    }}>
+      <CircularProgress size={20} />
+      <Typography sx={{ ml: 2 }}>
+        Loading parts...
+      </Typography>
+    </Box>
+  ) : (
+    <Autocomplete
+      multiple
+      fullWidth
+      options={inventoryParts.filter(part => {
+        // Filter out parts that are already selected
+        const isAlreadySelected = selectedParts.some(selectedPart => selectedPart._id === part._id);
+        const hasAvailableStock = getAvailableQuantity(part._id) > 0;
+        return !isAlreadySelected && hasAvailableStock;
+      })}
+      getOptionLabel={(option) => 
+        `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+      }
+      value={selectedParts}
+      onChange={(event, newValue, reason, details) => {
+        if (reason === 'selectOption' && details?.option) {
+          // User is adding a new part
+          const newPart = details.option;
+          
+          // Check if part is already selected (extra safety check)
+          const isAlreadySelected = selectedParts.some(selectedPart => selectedPart._id === newPart._id);
+          
+          if (isAlreadySelected) {
+            setSnackbar({
+              open: true,
+              message: `"${newPart.partName}" is already selected.`,
+              severity: 'warning'
+            });
+            return;
+          }
+
+          // Add the new part with default quantity 1
+          const newPartWithQuantity = {
+            ...newPart,
+            selectedQuantity: 1
+          };
+          
+          setSelectedParts(prev => [...prev, newPartWithQuantity]);
+          
+          setSnackbar({
+            open: true,
+            message: `"${newPart.partName}" added to selection.`,
+            severity: 'success'
+          });
+        } else if (reason === 'removeOption' && details?.option) {
+          // User is removing a part via chip
+          const removedPart = details.option;
+          setSelectedParts(prev => prev.filter(part => part._id !== removedPart._id));
+          
+          setSnackbar({
+            open: true,
+            message: `"${removedPart.partName}" removed from selection.`,
+            severity: 'info'
+          });
+        } else if (reason === 'clear') {
+          // User cleared all selections
+          setSelectedParts([]);
+          setSnackbar({
+            open: true,
+            message: 'All parts removed from selection.',
+            severity: 'info'
+          });
+        }
+      }}
+      renderTags={(value, getTagProps) =>
+        value.map((option, index) => (
+          <Chip
+            variant="outlined"
+            label={`${option.partName} (Qty: ${option.selectedQuantity || 1})`}
+            {...getTagProps({ index })}
+            key={option._id}
+            color="primary"
+            size="small"
+          />
+        ))
+      }
+      renderOption={(props, option) => (
+        <Box component="li" {...props}>
+          <Box sx={{ width: '100%' }}>
+            <Typography variant="body2" fontWeight={500}>
+              {option.partName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Part : {option.partNumber || 'N/A'} | 
+              Price: ₹{option.pricePerUnit || 0} | 
+              GST: {option.gstPercentage || option.taxAmount || 0}| 
+              Available: {getAvailableQuantity(option._id)} | 
+              {option.carName} - {option.model}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          placeholder="Search and select multiple parts"
+          variant="outlined"
+          InputProps={{
+            ...params.InputProps,
+            startAdornment: (
+              <>
+                <InputAdornment position="start">
+                  <InventoryIcon color="action" />
+                </InputAdornment>
+                {params.InputProps.startAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      noOptionsText={
+        inventoryParts.filter(part => getAvailableQuantity(part._id) > 0).length === 0 
+          ? "No parts available in stock"
+          : "No new parts available (all in-stock parts are already selected)"
+      }
+      filterOptions={(options, { inputValue }) => {
+        return options.filter(option => 
+          getAvailableQuantity(option._id) > 0 && (
+            option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
+            option.model?.toLowerCase().includes(inputValue.toLowerCase())
+          )
+        );
+      }}
+    />
+  )}
+
+  {/* Display information about selection */}
+  {selectedParts.length > 0 && (
+    <Box sx={{ mt: 1, p: 1, bgcolor: 'info.light', borderRadius: 1 }}>
+      <Typography variant="caption" color="info.dark">
+        ℹ️ {selectedParts.length} parts selected. Each part can only be selected once. Use quantity controls below to adjust amounts. You can remove parts using the × on chips above.
+      </Typography>
+    </Box>
+  )}
+
+  {/* Selected Parts with Enhanced Quantity Management */}
+  {selectedParts.length > 0 && (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+        Selected Parts with Details ({selectedParts.length}):
+      </Typography>
+      <List dense>
+        {selectedParts.map((part, partIndex) => {
+          const selectedQuantity = part.selectedQuantity || 1;
+          const quantity = part.quantity;
+          const unitPrice = part.pricePerUnit || 0;
+          const gstPercentage = part.taxAmount || 0;
+          const totalTax = (gstPercentage * selectedQuantity) / quantity;
+          const totalPrice = unitPrice * selectedQuantity;
+          const gstAmount = (totalPrice * gstPercentage) / 100;
+          const finalPrice = totalPrice + totalTax;
+          
+          // Get available quantity considering all current selections
+          const availableQuantity = getAvailableQuantity(part._id);
+          
+          // Calculate the maximum quantity user can select
+          const maxSelectableQuantity = availableQuantity + selectedQuantity;
+          const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
+
+          return (
+            <ListItem 
+              key={part._id} 
+              sx={{ 
+                border: `1px solid ${theme.palette.divider}`, 
+                borderRadius: 1, 
+                mb: 1,
+                py: 1,
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                bgcolor: 'background.paper'
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" fontWeight={500}>
+                    {part.partName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                  </Typography>
+                  <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
+                    Available Stock: {availableQuantity}
+                  </Typography>
+                  <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                    Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const newQuantity = selectedQuantity - 1;
+                        if (newQuantity >= 1) {
+                          handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
                         }
-                        value={selectedParts}
-                        onChange={(event, newValue) => {
-                          handlePartSelection(newValue, selectedParts);
-                        }}
-                        renderTags={(value, getTagProps) =>
-                          value.map((option, index) => (
-                            <Chip
-                              variant="outlined"
-                              label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
-                              {...getTagProps({ index })}
-                              key={option._id}
-                            />
-                          ))
+                      }}
+                      disabled={selectedQuantity <= 1}
+                      sx={{ 
+                        minWidth: '24px', 
+                        width: '24px', 
+                        height: '24px',
+                        border: `1px solid ${theme.palette.divider}`
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight="bold">-</Typography>
+                    </IconButton>
+                    <TextField
+                      size="small"
+                      type="number"
+                      label="Qty"
+                      value={selectedQuantity}
+                      onChange={(e) => {
+                        const newQuantity = parseInt(e.target.value) || 1;
+                        const oldQuantity = selectedQuantity;
+                        
+                        // Validate quantity limits
+                        if (newQuantity < 1) {
+                          return;
                         }
-                        renderOption={(props, option) => (
-                          <Box component="li" {...props}>
-                            <Box sx={{ width: '100%' }}>
-                              <Typography variant="body2" fontWeight={500}>
-                                {option.partName}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Part : {option.partNumber || 'N/A'} | 
-                                Price: ₹{option.pricePerUnit || 0} | 
-                                GST: {option.gstPercentage || option.taxAmount || 0}| 
-                                Available: {getAvailableQuantity(option._id)} | 
-                                {option.carName} - {option.model}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        )}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            placeholder="Select parts needed"
-                            variant="outlined"
-                            InputProps={{
-                              ...params.InputProps,
-                              startAdornment: (
-                                <>
-                                  <InputAdornment position="start">
-                                    <InventoryIcon color="action" />
-                                  </InputAdornment>
-                                  {params.InputProps.startAdornment}
-                                </>
-                              ),
-                            }}
-                          />
-                        )}
-                        noOptionsText="No parts available in stock"
-                        filterOptions={(options, { inputValue }) => {
-                          return options.filter(option => 
-                            getAvailableQuantity(option._id) > 0 && (
-                              option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
-                              option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
-                              option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
-                              option.model?.toLowerCase().includes(inputValue.toLowerCase())
-                            )
-                          );
-                        }}
-                      />
-                    )}
+                        
+                        if (newQuantity > maxSelectableQuantity) {
+                          setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                          return;
+                        }
 
-                    {/* Selected Parts with Enhanced Quantity Management */}
-                    {selectedParts.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                          Selected Parts with Details:
-                        </Typography>
-                        <List dense>
-                          {selectedParts.map((part, partIndex) => {
-                            const selectedQuantity = part.selectedQuantity || 1;
-                            const quantity= part.quantity;
-                            const unitPrice = part.pricePerUnit || 0;
-                            const gstPercentage = part.taxAmount || 0;
-                            const totalTax= (gstPercentage * selectedQuantity)/quantity;
-                            const totalPrice = unitPrice * selectedQuantity;
-                            const gstAmount = (totalPrice * gstPercentage) / 100;
-                            const finalPrice = totalPrice + totalTax;
-                            
-                            // Get available quantity considering all current selections
-                            const availableQuantity = getAvailableQuantity(part._id);
-                            
-                            // Calculate the maximum quantity user can select
-                            const maxSelectableQuantity = availableQuantity + selectedQuantity;
-                            const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
-
-                            return (
-                              <ListItem 
-                                key={part._id} 
-                                sx={{ 
-                                  border: `1px solid ${theme.palette.divider}`, 
-                                  borderRadius: 1, 
-                                  mb: 1,
-                                  py: 1,
-                                  flexDirection: 'column',
-                                  alignItems: 'stretch',
-                                  bgcolor: 'background.paper'
-                                }}
-                              >
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="body2" fontWeight={500}>
-                                      {part.partName}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                      Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                                    </Typography>
-                                    <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
-                                      Available Stock: {availableQuantity}
-                                    </Typography>
-                                    <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
-                                      Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          const newQuantity = selectedQuantity - 1;
-                                          if (newQuantity >= 1) {
-                                            handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
-                                          }
-                                        }}
-                                        disabled={selectedQuantity <= 1}
-                                        sx={{ 
-                                          minWidth: '24px', 
-                                          width: '24px', 
-                                          height: '24px',
-                                          border: `1px solid ${theme.palette.divider}`
-                                        }}
-                                      >
-                                        <Typography variant="caption" fontWeight="bold">-</Typography>
-                                      </IconButton>
-                                      <TextField
-                                        size="small"
-                                        type="number"
-                                        label="Qty"
-                                        value={selectedQuantity}
-                                        onChange={(e) => {
-                                          const newQuantity = parseInt(e.target.value) || 1;
-                                          const oldQuantity = selectedQuantity;
-                                          
-                                          // Validate quantity limits
-                                          if (newQuantity < 1) {
-                                            return;
-                                          }
-                                          
-                                          if (newQuantity > maxSelectableQuantity) {
-                                            setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                            return;
-                                          }
-
-                                          handlePartQuantityChange(partIndex, newQuantity, oldQuantity);
-                                        }}
-                                        inputProps={{ 
-                                          min: 1, 
-                                          max: maxSelectableQuantity,
-                                          style: { width: '50px', textAlign: 'center' },
-                                          readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
-                                        }}
-                                        sx={{ 
-                                          width: '70px',
-                                          '& .MuiInputBase-input': {
-                                            textAlign: 'center',
-                                            fontSize: '0.875rem'
-                                          }
-                                        }}
-                                        error={availableQuantity === 0}
-                                        disabled={maxSelectableQuantity === 0}
-                                      />
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          const newQuantity = selectedQuantity + 1;
-                                          if (newQuantity <= maxSelectableQuantity) {
-                                            handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
-                                          } else {
-                                            setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                          }
-                                        }}
-                                        disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
-                                        sx={{ 
-                                          minWidth: '24px', 
-                                          width: '24px', 
-                                          height: '24px',
-                                          border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
-                                          color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
-                                        }}
-                                      >
-                                        <Typography variant="caption" fontWeight="bold">+</Typography>
-                                      </IconButton>
-                                    </Box>
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => handlePartRemoval(partIndex)}
-                                    >
-                                      <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                  </Box>
-                                </Box>
-                                {/* Price Details */}
-                                <Box sx={{ 
-                                  mt: 1, 
-                                  p: 1, 
-                                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)', 
-                                  borderRadius: 1 
-                                }}>
-                                  <Grid container spacing={1} alignItems="center">
-                                    <Grid item xs={4}>
-                                      <Typography variant="caption" color="text.secondary">
-                                        Price/Unit: ₹{unitPrice.toFixed(2)}
-                                      </Typography>
-                                    </Grid>
-                                    <Grid item xs={3}>
-                                      <Typography variant="caption" color="text.secondary">
-                                        GST: {gstPercentage}
-                                      </Typography>
-                                    </Grid>
-                                    <Grid item xs={5}>
-                                      <Typography variant="caption" fontWeight={600} color="primary">
-                                        Total: ₹{finalPrice.toFixed(2)}
-                                      </Typography>
-                                    </Grid>
-                                  </Grid>
-                                </Box>
-                              </ListItem>
-                            );
-                          })}
-                        </List>
-                        {/* Total Summary */}
-                        {(() => {
-                          const grandTotal = selectedParts.reduce((total, part) => {
-                            const selectedQuantity = part.selectedQuantity || 1;
-                            const unitPrice = part.pricePerUnit || 0;
-                            const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-                            const totalPrice = unitPrice * selectedQuantity;
-                            const gstAmount = (totalPrice * gstPercentage) / 100;
-                            return total + totalPrice + gstAmount;
-                          }, 0);
-                          return (
-                            // <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
-                            //   <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-                            //     Selected Parts Total: ₹{grandTotal.toFixed(2)}
-                            //   </Typography>
-                            // </Box>
-                            <>
-                            </>
-                          );
-                        })()}
-                      </Box>
-                    )}
+                        handlePartQuantityChange(partIndex, newQuantity, oldQuantity);
+                      }}
+                      inputProps={{ 
+                        min: 1, 
+                        max: maxSelectableQuantity,
+                        style: { width: '50px', textAlign: 'center' },
+                        readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
+                      }}
+                      sx={{ 
+                        width: '70px',
+                        '& .MuiInputBase-input': {
+                          textAlign: 'center',
+                          fontSize: '0.875rem'
+                        }
+                      }}
+                      error={availableQuantity === 0}
+                      disabled={maxSelectableQuantity === 0}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const newQuantity = selectedQuantity + 1;
+                        if (newQuantity <= maxSelectableQuantity) {
+                          handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
+                        } else {
+                          setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                        }
+                      }}
+                      disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
+                      sx={{ 
+                        minWidth: '24px', 
+                        width: '24px', 
+                        height: '24px',
+                        border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                        color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                      }}
+                    >
+                      <Typography variant="caption" fontWeight="bold">+</Typography>
+                    </IconButton>
                   </Box>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handlePartRemoval(partIndex)}
+                    title="Remove part from selection"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Box>
+              {/* Price Details */}
+              <Box sx={{ 
+                mt: 1, 
+                p: 1, 
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)', 
+                borderRadius: 1 
+              }}>
+                <Grid container spacing={1} alignItems="center">
+                  <Grid item xs={4}>
+                    <Typography variant="caption" color="text.secondary">
+                      Price/Unit: ₹{unitPrice.toFixed(2)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="caption" color="text.secondary">
+                      GST: {gstPercentage}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={5}>
+                    <Typography variant="caption" fontWeight={600} color="primary">
+                      Total: ₹{finalPrice.toFixed(2)}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            </ListItem>
+          );
+        })}
+      </List>
+    </Box>
+  )}
+</Box>
 
                   {/* Add from Inventory Section */}
                   {addPartMode === 'inventory' && (

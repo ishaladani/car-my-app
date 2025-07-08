@@ -544,38 +544,63 @@ const AssignEngineer = () => {
   };
 
   // Handle Part Selection (Local State Only)
+  // const handlePartSelection = (assignmentId, newParts, previousParts = []) => {
+  //   try {
+  //     // Find newly added parts
+  //     const addedParts = newParts.filter(newPart => 
+  //       !previousParts.some(prevPart => prevPart._id === newPart._id)
+  //     );
+
+  //     // Process newly added parts - only validate, don't update API
+  //     for (const addedPart of addedParts) {
+  //       // Check if part has sufficient quantity available
+  //       const availableQuantity = getAvailableQuantity(addedPart._id);
+  //       if (availableQuantity < 1) {
+  //         setError(`Part "${addedPart.partName}" is out of stock!`);
+  //         return; // Don't update the selection
+  //       }
+  //     }
+
+  //     // Update the parts with selected quantity (local state only)
+  //     const updatedParts = newParts.map(part => ({
+  //       ...part,
+  //       selectedQuantity: part.selectedQuantity || 1,
+  //       availableQuantity: part.quantity
+  //     }));
+
+  //     // Update the assignment with new parts (local state only)
+  //     updateAssignment(assignmentId, 'parts', updatedParts);
+
+  //   } catch (err) {
+  //     console.error('Error handling part selection:', err);
+  //     setError('Failed to update part selection');
+  //   }
+  // };
+
   const handlePartSelection = (assignmentId, newParts, previousParts = []) => {
-    try {
-      // Find newly added parts
-      const addedParts = newParts.filter(newPart => 
-        !previousParts.some(prevPart => prevPart._id === newPart._id)
-      );
+  try {
+    // Prevent selecting duplicate parts
+    const uniqueParts = [];
+    const seenIds = new Set();
 
-      // Process newly added parts - only validate, don't update API
-      for (const addedPart of addedParts) {
-        // Check if part has sufficient quantity available
-        const availableQuantity = getAvailableQuantity(addedPart._id);
-        if (availableQuantity < 1) {
-          setError(`Part "${addedPart.partName}" is out of stock!`);
-          return; // Don't update the selection
-        }
+    for (const part of newParts) {
+      if (!seenIds.has(part._id)) {
+        seenIds.add(part._id);
+        uniqueParts.push({
+          ...part,
+          selectedQuantity: part.selectedQuantity || 1,
+          availableQuantity: part.quantity
+        });
       }
-
-      // Update the parts with selected quantity (local state only)
-      const updatedParts = newParts.map(part => ({
-        ...part,
-        selectedQuantity: part.selectedQuantity || 1,
-        availableQuantity: part.quantity
-      }));
-
-      // Update the assignment with new parts (local state only)
-      updateAssignment(assignmentId, 'parts', updatedParts);
-
-    } catch (err) {
-      console.error('Error handling part selection:', err);
-      setError('Failed to update part selection');
     }
-  };
+
+    // Update the assignment with filtered parts (no duplicates)
+    updateAssignment(assignmentId, 'parts', uniqueParts);
+  } catch (err) {
+    console.error('Error handling part selection:', err);
+    setError('Failed to update part selection');
+  }
+};
 
   // Handle Part Quantity Change (Local State Only)
   const handlePartQuantityChange = (assignmentId, partIndex, newQuantity, oldQuantity) => {
@@ -680,9 +705,9 @@ const AssignEngineer = () => {
         quantity: Number(part.quantity) || 1,
         pricePerUnit: Number(part.pricePerUnit) || 0,
         gstPercentage: Number(part.gstPercentage) || 0,
-        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1)),
         gstAmount: Number(((part.pricePerUnit || 0) * (part.quantity || 1) * (part.gstPercentage || 0)) / 100),
-        carName: part.carName || '',
+        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1))+ (part.gstAmount),
+           carName: part.carName || '',
         model: part.model || ''
       }));
 
@@ -1736,7 +1761,9 @@ const AssignEngineer = () => {
                             <Autocomplete
                               multiple
                               fullWidth
-                              options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
+                               options={inventoryParts.filter(
+    part => getAvailableQuantity(part._id) > 0 && !assignment.parts.some(p => p._id === part._id)
+  )}
                               getOptionLabel={(option) => 
                                 `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
                               }
