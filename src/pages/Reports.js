@@ -63,7 +63,7 @@ const RecordReport = () => {
 
   // Search and Filter States
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Completed');
+  // const [statusFilter, setStatusFilter] = useState('Completed');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -247,27 +247,27 @@ const RecordReport = () => {
   const handleSearch = (e) => {
     const searchTerm = e.target.value.toLowerCase();
     setSearch(searchTerm);
-    applyFilters(searchTerm, statusFilter, startDate, endDate);
+    // applyFilters(searchTerm, statusFilter, startDate, endDate);
   };
 
   // Handle status filter change
-  const handleStatusFilterChange = (e) => {
-    const newStatus = e.target.value;
-    setStatusFilter(newStatus);
-    applyFilters(search, newStatus, startDate, endDate);
-  };
+  // const handleStatusFilterChange = (e) => {
+  //   const newStatus = e.target.value;
+  //   setStatusFilter(newStatus);
+  //   applyFilters(search, newStatus, startDate, endDate);
+  // };
 
   // Handle date changes
   const handleStartDateChange = (e) => {
     const newStartDate = e.target.value;
     setStartDate(newStartDate);
-    applyFilters(search, statusFilter, newStartDate, endDate);
+    applyFilters(search,  newStartDate, endDate);
   };
   
   const handleEndDateChange = (e) => {
     const newEndDate = e.target.value;
     setEndDate(newEndDate);
-    applyFilters(search, statusFilter, startDate, newEndDate);
+    applyFilters(search,  startDate, newEndDate);
   };
 
   // Apply all filters
@@ -457,7 +457,7 @@ const RecordReport = () => {
   // Clear all filters
   const handleClearFilters = () => {
     setSearch('');
-    setStatusFilter('Completed');
+    // setStatusFilter('Completed');
     setStartDate('');
     setEndDate('');
     // Re-sort the original data when clearing filters
@@ -544,7 +544,7 @@ const RecordReport = () => {
                 />
               </Grid>
               {/* Status Filter */}
-              <Grid item xs={12} md={2}>
+              {/* <Grid item xs={12} md={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Status</InputLabel>
                   <Select
@@ -558,7 +558,7 @@ const RecordReport = () => {
                     <MenuItem value="Pending">Pending</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
+              </Grid> */}
               {/* Start Date */}
               <Grid item xs={12} md={2}>
                 <TextField

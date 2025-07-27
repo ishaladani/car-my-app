@@ -16,6 +16,9 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
 import PhoneIcon from "@mui/icons-material/Phone";
@@ -25,6 +28,10 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import BusinessIcon from "@mui/icons-material/Business";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import PersonIcon from "@mui/icons-material/Person";
+import PaymentIcon from "@mui/icons-material/Payment";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import axios from "axios";
 
 const Profile = () => {
@@ -34,16 +41,24 @@ const Profile = () => {
     email: "N/A",
     phone: "N/A",
     address: "N/A",
-    gstNum: "N/A", // CHANGED: from gstNumber to gstNum
+    gstNum: "N/A",
     subscriptionType: "Free",
     isSubscribed: false,
+    bankDetails: {
+      accountHolderName: "N/A",
+      accountNumber: "N/A",
+      ifscCode: "N/A",
+      bankName: "N/A",
+      branchName: "N/A",
+      upiId: "N/A"
+    }
   });
 
   const [editData, setEditData] = useState({});
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [imageChanged, setImageChanged] = useState(false); // Track if image was changed
+  const [imageChanged, setImageChanged] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -93,9 +108,17 @@ const Profile = () => {
           email: data.email || "N/A",
           phone: data.phone || "N/A",
           address: data.address || "N/A",
-          gstNum: data.gstNum || "N/A", // CHANGED: from gstNumber to gstNum
+          gstNum: data.gstNum || "N/A",
           subscriptionType: data.subscriptionType || "Free",
           isSubscribed: data.isSubscribed || false,
+          bankDetails: {
+            accountHolderName: data.bankDetails?.accountHolderName || "N/A",
+            accountNumber: data.bankDetails?.accountNumber || "N/A",
+            ifscCode: data.bankDetails?.ifscCode || "N/A",
+            bankName: data.bankDetails?.bankName || "N/A",
+            branchName: data.bankDetails?.branchName || "N/A",
+            upiId: data.bankDetails?.upiId || "N/A"
+          }
         };
 
         setGarageData(updatedData);
@@ -125,21 +148,33 @@ const Profile = () => {
 
   const handleEditClick = () => {
     setEditData({ ...garageData });
-    setImageChanged(false); // Reset image change flag
+    setImageChanged(false);
     setEditDialogOpen(true);
   };
 
   const handleEditClose = () => {
     setEditDialogOpen(false);
     setEditData({ ...garageData });
-    setImageChanged(false); // Reset image change flag
+    setImageChanged(false);
   };
 
   const handleInputChange = (field, value) => {
-    setEditData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    if (field.includes('.')) {
+      // Handle nested fields like bankDetails.accountHolderName
+      const [parent, child] = field.split('.');
+      setEditData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value,
+        },
+      }));
+    } else {
+      setEditData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    }
   };
 
   const compressImage = (file, maxWidth = 400, quality = 0.7) => {
@@ -149,7 +184,6 @@ const Profile = () => {
       const img = new Image();
 
       img.onload = () => {
-        // Calculate new dimensions
         let { width, height } = img;
         if (width > height) {
           if (width > maxWidth) {
@@ -166,7 +200,6 @@ const Profile = () => {
         canvas.width = width;
         canvas.height = height;
 
-        // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
         const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
         resolve(compressedDataUrl);
@@ -180,28 +213,23 @@ const Profile = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       showSnackbar("Please select a valid image file", "error");
       return;
     }
 
-    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
       showSnackbar("Image size should be less than 5MB", "error");
       return;
     }
 
     try {
-      // Compress image
       const compressedImage = await compressImage(file);
-
       setEditData((prev) => ({
         ...prev,
         image: compressedImage,
       }));
-
-      setImageChanged(true); // Mark that image has been changed
+      setImageChanged(true);
       showSnackbar("Image uploaded successfully", "success");
     } catch (error) {
       console.error("Error processing image:", error);
@@ -210,7 +238,7 @@ const Profile = () => {
   };
 
   const handleLogoUpload = async () => {
-    const logoFile = document.getElementById("image-upload").files[0]; // Get the file from the input
+    const logoFile = document.getElementById("image-upload").files[0];
 
     if (!logoFile) {
       showSnackbar("Please select an image to upload", "error");
@@ -218,7 +246,7 @@ const Profile = () => {
     }
 
     const formData = new FormData();
-    formData.append("logo", logoFile); // Append the actual file to the form data
+    formData.append("logo", logoFile);
 
     try {
       const token = localStorage.getItem("token");
@@ -230,7 +258,6 @@ const Profile = () => {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Send the logo to the server via PUT request
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/updatelogo/${garageId}`,
         formData,
@@ -239,8 +266,6 @@ const Profile = () => {
 
       if (response.status === 200 || response.status === 201) {
         showSnackbar("Logo updated successfully!", "success");
-
-        // Update the state and localStorage with the new logo URL
         setGarageData((prev) => ({ ...prev, image: response.data.logo }));
         localStorage.setItem("garageLogo", response.data.logo);
       }
@@ -257,12 +282,10 @@ const Profile = () => {
       return;
     }
 
-    // Upload the logo if changed
     if (imageChanged) {
       await handleLogoUpload();
     }
 
-    // Proceed with saving other changes (like name, phone, etc.)
     setUpdating(true);
     try {
       const token = localStorage.getItem("token");
@@ -273,48 +296,46 @@ const Profile = () => {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Prepare the data payload for the API
+      // Prepare the complete data payload for the API
       const updatePayload = {
         name: editData.name,
         phone: editData.phone || "",
         address: editData.address || "",
-        gstNum: editData.gstNum || "", // CHANGED: from gstNumber to gstNum
+        email: editData.email || "",
+        gstNum: editData.gstNum || "",
         subscriptionType: editData.subscriptionType,
         isSubscribed: editData.isSubscribed,
+        bankDetails: {
+          accountHolderName: editData.bankDetails?.accountHolderName || "",
+          accountNumber: editData.bankDetails?.accountNumber || "",
+          ifscCode: editData.bankDetails?.ifscCode || "",
+          bankName: editData.bankDetails?.bankName || "",
+          branchName: editData.bankDetails?.branchName || "",
+          upiId: editData.bankDetails?.upiId || ""
+        }
       };
 
-      // Always include logo in the payload, whether it's new, existing, or empty
-      // This ensures the logo field is properly updated on the server
       updatePayload.logo = editData.image || "";
 
-      console.log("Payload size:", JSON.stringify(updatePayload).length, "bytes");
-      console.log("Logo included:", !!updatePayload.logo);
-      console.log("Image changed:", imageChanged);
-      console.log("GST Number being sent:", updatePayload.gstNum); // CHANGED: from gstNumber to gstNum
+      console.log("Update payload:", updatePayload);
 
       const response = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/garage/allgarages/${garageId}`,
+        `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`, // Updated to match your curl command
         updatePayload,
         { headers }
       );
 
       if (response.status === 200 || response.status === 201) {
-        // Update the local state with the new data
         const updatedGarageData = { ...editData };
         setGarageData(updatedGarageData);
 
-        // Update localStorage with the new values
         localStorage.setItem("garageName", editData.name);
         localStorage.setItem("garageLogo", editData.image || "");
 
-        // Reset flags
         setImageChanged(false);
         setEditDialogOpen(false);
 
         showSnackbar("Profile updated successfully!", "success");
-
-        // Optionally, you can force a page refresh to ensure all components reflect the new logo
-        // window.location.reload();
       }
     } catch (error) {
       console.error("Error updating garage data:", error);
@@ -332,6 +353,13 @@ const Profile = () => {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const maskAccountNumber = (accountNumber) => {
+    if (!accountNumber || accountNumber === "N/A") return accountNumber;
+    const str = accountNumber.toString();
+    if (str.length <= 4) return str;
+    return str.substring(0, 2) + "*".repeat(str.length - 4) + str.substring(str.length - 2);
   };
 
   if (loading) {
@@ -394,6 +422,7 @@ const Profile = () => {
 
         {/* Details */}
         <Box sx={{ p: 3 }}>
+          {/* Contact Information */}
           <Typography variant="h6" gutterBottom>
             Contact Information
           </Typography>
@@ -414,7 +443,7 @@ const Profile = () => {
             <Grid item xs={12} sm={6}>
               <Box display="flex" alignItems="center" gap={1}>
                 <BusinessIcon color="action" />
-                <Typography>GST: {garageData.gstNum}</Typography> {/* CHANGED: from gstNumber to gstNum */}
+                <Typography>GST: {garageData.gstNum}</Typography>
               </Box>
             </Grid>
             <Grid item xs={12}>
@@ -424,11 +453,69 @@ const Profile = () => {
               </Box>
             </Grid>
           </Grid>
+
+          {/* Bank Details Section */}
+          <Box sx={{ mt: 4 }}>
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <AccountBalanceIcon color="action" />
+                  <Typography variant="h6">Bank Details</Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <PersonIcon color="action" />
+                      <Typography variant="subtitle2">Account Holder:</Typography>
+                    </Box>
+                    <Typography>{garageData.bankDetails.accountHolderName}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <PaymentIcon color="action" />
+                      <Typography variant="subtitle2">Account Number:</Typography>
+                    </Box>
+                    <Typography>{maskAccountNumber(garageData.bankDetails.accountNumber)}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <BusinessIcon color="action" />
+                      <Typography variant="subtitle2">IFSC Code:</Typography>
+                    </Box>
+                    <Typography>{garageData.bankDetails.ifscCode}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <AccountBalanceIcon color="action" />
+                      <Typography variant="subtitle2">Bank Name:</Typography>
+                    </Box>
+                    <Typography>{garageData.bankDetails.bankName}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <LocationOnIcon color="action" />
+                      <Typography variant="subtitle2">Branch:</Typography>
+                    </Box>
+                    <Typography>{garageData.bankDetails.branchName}</Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                      <PaymentIcon color="action" />
+                      <Typography variant="subtitle2">UPI ID:</Typography>
+                    </Box>
+                    <Typography>{garageData.bankDetails.upiId}</Typography>
+                  </Grid>
+                </Grid>
+              </AccordionDetails>
+            </Accordion>
+          </Box>
         </Box>
       </Paper>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="md" fullWidth>
+      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="lg" fullWidth>
         <DialogTitle>Edit Garage Profile</DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -470,7 +557,12 @@ const Profile = () => {
               )}
             </Grid>
 
-            {/* Name */}
+            {/* Basic Information */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>Basic Information</Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -481,25 +573,17 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* Email - Read Only */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Email"
                 type="email"
                 value={editData.email || ""}
+                onChange={(e) => handleInputChange("email", e.target.value)}
                 variant="outlined"
-                disabled
-                helperText="Email cannot be changed"
-                sx={{
-                  "& .MuiInputBase-input.Mui-disabled": {
-                    WebkitTextFillColor: "rgba(0, 0, 0, 0.6)",
-                  },
-                }}
               />
             </Grid>
 
-            {/* Phone */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -510,13 +594,12 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* GST Number */}
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="GST Number"
                 value={editData.gstNum || ""}
-                onChange={(e) => handleInputChange("gstNum", e.target.value.toUpperCase())} 
+                onChange={(e) => handleInputChange("gstNum", e.target.value.toUpperCase())}
                 variant="outlined"
                 placeholder="e.g., 27AAAPL1234C1Z5"
                 inputProps={{ maxLength: 15 }}
@@ -524,7 +607,6 @@ const Profile = () => {
               />
             </Grid>
 
-            {/* Address */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -534,6 +616,75 @@ const Profile = () => {
                 value={editData.address || ""}
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 variant="outlined"
+              />
+            </Grid>
+
+            {/* Bank Details */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Bank Details</Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Account Holder Name"
+                value={editData.bankDetails?.accountHolderName || ""}
+                onChange={(e) => handleInputChange("bankDetails.accountHolderName", e.target.value)}
+                variant="outlined"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Account Number"
+                value={editData.bankDetails?.accountNumber || ""}
+                onChange={(e) => handleInputChange("bankDetails.accountNumber", e.target.value)}
+                variant="outlined"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="IFSC Code"
+                value={editData.bankDetails?.ifscCode || ""}
+                onChange={(e) => handleInputChange("bankDetails.ifscCode", e.target.value.toUpperCase())}
+                variant="outlined"
+                placeholder="e.g., SBIN0000123"
+                inputProps={{ maxLength: 11 }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Bank Name"
+                value={editData.bankDetails?.bankName || ""}
+                onChange={(e) => handleInputChange("bankDetails.bankName", e.target.value)}
+                variant="outlined"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Branch Name"
+                value={editData.bankDetails?.branchName || ""}
+                onChange={(e) => handleInputChange("bankDetails.branchName", e.target.value)}
+                variant="outlined"
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="UPI ID"
+                value={editData.bankDetails?.upiId || ""}
+                onChange={(e) => handleInputChange("bankDetails.upiId", e.target.value)}
+                variant="outlined"
+                placeholder="e.g., user@paytm"
               />
             </Grid>
           </Grid>
@@ -549,7 +700,12 @@ const Profile = () => {
       </Dialog>
 
       {/* Snackbar for notifications */}
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleSnackbarClose} 
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
         <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
           {snackbar.message}
         </Alert>

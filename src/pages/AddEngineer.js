@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -48,11 +48,12 @@ import {
   AdminPanelSettings as AdminIcon,
   ManageAccounts as ManagerIcon,
   Groups as StaffIcon,
-  Circle as CircleIcon
+  Circle as CircleIcon,
+  Engineering as EngineerIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
-const UserManagement = () => {
+const AddEngineer = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   
@@ -61,16 +62,25 @@ const UserManagement = () => {
     garageId = localStorage.getItem("garage_id");
   }
 
-  // State
-  const [users, setUsers] = useState([]);
+  // State - Only for engineers
+  const [engineers, setEngineers] = useState([]);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedEngineer, setSelectedEngineer] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [addingEngineer, setAddingEngineer] = useState(false);
+  const [engineerAddError, setEngineerAddError] = useState(null);
+  const [engineerAddSuccess, setEngineerAddSuccess] = useState(false);
+    
+  const garageToken = localStorage.getItem('token');
+    
+  // Updated API URLs
+  const API_BASE_URL = 'https://garage-management-zi5z.onrender.com/api'; 
 
   const token = localStorage.getItem("token")
     ? `Bearer ${localStorage.getItem("token")}`
@@ -79,28 +89,41 @@ const UserManagement = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
-    role: 'manager',
-    permissions: []
+    phone: '',
+    role: 'staff', // Default to staff for engineers
+    permissions: [],
+    specialization: '',
+    experience: ''
+  });
+
+  // New engineer state for the new add function
+  const [newEngineer, setNewEngineer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    specialty: '', // Changed from specialization to specialty to match API
+    experience: '',
+    role: 'staff'
   });
 
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
-    contact: '',
+    phone: '', // Changed from contact to phone to match API
     username: '',
     enabled: true,
-    permissions: []
+    permissions: [],
+    specialty: '', // Changed from specialization to specialty
+    experience: ''
   });
 
   const availableRoles = [
-    { value: 'admin', label: 'Administrator', icon: <AdminIcon />, color: '#f44336' },
-    { value: 'manager', label: 'Manager', icon: <ManagerIcon />, color: '#ff9800' },
-    { value: 'staff', label: 'Staff', icon: <StaffIcon />, color: '#4caf50' }
+    { value: 'staff', label: 'Engineer', icon: <EngineerIcon />, color: '#4caf50' },
+    { value: 'manager', label: 'Senior Engineer', icon: <ManagerIcon />, color: '#ff9800' },
+    { value: 'admin', label: 'Lead Engineer', icon: <AdminIcon />, color: '#f44336' }
   ];
 
   const availablePermissions = [
-    // { value: 'Dashboard', label: 'Dashboard', color: '#2196f3' },
     { value: 'Create Job Cards', label: 'Create Job Cards', color: '#4caf50' },
     { value: 'Manage Inventory', label: 'Manage Inventory', color: '#ff9800' },
     { value: 'Reports & Records', label: 'Reports & Records', color: '#9c27b0' },
@@ -109,11 +132,57 @@ const UserManagement = () => {
     { value: 'Add Engineer', label: 'Add Engineer', color: '#e91e63' }
   ];
 
+  // Utility API Call with Authorization
+  const apiCall = useCallback(async (endpoint, options = {}) => {
+    try {
+      const response = await axios({
+        url: `${API_BASE_URL}${endpoint}`,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+          ...options.headers
+        },
+        ...options
+      });
+      return response;
+    } catch (err) {
+      console.error(`API call failed for ${endpoint}:`, err);
+      throw err;
+    }
+  }, [garageToken]);
+
+   const fetchEngineers = useCallback(async () => {
+      if (!garageId) {
+        return;
+      }
+      
+      try {
+        setIsLoading(true);
+        const res = await apiCall(`/garage/engineers/${garageId}`, { method: 'GET' });
+        const engineersData = res.data?.engineers || res.data || [];
+        
+        // Map engineers data to include id field
+        const engineersWithId = engineersData.map(engineer => ({
+          ...engineer,
+          id: engineer._id,
+          permissions: engineer.permissions || []
+        }));
+        
+        setEngineers(engineersWithId);
+        console.log('Engineers data:', engineersWithId); // Print engineers data
+      } catch (err) {
+        console.error('Failed to fetch engineers:', err);
+        setError(err.response?.data?.message || 'Failed to load engineers');
+      } finally {
+        setIsLoading(false);
+      }
+    }, [garageId, apiCall]);
+
   // Effects
   useEffect(() => {
     if (!garageId) navigate("/login");
-    fetchUsers();
-  }, []);
+    fetchEngineers();
+  }, [fetchEngineers, navigate, garageId]);
 
   useEffect(() => {
     if (error || success) {
@@ -136,67 +205,33 @@ const UserManagement = () => {
     setEditFormData({ ...editFormData, [name]: value });
   };
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/getusersbygarage', {
-        method: 'GET',
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const usersWithId = data.map(user => ({
-        ...user,
-        id: user._id,
-        permissions: user.permissions || []
-      }));
-      setUsers(usersWithId);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      setError('Failed to fetch users. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredUsers = useMemo(() => {
-    return (Array.isArray(users) ? users : []).filter(user => {
-      if (!user) return false;
+  const filteredEngineers = useMemo(() => {
+    return (Array.isArray(engineers) ? engineers : []).filter(engineer => {
+      if (!engineer) return false;
       const searchLower = (searchTerm || '').toLowerCase();
-      return ['name', 'username', 'email'].some(field =>
-        (user[field] || '').toLowerCase().includes(searchLower)
+      return ['name', 'username', 'email', 'specialty', 'specialization'].some(field =>
+        (engineer[field] || '').toLowerCase().includes(searchLower)
       );
     });
-  }, [users, searchTerm]);
+  }, [engineers, searchTerm]);
 
   const validateAddForm = () => {
-    if (!formData.name.trim()) {
-      setError('Name is required');
+    if (!newEngineer.name.trim()) {
+      setEngineerAddError('Name is required');
       return false;
     }
-    if (!formData.email.trim()) {
-      setError('Email is required');
+    if (!newEngineer.email.trim()) {
+      setEngineerAddError('Email is required');
       return false;
     }
-    if (!formData.password.trim()) {
-      setError('Password is required');
-      return false;
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (!newEngineer.phone.trim()) {
+      setEngineerAddError('Phone is required');
       return false;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address');
+    if (!emailRegex.test(newEngineer.email)) {
+      setEngineerAddError('Please enter a valid email address');
       return false;
     }
     
@@ -204,138 +239,149 @@ const UserManagement = () => {
   };
 
   const handleAddOpen = () => {
-    setError('');
-    setSuccess('');
+    setEngineerAddError(null);
+    setEngineerAddSuccess(false);
     setOpenAddDialog(true);
   };
 
   const handleAddClose = () => {
-    setOpenAddDialog(false);
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      role: 'manager',
-      permissions: []
-    });
-    setError('');
-    setSuccess('');
+    handleCloseAddEngineerDialog();
   };
 
-  const handleEditOpen = (user) => {
+  const handleEditOpen = (engineer) => {
     setError('');
     setSuccess('');
-    setSelectedUser(user);
+    setSelectedEngineer(engineer);
     setEditFormData({
-      name: user.name || '',
-      email: user.email || '',
-      contact: user.contact || '',
-      username: user.username || '',
-      enabled: user.enabled !== undefined ? user.enabled : true,
-      permissions: user.permissions || []
+      name: engineer.name || '',
+      email: engineer.email || '',
+      phone: engineer.phone || engineer.contact || '', // Handle both phone and contact
+      username: engineer.username || '',
+      enabled: engineer.enabled !== undefined ? engineer.enabled : true,
+      permissions: engineer.permissions || [],
+      specialty: engineer.specialty || engineer.specialization || '', // Handle both specialty and specialization
+      experience: engineer.experience || ''
     });
     setOpenEditDialog(true);
   };
 
   const handleEditClose = () => {
     setOpenEditDialog(false);
-    setSelectedUser(null);
+    setSelectedEngineer(null);
     setError('');
     setSuccess('');
   };
 
-  const handleSubmit = async () => {
-    if (!validateAddForm()) return;
+  const handleAddEngineer = async () => {
+    if (!validateAddForm()) {
+      return;
+    }
+
+    if (!/^\d{10}$/.test(newEngineer.phone)) {
+      setEngineerAddError('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    setAddingEngineer(true);
+    setEngineerAddError(null);
 
     try {
-      setLoading(true);
-      setError('');
-      
-      const payload = {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-        role: formData.role,
-        permissions: formData.permissions || []
-      };
-
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/create-user', {
+      // Fixed API endpoint to match your specification
+      const response = await fetch(`${API_BASE_URL}/garage/engineers/add`, {
         method: 'POST',
         headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      setSuccess('User created successfully!');
-      await fetchUsers();
-      handleAddClose();
-    } catch (error) {
-      console.error('Error creating user:', error);
-      setError(error.message || 'Failed to create user. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async () => {
-    try {
-      if (!selectedUser?.id) {
-        throw new Error('No user selected');
-      }
-
-      let garageId = localStorage.getItem("garageId");
-      if (!garageId) {
-        garageId = localStorage.getItem("garage_id");
-      }
-
-      if (!garageId) {
-        throw new Error('Garage ID not found. Please log in again.');
-      }
-
-      const response = await fetch(`https://garage-management-zi5z.onrender.com/api/garage/update-permissions/${selectedUser.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': token
         },
         body: JSON.stringify({
-          permissions: editFormData.permissions,
+          name: newEngineer.name,
+          email: newEngineer.email,
+          phone: newEngineer.phone,
+          specialty: newEngineer.specialty,
           garageId: garageId
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update user permissions');
+        throw new Error(errorData.message || 'Failed to add engineer');
       }
 
-      setSuccess('User permissions updated successfully!');
+      await fetchEngineers();
+
+      setEngineerAddSuccess(true);
+      setTimeout(() => {
+        setEngineerAddSuccess(false);
+        handleCloseAddEngineerDialog();
+      }, 1500);
+    } catch (err) {
+      console.error('Add engineer error:', err);
+      setEngineerAddError(err.message || 'Failed to add engineer');
+    } finally {
+      setAddingEngineer(false);
+    }
+  };
+
+  const handleCloseAddEngineerDialog = () => {
+    setOpenAddDialog(false);
+    setNewEngineer({
+      name: '',
+      email: '',
+      phone: '',
+      specialty: '',
+      experience: '',
+      role: 'staff'
+    });
+    setEngineerAddError(null);
+    setEngineerAddSuccess(false);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      if (!selectedEngineer?.id) {
+        throw new Error('No engineer selected');
+      }
+
+      // Updated to use new API endpoint
+      const response = await fetch(`${API_BASE_URL}/engineers/${selectedEngineer.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update engineer');
+      }
+
+      setSuccess('Engineer updated successfully!');
       setError('');
-      await fetchUsers();
+      await fetchEngineers();
       handleEditClose();
 
     } catch (error) {
-      console.error('Error updating user permissions:', error);
-      setError(error.message || 'Failed to update user permissions');
+      console.error('Error updating engineer:', error);
+      setError(error.message || 'Failed to update engineer');
       setSuccess('');
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
+  const handleDelete = async (engineerId) => {
+    if (!window.confirm("Are you sure you want to delete this engineer?")) return;
     
     try {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`https://garage-management-zi5z.onrender.com/api/garage/delete-user/${userId}`, {
+      // Updated to use new API endpoint
+      const response = await fetch(`${API_BASE_URL}/engineers/${engineerId}`, {
         method: "DELETE",
         headers: { 
           'Authorization': token,
@@ -348,22 +394,22 @@ const UserManagement = () => {
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      setSuccess('User deleted successfully!');
-      await fetchUsers();
+      setSuccess('Engineer deleted successfully!');
+      await fetchEngineers();
     } catch (error) {
-      console.error("Error deleting user:", error);
-      setError(error.message || 'Failed to delete user. Please try again.');
+      console.error("Error deleting engineer:", error);
+      setError(error.message || 'Failed to delete engineer. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const getRoleInfo = (role) => {
-    return availableRoles.find(r => r.value === role) || availableRoles[1];
+    return availableRoles.find(r => r.value === role) || availableRoles[0];
   };
 
   const getInitials = (name) => {
-    return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+    return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'E';
   };
 
   return (
@@ -389,10 +435,10 @@ const UserManagement = () => {
           <Box display="flex" justifyContent="space-between" alignItems="center">
             <Box>
               <Typography variant="h4" fontWeight={600} gutterBottom>
-                User Management
+                Engineer Management
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                Manage your team members and their permissions
+                Manage your engineering team and their specializations
               </Typography>
             </Box>
             <Button 
@@ -400,7 +446,7 @@ const UserManagement = () => {
               size="large"
               startIcon={<AddIcon />} 
               onClick={handleAddOpen}
-              disabled={loading}
+              disabled={loading || addingEngineer}
               sx={{ 
                 bgcolor: 'rgba(255,255,255,0.2)', 
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
@@ -408,23 +454,23 @@ const UserManagement = () => {
                 px: 3
               }}
             >
-              Add User
+              Add Engineer
             </Button>
           </Box>
         </Paper>
 
         {/* Error and Success Messages */}
-        {error && (
-          <Fade in={!!error}>
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-              {error}
+        {(error || engineerAddError) && (
+          <Fade in={!!(error || engineerAddError)}>
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => {setError(''); setEngineerAddError(null);}}>
+              {error || engineerAddError}
             </Alert>
           </Fade>
         )}
-        {success && (
-          <Fade in={!!success}>
-            <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-              {success}
+        {(success || engineerAddSuccess) && (
+          <Fade in={!!(success || engineerAddSuccess)}>
+            <Alert severity="success" sx={{ mb: 2 }} onClose={() => {setSuccess(''); setEngineerAddSuccess(false);}}>
+              {success || (engineerAddSuccess ? 'Engineer added successfully!' : '')}
             </Alert>
           </Fade>
         )}
@@ -434,7 +480,7 @@ const UserManagement = () => {
           <TextField
             fullWidth
             variant="outlined"
-            placeholder="Search users by name, username or email..."
+            placeholder="Search engineers by name, email or specialization..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -452,12 +498,12 @@ const UserManagement = () => {
           />
         </Paper>
 
-        {/* Users Grid */}
+        {/* Engineers Grid */}
         <Grid container spacing={3}>
-          {filteredUsers.map((user, index) => {
-            const roleInfo = getRoleInfo(user.role);
+          {filteredEngineers.map((engineer, index) => {
+            const roleInfo = getRoleInfo(engineer.role);
             return (
-              <Grid item xs={12} sm={6} lg={4} key={user.id}>
+              <Grid item xs={12} sm={6} lg={4} key={engineer.id}>
                 <Zoom in={true} style={{ transitionDelay: `${index * 100}ms` }}>
                   <Card 
                     elevation={2}
@@ -472,7 +518,7 @@ const UserManagement = () => {
                     }}
                   >
                     <CardContent sx={{ p: 3 }}>
-                      {/* User Header */}
+                      {/* Engineer Header */}
                       <Box display="flex" alignItems="center" mb={2}>
                         <Badge
                           overlap="circular"
@@ -480,7 +526,7 @@ const UserManagement = () => {
                           badgeContent={
                             <CircleIcon 
                               sx={{ 
-                                color: user.enabled ? '#4caf50' : '#f44336',
+                                color: engineer.enabled ? '#4caf50' : '#f44336',
                                 fontSize: 12
                               }} 
                             />
@@ -495,12 +541,12 @@ const UserManagement = () => {
                               fontWeight: 600
                             }}
                           >
-                            {getInitials(user.name)}
+                            {getInitials(engineer.name)}
                           </Avatar>
                         </Badge>
                         <Box ml={2} flex={1}>
                           <Typography variant="h6" fontWeight={600} noWrap>
-                            {user.name || 'Unknown User'}
+                            {engineer.name || 'Unknown Engineer'}
                           </Typography>
                           <Chip 
                             icon={roleInfo.icon}
@@ -517,20 +563,29 @@ const UserManagement = () => {
 
                       <Divider sx={{ my: 2 }} />
 
-                      {/* User Details */}
+                      {/* Engineer Details */}
                       <Stack spacing={1.5}>
                         <Box display="flex" alignItems="center">
                           <EmailIcon color="action" sx={{ mr: 1, fontSize: 20 }} />
                           <Typography variant="body2" color="text.secondary" noWrap>
-                            {user.email || 'No email'}
+                            {engineer.email || 'No email'}
                           </Typography>
                         </Box>
                         
-                        {user.contact && (
+                        {(engineer.phone || engineer.contact) && (
                           <Box display="flex" alignItems="center">
                             <PhoneIcon color="action" sx={{ mr: 1, fontSize: 20 }} />
                             <Typography variant="body2" color="text.secondary">
-                              {user.contact}
+                              {engineer.phone || engineer.contact}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {(engineer.specialty || engineer.specialization) && (
+                          <Box display="flex" alignItems="center">
+                            <EngineerIcon color="action" sx={{ mr: 1, fontSize: 20 }} />
+                            <Typography variant="body2" color="text.secondary">
+                              {engineer.specialty || engineer.specialization}
                             </Typography>
                           </Box>
                         )}
@@ -538,19 +593,19 @@ const UserManagement = () => {
                         <Box display="flex" alignItems="center">
                           <SecurityIcon color="action" sx={{ mr: 1, fontSize: 20 }} />
                           <Typography variant="body2" color="text.secondary">
-                            {user.permissions?.length || 0} permissions
+                            {engineer.permissions?.length || 0} permissions
                           </Typography>
                         </Box>
                       </Stack>
 
                       {/* Permissions Preview */}
-                      {user.permissions && user.permissions.length > 0 && (
+                      {engineer.permissions && engineer.permissions.length > 0 && (
                         <Box mt={2}>
                           <Typography variant="caption" color="text.secondary" display="block" mb={1}>
                             Permissions:
                           </Typography>
                           <Box display="flex" flexWrap="wrap" gap={0.5}>
-                            {user.permissions.slice(0, 2).map((permission) => {
+                            {engineer.permissions.slice(0, 2).map((permission) => {
                               const permInfo = availablePermissions.find(p => p.value === permission);
                               return (
                                 <Chip
@@ -567,9 +622,9 @@ const UserManagement = () => {
                                 />
                               );
                             })}
-                            {user.permissions.length > 2 && (
+                            {engineer.permissions.length > 2 && (
                               <Chip
-                                label={`+${user.permissions.length - 2} more`}
+                                label={`+${engineer.permissions.length - 2} more`}
                                 size="small"
                                 variant="outlined"
                                 sx={{ fontSize: '0.7rem', height: 24 }}
@@ -583,10 +638,10 @@ const UserManagement = () => {
 
                       {/* Actions */}
                       <Box display="flex" justifyContent="space-between">
-                        <Tooltip title="Edit User">
+                        <Tooltip title="Edit Engineer">
                           <IconButton 
                             color="primary" 
-                            onClick={() => handleEditOpen(user)}
+                            onClick={() => handleEditOpen(engineer)}
                             sx={{ 
                               bgcolor: `${theme.palette.primary.main}20`,
                               '&:hover': { bgcolor: `${theme.palette.primary.main}30` }
@@ -596,10 +651,10 @@ const UserManagement = () => {
                           </IconButton>
                         </Tooltip>
                         
-                        <Tooltip title="Delete User">
+                        <Tooltip title="Delete Engineer">
                           <IconButton 
                             color="error" 
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => handleDelete(engineer.id)}
                             sx={{ 
                               bgcolor: `${theme.palette.error.main}20`,
                               '&:hover': { bgcolor: `${theme.palette.error.main}30` }
@@ -618,7 +673,7 @@ const UserManagement = () => {
         </Grid>
 
         {/* Empty State */}
-        {filteredUsers.length === 0 && !loading && (
+        {filteredEngineers.length === 0 && !isLoading && (
           <Paper 
             elevation={1} 
             sx={{ 
@@ -628,19 +683,19 @@ const UserManagement = () => {
               mt: 4
             }}
           >
-            <PersonIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+            <EngineerIcon sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
             <Typography variant="h6" color="text.secondary" gutterBottom>
-              {searchTerm ? 'No users found' : 'No users yet'}
+              {searchTerm ? 'No engineers found' : 'No engineers yet'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {searchTerm 
                 ? 'Try adjusting your search terms' 
-                : 'Start by adding your first team member'}
+                : 'Start by adding your first engineer'}
             </Typography>
           </Paper>
         )}
 
-        {/* Add User Dialog */}
+        {/* Add Engineer Dialog - FIXED */}
         <Dialog
           open={openAddDialog}
           onClose={handleAddClose}
@@ -650,27 +705,26 @@ const UserManagement = () => {
             sx: { borderRadius: 2 }
           }}
         >
-          <DialogTitle sx={{ pb: 1,  }}>
+          <DialogTitle sx={{ pb: 1 }}>
             <Typography variant="h5" fontWeight={600}>
-              Add New User
+              Add New Engineer
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Create a new team member account
+              Create a new engineer account
             </Typography>
           </DialogTitle>
-          <DialogContent sx={{ pt: 2, mt:2 }}>
+          <DialogContent sx={{ pt: 2 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12} sx={{ pt: 2, mt:2 }}>
+              <Grid item xs={12}>
                 <TextField 
-                
                   fullWidth 
                   label="Full Name" 
                   name="name" 
-                  value={formData.name} 
-                  onChange={handleInputChange} 
+                  value={newEngineer.name} 
+                  onChange={(e) => setNewEngineer({...newEngineer, name: e.target.value})} 
                   required 
-                  error={!formData.name.trim() && formData.name !== ''}
-                  helperText={!formData.name.trim() && formData.name !== '' ? 'Name is required' : ''}
+                  error={!newEngineer.name.trim() && newEngineer.name !== ''}
+                  helperText={!newEngineer.name.trim() && newEngineer.name !== '' ? 'Name is required' : ''}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -685,12 +739,12 @@ const UserManagement = () => {
                   fullWidth 
                   label="Email Address" 
                   name="email" 
-                  type="email" 
-                  value={formData.email} 
-                  onChange={handleInputChange} 
+                  type="email"
+                  value={newEngineer.email} 
+                  onChange={(e) => setNewEngineer({...newEngineer, email: e.target.value})} 
                   required 
-                  error={!formData.email.trim() && formData.email !== ''}
-                  helperText={!formData.email.trim() && formData.email !== '' ? 'Email is required' : ''}
+                  error={!newEngineer.email.trim() && newEngineer.email !== ''}
+                  helperText={!newEngineer.email.trim() && newEngineer.email !== '' ? 'Email is required' : ''}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -701,106 +755,60 @@ const UserManagement = () => {
                 />
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleInputChange}
+                <TextField 
+                  fullWidth 
+                  label="Phone Number" 
+                  name="phone" 
+                  value={newEngineer.phone} 
+                  onChange={(e) => setNewEngineer({...newEngineer, phone: e.target.value})} 
                   required
-                  error={!formData.password.trim() && formData.password !== ''}
-                  helperText={!formData.password.trim() && formData.password !== '' ? 'Password is required' : ''}
+                  error={!newEngineer.phone.trim() && newEngineer.phone !== ''}
+                  helperText={!newEngineer.phone.trim() && newEngineer.phone !== '' ? 'Phone is required' : 'Enter 10-digit phone number'}
                   InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                          {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </IconButton>
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PhoneIcon color="action" />
                       </InputAdornment>
                     ),
                   }}
                 />
               </Grid>
               <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Role</InputLabel>
-                  <Select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    label="Role"
-                  >
-                    {availableRoles.map((role) => (
-                      <MenuItem key={role.value} value={role.value}>
-                        <Box display="flex" alignItems="center">
-                          {role.icon}
-                          <Box ml={1}>{role.label}</Box>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Permissions</InputLabel>
-                  <Select
-                    multiple
-                    value={formData.permissions || []}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({
-                        ...formData,
-                        permissions: typeof value === 'string' ? value.split(',') : value,
-                      });
-                    }}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {selected.map((value) => {
-                          const perm = availablePermissions.find(p => p.value === value);
-                          return (
-                            <Chip 
-                              key={value} 
-                              label={perm?.label || value} 
-                              size="small" 
-                              sx={{ 
-                                bgcolor: `${perm?.color}20`,
-                                color: perm?.color
-                              }}
-                            />
-                          );
-                        })}
-                      </Box>
-                    )}
-                  >
-                    {availablePermissions.map((permission) => (
-                      <MenuItem key={permission.value} value={permission.value}>
-                        <Checkbox checked={(formData.permissions || []).indexOf(permission.value) > -1} />
-                        <ListItemText primary={permission.label} />
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <TextField 
+                  fullWidth 
+                  label="Specialty" 
+                  name="specialty" 
+                  value={newEngineer.specialty} 
+                  onChange={(e) => setNewEngineer({...newEngineer, specialty: e.target.value})} 
+                  placeholder="e.g., Engine Specialist, Electrical Systems, etc."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EngineerIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
               </Grid>
             </Grid>
           </DialogContent>
           <DialogActions sx={{ p: 3, pt: 1 }}>
-            <Button onClick={handleAddClose} disabled={loading} size="large">
+            <Button onClick={handleAddClose} disabled={addingEngineer} size="large">
               Cancel
             </Button>
             <Button 
-              onClick={handleSubmit} 
+              onClick={handleAddEngineer} 
               variant="contained" 
-              disabled={loading}
+              disabled={addingEngineer}
               size="large"
               sx={{ minWidth: 120 }}
             >
-              {loading ? 'Creating...' : 'Create User'}
+              {addingEngineer ? 'Adding...' : 'Add Engineer'}
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Edit User Dialog */}
+        {/* Edit Engineer Dialog */}
         <Dialog
           open={openEditDialog}
           onClose={handleEditClose}
@@ -812,10 +820,10 @@ const UserManagement = () => {
         >
           <DialogTitle sx={{ pb: 1 }}>
             <Typography variant="h5" fontWeight={600}>
-              Edit User
+              Edit Engineer
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Update user information and permissions
+              Update engineer information
             </Typography>
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
@@ -827,9 +835,6 @@ const UserManagement = () => {
                   name="name" 
                   value={editFormData.name} 
                   onChange={handleEditInputChange}
-                  required
-                  error={!editFormData.name.trim() && editFormData.name !== ''}
-                  helperText={!editFormData.name.trim() && editFormData.name !== '' ? 'Name is required' : ''}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -844,11 +849,9 @@ const UserManagement = () => {
                   fullWidth 
                   label="Email Address" 
                   name="email" 
+                  type="email"
                   value={editFormData.email} 
                   onChange={handleEditInputChange}
-                  required
-                  error={!editFormData.email.trim() && editFormData.email !== ''}
-                  helperText={!editFormData.email.trim() && editFormData.email !== '' ? 'Email is required' : ''}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -861,9 +864,9 @@ const UserManagement = () => {
               <Grid item xs={12}>
                 <TextField 
                   fullWidth 
-                  label="Contact Number" 
-                  name="contact" 
-                  value={editFormData.contact} 
+                  label="Phone Number" 
+                  name="phone" 
+                  value={editFormData.phone} 
                   onChange={handleEditInputChange}
                   InputProps={{
                     startAdornment: (
@@ -884,6 +887,33 @@ const UserManagement = () => {
                 />
               </Grid>
               <Grid item xs={12}>
+                <TextField 
+                  fullWidth 
+                  label="Specialty" 
+                  name="specialty" 
+                  value={editFormData.specialty} 
+                  onChange={handleEditInputChange}
+                  placeholder="e.g., Engine Specialist, Electrical Systems, etc."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EngineerIcon color="action" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField 
+                  fullWidth 
+                  label="Experience" 
+                  name="experience" 
+                  value={editFormData.experience} 
+                  onChange={handleEditInputChange}
+                  placeholder="e.g., 5 years, Expert level, etc."
+                />
+              </Grid>
+              <Grid item xs={12}>
                 <FormControlLabel
                   control={
                     <Checkbox
@@ -891,7 +921,7 @@ const UserManagement = () => {
                       onChange={(e) => setEditFormData({...editFormData, enabled: e.target.checked})}
                     />
                   }
-                  label="User Account Enabled"
+                  label="Engineer Account Enabled"
                 />
               </Grid>
               <Grid item xs={12}>
@@ -948,7 +978,7 @@ const UserManagement = () => {
               size="large"
               sx={{ minWidth: 120 }}
             >
-              {loading ? 'Updating...' : 'Update User'}
+              {loading ? 'Updating...' : 'Update Engineer'}
             </Button>
           </DialogActions>
         </Dialog>
@@ -957,4 +987,4 @@ const UserManagement = () => {
   );
 };
 
-export default UserManagement;
+export default AddEngineer;

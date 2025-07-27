@@ -129,7 +129,7 @@ const WorkInProgress = () => {
 
   const [status, setStatus] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [laborHours, setLaborHours] = useState('');
+  // const [laborHours, setLaborHours] = useState('');
   const [error, setError] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
 
@@ -988,9 +988,9 @@ const ImprovedPartsSelection = () => {
           setRemarks(data.engineerRemarks);
         }
 
-        if (data.laborHours !== undefined) {
-          setLaborHours(data.laborHours.toString());
-        }
+        // if (data.laborHours !== undefined) {
+        //   setLaborHours(data.laborHours.toString());
+        // }
 
         setSnackbar({
           open: true,
@@ -1109,7 +1109,7 @@ const ImprovedPartsSelection = () => {
       }
 
       const requestData = {
-        laborHours: parseInt(laborHours) || 0,
+        // laborHours: parseInt(laborHours) || 0,
         engineerRemarks: remarks,
         status: status,
         assignedEngineerId: assignedEngineers.map(eng => eng._id) // Multiple engineers
@@ -2064,7 +2064,7 @@ const ImprovedPartsSelection = () => {
                 </Box>
                 <CardContent sx={{ p: 3 }}>
                   <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                    {/* <Grid item xs={12} md={6}>
                       <TextField
                         fullWidth
                         label="Labor Hours"
@@ -2080,8 +2080,8 @@ const ImprovedPartsSelection = () => {
                           ),
                         }}
                       />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
+                    </Grid> */}
+                    {/* <Grid item xs={12} md={6}>
                       <FormControl fullWidth>
                         <InputLabel id="status-label">Status</InputLabel>
                         <Select
@@ -2108,7 +2108,7 @@ const ImprovedPartsSelection = () => {
                           ))}
                         </Select>
                       </FormControl>
-                    </Grid>
+                    </Grid> */}
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -2119,7 +2119,6 @@ const ImprovedPartsSelection = () => {
                         variant="outlined"
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
-                        required
                       />
                     </Grid>
                   </Grid>

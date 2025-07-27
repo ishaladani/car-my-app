@@ -228,6 +228,7 @@ const LoginPage = () => {
       
       localStorage.setItem('token', data.token);
       localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
+      localStorage.setItem('name',isGarageLogin ? data.garage.name : data.user.name);
       
       if (isGarageLogin && data.garage && data.garage._id) {
         localStorage.setItem('garageId', data.garage._id);

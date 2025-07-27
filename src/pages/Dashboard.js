@@ -984,6 +984,7 @@ const Dashboard = () => {
                         <TableHead>
                           <TableRow>
                             <TableCell>No.</TableCell>
+                            <TableCell>Created By</TableCell>
                             <TableCell>Vehicle No.</TableCell>
                             <TableCell>Customer</TableCell>
                             <TableCell>Service</TableCell>
@@ -1004,6 +1005,7 @@ const Dashboard = () => {
                                 <TableCell sx={{ fontWeight: 500 }}>
                                   {index + 1} {/* Display row number */}
                                 </TableCell>
+                                <TableCell sx={{ fontWeight: 500 }}>{job.createdBy}</TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>
                                   {job.carNumber || job.registrationNumber || "N/A"}
                                 </TableCell>

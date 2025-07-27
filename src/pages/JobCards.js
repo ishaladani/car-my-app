@@ -631,6 +631,9 @@ const JobCards = () => {
   });
 
   const garageId = localStorage.getItem('garageId');
+  
+  const CreateBy = localStorage.getItem('name');
+
 
   // Form state with status field added
   const [formData, setFormData] = useState({
@@ -835,8 +838,9 @@ const JobCards = () => {
         if (value.trim() && !validateChassisNumber(value)) error = 'Chassis number must be 10–20 characters';
         break;
       case 'excessAmount':
-        if (value && !validateExcessAmount(value)) error = 'Enter a valid amount (0–1,000,000)';
-        break;
+  // Only validate if value exists and is not empty
+  if (value && value.trim() && !validateExcessAmount(value)) error = 'Enter a valid amount (0–1,000,000)';
+  break;
       case 'status':
         if (!value) error = 'Status is required';
         break;
@@ -1064,116 +1068,30 @@ const JobCards = () => {
     setShowPreview(true);
   };
 
-  // Actual submit handler - called after preview confirmation
   const handleActualSubmit = async () => {
-    setLoading(true);
-    setShowPreview(false);
+  setLoading(true);
+  setShowPreview(false);
 
-    try {
-      const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
+  try {
+    const apiBaseUrl = 'https://garage-management-zi5z.onrender.com';
 
-      if (!garageId) {
-        navigate("/login");
-        return;
-      }
+    if (!garageId) {
+      navigate("/login");
+      return;
+    }
 
-      let response;
+    // Get the createdBy value from localStorage
+    const createdBy = localStorage.getItem('name') || 'Unknown User';
 
-      if (isEditMode && id) {
-        // For updates, handle images/video separately if there are new files
-        const hasNewImages = Object.values(carImages).some(image => image !== null);
-        const hasNewFiles = hasNewImages || videoFile;
+    let response;
 
-        if (hasNewFiles) {
-          // Use FormData for file uploads in edit mode
-          const formDataToSend = new FormData();
+    if (isEditMode && id) {
+      // For updates, handle images/video separately if there are new files
+      const hasNewImages = Object.values(carImages).some(image => image !== null);
+      const hasNewFiles = hasNewImages || videoFile;
 
-          // Add all form fields
-          Object.entries(formData).forEach(([key, value]) => {
-            if (value) formDataToSend.append(key, value);
-          });
-
-          // Add additional fields
-          formDataToSend.append('jobDetails', getJobDetailsForAPI());
-          formDataToSend.append('garageId', garageId);
-          formDataToSend.append('fuelLevel', fuelLevel);
-
-          // Add information about which existing images to keep
-          const imagesToKeep = Object.entries(existingImages)
-            .filter(([key, value]) => value !== null)
-            .map(([key]) => key);
-          formDataToSend.append('keepExistingImages', JSON.stringify(imagesToKeep));
-
-          // Add information about video removal
-          if (!existingVideo && !videoFile) {
-            formDataToSend.append('removeVideo', 'true');
-          }
-
-          // Add image files
-          Object.entries(carImages).forEach(([view, file]) => {
-            if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
-          });
-
-          // Add video file
-          if (videoFile) {
-            formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
-          }
-
-          const configWithFiles = {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
-            },
-            timeout: 60000,
-          };
-
-          response = await axios.put(
-            `${apiBaseUrl}/api/garage/jobCards/${id}`,
-            formDataToSend,
-            configWithFiles
-          );
-        } else {
-          // Use JSON for updates without new files
-          const jobCardPayload = {
-            contactNumber: formData.contactNumber,
-            customerName: formData.customerName,
-            email: formData.email,
-            carNumber: formData.carNumber,
-            model: formData.model,
-            company: formData.company,
-            kilometer: formData.kilometer,
-            fuelType: formData.fuelType,
-            insuranceProvider: formData.insuranceProvider,
-            expiryDate: formData.expiryDate,
-            policyNumber: formData.policyNumber,
-            registrationNumber: formData.carNumber,
-            type: formData.type,
-            excessAmount: formData.excessAmount,
-            chesiNumber: formData.chesiNumber,
-            status: formData.status,
-            jobDetails: getJobDetailsForAPI(),
-            fuelLevel: fuelLevel,
-            keepExistingImages: Object.entries(existingImages)
-              .filter(([key, value]) => value !== null)
-              .map(([key]) => key),
-            keepExistingVideo: existingVideo !== null,
-          };
-
-          const config = {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
-            },
-          };
-
-          response = await axios.put(
-            `${apiBaseUrl}/api/garage/jobCards/${id}`,
-            jobCardPayload,
-            config
-          );
-        }
-      } else {
-        // Create new job card - always use FormData
+      if (hasNewFiles) {
+        // Use FormData for file uploads in edit mode
         const formDataToSend = new FormData();
 
         // Add all form fields
@@ -1181,11 +1099,22 @@ const JobCards = () => {
           if (value) formDataToSend.append(key, value);
         });
 
-        // Add additional fields
+        // Add additional fields including createdBy
         formDataToSend.append('jobDetails', getJobDetailsForAPI());
         formDataToSend.append('garageId', garageId);
         formDataToSend.append('fuelLevel', fuelLevel);
-        formDataToSend.append('customerNumber', 1);
+        formDataToSend.append('createdBy', createdBy); // Added this line
+
+        // Add information about which existing images to keep
+        const imagesToKeep = Object.entries(existingImages)
+          .filter(([key, value]) => value !== null)
+          .map(([key]) => key);
+        formDataToSend.append('keepExistingImages', JSON.stringify(imagesToKeep));
+
+        // Add information about video removal
+        if (!existingVideo && !videoFile) {
+          formDataToSend.append('removeVideo', 'true');
+        }
 
         // Add image files
         Object.entries(carImages).forEach(([view, file]) => {
@@ -1197,7 +1126,7 @@ const JobCards = () => {
           formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
         }
 
-        const config = {
+        const configWithFiles = {
           headers: {
             'Content-Type': 'multipart/form-data',
             'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
@@ -1205,51 +1134,133 @@ const JobCards = () => {
           timeout: 60000,
         };
 
-        response = await axios.post(
-          `${apiBaseUrl}/api/garage/jobCards/add`,
+        response = await axios.put(
+          `${apiBaseUrl}/api/garage/jobCards/${id}`,
           formDataToSend,
+          configWithFiles
+        );
+      } else {
+        // Use JSON for updates without new files
+        const jobCardPayload = {
+          contactNumber: formData.contactNumber,
+          customerName: formData.customerName,
+          email: formData.email,
+          carNumber: formData.carNumber,
+          model: formData.model,
+          company: formData.company,
+          kilometer: formData.kilometer,
+          fuelType: formData.fuelType,
+          insuranceProvider: formData.insuranceProvider,
+          expiryDate: formData.expiryDate,
+          policyNumber: formData.policyNumber,
+          registrationNumber: formData.carNumber,
+          type: formData.type,
+          excessAmount: formData.excessAmount,
+          chesiNumber: formData.chesiNumber,
+          status: formData.status,
+          jobDetails: getJobDetailsForAPI(),
+          fuelLevel: fuelLevel,
+          createdBy: createdBy, // Added this line
+          keepExistingImages: Object.entries(existingImages)
+            .filter(([key, value]) => value !== null)
+            .map(([key]) => key),
+          keepExistingVideo: existingVideo !== null,
+        };
+
+        const config = {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+          },
+        };
+
+        response = await axios.put(
+          `${apiBaseUrl}/api/garage/jobCards/${id}`,
+          jobCardPayload,
           config
         );
       }
+    } else {
+      // Create new job card - always use FormData
+      const formDataToSend = new FormData();
 
-      setSnackbar({
-        open: true,
-        message: `Job card ${isEditMode ? 'updated' : 'created'} successfully!`,
-        severity: 'success'
+      // Add all form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) formDataToSend.append(key, value);
       });
 
-      setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard?._id || response.data._id || id}`, {
-        state: { jobCardId: response.data.jobCard?._id || response.data._id || id }
-      }), 1500);
+      // Add additional fields
+      formDataToSend.append('jobDetails', getJobDetailsForAPI());
+      formDataToSend.append('garageId', garageId);
+      formDataToSend.append('fuelLevel', fuelLevel);
+      formDataToSend.append('customerNumber', 1);
+      formDataToSend.append('createdBy', createdBy); // Changed from CreateBy to createdBy for consistency
+      // Note: If your API expects 'CreateBy' instead of 'createdBy', change it back to:
+      // formDataToSend.append('CreateBy', createdBy);
 
-    } catch (error) {
-      console.error('API Error:', error);
-      let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} job card`;
-      if (error.response) {
-        errorMessage = error.response.data.message || errorMessage;
-        if (error.response.status === 400 && error.response.data.errors) {
-          const serverErrors = {};
-          error.response.data.errors.forEach(err => {
-            serverErrors[err.field] = err.message;
-          });
-          setErrors(prev => ({ ...prev, ...serverErrors }));
-        }
-      } else if (error.request) {
-        errorMessage = 'Network error - please check your connection';
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = 'Request timeout - please try again';
+      // Add image files
+      Object.entries(carImages).forEach(([view, file]) => {
+        if (file) formDataToSend.append('images', file, `${view}_${file.name}`);
+      });
+
+      // Add video file
+      if (videoFile) {
+        formDataToSend.append('video', videoFile, `video_${videoFile.name}`);
       }
 
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: 'error'
-      });
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
+        },
+        timeout: 60000,
+      };
 
-    } finally {
-      setLoading(false);
+      response = await axios.post(
+        `${apiBaseUrl}/api/garage/jobCards/add`,
+        formDataToSend,
+        config
+      );
     }
-  };
+
+    setSnackbar({
+      open: true,
+      message: `Job card ${isEditMode ? 'updated' : 'created'} successfully!`,
+      severity: 'success'
+    });
+
+    setTimeout(() => navigate(`/Assign-Engineer/${response.data.jobCard?._id || response.data._id || id}`, {
+      state: { jobCardId: response.data.jobCard?._id || response.data._id || id }
+    }), 1500);
+
+  } catch (error) {
+    console.error('API Error:', error);
+    let errorMessage = `Failed to ${isEditMode ? 'update' : 'create'} job card`;
+    if (error.response) {
+      errorMessage = error.response.data.message || errorMessage;
+      if (error.response.status === 400 && error.response.data.errors) {
+        const serverErrors = {};
+        error.response.data.errors.forEach(err => {
+          serverErrors[err.field] = err.message;
+        });
+        setErrors(prev => ({ ...prev, ...serverErrors }));
+      }
+    } else if (error.request) {
+      errorMessage = 'Network error - please check your connection';
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = 'Request timeout - please try again';
+    }
+
+    setSnackbar({
+      open: true,
+      message: errorMessage,
+      severity: 'error'
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   const hasError = (fieldName) => {
     return touched[fieldName] && errors[fieldName];
@@ -1490,7 +1501,7 @@ const JobCards = () => {
                       <TableRow>
                         <TableCell><strong>S.No.</strong></TableCell>
                         <TableCell><strong>Description</strong></TableCell>
-                        <TableCell align="right"><strong>Price (₹)</strong></TableCell>
+                        {/* <TableCell align="right"><strong>Price (₹)</strong></TableCell> */}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1498,9 +1509,9 @@ const JobCards = () => {
                         <TableRow key={index}>
                           <TableCell>{index + 1}</TableCell>
                           <TableCell sx={{ wordBreak: 'break-word' }}>{point.description}</TableCell>
-                          <TableCell align="right">
+                          {/* <TableCell align="right">
                             {point.price ? `₹${parseFloat(point.price).toLocaleString('en-IN')}` : '₹0'}
-                          </TableCell>
+                          </TableCell> */}
                         </TableRow>
                       ))}
                       <TableRow>
@@ -1788,6 +1799,34 @@ const JobCards = () => {
                 </Paper>
               </Box>
 
+              {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
+              {formData.fuelType !== 'cng' && formData.fuelType !== 'lpg' && (
+                <Box sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Fuel Level</Typography>
+                  <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+                    <Grid container spacing={3}>
+                      <Grid item xs={12}>
+                        <Typography component="legend" sx={{ mb: 1 }}>Current Fuel Level</Typography>
+                        <Rating
+                          name="fuel-level"
+                          value={fuelLevel}
+                          onChange={(event, newValue) => {
+                            setFuelLevel(newValue);
+                          }}
+                          max={5}
+                          size="large"
+                          icon={<LocalGasStation fontSize="inherit" />}
+                          emptyIcon={<LocalGasStation fontSize="inherit" />}
+                        />
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Box>
+              )}
+
               {/* Insurance Details */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Insurance Details</Typography>
@@ -1834,33 +1873,7 @@ const JobCards = () => {
                 </Paper>
               </Box>
 
-              {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
-              {formData.fuelType !== 'cng' && formData.fuelType !== 'lpg' && (
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Fuel Level</Typography>
-                  <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
-                    <Grid container spacing={3}>
-                      <Grid item xs={12}>
-                        <Typography component="legend" sx={{ mb: 1 }}>Current Fuel Level</Typography>
-                        <Rating
-                          name="fuel-level"
-                          value={fuelLevel}
-                          onChange={(event, newValue) => {
-                            setFuelLevel(newValue);
-                          }}
-                          max={5}
-                          size="large"
-                          icon={<LocalGasStation fontSize="inherit" />}
-                          emptyIcon={<LocalGasStation fontSize="inherit" />}
-                        />
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                </Box>
-              )}
+              
 
               {/* Job Details with Price */}
               <Box sx={{ mb: 4 }}>
@@ -1883,7 +1896,7 @@ const JobCards = () => {
                             ),
                           }}
                         />
-                        <TextField
+                        {/* <TextField
                           placeholder="Price (₹)"
                           value={currentJobPrice}
                           onChange={(e) => {
@@ -1902,7 +1915,7 @@ const JobCards = () => {
                               </InputAdornment>
                             ),
                           }}
-                        />
+                        /> */}
                         <Button
                           variant="contained"
                           onClick={addJobPoint}
@@ -1923,7 +1936,7 @@ const JobCards = () => {
                                 <TableRow>
                                   <TableCell><strong>S.No.</strong></TableCell>
                                   <TableCell><strong>Description</strong></TableCell>
-                                  <TableCell align="right"><strong>Price (₹)</strong></TableCell>
+                                  {/* <TableCell align="right"><strong>Price (₹)</strong></TableCell> */}
                                   <TableCell align="center"><strong>Actions</strong></TableCell>
                                 </TableRow>
                               </TableHead>
@@ -1941,7 +1954,7 @@ const JobCards = () => {
                                         InputProps={{ disableUnderline: false }}
                                       />
                                     </TableCell>
-                                    <TableCell align="right">
+                                    {/* <TableCell align="right">
                                       <TextField
                                         value={point.price}
                                         onChange={(e) => {
@@ -1957,7 +1970,7 @@ const JobCards = () => {
                                           startAdornment: <InputAdornment position="start">₹</InputAdornment>
                                         }}
                                       />
-                                    </TableCell>
+                                    </TableCell> */}
                                     <TableCell align="center">
                                       <IconButton 
                                         onClick={() => removeJobPoint(index)} 
@@ -2029,20 +2042,6 @@ const JobCards = () => {
                     ))}
                   </Grid>
 
-                  {/* Instructions for Camera Usage */}
-                  <Box sx={{ mt: 3, p: 2, bgcolor: 'info.main', color: 'info.contrastText', borderRadius: 1 }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CameraAlt sx={{ mr: 1 }} />
-                      Camera Instructions
-                    </Typography>
-                    <Typography variant="body2">
-                      • Click "Take Photo" to capture images directly with your camera
-                      • Allow camera permissions when prompted
-                      • Use "Upload" to select existing photos from your device
-                      • Mobile users: The back camera will be used automatically for better quality
-                      • All images are validated and compressed for optimal upload
-                    </Typography>
-                  </Box>
 
                   {/* Video Upload Section */}
                   <Box sx={{ mt: 4 }}>

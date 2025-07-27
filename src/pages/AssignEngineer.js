@@ -1178,34 +1178,9 @@ const AssignEngineer = () => {
               <Typography variant="h5" fontWeight={600}>
                 Assign Engineer & Job Details
               </Typography>
-              {fetchingData && (
-                <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-                  <CircularProgress size={20} />
-                  <Typography variant="body2" sx={{ ml: 1 }}>
-                    Loading job card data...
-                  </Typography>
-                </Box>
-              )}
-              {jobCardDataTemp && (
-                <Box sx={{ display: 'flex', alignItems: 'center', ml: 2 }}>
-                  <CircularProgress size={20} />
-                  <Typography variant="body2" sx={{ ml: 1 }}>
-                    Setting up engineer and parts...
-                  </Typography>
-                </Box>
-              )}
+             
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenAddEngineerDialog(true)}
-                size="small"
-              >
-                Add Engineer
-              </Button>
-            </Box>
+           
           </Box>
 
           {/* Updated Assignment Summary Card with Job Details Cost */}
@@ -1595,6 +1570,18 @@ const AssignEngineer = () => {
                   <Typography variant="h6" fontWeight={600}>
                     Engineer Assignments
                   </Typography>
+                  
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenAddEngineerDialog(true)}
+                size="small"
+              >
+                Add Engineer
+              </Button>
+            </Box>
                 </Box>
 
                 {/* Assignments */}

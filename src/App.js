@@ -21,6 +21,7 @@ import AwaitingApproval from './pages/AwaitingApproval';
 import WaitingApprovalPage from './pages/WaitingApprovalPage';
 import RenewPlanPage from './pages/RenewPlanPage';
 import Profile from './pages/Profile';
+import AddEngineer from './pages/AddEngineer';
 
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
              <Route path="billing/:id" element={<BillingPage />} />
               <Route path='UserManagemt' element={<UserManagement/>}/>
               <Route path='Profile' element={<Profile/>}/>
+              <Route path='add-Engineer' element={<AddEngineer/>}/>
              
               
      
