@@ -2220,7 +2220,7 @@ const AutoServeBilling = () => {
     try {
       // UPDATED: Use new API endpoint
       const response = await axios.post(
-        `http://localhost:3000/api/bill/generate/${jobCardIdFromUrl}`,
+        `https://garage-management-zi5z.onrender.com/api/bill/generate/${jobCardIdFromUrl}`,
         apiData,
         {
           headers: {
@@ -2294,7 +2294,7 @@ const AutoServeBilling = () => {
       };
 
       const billResponse = await axios.post(
-        `http://localhost:3000/api/bill/generate/${jobCardIdFromUrl}`,
+        `https://garage-management-zi5z.onrender.com/api/bill/generate/${jobCardIdFromUrl}`,
         apiData,
         {
           headers: {
@@ -2316,7 +2316,7 @@ const AutoServeBilling = () => {
 
       // Process online payment
       const paymentResponse = await axios.post(
-        "http://localhost:3000/api/bill/pay",
+        "https://garage-management-zi5z.onrender.com/api/bill/pay",
         {
           billId: billId,
           paymentMethod: "Online Payment"

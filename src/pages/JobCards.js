@@ -1330,20 +1330,7 @@ const JobCards = () => {
       <DialogContent sx={{ p: 3 }}>
         <Box sx={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {/* Header Info */}
-          <PreviewCard>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" color="primary">
-                  {isEditMode ? `Job Card #${id}` : 'New Job Card'}
-                </Typography>
-                <Chip 
-                  label={`Status: ${formData.status.replace('_', ' ').toUpperCase()}`}
-                  color={getStatusColor(formData.status)}
-                  variant="outlined"
-                />
-              </Box>
-            </CardContent>
-          </PreviewCard>
+         
 
           {/* Customer Details */}
           <PreviewCard>
@@ -1514,12 +1501,12 @@ const JobCards = () => {
                           </TableCell> */}
                         </TableRow>
                       ))}
-                      <TableRow>
+                      {/* <TableRow>
                         <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
                         <TableCell align="right">
                           <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
                         </TableCell>
-                      </TableRow>
+                      </TableRow> */}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -1982,7 +1969,7 @@ const JobCards = () => {
                                     </TableCell>
                                   </TableRow>
                                 ))}
-                                <TableRow>
+                                {/* <TableRow>
                                   <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
                                   <TableCell align="right">
                                     <Typography variant="h6" color="primary">
@@ -1990,7 +1977,7 @@ const JobCards = () => {
                                     </Typography>
                                   </TableCell>
                                   <TableCell></TableCell>
-                                </TableRow>
+                                </TableRow> */}
                               </TableBody>
                             </Table>
                           </TableContainer>

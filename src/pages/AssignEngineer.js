@@ -68,7 +68,6 @@ const AssignEngineer = () => {
   const [jobPoints, setJobPoints] = useState([]);
   const [currentJobPoint, setCurrentJobPoint] = useState({
     description: '',
-    price: ''
   });
 
   const jobCardId = location.state?.jobCardId;
@@ -136,13 +135,16 @@ const AssignEngineer = () => {
 
   // Updated job details functions with pricing
   const addJobPoint = () => {
-    if (currentJobPoint.description.trim() && currentJobPoint.price) {
+    if (currentJobPoint.description.trim()) {
       const newJobPoint = {
-        description: currentJobPoint.description.trim(),
-        price: parseFloat(currentJobPoint.price) || 0
+        id: Date.now(), // Simple ID generation
+        description: currentJobPoint.description.trim()
       };
+      
       setJobPoints(prev => [...prev, newJobPoint]);
-      setCurrentJobPoint({ description: '', price: '' });
+      
+      // Clear the input fields
+      setCurrentJobPoint({ description: '' });
     }
   };
   
@@ -150,6 +152,7 @@ const AssignEngineer = () => {
     setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  // Handle input changes
   const handleJobPointInputChange = (field, value) => {
     setCurrentJobPoint(prev => ({
       ...prev,
@@ -164,10 +167,7 @@ const AssignEngineer = () => {
     }
   };
 
-  // Calculate total job details price
-  const calculateJobDetailsTotal = () => {
-    return jobPoints.reduce((total, point) => total + (point.price || 0), 0);
-  };
+  
 
   // Updated function to get job details for API
   const getJobDetailsForAPI = () => {
@@ -271,6 +271,10 @@ const AssignEngineer = () => {
       setIsLoadingInventory(false);
     }
   }, [garageId, apiCall]);
+
+  const removeExistingJobPoint = (indexToRemove) => {
+  setParsedJobDetails(prev => prev.filter((_, index) => index !== indexToRemove));
+};
 
   // Helper function to get available quantity considering all current selections
   const getAvailableQuantity = (partId) => {
@@ -1389,178 +1393,112 @@ const AssignEngineer = () => {
           </Card>
 
           {/* Enhanced Job Details Section with Price */}
-          <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Job Details (Point-wise with Pricing)
+<Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
+  <CardContent>
+    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      Job Details (Point-wise)
+    </Typography>
+    <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+       
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <TextField
+              fullWidth
+              placeholder="Enter job detail description..."
+              value={currentJobPoint.description}
+              onChange={(e) => handleJobPointInputChange('description', e.target.value)}
+              onKeyPress={handleJobPointKeyPress}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <DescriptionIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 2, minWidth: '200px' }}
+            />
+            <Button
+              variant="contained"
+              onClick={addJobPoint}
+              disabled={!currentJobPoint.description.trim()}
+              startIcon={<AddIcon />}
+              sx={{ minWidth: 120 }}
+            >
+              Add Point
+            </Button>
+          </Box>
+
+        
+          {jobPoints.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Current Job Details Points:
               </Typography>
-              <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    {/* Input section for adding new job points */}
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                      <TextField
-                        fullWidth
-                        placeholder="Enter job detail description..."
-                        value={currentJobPoint.description}
-                        onChange={(e) => handleJobPointInputChange('description', e.target.value)}
-                        onKeyPress={handleJobPointKeyPress}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <DescriptionIcon />
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ flex: 2, minWidth: '200px' }}
-                      />
-                      
-                      <TextField
-                        label="Price (₹)"
-                        type="number"
-                        placeholder="0.00"
-                        value={currentJobPoint.price}
-                        onChange={(e) => handleJobPointInputChange('price', e.target.value)}
-                        onKeyPress={handleJobPointKeyPress}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <MoneyIcon />
-                            </InputAdornment>
-                          ),
-                        }}
-                        inputProps={{ 
-                          min: 0, 
-                          step: 0.01 
-                        }}
-                        sx={{ flex: 1, minWidth: '120px' }}
-                      />
-                      
-                      <Button
-                        variant="contained"
-                        onClick={addJobPoint}
-                        disabled={!currentJobPoint.description.trim() || !currentJobPoint.price}
-                        startIcon={<AddIcon />}
-                        sx={{ minWidth: 120 }}
+              <List sx={{ 
+                bgcolor: 'background.paper', 
+                border: 1, 
+                borderColor: 'divider', 
+                borderRadius: 1,
+                mb: 2
+              }}>
+                {jobPoints.map((point, index) => (
+                  <ListItem key={index} divider>
+                    <ListItemText 
+                      primary={point.description}
+                      sx={{ wordBreak: 'break-word' }}
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton 
+                        edge="end" 
+                        onClick={() => removeJobPoint(index)} 
+                        color="error"
                       >
-                        Add Point
-                      </Button>
-                    </Box>
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
 
-                    {/* Display current job points being added */}
-                    {jobPoints.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Current Job Details Points:
-                        </Typography>
-                        <List sx={{ 
-                          bgcolor: 'background.paper', 
-                          border: 1, 
-                          borderColor: 'divider', 
-                          borderRadius: 1,
-                          mb: 2
-                        }}>
-                          {jobPoints.map((point, index) => (
-                            <ListItem key={index} divider>
-                              <ListItemText 
-                                primary={point.description}
-                                secondary={`Price: ₹${point.price.toFixed(2)}`}
-                                sx={{ wordBreak: 'break-word' }}
-                              />
-                              <ListItemSecondaryAction>
-                                <IconButton 
-                                  edge="end" 
-                                  onClick={() => removeJobPoint(index)} 
-                                  color="error"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </ListItemSecondaryAction>
-                            </ListItem>
-                          ))}
-                        </List>
-                        
-                        {/* Total Price Summary */}
-                        <Box sx={{ 
-                          p: 2, 
-                          bgcolor: 'primary.main', 
-                          color: 'primary.contrastText',
-                          borderRadius: 1,
-                          mb: 2
-                        }}>
-                          <Typography variant="h6" fontWeight={600}>
-                            Total New Job Details Cost: ₹{calculateJobDetailsTotal().toFixed(2)}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* Display existing job details from job card (if any) */}
-                    {parsedJobDetails.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main' }}>
-                          📋 Existing Job Details from Job Card:
-                        </Typography>
-                        <List sx={{ 
-                          bgcolor: 'background.paper', 
-                          border: 1, 
-                          borderColor: 'info.main', 
-                          borderRadius: 1 
-                        }}>
-                          {parsedJobDetails.map((item, index) => (
-                            <ListItem key={index} divider>
-                              <ListItemText 
-                                primary={`Description: ${item.description}`} 
-                                secondary={`Price: ₹${item.price}`}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                        
-                        {/* Total from existing job details */}
-                        <Box sx={{ 
-                          mt: 1,
-                          p: 1, 
-                          bgcolor: 'info.main', 
-                          color: 'info.contrastText',
-                          borderRadius: 1
-                        }}>
-                          <Typography variant="subtitle2" fontWeight={600}>
-                            Existing Total: ₹{parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0).toFixed(2)}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* API Preview */}
-                    {/* {jobPoints.length > 0 && (
-                      <Box sx={{ 
-                        mt: 2, 
-                        p: 2, 
-                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'grey.50', 
-                        borderRadius: 1 
-                      }}>
-                        <Typography variant="caption" color="text.secondary" gutterBottom>
-                          Preview (JSON format sent to API):
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            whiteSpace: 'pre-line', 
-                            fontFamily: 'monospace', 
-                            color: 'text.primary',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          {JSON.stringify(jobPoints, null, 2)}
-                        </Typography>
-                      </Box>
-                    )} */}
-                  </Grid>
-                </Grid>
-              </Paper>
-            </CardContent>
-          </Card>
+         
+          {parsedJobDetails.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main' }}>
+                📋 Existing Job Details from Job Card:
+              </Typography>
+              <List sx={{ 
+                bgcolor: 'background.paper', 
+                border: 1, 
+                borderColor: 'info.main', 
+                borderRadius: 1 
+              }}>
+                {parsedJobDetails.map((item, index) => (
+                  <ListItem key={index} divider>
+                    <ListItemText 
+                      primary={`Description: ${item.description}`} 
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton 
+                        edge="end" 
+                        onClick={() => removeExistingJobPoint(index)} 
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </Grid>
+      </Grid>
+    </Paper>
+  </CardContent>
+</Card>
 
           {/* Main Form Card */}
           <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>

@@ -35,7 +35,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
   const theme = useTheme();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
-  const [zoomLevel, setZoomLevel] = useState(1); // Default zoom level
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   if (!jobData) return null;
 
@@ -104,68 +104,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
     });
   };
 
-  const generatePDF = () => {
-    setIsGeneratingPDF(true);
-    const doc = new jsPDF();
-  
-    doc.setFontSize(16);
-    doc.text(" Job Card Details", 14, 20);
-    // doc.setFontSize(10);
-    // doc.text(`Job ID: ${jobData._id}`, 14, 28);
-  
-    const tableData = [
-      ['Customer Name', jobData.customerName || 'N/A'],
-      ['Contact Number', jobData.contactNumber || 'N/A'],
-      ['Email', jobData.email || 'N/A'],
-      ['Company', jobData.company || 'N/A'],
-      ['Car Number', jobData.carNumber || 'N/A'],
-      // ['Registration Number', jobData.registrationNumber || 'N/A'],
-      ['Model', jobData.model || 'N/A'],
-      ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
-      ['Fuel Type', jobData.fuelType || 'N/A'],
-      ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
-      ['Policy Number', jobData.policyNumber || 'N/A'],
-      ['Expiry Date', formatDate(jobData.expiryDate)],
-      ['Excess Amount', jobData.excessAmount ? `RS.${jobData.excessAmount.toLocaleString()}` : 'N/A'],
-      ['Job Type', jobData.type || 'N/A'],
-      ['Engineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
-      ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
-      ['Status', jobData.status || 'N/A'],
-      ['Created Date', formatDate(jobData.createdAt)]
-    ];
-  
-    autoTable(doc, {
-      startY: 35,
-      head: [['Field', 'Value']],
-      body: tableData,
-      theme: 'grid',
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [63, 81, 181] },
-      margin: { left: 10, right: 10 },
-    });
-  
-    // Job Details Section (multi-line)
-    // let finalY = doc.lastAutoTable.finalY + 10;
-    // doc.setFontSize(12);
-    // doc.text("🔧 Job Details", 14, finalY);
-  
-    // finalY += 6;
-    // if (parsedJobDetails.length > 0) {
-    //   parsedJobDetails.forEach((item, index) => {
-    //     doc.setFontSize(10);
-    //     doc.text(`• ${item.description} - ₹${item.price}`, 14, finalY);
-    //     finalY += 6;
-    //   });
-    // } else {
-    //   doc.setFontSize(10);
-    //   doc.text("No job details provided.", 14, finalY);
-    // }
-  
-    doc.save(`JobCard.pdf`);
-    setIsGeneratingPDF(false);
-  };
-  
-
   const parsedJobDetails = (() => {
     try {
       return Array.isArray(JSON.parse(jobData.jobDetails)) ? JSON.parse(jobData.jobDetails) : [];
@@ -173,6 +111,252 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       return [];
     }
   })();
+
+  const generatePDF = () => {
+    setIsGeneratingPDF(true);
+    const doc = new jsPDF();
+
+    // Set up colors
+    const primaryColor = [63, 81, 181]; // Theme primary color
+    const lightGray = [245, 245, 245];   // Light background for headers
+    const darkGray = [66, 66, 66];       // Dark text for headers
+    const blackColor = [0, 0, 0];        // Standard black text
+
+    // --- Page Setup ---
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 14;
+    const sectionSpacing = 12; // Space after a section
+    const headerHeight = 30;   // Height for main header
+
+    // --- Header with company branding ---
+    doc.setFillColor(...primaryColor);
+    doc.rect(0, 0, pageWidth, headerHeight, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22); // Increased header font size
+    doc.setFont('helvetica', 'bold');
+    doc.text('JOB CARD DETAILS', margin, 19); // Adjusted Y position
+
+    // Job ID and Date (aligned to the right)
+    doc.setFontSize(12); // Increased font size
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - margin - 50, 19); // Adjusted position
+
+    // Reset text color for content
+    doc.setTextColor(...blackColor);
+    let yPosition = headerHeight + 10; // Start content below header
+
+    // --- Helper Function for Section Headers ---
+    const addSectionHeader = (title) => {
+         // Check if enough space for header and some content, else new page
+        if (yPosition > pageHeight - 30) {
+            doc.addPage();
+            yPosition = 20;
+        }
+        doc.setFillColor(...lightGray);
+        doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, 'F'); // Slightly taller header
+        doc.setFontSize(14); // Increased section header font size
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...darkGray);
+        doc.text(title, margin + 3, yPosition + 7); // Adjusted Y for vertical centering
+        yPosition += 15; // Increased space after header
+        doc.setTextColor(...blackColor);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12); // Set body font size
+    };
+
+    // --- Customer Information Section ---
+    addSectionHeader('CUSTOMER INFORMATION');
+    const customerData = [
+      ['Customer Name', jobData.customerName || 'N/A'],
+      ['Contact Number', jobData.contactNumber || 'N/A'],
+      ['Email', jobData.email || 'N/A'],
+      ['Company', jobData.company || 'N/A']
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: customerData,
+      theme: 'plain',
+      styles: {
+        fontSize: 12, // Increased font size
+        cellPadding: 4, // Increased padding
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak', // Handle text overflow
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 }, // Slightly wider label column
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 } // Adjust data column width
+      },
+       bodyStyles: {
+           valign: 'top' // Align text to the top of cells
+       },
+      margin: { left: margin, right: margin },
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing; // Update Y position after table
+      }
+    });
+
+    // --- Vehicle Information Section ---
+    addSectionHeader('VEHICLE INFORMATION');
+    const vehicleData = [
+      ['Car Number', jobData.carNumber || 'N/A'],
+      ['Registration Number', jobData.registrationNumber || 'N/A'],
+      ['Model', jobData.model || 'N/A'],
+      ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
+      ['Fuel Type', jobData.fuelType || 'N/A']
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: vehicleData,
+      theme: 'plain',
+      styles: {
+        fontSize: 12,
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+      },
+       bodyStyles: {
+           valign: 'top'
+       },
+      margin: { left: margin, right: margin },
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing;
+      }
+    });
+
+    // --- Insurance Information Section ---
+    addSectionHeader('INSURANCE INFORMATION');
+    const insuranceData = [
+      ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
+      ['Policy Number', jobData.policyNumber || 'N/A'],
+      ['Insurance Type', jobData.type || 'N/A'],
+      ['Expiry Date', formatDate(jobData.expiryDate)],
+      ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A']
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: insuranceData,
+      theme: 'plain',
+      styles: {
+        fontSize: 12,
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+      },
+       bodyStyles: {
+           valign: 'top'
+       },
+      margin: { left: margin, right: margin },
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing;
+      }
+    });
+
+    // --- Job Information Section ---
+    addSectionHeader('JOB INFORMATION');
+    const jobInfoData = [
+      ['Assigned Engineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
+      ['Status', jobData.status || 'Pending'],
+      ['Created Date', formatDate(jobData.createdAt)],
+      ['Engineer Remarks', jobData.engineerRemarks || 'N/A']
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: jobInfoData,
+      theme: 'plain',
+      styles: {
+        fontSize: 12,
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+      },
+       bodyStyles: {
+           valign: 'top'
+       },
+      margin: { left: margin, right: margin },
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing;
+      }
+    });
+
+    // --- Job Details Section (if exists) ---
+    if (parsedJobDetails.length > 0) {
+      addSectionHeader('JOB DETAILS & SERVICES');
+      // Prepare job details data
+      const jobDetailsData = parsedJobDetails.map((item, index) => {
+        const description = item.description || 'N/A';
+        return [index + 1, description];
+      });
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['S.No.', 'Description']],
+        body: jobDetailsData,
+        theme: 'striped',
+        styles: {
+          fontSize: 12,
+          cellPadding: 5, // Increased padding
+          overflow: 'linebreak',
+          cellWidth: 'wrap'
+        },
+        headStyles: {
+          fillColor: primaryColor,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 12
+        },
+        columnStyles: {
+          0: { cellWidth: 25, halign: 'center' }, // Slightly wider S.No.
+          1: { cellWidth: pageWidth - 2 * margin - 25 - 15 } // Adjust description width
+        },
+         bodyStyles: {
+             valign: 'top'
+         },
+        margin: { left: margin, right: margin },
+        // Ensure table doesn't split awkwardly
+        pageBreak: 'auto',
+        didDrawPage: function (data) {
+            yPosition = data.cursor.y + sectionSpacing;
+        }
+      });
+    }
+
+    // --- Footer ---
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9); // Slightly larger footer font
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      doc.text('Generated by Job Management System', margin, pageHeight - 10);
+    }
+
+    // --- Save the PDF ---
+    const fileName = `JobCard_${jobData.carNumber || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    setIsGeneratingPDF(false);
+  };
 
   return (
     <>
@@ -244,7 +428,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                 </CardContent>
               </Card>
             </Grid>
-
             {/* Vehicle Information */}
             <Grid item xs={12} md={6}>
               <Card variant="outlined" sx={{ height: '100%' }}>
@@ -286,7 +469,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                 </CardContent>
               </Card>
             </Grid>
-
             {/* Insurance Information */}
             <Grid item xs={12} md={6}>
               <Card variant="outlined" sx={{ height: '100%' }}>
@@ -318,7 +500,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                 </CardContent>
               </Card>
             </Grid>
-
             {/* Job Information */}
             <Grid item xs={12} md={6}>
               <Card variant="outlined" sx={{ height: '100%' }}>
@@ -330,22 +511,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     </Typography>
                   </Box>
                   <Box>
-                    <Typography variant="body2" color="text.secondary">Job Type</Typography>
+                    <Typography variant="body2" color="text.secondary">Insurance Type</Typography>
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
                       {jobData.type || 'N/A'}
-                    </Typography>
-                    {/* <Typography variant="body2" color="text.secondary">Job Details</Typography> */}
-                    <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
-                    <Box component="ul" sx={{ pl: 2 }}>
-              {parsedJobDetails.length > 0 ? (
-                parsedJobDetails.map((item, index) => (
-                  <li key={index}>{item.description} - ₹{item.price}</li>
-                ))
-              ) : (
-               <></>
-                // <Typography variant="body2" color="text.secondary">No job details provided.</Typography>
-              )}
-            </Box>
                     </Typography>
                     <Typography variant="body2" color="text.secondary">Engineer</Typography>
                     <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
@@ -359,8 +527,26 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                 </CardContent>
               </Card>
             </Grid>
-
-            {/* Images Section - Zoom Enabled */}
+            {/* Job Details Section */}
+            {parsedJobDetails.length > 0 && (
+              <Grid item xs={12}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Job Details & Services
+                    </Typography>
+                    <Box component="ul" sx={{ pl: 2, mb: 0 }}>
+                      {parsedJobDetails.map((item, index) => (
+                        <Box key={index} component="li" sx={{ mb: 1, display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{item.description || 'N/A'}</span>
+                        </Box>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+            {/* Images Section */}
             {jobData.images && jobData.images.length > 0 && (
               <Grid item xs={12}>
                 <Card variant="outlined">
@@ -414,7 +600,6 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
       {/* Image Zoom Modal */}
       {zoomedImage && (
         <Box

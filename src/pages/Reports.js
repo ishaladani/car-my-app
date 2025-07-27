@@ -33,6 +33,9 @@ import {
   Stack,
   Alert,
   CircularProgress,
+  Tabs,
+  Tab,
+  Tooltip,
 } from '@mui/material';
 import { 
   Search as SearchIcon,
@@ -42,6 +45,7 @@ import {
   Work as WorkIcon,
   Print as PrintIcon,
   Close as CloseIcon,
+  Receipt as ReceiptIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -55,24 +59,23 @@ const RecordReport = () => {
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const theme = useTheme();
   const { darkMode } = useThemeContext();
-
+  
   // Search and Filter States
   const [search, setSearch] = useState('');
-  // const [statusFilter, setStatusFilter] = useState('Completed');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [billTypeFilter, setBillTypeFilter] = useState('All'); // New state for GST/Non-GST filter
 
   // Data States
   const [jobsData, setJobsData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-
+  
   // Pagination States
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -103,7 +106,6 @@ const RecordReport = () => {
       doc.setFontSize(16);
       doc.setTextColor(33, 33, 33);
       doc.text(" Job Card Details", 14, 20);
-
       const tableData = [
         ['Customer Name', jobData.customerName || 'N/A'],
         ['Contact Number', jobData.contactNumber || 'N/A'],
@@ -123,7 +125,6 @@ const RecordReport = () => {
         ['Status', jobData.status || 'N/A'],
         ['Created Date', formatDate(jobData.createdAt)],
       ];
-
       autoTable(doc, {
         startY: 30,
         head: [['Field', 'Value']],
@@ -141,7 +142,6 @@ const RecordReport = () => {
         alternateRowStyles: { fillColor: [245, 245, 245] },
         margin: { left: 10, right: 10 },
       });
-
       doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
       console.error("PDF generation failed", err);
@@ -151,17 +151,14 @@ const RecordReport = () => {
 
   const formatJobDetails = (jobDetailsString) => {
     if (!jobDetailsString) return 'No details available';
-    
     // If it's already a plain string (not JSON), return it directly
     if (typeof jobDetailsString === 'string' && 
         !jobDetailsString.trim().startsWith('[') && 
         !jobDetailsString.trim().startsWith('{')) {
       return jobDetailsString;
     }
-
     try {
       const details = JSON.parse(jobDetailsString);
-      
       if (Array.isArray(details) && details.length > 0) {
         // Show first 2 items with prices
         const displayItems = details.slice(0, 2).map(item => {
@@ -169,10 +166,8 @@ const RecordReport = () => {
           const price = item.price ? ` (₹${item.price})` : '';
           return `• ${description}${price}`;
         }).join('\n');
-        
         const moreCount = details.length - 2;
         const moreText = moreCount > 0 ? `\n+${moreCount} more service${moreCount > 1 ? 's' : ''}` : '';
-        
         return displayItems + moreText;
       } else if (typeof details === 'object' && details !== null) {
         // Handle single object case
@@ -200,7 +195,6 @@ const RecordReport = () => {
       navigate("/login");
       return;
     }
-
     const fetchJobs = async () => {
       try {
         setLoading(true);
@@ -216,7 +210,6 @@ const RecordReport = () => {
         );
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
@@ -224,12 +217,9 @@ const RecordReport = () => {
           : data.data
           ? data.data
           : [];
-
         const completedJobs = jobsData.filter(job => job.status === "Completed");
-        
         // Sort jobs by completed date (most recent first)
         const sortedJobs = sortJobsByCompletedDate(completedJobs);
-        
         setJobsData(sortedJobs);
         setFilteredData(sortedJobs);
       } catch (error) {
@@ -239,7 +229,6 @@ const RecordReport = () => {
         setLoading(false);
       }
     };
-
     fetchJobs();
   }, [garageId, navigate]);
 
@@ -247,31 +236,31 @@ const RecordReport = () => {
   const handleSearch = (e) => {
     const searchTerm = e.target.value.toLowerCase();
     setSearch(searchTerm);
-    // applyFilters(searchTerm, statusFilter, startDate, endDate);
+    applyFilters(searchTerm, startDate, endDate, billTypeFilter);
   };
-
-  // Handle status filter change
-  // const handleStatusFilterChange = (e) => {
-  //   const newStatus = e.target.value;
-  //   setStatusFilter(newStatus);
-  //   applyFilters(search, newStatus, startDate, endDate);
-  // };
 
   // Handle date changes
   const handleStartDateChange = (e) => {
     const newStartDate = e.target.value;
     setStartDate(newStartDate);
-    applyFilters(search,  newStartDate, endDate);
+    applyFilters(search, newStartDate, endDate, billTypeFilter);
   };
-  
+
   const handleEndDateChange = (e) => {
     const newEndDate = e.target.value;
     setEndDate(newEndDate);
-    applyFilters(search,  startDate, newEndDate);
+    applyFilters(search, startDate, newEndDate, billTypeFilter);
+  };
+
+  // Handle Bill Type filter change
+  const handleBillTypeFilterChange = (e) => {
+    const newBillType = e.target.value;
+    setBillTypeFilter(newBillType);
+    applyFilters(search, startDate, endDate, newBillType);
   };
 
   // Apply all filters
-  const applyFilters = (searchTerm, status, start, end) => {
+  const applyFilters = (searchTerm, start, end, billType) => {
     let filtered = [...jobsData];
     if (searchTerm.trim() !== '') {
       filtered = filtered.filter(
@@ -283,18 +272,25 @@ const RecordReport = () => {
           (job.type && job.type.toLowerCase().includes(searchTerm))
       );
     }
-    if (status && status !== 'All') {
-      filtered = filtered.filter(job => job.status === status);
-    }
+    
     if (start && end) {
       filtered = filtered.filter(job => {
         const jobDate = new Date(job.createdAt);
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-        return jobDate >= startDate && jobDate <= endDate;
+        const startDateObj = new Date(start);
+        const endDateObj = new Date(end);
+        return jobDate >= startDateObj && jobDate <= endDateObj;
       });
     }
-    
+
+    // Apply Bill Type filter
+    if (billType && billType !== 'All') {
+      if (billType === 'GST') {
+        filtered = filtered.filter(job => job.gstApplicable === true);
+      } else if (billType === 'Non-GST') {
+        filtered = filtered.filter(job => job.gstApplicable === false);
+      }
+    }
+
     // Sort filtered data by completed date (most recent first)
     const sortedFiltered = sortJobsByCompletedDate(filtered);
     setFilteredData(sortedFiltered);
@@ -322,7 +318,6 @@ const RecordReport = () => {
           </Typography>
         );
       }
-  
       // If it's already a plain string (not JSON), display it directly
       if (typeof jobDetailsString === 'string' && 
           !jobDetailsString.trim().startsWith('[') && 
@@ -333,10 +328,8 @@ const RecordReport = () => {
           </Typography>
         );
       }
-  
       try {
         const details = JSON.parse(jobDetailsString);
-        
         if (Array.isArray(details) && details.length > 0) {
           return (
             <Box>
@@ -360,7 +353,7 @@ const RecordReport = () => {
                   </Typography>
                   {showPrices && item.price && (
                     <Chip 
-                      label={`${item.price}`} 
+                      label={`₹${item.price}`} 
                       size="small" 
                       variant="outlined"
                       sx={{ 
@@ -403,7 +396,7 @@ const RecordReport = () => {
               )}
               {showPrices && details.price && (
                 <Chip 
-                  label={`${details.price}`} 
+                  label={`₹${details.price}`} 
                   size="small" 
                   variant="outlined"
                   sx={{ 
@@ -438,7 +431,6 @@ const RecordReport = () => {
         );
       }
     };
-  
     return parseAndDisplayJobDetails(jobDetails);
   };
 
@@ -457,34 +449,19 @@ const RecordReport = () => {
   // Clear all filters
   const handleClearFilters = () => {
     setSearch('');
-    // setStatusFilter('Completed');
     setStartDate('');
     setEndDate('');
+    setBillTypeFilter('All');
     // Re-sort the original data when clearing filters
     const sortedJobs = sortJobsByCompletedDate([...jobsData]);
     setFilteredData(sortedJobs);
     setPage(0);
   };
 
-  // Handle update button click
-  const handleUpdate = async (id) => {
-    try {
-      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`); 
-      const jobCard = response.data;
-      const { engineerId, laborHours, qualityCheck } = jobCard;
-      if (!engineerId || engineerId.length === 0 || !engineerId[0]?._id) {
-        navigate(`/assign-engineer/${id}`);
-      } else if (laborHours === null || laborHours === undefined) {
-        navigate(`/work-in-progress/${id}`);
-      } else if (!qualityCheck || !qualityCheck.billApproved) {
-        navigate(`/quality-check/${id}`);
-      } else {
-        navigate(`/billing/${id}`);
-      }
-    } catch (error) {
-      console.error("Error fetching job card:", error);
-      alert("Failed to load job card details.");
-    }
+  // Handle view bill button click
+  const handleViewBill = (jobId) => {
+    // Navigate to the billing page for the specific job
+    navigate(`/billing/${jobId}`);
   };
 
   // Get current page data
@@ -522,11 +499,10 @@ const RecordReport = () => {
               />
             </Box>
             <Divider sx={{ my: 3 }} />
-
             {/* Search and Filter Section */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
               {/* Search Bar */}
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
                   value={search}
@@ -543,22 +519,6 @@ const RecordReport = () => {
                   }}
                 />
               </Grid>
-              {/* Status Filter */}
-              {/* <Grid item xs={12} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={statusFilter}
-                    onChange={handleStatusFilterChange}
-                    label="Status"
-                  >
-                    <MenuItem value="All">All Status</MenuItem>
-                    <MenuItem value="Completed">Completed</MenuItem>
-                    <MenuItem value="In Progress">In Progress</MenuItem>
-                    <MenuItem value="Pending">Pending</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid> */}
               {/* Start Date */}
               <Grid item xs={12} md={2}>
                 <TextField
@@ -583,8 +543,23 @@ const RecordReport = () => {
                   size="small"
                 />
               </Grid>
-              {/* Clear Filters Button */}
+              {/* Bill Type Filter */}
               <Grid item xs={12} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Bill Type</InputLabel>
+                  <Select
+                    value={billTypeFilter}
+                    onChange={handleBillTypeFilterChange}
+                    label="Bill Type"
+                  >
+                    <MenuItem value="All">All Bills</MenuItem>
+                    <MenuItem value="GST">GST</MenuItem>
+                    <MenuItem value="Non-GST">Non-GST</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {/* Clear Filters Button */}
+              <Grid item xs={12} md={3}>
                 <Button
                   fullWidth
                   variant="outlined"
@@ -597,14 +572,12 @@ const RecordReport = () => {
                 </Button>
               </Grid>
             </Grid>
-
             {/* Error Alert */}
             {error && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {error}
               </Alert>
             )}
-
             {/* Job Cards Table */}
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -654,6 +627,13 @@ const RecordReport = () => {
                             color: '#fff',
                             fontWeight: 'bold'
                           }}>
+                            Subaccount
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
                             Job Details
                           </TableCell>
                           <TableCell sx={{ 
@@ -688,6 +668,17 @@ const RecordReport = () => {
                               <TableCell>{job._id?.slice(-6) || 'N/A'}</TableCell>
                               <TableCell>{job.carNumber || job.registrationNumber || 'N/A'}</TableCell>
                               <TableCell>{job.customerName || 'N/A'}</TableCell>
+                              <TableCell>
+                                {job.subaccountId && job.subaccountId.name ? (
+                                  <Chip 
+                                    label={job.subaccountId.name} 
+                                    size="small"
+                                    variant="outlined"
+                                  />
+                                ) : (
+                                  'N/A'
+                                )}
+                              </TableCell>
                               <TableCell sx={{ 
                                 maxWidth: '300px',
                                 whiteSpace: 'pre-line',
@@ -710,35 +701,42 @@ const RecordReport = () => {
                               <TableCell>{formatDate(job.completedAt || job.updatedAt)}</TableCell>
                               <TableCell align="center">
                                 <Stack direction="row" spacing={1} justifyContent="center">
-                                  <Button
-                                    variant="contained"
-                                    color="primary"
-                                    size="small"
-                                    onClick={() => navigate(`/jobs/${job._id}`)}
-                                  >
-                                    Job Card
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handleUpdate(job._id)}
-                                  >
-                                    Update
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handleViewClick(job)}
-                                  >
-                                    Details
-                                  </Button>
+                                  <Tooltip title="View Job Card">
+                                    <Button
+                                      variant="contained"
+                                      color="primary"
+                                      size="small"
+                                      onClick={() => navigate(`/jobs/${job._id}`)}
+                                    >
+                                      Job Card
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip title="View/Download Bill">
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={<ReceiptIcon />}
+                                      onClick={() => handleViewBill(job._id)}
+                                    >
+                                      Bill
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip title="View Details">
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => handleViewClick(job)}
+                                    >
+                                      Details
+                                    </Button>
+                                  </Tooltip>
                                 </Stack>
                               </TableCell>
                             </TableRow>
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={7} sx={{ textAlign: 'center', py: 3 }}>
+                            <TableCell colSpan={8} sx={{ textAlign: 'center', py: 3 }}>
                               {filteredData.length === 0 && jobsData.length > 0 
                                 ? "No jobs match your search criteria" 
                                 : "No completed job records found"}
@@ -765,7 +763,6 @@ const RecordReport = () => {
           </CardContent>
         </Card>
       </Container>
-
       {/* Enhanced Job Detail Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3 }}>
@@ -789,7 +786,7 @@ const RecordReport = () => {
               {/* Main Info Section */}
               <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
                 <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={4}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
                         Job ID
@@ -799,7 +796,7 @@ const RecordReport = () => {
                       </Typography>
                     </Card>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={4}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
                         Status
@@ -817,16 +814,21 @@ const RecordReport = () => {
                       </Box>
                     </Card>
                   </Grid>
-                  {/* <Grid item xs={12} md={4}>
+                  <Grid item xs={12} md={4}>
                     <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
                       <Typography variant="overline" color="text.secondary">
-                        Total Cost
+                        Bill Type
                       </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: theme.palette.success.main }}>
-                        ₹{selectedJob.totalCost?.toLocaleString() || '0'}
-                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Chip 
+                          label={selectedJob.gstApplicable ? 'GST' : 'Non-GST'} 
+                          color={selectedJob.gstApplicable ? 'primary' : 'secondary'}
+                          variant="outlined"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
                     </Card>
-                  </Grid> */}
+                  </Grid>
                 </Grid>
               </Box>
               <Divider />
@@ -851,6 +853,14 @@ const RecordReport = () => {
                       </Typography>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>
                         {selectedJob.customerName || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Subaccount
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.subaccountId && selectedJob.subaccountId.name ? selectedJob.subaccountId.name : 'N/A'}
                       </Typography>
                     </Box>
                     <Box sx={{ mb: 3 }}>
@@ -895,6 +905,14 @@ const RecordReport = () => {
                         {selectedJob.laborHours || 'N/A'} hours
                       </Typography>
                     </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Engineer
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.engineerId?.[0]?.name || 'Not Assigned'}
+                      </Typography>
+                    </Box>
                   </Grid>
                 </Grid>
               </Box>
@@ -909,6 +927,14 @@ const RecordReport = () => {
             sx={{ mr: 2 }}
           >
             Download PDF
+          </Button>
+          <Button 
+            onClick={() => handleViewBill(selectedJob?._id)} 
+            variant="outlined"
+            startIcon={<ReceiptIcon />}
+            sx={{ mr: 2 }}
+          >
+            View Bill
           </Button>
           <Button 
             onClick={handleCloseDialog} 
