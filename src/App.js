@@ -19,9 +19,9 @@ import BillingPage from './pages/BillingPage';
 import UserManagement from './pages/UserList';
 import AwaitingApproval from './pages/AwaitingApproval';
 import WaitingApprovalPage from './pages/WaitingApprovalPage';
-import RenewPlanPage from './pages/RenewPlanPage';
 import Profile from './pages/Profile';
 import AddEngineer from './pages/AddEngineer';
+import RenewPlanPage from './Login/RenewPlanPage';
 
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/signup/:id" element={<SignUpPage />} />
           <Route path="/renew-plan" element={<RenewPlanPage />} />
           <Route path="/" element={<AppLayout />}>
               <Route index element={<Dashboard />} />
@@ -48,6 +48,7 @@ function App() {
               <Route path='UserManagemt' element={<UserManagement/>}/>
               <Route path='Profile' element={<Profile/>}/>
               <Route path='add-Engineer' element={<AddEngineer/>}/>
+              
              
               
      
@@ -55,22 +56,7 @@ function App() {
              
             <Route path='AwaitingApproval' element={<AwaitingApproval/>}/>
             <Route path='/waiting-approval' element={<WaitingApprovalPage/>}/>
-
-          {/* <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<AppLayout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="jobs" element={<JobCards />} />
-              <Route path="inventory" element={<InventoryManagement />} />
-              <Route path="reports" element={<RecordReport />} />
-              <Route path="assign-engineer" element={<AssignEngineer />} />
-              <Route path="work-in-progress" element={<WorkInProgress />} />
-              <Route path="quality-check" element={<QualityCheck />} />
-              <Route path="reminders" element={<SetServiceReminder />} />
-              <Route path="insurance" element={<InsuranceManagement />} />
-            </Route>
-          </Route> */}
-          
-          {/* Redirect any unknown routes to login */}
+         
         
         </Routes>
       </Router>
@@ -80,7 +66,6 @@ function App() {
 
 export default App;
 
-// import React from 'react';
 // import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 // // import GarageLogin from './components/GarageLogin';
 // // import GarageDashboard from './components/GarageDashboard';

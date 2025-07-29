@@ -83,7 +83,6 @@ const JobDetailsComponent = ({
         </Typography>
       );
     }
-
     // If it's already a plain string (not JSON), display it directly
     if (typeof jobDetailsString === 'string' &&
       !jobDetailsString.trim().startsWith('[') &&
@@ -94,10 +93,8 @@ const JobDetailsComponent = ({
         </Typography>
       );
     }
-
     try {
       const details = JSON.parse(jobDetailsString);
-
       if (Array.isArray(details) && details.length > 0) {
         return (
           <Box>
@@ -199,17 +196,16 @@ const JobDetailsComponent = ({
       );
     }
   };
-
   return parseAndDisplayJobDetails(jobDetails);
 };
 
 const Dashboard = () => {
-
   let garageId = localStorage.getItem("garageId");
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
 
+  const token = localStorage.getItem("token"); // ✅ Get JWT token
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const [modalOpen, setModalOpen] = useState(false);
@@ -217,7 +213,6 @@ const Dashboard = () => {
     name: "",
     image: "",
   });
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [jobDetailsModalOpen, setJobDetailsModalOpen] = useState(false);
@@ -229,20 +224,20 @@ const Dashboard = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Pagination states for inventory
+  // Pagination states
   const [showAllLowStock, setShowAllLowStock] = useState(false);
   const [showAllHighStock, setShowAllHighStock] = useState(false);
   const [pendingDevices, setPendingDevices] = useState([]);
   const [showAllPendingDevices, setShowAllPendingDevices] = useState(false);
 
-  // Job pagination states
+  // Job pagination
   const [jobsPage, setJobsPage] = useState(0);
   const [jobsRowsPerPage, setJobsRowsPerPage] = useState(5);
-
-  const ITEMS_PER_PAGE = 5; // Show 5 items initially
+  const ITEMS_PER_PAGE = 5;
 
   const [currentJobs, setCurrentJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
+
   const [dashboardStats, setDashboardStats] = useState([
     {
       title: "Active Jobs",
@@ -273,11 +268,11 @@ const Dashboard = () => {
     },
   ]);
 
-  // Inventory data will be fetched from API and separated into low/high stock
   const [lowStockItems, setLowStockItems] = useState([]);
   const [highStockItems, setHighStockItems] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState(null);
+
   const navigate = useNavigate();
 
   const handleSaveProfile = (data) => {
@@ -299,11 +294,13 @@ const Dashboard = () => {
 
   const handleUpdate = async (id) => {
     try {
-      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`);
+      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}` // ✅ Add token here too
+        }
+      });
       const jobCard = response.data;
-
       const { engineerId, laborHours, qualityCheck } = jobCard;
-
       if (!engineerId || engineerId.length === 0 || !engineerId[0]?._id) {
         navigate(`/assign-engineer/${id}`);
       } else if (laborHours === null || laborHours === undefined) {
@@ -356,8 +353,6 @@ const Dashboard = () => {
 
   const applyFilters = (searchTerm, status, start, end) => {
     let filtered = [...currentJobs];
-
-    // Apply search filter
     if (searchTerm.trim() !== '') {
       filtered = filtered.filter(
         job =>
@@ -368,13 +363,9 @@ const Dashboard = () => {
           (job.type && job.type.toLowerCase().includes(searchTerm))
       );
     }
-
-    // Apply status filter
     if (status && status !== 'All') {
       filtered = filtered.filter(job => job.status === status);
     }
-
-    // Apply date range filter
     if (start && end) {
       filtered = filtered.filter(job => {
         const jobDate = new Date(job.createdAt);
@@ -383,9 +374,8 @@ const Dashboard = () => {
         return jobDate >= startDate && jobDate <= endDate;
       });
     }
-
     setFilteredJobs(filtered);
-    setJobsPage(0); // Reset to first page when filters change
+    setJobsPage(0);
   };
 
   const handleClearFilters = () => {
@@ -397,7 +387,6 @@ const Dashboard = () => {
     setJobsPage(0);
   };
 
-  // Job pagination handlers
   const handleJobsPageChange = (event, newPage) => {
     setJobsPage(newPage);
   };
@@ -407,14 +396,12 @@ const Dashboard = () => {
     setJobsPage(0);
   };
 
-  // Get paginated jobs from filtered results
   const getPaginatedJobs = () => {
     const startIndex = jobsPage * jobsRowsPerPage;
     const endIndex = startIndex + jobsRowsPerPage;
     return filteredJobs.slice(startIndex, endIndex);
   };
 
-  // Helper functions for inventory pagination
   const getDisplayedItems = (items, showAll, itemsPerPage = ITEMS_PER_PAGE) => {
     return showAll ? items : items.slice(0, itemsPerPage);
   };
@@ -423,18 +410,16 @@ const Dashboard = () => {
     return items.length > itemsPerPage;
   };
 
-  // Fetch garage profile data
-  useEffect(() => {
-  }, [garageId]);
-
   // Fetch job data from API
   useEffect(() => {
-    if (!garageId) {
-      navigate("/login")
-    }
+    // if (!garageId) {
+    //   navigate("/login");
+    //   return;
+    // }
+
     const fetchJobs = async () => {
-      if (!garageId) {
-        setError("Authentication garage ID not found. Please log in again.");
+      if (!token) {
+        setError("Authentication token not found. Please log in again.");
         setLoading(false);
         return;
       }
@@ -448,19 +433,24 @@ const Dashboard = () => {
           {
             method: 'GET',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}` // ✅ Added token
             },
           }
         );
 
         if (!response.ok) {
+          if (response.status === 401) {
+            setError("Session expired. Please log in again.");
+            // setTimeout(() => navigate("/login"), 2000);
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
         console.log("Jobs API response:", data);
 
-        // Process the response
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
@@ -469,28 +459,18 @@ const Dashboard = () => {
               ? data.data
               : [];
 
-        // Filter out completed jobs - only show active jobs (Pending and In Progress)
         const activeJobs = jobsData.filter(job =>
           job.status === "Pending" || job.status === "In Progress"
         );
 
-        // Extract and format job data from API response
         setCurrentJobs(activeJobs);
-        setFilteredJobs(activeJobs); // Initialize filtered jobs
-
-        // Reset pagination when jobs data changes
+        setFilteredJobs(activeJobs);
         setJobsPage(0);
 
-        // Update dashboard stats
         const updatedStats = [...dashboardStats];
-
-        // Count active jobs (Pending or In Progress)
-        const activeJobsCount = activeJobs.length;
-
-        updatedStats[0].value = activeJobsCount;
+        updatedStats[0].value = activeJobs.length;
         setDashboardStats(updatedStats);
 
-        // Extract pending devices from jobs
         const pendingDevicesFromJobs = activeJobs.map(job => ({
           id: job._id,
           deviceName: job.carNumber || job.registrationNumber || "Unknown Device",
@@ -499,9 +479,7 @@ const Dashboard = () => {
           jobType: job.jobDetails || job.type || "General Service",
           dateCreated: job.createdAt || new Date().toISOString(),
         }));
-
         setPendingDevices(pendingDevicesFromJobs);
-
       } catch (error) {
         console.error("Error fetching jobs:", error);
         setError(`Failed to load jobs data: ${error.message}`);
@@ -511,7 +489,7 @@ const Dashboard = () => {
     };
 
     fetchJobs();
-  }, [garageId]);
+  }, [garageId, token, navigate]);
 
   // Update filtered jobs when currentJobs changes
   useEffect(() => {
@@ -521,10 +499,7 @@ const Dashboard = () => {
   // Fetch inventory data from API
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!garageId) {
-        console.warn("garageId missing for inventory fetch");
-        return;
-      }
+      if (!garageId || !token) return;
 
       try {
         setInventoryLoading(true);
@@ -535,33 +510,25 @@ const Dashboard = () => {
           {
             method: 'GET',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}` // ✅ Token added
             },
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
         console.log("Inventory API response:", data);
 
-        // Process the response
         const inventoryData = Array.isArray(data)
           ? data
-          : data.inventory
-            ? data.inventory
-            : data.data
-              ? data.data
-              : [];
+          : data.inventory || data.data || [];
 
-        // Sort inventory items into high and low stock based on quantity
         const highStock = [];
         const lowStock = [];
 
         inventoryData.forEach((item) => {
-          // Using the actual structure from the API
           const inventoryItem = {
             id: item._id || "",
             name: item.partName || "Unknown Part",
@@ -571,8 +538,6 @@ const Dashboard = () => {
             model: item.model || "",
             reorderPoint: Math.floor(item.quantity * 0.2) || 5,
           };
-
-          // Items with quantity >= 10 go to high stock, others to low stock (threshold can be adjusted)
           if (item.quantity >= 10) {
             highStock.push(inventoryItem);
           } else {
@@ -580,7 +545,6 @@ const Dashboard = () => {
           }
         });
 
-        // Update the dashboard stats with total inventory count
         const updatedStats = [...dashboardStats];
         updatedStats[1].value = inventoryData.reduce(
           (total, item) => total + (item.quantity || 0),
@@ -588,14 +552,11 @@ const Dashboard = () => {
         );
         setDashboardStats(updatedStats);
 
-        // Update state with sorted inventory items
         setHighStockItems(highStock);
         setLowStockItems(lowStock);
       } catch (error) {
         console.error("Error fetching inventory:", error);
         setInventoryError(`Failed to load inventory data: ${error.message}`);
-
-        // Set fallback empty arrays if API fails
         setHighStockItems([]);
         setLowStockItems([]);
       } finally {
@@ -604,12 +565,10 @@ const Dashboard = () => {
     };
 
     fetchInventory();
-  }, [garageId]);
+  }, [garageId, token]);
 
   const getStatusChip = (status) => {
-    // Standardize status value
     const normalizedStatus = status || "Pending";
-
     switch (normalizedStatus) {
       case "Completed":
         return (
@@ -676,47 +635,32 @@ const Dashboard = () => {
     }
   };
 
-  // UPDATED: Dynamic job progress calculation based on job card data
   const getJobProgress = (job) => {
-    // Check if engineerId exists and has valid data
     if (!job.engineerId || job.engineerId.length === 0 || !job.engineerId[0]?._id) {
-      return 25; // No engineer assigned - 25%
-    }
-    // Check if laborHours is set
-    else if (job.laborHours === null || job.laborHours === undefined) {
-      return 50; // Engineer assigned but no labor hours - 50%
-    }
-    // Check if quality check is completed and bill approved
-    else if (!job.qualityCheck || !job.qualityCheck.billApproved) {
-      return 75; // Labor hours set but quality check not approved - 75%
-    }
-    // All conditions met
-    else {
-      return 90; // Quality check approved - 90%
-    }
-  };
-
-  // UPDATED: Get progress color based on percentage
-  const getProgressColor = (progress) => {
-    if (progress >= 90) {
-      return theme.palette.success.main; // Green for 90%+
-    } else if (progress >= 75) {
-      return theme.palette.info.main; // Blue for 75%
-    } else if (progress >= 50) {
-      return theme.palette.warning.main; // Orange for 50%
+      return 25;
+    } else if (job.laborHours === null || job.laborHours === undefined) {
+      return 50;
+    } else if (!job.qualityCheck || !job.qualityCheck.billApproved) {
+      return 75;
     } else {
-      return theme.palette.error.main; // Red for 25%
+      return 90;
     }
   };
 
-  // Debug info (remove in production)
+  const getProgressColor = (progress) => {
+    if (progress >= 90) return theme.palette.success.main;
+    if (progress >= 75) return theme.palette.info.main;
+    if (progress >= 50) return theme.palette.warning.main;
+    return theme.palette.error.main;
+  };
+
   useEffect(() => {
     console.log("Dashboard Debug Info:", {
       garageId,
-      hasGarageId: !!localStorage.getItem("garageId"),
+      tokenPresent: !!token,
       localStorageKeys: Object.keys(localStorage)
     });
-  }, [garageId]);
+  }, [garageId, token]);
 
   return (
     <>
@@ -732,6 +676,7 @@ const Dashboard = () => {
         <Container maxWidth="xl">
           <Card sx={{ mb: 4, overflow: "visible", borderRadius: 2 }}>
             <CardContent>
+              {/* Rest of your UI remains unchanged */}
               <Box
                 display="flex"
                 justifyContent="space-between"
@@ -748,10 +693,9 @@ const Dashboard = () => {
                   </Typography>
                 </Box>
               </Box>
-
               <Divider sx={{ my: 3 }} />
 
-              {/* Stats Cards - exactly 3 cards */}
+              {/* Stats Cards */}
               <Grid container spacing={3} sx={{ mb: 4 }}>
                 {dashboardStats.map((card, index) => (
                   <Grid item xs={12} sm={6} md={4} key={index}>
@@ -837,9 +781,7 @@ const Dashboard = () => {
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                   Active Jobs ({filteredJobs.length} of {currentJobs.length} total)
                 </Typography>
-
                 <Grid container spacing={2} sx={{ mb: 3 }}>
-                  {/* Search Bar */}
                   <Grid item xs={12} md={4}>
                     <TextField
                       fullWidth
@@ -870,8 +812,6 @@ const Dashboard = () => {
                       }}
                     />
                   </Grid>
-
-                  {/* Status Filter */}
                   <Grid item xs={12} md={2}>
                     <FormControl fullWidth size="small">
                       <InputLabel>Status</InputLabel>
@@ -886,8 +826,6 @@ const Dashboard = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-
-                  {/* Start Date */}
                   <Grid item xs={12} md={2}>
                     <TextField
                       fullWidth
@@ -899,8 +837,6 @@ const Dashboard = () => {
                       size="small"
                     />
                   </Grid>
-
-                  {/* End Date */}
                   <Grid item xs={12} md={2}>
                     <TextField
                       fullWidth
@@ -912,8 +848,6 @@ const Dashboard = () => {
                       size="small"
                     />
                   </Grid>
-
-                  {/* Clear Filters Button */}
                   <Grid item xs={12} md={2}>
                     <Button
                       fullWidth
@@ -927,8 +861,6 @@ const Dashboard = () => {
                     </Button>
                   </Grid>
                 </Grid>
-
-                {/* Filter Results Info */}
                 {(search || statusFilter !== 'All' || startDate || endDate) && (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     {filteredJobs.length === 0
@@ -938,7 +870,7 @@ const Dashboard = () => {
                 )}
               </Box>
 
-              {/* Current Jobs Table with Pagination */}
+              {/* Jobs Table */}
               <Paper
                 elevation={0}
                 sx={{
@@ -999,11 +931,10 @@ const Dashboard = () => {
                           {getPaginatedJobs().map((job, index) => {
                             const progress = getJobProgress(job);
                             const progressColor = getProgressColor(progress);
-
                             return (
                               <TableRow key={job._id}>
                                 <TableCell sx={{ fontWeight: 500 }}>
-                                  {index + 1} {/* Display row number */}
+                                  {index + 1}
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>{job.createdBy}</TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>
@@ -1093,101 +1024,77 @@ const Dashboard = () => {
                           })}
                         </TableBody>
                       </Table>
-
                     </TableContainer>
-
-                    {/* Status Page Legend */}
-                    <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Status Page indicates the current workflow step of the job:
+                    {/* Pagination */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        p: 2,
+                        borderTop: `1px solid ${theme.palette.divider}`,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        Showing {jobsPage * jobsRowsPerPage + 1} to{" "}
+                        {Math.min(
+                          (jobsPage + 1) * jobsRowsPerPage,
+                          filteredJobs.length
+                        )}{" "}
+                        of {filteredJobs.length} jobs
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                        <Chip label="Assign Engineer" size="small" color="primary" variant="outlined" />
-                        <Chip label="Work In Progress" size="small" color="warning" variant="outlined" />
-                        <Chip label="Quality Check" size="small" color="info" variant="outlined" />
-                        <Chip label="Billing" size="small" color="success" variant="outlined" />
-                      </Box>
-                    </Box>
-
-                    {/* Pagination Component */}
-                    {filteredJobs.length > 0 && (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          p: 2,
-                          borderTop: `1px solid ${theme.palette.divider}`,
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          Showing {jobsPage * jobsRowsPerPage + 1} to{" "}
-                          {Math.min(
-                            (jobsPage + 1) * jobsRowsPerPage,
-                            filteredJobs.length
-                          )}{" "}
-                          of {filteredJobs.length} jobs
-                        </Typography>
-
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                          {/* Rows per page selector */}
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Rows per page:
-                            </Typography>
-                            <select
-                              value={jobsRowsPerPage}
-                              onChange={handleJobsRowsPerPageChange}
-                              style={{
-                                padding: "4px 8px",
-                                border: `1px solid ${theme.palette.divider}`,
-                                borderRadius: "4px",
-                                backgroundColor: theme.palette.background.paper,
-                                color: theme.palette.text.primary,
-                              }}
-                            >
-                              <option value={5}>5</option>
-                              <option value={10}>10</option>
-                              <option value={25}>25</option>
-                              <option value={50}>50</option>
-                            </select>
-                          </Box>
-
-                          {/* Pagination controls */}
-                          <Box sx={{ display: "flex", alignItems: "center" }}>
-                            <IconButton
-                              onClick={(e) => handleJobsPageChange(e, jobsPage - 1)}
-                              disabled={jobsPage === 0}
-                              size="small"
-                            >
-                              <NavigateBeforeIcon />
-                            </IconButton>
-
-                            <Typography variant="body2" sx={{ mx: 2 }}>
-                              Page {jobsPage + 1} of {Math.ceil(filteredJobs.length / jobsRowsPerPage)}
-                            </Typography>
-
-                            <IconButton
-                              onClick={(e) => handleJobsPageChange(e, jobsPage + 1)}
-                              disabled={jobsPage >= Math.ceil(filteredJobs.length / jobsRowsPerPage) - 1}
-                              size="small"
-                            >
-                              <NavigateNextIcon />
-                            </IconButton>
-                          </Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Rows per page:
+                          </Typography>
+                          <select
+                            value={jobsRowsPerPage}
+                            onChange={handleJobsRowsPerPageChange}
+                            style={{
+                              padding: "4px 8px",
+                              border: `1px solid ${theme.palette.divider}`,
+                              borderRadius: "4px",
+                              backgroundColor: theme.palette.background.paper,
+                              color: theme.palette.text.primary,
+                            }}
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                          </select>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <IconButton
+                            onClick={(e) => handleJobsPageChange(e, jobsPage - 1)}
+                            disabled={jobsPage === 0}
+                            size="small"
+                          >
+                            <NavigateBeforeIcon />
+                          </IconButton>
+                          <Typography variant="body2" sx={{ mx: 2 }}>
+                            Page {jobsPage + 1} of {Math.ceil(filteredJobs.length / jobsRowsPerPage)}
+                          </Typography>
+                          <IconButton
+                            onClick={(e) => handleJobsPageChange(e, jobsPage + 1)}
+                            disabled={jobsPage >= Math.ceil(filteredJobs.length / jobsRowsPerPage) - 1}
+                            size="small"
+                          >
+                            <NavigateNextIcon />
+                          </IconButton>
                         </Box>
                       </Box>
-                    )}
+                    </Box>
                   </>
                 )}
               </Paper>
 
-              {/* Inventory Section with Pagination */}
+              {/* Inventory Section */}
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Inventory Management
               </Typography>
               <Grid container spacing={3}>
-                {/* Low Stock Inventory with Pagination */}
                 <Grid item xs={12} md={6}>
                   <Box sx={{ mb: 2 }}>
                     <Box
@@ -1304,8 +1211,6 @@ const Dashboard = () => {
                     </Paper>
                   </Box>
                 </Grid>
-
-                {/* High Stock Inventory with Pagination */}
                 <Grid item xs={12} md={6}>
                   <Box sx={{ mb: 2 }}>
                     <Box
@@ -1422,14 +1327,13 @@ const Dashboard = () => {
                     </Paper>
                   </Box>
                 </Grid>
-
               </Grid>
             </CardContent>
           </Card>
         </Container>
       </Box>
 
-      {/* Job Actions Menu */}
+      {/* Modals */}
       <Menu
         anchorEl={actionMenu}
         open={Boolean(actionMenu)}
@@ -1475,7 +1379,6 @@ const Dashboard = () => {
         currentImage={profileData.image}
       />
 
-      {/* Job Details Modal */}
       <JobDetailsModal
         open={jobDetailsModalOpen}
         onClose={() => {

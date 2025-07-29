@@ -27,7 +27,6 @@ import {
   Toolbar,
   Container
 } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Visibility, 
   VisibilityOff, 
@@ -39,15 +38,16 @@ import {
   Lock,
   VerifiedUser,
   Send,
-  Logout,
   ExitToApp
 } from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 const LoginPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -59,7 +59,7 @@ const LoginPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   // Forgot Password State
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState(0);
@@ -86,7 +86,6 @@ const LoginPage = () => {
     const token = localStorage.getItem('token');
     const userType = localStorage.getItem('userType');
     const garageId = localStorage.getItem('garageId');
-    
     if (token && userType && garageId) {
       setIsLoggedIn(true);
       setCurrentUser({
@@ -102,53 +101,35 @@ const LoginPage = () => {
   const handleLogout = async () => {
     console.log("=== LOGOUT BUTTON CLICKED ===");
     setLogoutLoading(true);
-    
     try {
       const storedUserId = localStorage.getItem("garageId");
       const token = localStorage.getItem("token");
-      
-      console.log("Stored userId:", storedUserId);
-      console.log("Stored token:", token ? "Token exists" : "No token found");
-      
+
       if (!storedUserId) {
-        console.error("No userId found in localStorage");
-        return;
+        console.error("No garageId found in localStorage");
       }
-      
       if (!token) {
         console.error("No token found in localStorage");
-        return;
       }
-      
-      console.log("Making API call to logout...");
-      
-      const response = await axios.post(
-        `${BASE_URL}/api/garage/logout/${storedUserId}`,
-        {},
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+
+      if (storedUserId && token) {
+        console.log("Calling logout API...");
+        await axios.post(
+          `${BASE_URL}/api/garage/logout/${storedUserId}`,
+          {},
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
-      
-      console.log("Logout API response:", response.data);
-      console.log("Logout API called successfully");
-      
+        );
+        console.log("Logout API called successfully");
+      }
     } catch (error) {
-      console.error("Error calling logout API:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data
-      });
+      console.error("Error during logout:", error);
     } finally {
-      console.log("Clearing localStorage and resetting state...");
-      
       localStorage.clear();
-      
       setIsLoggedIn(false);
       setCurrentUser(null);
       setFormData({ email: '', password: '' });
@@ -177,6 +158,7 @@ const LoginPage = () => {
     if (forgotPasswordError) setForgotPasswordError('');
   };
 
+  // Handle login
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -207,44 +189,63 @@ const LoginPage = () => {
       }
 
       const data = await response.json();
-      
-      if (data.message && data.message.includes('subscription has expired')) {
-        if (isGarageLogin && data.garage && data.garage._id) {
-          localStorage.setItem('garageId', data.garage._id);
-          localStorage.setItem('garageName', data.garage.name || 'Your Garage');
-          localStorage.setItem('garageEmail', data.garage.email || formData.email);
+
+      // Check for expired subscription
+      if (
+        data.subscriptionExpired === true &&
+        data.message === "Your subscription has expired. Please renew your plan."
+      ) {
+        try {
+          // Fetch garage details using email
+          const encodedEmail = encodeURIComponent(formData.email);
+          const res = await fetch(
+            `${BASE_URL}/api/garage/get-garage-id/${encodedEmail}`
+          );
+
+          if (!res.ok) throw new Error('Failed to fetch garage data');
+
+          const result = await res.json();
+          const { garageId, name, email: garageEmail } = result.data;
+
+          // Navigate to renew-plan with full data
+          navigate('/renew-plan', {
+            state: {
+              garageId,
+              garageName: name,
+              garageEmail: garageEmail,
+              message: data.message,
+            },
+          });
+        } catch (err) {
+          console.error("Error fetching garage data:", err);
+          alert("Could not retrieve garage details. Please contact support.");
         }
-        
-        navigate('/renew-plan', {
-          state: {
-            garageId: data.garage?._id,
-            garageName: data.garage?.name || 'Your Garage',
-            garageEmail: data.garage?.email || formData.email,
-            message: data.message
-          }
-        });
+
+        setError(data.message);
         return;
       }
-      
+
+      // Save login data
       localStorage.setItem('token', data.token);
       localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
-      localStorage.setItem('name',isGarageLogin ? data.garage.name : data.user.name);
-      
-      if (isGarageLogin && data.garage && data.garage._id) {
-        localStorage.setItem('garageId', data.garage._id);
-      } else if (!isGarageLogin && data.user && data.user.garageId) {
-        localStorage.setItem('garageId', data.user.garageId);
+      localStorage.setItem('name', isGarageLogin ? data.garage?.name : data.user?.name);
+
+      const garageId = isGarageLogin 
+        ? data.garage?._id 
+        : data.user?.garageId;
+
+      if (garageId) {
+        localStorage.setItem('garageId', garageId);
       }
-      
+
       setIsLoggedIn(true);
       setCurrentUser({
         userType: isGarageLogin ? 'garage' : 'user',
-        garageId: isGarageLogin ? data.garage?._id : data.user?.garageId,
+        garageId,
         token: data.token
       });
-      
-      const redirectPath = isGarageLogin ? '/' : '/';
-      navigate(redirectPath);
+
+      navigate(isGarageLogin ? '/' : '/');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -252,7 +253,7 @@ const LoginPage = () => {
     }
   };
 
-  // Send OTP
+  // Send OTP for password reset
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setForgotPasswordError('');
@@ -268,12 +269,8 @@ const LoginPage = () => {
     try {
       const response = await fetch(`${BASE_URL}/api/verify/send-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: forgotPasswordData.email
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordData.email })
       });
 
       if (!response.ok) {
@@ -281,12 +278,11 @@ const LoginPage = () => {
         throw new Error(errorData.message || 'Failed to send OTP');
       }
 
-      const data = await response.json();
-      setForgotPasswordSuccess('OTP sent successfully! Please check your email.');
+      setForgotPasswordSuccess('OTP sent successfully! Check your email.');
       setOtpSent(true);
       setForgotPasswordStep(1);
-      
       setResendTimer(60);
+
       const timer = setInterval(() => {
         setResendTimer(prev => {
           if (prev <= 1) {
@@ -296,7 +292,6 @@ const LoginPage = () => {
           return prev - 1;
         });
       }, 1000);
-
     } catch (err) {
       setForgotPasswordError(err.message);
     } finally {
@@ -308,7 +303,6 @@ const LoginPage = () => {
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setForgotPasswordError('');
-    setForgotPasswordSuccess('');
     setForgotPasswordLoading(true);
 
     if (!forgotPasswordData.otp) {
@@ -320,9 +314,7 @@ const LoginPage = () => {
     try {
       const response = await fetch(`${BASE_URL}/api/verify/verify-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: forgotPasswordData.email,
           otp: forgotPasswordData.otp
@@ -334,11 +326,9 @@ const LoginPage = () => {
         throw new Error(errorData.message || 'Invalid OTP');
       }
 
-      const data = await response.json();
       setForgotPasswordSuccess('OTP verified successfully!');
       setOtpVerified(true);
       setForgotPasswordStep(2);
-
     } catch (err) {
       setForgotPasswordError(err.message);
     } finally {
@@ -350,23 +340,24 @@ const LoginPage = () => {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setForgotPasswordError('');
-    setForgotPasswordSuccess('');
     setForgotPasswordLoading(true);
 
-    if (!forgotPasswordData.newPassword || !forgotPasswordData.confirmPassword) {
-      setForgotPasswordError('Please fill in all password fields');
+    const { newPassword, confirmPassword } = forgotPasswordData;
+
+    if (!newPassword || !confirmPassword) {
+      setForgotPasswordError('Please fill in all fields');
       setForgotPasswordLoading(false);
       return;
     }
 
-    if (forgotPasswordData.newPassword !== forgotPasswordData.confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setForgotPasswordError('Passwords do not match');
       setForgotPasswordLoading(false);
       return;
     }
 
-    if (forgotPasswordData.newPassword.length < 6) {
-      setForgotPasswordError('Password must be at least 6 characters long');
+    if (newPassword.length < 6) {
+      setForgotPasswordError('Password must be at least 6 characters');
       setForgotPasswordLoading(false);
       return;
     }
@@ -374,12 +365,10 @@ const LoginPage = () => {
     try {
       const response = await fetch(`${BASE_URL}/api/verify/reset-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: forgotPasswordData.email,
-          newPassword: forgotPasswordData.newPassword
+          newPassword
         })
       });
 
@@ -388,13 +377,10 @@ const LoginPage = () => {
         throw new Error(errorData.message || 'Password reset failed');
       }
 
-      const data = await response.json();
-      setForgotPasswordSuccess('Password reset successfully! You can now login with your new password.');
-      
+      setForgotPasswordSuccess('Password reset successful! You can now log in.');
       setTimeout(() => {
         closeForgotPasswordDialog();
       }, 3000);
-
     } catch (err) {
       setForgotPasswordError(err.message);
     } finally {
@@ -415,6 +401,7 @@ const LoginPage = () => {
   const openForgotPasswordDialog = () => {
     setForgotPasswordOpen(true);
     setForgotPasswordStep(0);
+    setForgotPasswordData({ email: '', otp: '', newPassword: '', confirmPassword: '' });
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
     setOtpSent(false);
@@ -425,12 +412,7 @@ const LoginPage = () => {
   const closeForgotPasswordDialog = () => {
     setForgotPasswordOpen(false);
     setForgotPasswordStep(0);
-    setForgotPasswordData({
-      email: '',
-      otp: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
+    setForgotPasswordData({ email: '', otp: '', newPassword: '', confirmPassword: '' });
     setForgotPasswordError('');
     setForgotPasswordSuccess('');
     setOtpSent(false);
@@ -444,7 +426,7 @@ const LoginPage = () => {
     }
   };
 
-  // Dynamic styling based on login type
+  // Theme colors
   const getThemeColors = () => {
     return isGarageLogin 
       ? { primary: '#08197B', secondary: '#364ab8', accent: '#2196F3' }
@@ -453,18 +435,17 @@ const LoginPage = () => {
 
   const colors = getThemeColors();
 
-  // Theme-aware TextField styles
+  // TextField styling
   const getTextFieldStyles = () => ({
     '& .MuiOutlinedInput-root': {
       backgroundColor: theme.palette.mode === 'dark' 
         ? theme.palette.background.paper 
         : theme.palette.background.default,
-      color: theme.palette.text.primary,
       borderRadius: 2,
       '& fieldset': {
         borderColor: theme.palette.mode === 'dark' 
           ? theme.palette.divider 
-          : theme.palette.grey[300]
+          : '#ddd'
       },
       '&:hover fieldset': {
         borderColor: colors.secondary
@@ -473,21 +454,12 @@ const LoginPage = () => {
         borderColor: colors.primary
       },
       '& input': {
-        color: theme.palette.text.primary,
-      },
-      '& input::placeholder': {
-        color: theme.palette.text.secondary,
-        opacity: 0.7
+        color: theme.palette.text.primary
       }
     },
     '& .MuiInputLabel-root': {
       color: theme.palette.text.secondary,
-      '&.Mui-focused': {
-        color: colors.primary
-      }
-    },
-    '& .MuiInputAdornment-root .MuiSvgIcon-root': {
-      color: theme.palette.text.secondary
+      '&.Mui-focused': { color: colors.primary }
     }
   });
 
@@ -497,7 +469,7 @@ const LoginPage = () => {
     <>
       <CssBaseline />
       
-      {/* Top Navigation Bar with Logout (Only when logged in) */}
+      {/* AppBar (only when logged in) */}
       {isLoggedIn && (
         <AppBar 
           position="fixed" 
@@ -511,21 +483,16 @@ const LoginPage = () => {
         >
           <Toolbar sx={{ justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="h6" component="div" sx={{ color: colors.primary, fontWeight: 600 }}>
+              <Typography variant="h6" sx={{ color: colors.primary, fontWeight: 600 }}>
                 Garage Management
               </Typography>
               <Chip
                 icon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
                 label={`Logged in as ${currentUser?.userType === 'garage' ? 'Garage' : 'User'}`}
                 size="small"
-                sx={{
-                  backgroundColor: colors.primary,
-                  color: 'white',
-                  fontWeight: 500
-                }}
+                sx={{ backgroundColor: colors.primary, color: 'white', fontWeight: 500 }}
               />
             </Box>
-            
             <Button
               variant="outlined"
               onClick={handleLogout}
@@ -535,17 +502,7 @@ const LoginPage = () => {
                 borderColor: '#ff4444',
                 color: '#ff4444',
                 backgroundColor: 'rgba(255, 68, 68, 0.08)',
-                backdropFilter: 'blur(10px)',
-                '&:hover': {
-                  borderColor: '#cc3333',
-                  backgroundColor: 'rgba(255, 68, 68, 0.15)',
-                  color: '#cc3333'
-                },
-                '&:disabled': {
-                  borderColor: theme.palette.text.disabled,
-                  color: theme.palette.text.disabled,
-                  backgroundColor: 'transparent'
-                }
+                '&:hover': { backgroundColor: 'rgba(255, 68, 68, 0.15)', color: '#cc3333' }
               }}
             >
               {logoutLoading ? 'Logging out...' : 'Logout'}
@@ -554,16 +511,16 @@ const LoginPage = () => {
         </AppBar>
       )}
 
+      {/* Main Login Page */}
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '100vh',
-          backgroundColor: theme.palette.background.default,
           p: 2,
-          pt: isLoggedIn ? 10 : 2, // Add padding top when logged in to account for AppBar
-          background: theme.palette.mode === 'dark' 
+          pt: isLoggedIn ? 10 : 2,
+          background: theme.palette.mode === 'dark'
             ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
             : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`
         }}
@@ -578,36 +535,18 @@ const LoginPage = () => {
               p: 4,
               textAlign: 'center',
               borderRadius: 3,
-              position: 'relative',
               backgroundColor: theme.palette.background.paper,
-              backdropFilter: 'blur(10px)',
-              border: theme.palette.mode === 'dark' 
-                ? `1px solid ${theme.palette.divider}` 
-                : 'none'
+              backdropFilter: 'blur(10px)'
             }}
           >
-            {/* Already Logged In Alert */}
+            {/* Already logged in alert */}
             {isLoggedIn && (
-              <Alert 
-                severity="success" 
-                sx={{ 
-                  mb: 3,
-                  borderRadius: 2,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? theme.palette.success.dark 
-                    : theme.palette.success.light,
-                  color: theme.palette.success.contrastText,
-                  '& .MuiAlert-message': {
-                    fontWeight: 500
-                  }
-                }}
-              >
-                ✅ You are successfully logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Customer'}. 
-                Use the logout button above to switch accounts.
+              <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+                ✅ You are logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Customer'}.
               </Alert>
             )}
 
-            {/* Login Type Indicator */}
+            {/* Login Type Chip */}
             <Box sx={{ mb: 3 }}>
               <Chip
                 icon={isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
@@ -623,76 +562,61 @@ const LoginPage = () => {
               />
             </Box>
 
-            <Typography 
-              variant="h3" 
-              component="h1"
-              sx={{
-                mb: 2,
-                fontWeight: 700,
-                color: colors.primary,
-                fontSize: { xs: '2rem', sm: '2.5rem' }
-              }}
-            >
+            <Typography variant="h3" component="h1" sx={{ mb: 2, fontWeight: 700, color: colors.primary }}>
               {isLoggedIn ? 'Account Status' : 'Welcome Back'}
             </Typography>
 
-            <Typography 
-              variant="body1" 
-              sx={{
-                mb: 4,
-                color: theme.palette.text.secondary,
-                fontSize: '1.1rem'
-              }}
-            >
+            <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
               {isLoggedIn 
-                ? 'You are currently signed in. Use the navigation above to access your dashboard or logout.'
-                : (isGarageLogin 
-                  ? 'Access your garage management system'
-                  : 'Sign in to your customer account')
+                ? 'You are currently signed in.'
+                : (isGarageLogin ? 'Access your garage management system' : 'Sign in to your customer account')
               }
             </Typography>
-            
-            {/* Show login form only when not logged in */}
+
+            {/* Login Form */}
             {!isLoggedIn && (
               <>
                 {error && (
-                  <Alert 
-                    severity="error" 
-                    sx={{ 
-                      mb: 3,
-                      borderRadius: 2,
-                      backgroundColor: theme.palette.mode === 'dark' 
-                        ? theme.palette.error.dark 
-                        : theme.palette.error.light,
-                      color: theme.palette.error.contrastText,
-                      '& .MuiAlert-message': {
-                        fontWeight: 500
-                      }
-                    }}
-                  >
+                  <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
                     {error}
+                    {error === "Your subscription has expired. Please renew your plan." && (
+                      <Button
+                        variant="contained"
+                        color="warning"
+                        sx={{ ml: 2, mt: 1 }}
+                        onClick={async () => {
+                          try {
+                            const encodedEmail = encodeURIComponent(formData.email);
+                            const res = await fetch(
+                              `${BASE_URL}/api/garage/get-garage-id/${encodedEmail}`
+                            );
+                            if (!res.ok) throw new Error("Garage not found");
+                            const result = await res.json();
+                            const { garageId, name, email } = result.data;
+                            navigate('/renew-plan', {
+                              state: { garageId, garageName: name, garageEmail: email, message: error }
+                            });
+                          } catch (err) {
+                            alert("Could not retrieve garage details. Please contact support.");
+                          }
+                        }}
+                      >
+                        Renew Now
+                      </Button>
+                    )}
                   </Alert>
                 )}
-                
-                <Box 
-                  component="form" 
-                  onSubmit={handleLogin}
-                  sx={{ width: '100%' }}
-                >
+
+                <Box component="form" onSubmit={handleLogin}>
                   <TextField
                     fullWidth
                     name="email"
                     label="Email Address"
                     type="email"
-                    variant="outlined"
-                    placeholder={isGarageLogin ? "garage@example.com" : "user@example.com"}
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    sx={{
-                      mb: 3,
-                      ...getTextFieldStyles()
-                    }}
+                    sx={{ mb: 3, ...getTextFieldStyles() }}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
@@ -701,30 +625,20 @@ const LoginPage = () => {
                       )
                     }}
                   />
-                  
+
                   <TextField
                     fullWidth
                     name="password"
                     label="Password"
                     type={showPassword ? 'text' : 'password'}
-                    variant="outlined"
-                    placeholder="Enter your password"
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    sx={{
-                      mb: 2,
-                      ...getTextFieldStyles()
-                    }}
+                    sx={{ mb: 2, ...getTextFieldStyles() }}
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton
-                            aria-label="toggle password visibility"
-                            onClick={togglePasswordVisibility}
-                            edge="end"
-                            sx={{ color: colors.primary }}
-                          >
+                          <IconButton onClick={togglePasswordVisibility} edge="end">
                             {showPassword ? <VisibilityOff /> : <Visibility />}
                           </IconButton>
                         </InputAdornment>
@@ -732,27 +646,18 @@ const LoginPage = () => {
                     }}
                   />
 
-                  {/* Forgot Password Link */}
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
                     <Link
                       component="button"
                       type="button"
                       variant="body2"
                       onClick={openForgotPasswordDialog}
-                      sx={{
-                        color: colors.primary,
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                        '&:hover': {
-                          color: colors.secondary,
-                          textDecoration: 'underline'
-                        }
-                      }}
+                      sx={{ color: colors.primary, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                     >
                       Forgot Password?
                     </Link>
                   </Box>
-                  
+
                   <Button
                     type="submit"
                     variant="contained"
@@ -760,62 +665,29 @@ const LoginPage = () => {
                     fullWidth
                     sx={{
                       height: 48,
-                      fontSize: '1.1rem',
                       fontWeight: 600,
                       mb: 3,
                       borderRadius: 2,
-                      backgroundColor: colors.primary,
                       background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                      '&:hover': {
-                        backgroundColor: colors.secondary,
-                        transform: 'translateY(-1px)',
-                        boxShadow: `0 6px 20px ${colors.primary}30`
-                      },
-                      '&:disabled': {
-                        backgroundColor: theme.palette.action.disabledBackground,
-                        color: theme.palette.action.disabled
-                      },
-                      transition: 'all 0.3s ease'
+                      '&:hover': { transform: 'translateY(-1px)', boxShadow: `0 6px 20px ${colors.primary}30` }
                     }}
                   >
-                    {loading ? (
-                      <CircularProgress size={24} color="inherit" />
-                    ) : (
-                      `Sign In as ${isGarageLogin ? 'Garage' : 'User'}`
-                    )}
+                    {loading ? <CircularProgress size={24} color="inherit" /> : `Sign In as ${isGarageLogin ? 'Garage' : 'User'}`}
                   </Button>
                 </Box>
 
                 <Divider sx={{ my: 3 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Switch Login Type
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Switch Login Type</Typography>
                 </Divider>
 
                 <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isGarageLogin}
-                      onChange={handleLoginTypeChange}
-                      sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': {
-                          color: colors.primary,
-                        },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                          backgroundColor: colors.primary,
-                        },
-                      }}
-                    />
-                  }
+                  control={<Switch checked={isGarageLogin} onChange={handleLoginTypeChange} />}
                   label={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
-                      <Typography variant="body1" fontWeight={500}>
-                        {isGarageLogin ? 'Garage Owner' : 'Customer'}
-                      </Typography>
+                      <Typography fontWeight={500}>{isGarageLogin ? 'Garage Owner' : 'Customer'}</Typography>
                     </Box>
                   }
-                  sx={{ mb: 3 }}
                 />
 
                 <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
@@ -824,15 +696,7 @@ const LoginPage = () => {
                     component="button"
                     variant="body1"
                     onClick={() => navigate('/signup')}
-                    sx={{
-                      fontWeight: 600,
-                      color: colors.primary,
-                      textDecoration: 'none',
-                      '&:hover': {
-                        color: colors.secondary,
-                        textDecoration: 'underline'
-                      }
-                    }}
+                    sx={{ fontWeight: 600, color: colors.primary, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                   >
                     Create Account
                   </Link>
@@ -840,378 +704,155 @@ const LoginPage = () => {
               </>
             )}
 
-            {/* Show dashboard access buttons when logged in */}
+            {/* Dashboard Access Button */}
             {isLoggedIn && (
-              <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ mt: 4 }}>
                 <Button
                   variant="contained"
                   onClick={() => navigate('/')}
                   startIcon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
                   sx={{
                     height: 48,
-                    fontSize: '1.1rem',
                     fontWeight: 600,
                     borderRadius: 2,
-                    backgroundColor: colors.primary,
-                    background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                    '&:hover': {
-                      backgroundColor: colors.secondary,
-                      transform: 'translateY(-1px)',
-                      boxShadow: `0 6px 20px ${colors.primary}30`
-                    },
-                    transition: 'all 0.3s ease'
+                    background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`
                   }}
                 >
                   Go to Dashboard
                 </Button>
               </Box>
             )}
-
-            {/* Additional Info based on login type */}
-            <Box sx={{ 
-              mt: 3, 
-              p: 2, 
-              backgroundColor: theme.palette.mode === 'dark' 
-                ? `${colors.primary}20` 
-                : `${colors.primary}08`, 
-              borderRadius: 2 
-            }}>
-              <Typography variant="body2" color="text.secondary">
-                {isLoggedIn 
-                  ? '🎉 You have full access to your account features and dashboard'
-                  : (isGarageLogin 
-                    ? '🔧 Manage your garage operations, appointments, and customer service'
-                    : '🚗 Book services, track repairs, and manage your vehicle maintenance')
-                }
-              </Typography>
-            </Box>
           </Paper>
         </Container>
       </Box>
 
-      {/* Forgot Password Dialog with OTP Flow */}
-      <Dialog 
-        open={forgotPasswordOpen} 
-        onClose={closeForgotPasswordDialog}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            p: 1,
-            backgroundColor: theme.palette.background.paper,
-            border: theme.palette.mode === 'dark' 
-              ? `1px solid ${theme.palette.divider}` 
-              : 'none'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          textAlign: 'center', 
-          color: colors.primary,
-          fontWeight: 700,
-          fontSize: '1.5rem',
-          pb: 1
-        }}>
+      {/* Forgot Password Dialog */}
+      <Dialog open={forgotPasswordOpen} onClose={closeForgotPasswordDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ textAlign: 'center', color: colors.primary, fontWeight: 700 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-            <Lock />
-            Reset Password
+            <Lock /> Reset Password
           </Box>
         </DialogTitle>
-        
         <DialogContent>
-          {/* Stepper */}
-          <Stepper activeStep={forgotPasswordStep} sx={{ mb: 4 }}>
-            {steps.map((label, index) => (
-              <Step key={label}>
-                <StepLabel
-                  sx={{
-                    '& .MuiStepLabel-label.Mui-active': {
-                      color: colors.primary
-                    },
-                    '& .MuiStepLabel-label.Mui-completed': {
-                      color: colors.secondary
-                    }
-                  }}
-                >
-                  {label}
-                </StepLabel>
-              </Step>
-            ))}
-          </Stepper>
+          <Stepper activeStep={forgotPasswordStep}>{steps.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}</Stepper>
 
-          {forgotPasswordError && (
-            <Alert 
-              severity="error" 
-              sx={{ 
-                mb: 2, 
-                borderRadius: 2,
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? theme.palette.error.dark 
-                  : theme.palette.error.light,
-                color: theme.palette.error.contrastText
-              }}
-            >
-              {forgotPasswordError}
-            </Alert>
-          )}
+          {forgotPasswordError && <Alert severity="error" sx={{ mb: 2 }}>{forgotPasswordError}</Alert>}
+          {forgotPasswordSuccess && <Alert severity="success" sx={{ mb: 2 }}>{forgotPasswordSuccess}</Alert>}
 
-          {forgotPasswordSuccess && (
-            <Alert 
-              severity="success" 
-              sx={{ 
-                mb: 2, 
-                borderRadius: 2,
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? theme.palette.success.dark 
-                  : theme.palette.success.light,
-                color: theme.palette.success.contrastText
-              }}
-            >
-              {forgotPasswordSuccess}
-            </Alert>
-          )}
-
-          {/* Step 0: Email Input */}
           {forgotPasswordStep === 0 && (
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-                Enter your email address to receive an OTP for password reset.
-              </Typography>
-
-              <Box component="form" onSubmit={handleSendOtp}>
-                <TextField
-                  fullWidth
-                  name="email"
-                  label="Email Address"
-                  type="email"
-                  variant="outlined"
-                  placeholder="Enter your email"
-                  value={forgotPasswordData.email}
-                  onChange={handleForgotPasswordChange}
-                  required
-                  sx={{
-                    mb: 3,
-                    ...getTextFieldStyles()
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Email color="action" />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Box>
+            <Box component="form" onSubmit={handleSendOtp}>
+              <TextField
+                fullWidth
+                name="email"
+                label="Email Address"
+                type="email"
+                value={forgotPasswordData.email}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 3, ...getTextFieldStyles() }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color="action" />
+                    </InputAdornment>
+                  )
+                }}
+              />
             </Box>
           )}
 
-          {/* Step 1: OTP Input */}
           {forgotPasswordStep === 1 && (
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-                We've sent a 6-digit OTP to <strong>{forgotPasswordData.email}</strong>. 
-                Please enter it below.
-              </Typography>
-
-              <Box component="form" onSubmit={handleVerifyOtp}>
-                <TextField
-                  fullWidth
-                  name="otp"
-                  label="Enter OTP"
-                  type="text"
-                  variant="outlined"
-                  placeholder="123456"
-                  value={forgotPasswordData.otp}
-                  onChange={handleForgotPasswordChange}
-                  required
-                  inputProps={{ 
-                    maxLength: 6, 
-                    style: { 
-                      textAlign: 'center', 
-                      fontSize: '1.5rem', 
-                      letterSpacing: '0.5rem',
-                      color: theme.palette.text.primary
-                    } 
-                  }}
-                  sx={{
-                    mb: 2,
-                    ...getTextFieldStyles()
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <VerifiedUser color="action" />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-
-                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                  <Button
-                    variant="text"
-                    onClick={handleResendOtp}
-                    disabled={resendTimer > 0}
-                    sx={{
-                      color: colors.primary,
-                      '&:hover': { backgroundColor: `${colors.primary}08` }
-                    }}
-                  >
-                    {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
-                  </Button>
-                </Box>
+            <Box component="form" onSubmit={handleVerifyOtp}>
+              <TextField
+                fullWidth
+                name="otp"
+                label="Enter OTP"
+                type="text"
+                value={forgotPasswordData.otp}
+                onChange={handleForgotPasswordChange}
+                required
+                inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.5rem' } }}
+                sx={{ mb: 2, ...getTextFieldStyles() }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <VerifiedUser color="action" />
+                    </InputAdornment>
+                  )
+                }}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                <Button
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0}
+                  sx={{ color: colors.primary }}
+                >
+                  {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
+                </Button>
               </Box>
             </Box>
           )}
 
-          {/* Step 2: New Password */}
           {forgotPasswordStep === 2 && (
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-                OTP verified successfully! Now set your new password.
-              </Typography>
-
-              <Box component="form" onSubmit={handleResetPassword}>
-                <TextField
-                  fullWidth
-                  name="newPassword"
-                  label="New Password"
-                  type={showNewPassword ? 'text' : 'password'}
-                  variant="outlined"
-                  placeholder="Enter new password"
-                  value={forgotPasswordData.newPassword}
-                  onChange={handleForgotPasswordChange}
-                  required
-                  sx={{
-                    mb: 2,
-                    ...getTextFieldStyles()
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          aria-label="toggle new password visibility"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          edge="end"
-                          sx={{ color: colors.primary }}
-                        >
-                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-
-                <TextField
-                  fullWidth
-                  name="confirmPassword"
-                  label="Confirm New Password"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  variant="outlined"
-                  placeholder="Confirm new password"
-                  value={forgotPasswordData.confirmPassword}
-                  onChange={handleForgotPasswordChange}
-                  required
-                  sx={{
-                    mb: 3,
-                    ...getTextFieldStyles()
-                  }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          aria-label="toggle confirm password visibility"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          edge="end"
-                          sx={{ color: colors.primary }}
-                        >
-                          {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Box>
+            <Box component="form" onSubmit={handleResetPassword}>
+              <TextField
+                fullWidth
+                name="newPassword"
+                label="New Password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={forgotPasswordData.newPassword}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 2, ...getTextFieldStyles() }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end">
+                        {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+              <TextField
+                fullWidth
+                name="confirmPassword"
+                label="Confirm Password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={forgotPasswordData.confirmPassword}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 3, ...getTextFieldStyles() }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
+                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
             </Box>
           )}
         </DialogContent>
-        
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={closeForgotPasswordDialog}
-            variant="outlined"
-            sx={{
-              borderColor: colors.primary,
-              color: colors.primary,
-              '&:hover': {
-                borderColor: colors.secondary,
-                backgroundColor: `${colors.primary}08`
-              }
-            }}
-          >
+          <Button onClick={closeForgotPasswordDialog} variant="outlined" sx={{ borderColor: colors.primary, color: colors.primary }}>
             Cancel
           </Button>
-          
           {forgotPasswordStep === 0 && (
-            <Button 
-              onClick={handleSendOtp}
-              variant="contained"
-              disabled={forgotPasswordLoading}
-              startIcon={<Send />}
-              sx={{
-                backgroundColor: colors.primary,
-                '&:hover': {
-                  backgroundColor: colors.secondary
-                }
-              }}
-            >
-              {forgotPasswordLoading ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                'Send OTP'
-              )}
+            <Button onClick={handleSendOtp} variant="contained" disabled={forgotPasswordLoading} startIcon={<Send />}>
+              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Send OTP'}
             </Button>
           )}
-
           {forgotPasswordStep === 1 && (
-            <Button 
-              onClick={handleVerifyOtp}
-              variant="contained"
-              disabled={forgotPasswordLoading}
-              startIcon={<VerifiedUser />}
-              sx={{
-                backgroundColor: colors.primary,
-                '&:hover': {
-                  backgroundColor: colors.secondary
-                }
-              }}
-            >
-              {forgotPasswordLoading ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                'Verify OTP'
-              )}
+            <Button onClick={handleVerifyOtp} variant="contained" disabled={forgotPasswordLoading} startIcon={<VerifiedUser />}>
+              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Verify OTP'}
             </Button>
           )}
-
           {forgotPasswordStep === 2 && (
-            <Button 
-              onClick={handleResetPassword}
-              variant="contained"
-              disabled={forgotPasswordLoading}
-              startIcon={<Lock />}
-              sx={{
-                backgroundColor: colors.primary,
-                '&:hover': {
-                  backgroundColor: colors.secondary
-                }
-              }}
-            >
-              {forgotPasswordLoading ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                'Reset Password'
-              )}
+            <Button onClick={handleResetPassword} variant="contained" disabled={forgotPasswordLoading} startIcon={<Lock />}>
+              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Reset Password'}
             </Button>
           )}
         </DialogActions>
