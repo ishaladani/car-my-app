@@ -22,6 +22,7 @@ import WaitingApprovalPage from './pages/WaitingApprovalPage';
 import Profile from './pages/Profile';
 import AddEngineer from './pages/AddEngineer';
 import RenewPlanPage from './Login/RenewPlanPage';
+import InventoryDashboard from './pages/InventoryDashboard';
 
 
 function App() {
@@ -48,9 +49,7 @@ function App() {
               <Route path='UserManagemt' element={<UserManagement/>}/>
               <Route path='Profile' element={<Profile/>}/>
               <Route path='add-Engineer' element={<AddEngineer/>}/>
-              
-             
-              
+              <Route path='inventory-dashboard' element={<InventoryDashboard/>}/>
      
             </Route>
              

@@ -50,7 +50,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Description as DescriptionIcon,
   Save as SaveIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -132,6 +133,170 @@ const AssignEngineer = () => {
 
   const [fetchingData, setFetchingData] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+
+
+  const updateJobCardWithParts = async (selectedParts) => {
+  try {
+    // Get existing job details
+    const jobDetailsString = getJobDetailsForAPI();
+
+    // Format parts for API
+    const formattedParts = selectedParts.map(part => ({
+      partId: part._id,
+      partName: part.partName,
+      partNumber: part.partNumber || '',
+      quantity: part.selectedQuantity || 1,
+      pricePerUnit: part.pricePerUnit || 0,
+      gstPercentage: part.taxAmount || 0,
+      carName: part.carName || '',
+      model: part.model || ''
+    }));
+
+    console.log('Updating job card immediately with parts:', formattedParts);
+
+    // Update job card with current job details and newly selected parts
+    await updateJobCard(id, jobDetailsString, formattedParts);
+
+    // Show success notification
+    setSnackbar({
+      open: true,
+      message: `✅ Job card updated with ${formattedParts.length} part(s)`,
+      severity: 'success'
+    });
+
+  } catch (error) {
+    console.error('Error updating job card with parts:', error);
+    setSnackbar({
+      open: true,
+      message: 'Failed to update job card with selected parts',
+      severity: 'error'
+    });
+  }
+};
+
+// **ALTERNATIVE: Update job card when part quantity changes**
+const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity, oldQuantity) => {
+  const assignment = assignments.find(a => a.id === assignmentId);
+  if (!assignment) return;
+
+  const part = assignment.parts[partIndex];
+  if (!part) return;
+
+  try {
+    // Get available quantity considering all current selections
+    const availableQuantity = getAvailableQuantity(part._id);
+    const currentlySelected = part.selectedQuantity || 1;
+    const maxSelectableQuantity = availableQuantity + currentlySelected;
+
+    // Validate maximum quantity
+    if (newQuantity > maxSelectableQuantity) {
+      setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`);
+      return;
+    }
+
+    if (newQuantity < 1) {
+      setError('Quantity must be at least 1');
+      return;
+    }
+
+    // Update the part quantity in the assignment (local state)
+    const updatedParts = assignment.parts.map((p, idx) => 
+      idx === partIndex 
+        ? { ...p, selectedQuantity: newQuantity }
+        : p
+    );
+    
+    updateAssignment(assignmentId, 'parts', updatedParts);
+
+    // **NEW: Update job card API with updated quantities**
+    if (id) {
+      await updateJobCardWithParts(updatedParts);
+    }
+
+    // Clear any previous errors
+    if (error && error.includes(part.partName)) {
+      setError(null);
+    }
+
+  } catch (err) {
+    console.error('Error updating part quantity:', err);
+    setError(`Failed to update quantity for "${part.partName}"`);
+  }
+};
+
+// **ENHANCED: Update job card when parts are removed**
+const handlePartRemoval = async (assignmentId, partIndex) => {
+  const assignment = assignments.find(a => a.id === assignmentId);
+  if (!assignment) return;
+
+  const part = assignment.parts[partIndex];
+  if (!part) return;
+
+  try {
+    // Remove part from assignment (local state)
+    const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
+    updateAssignment(assignmentId, 'parts', updatedParts);
+
+    // **NEW: Update job card API with remaining parts**
+    if (id) {
+      await updateJobCardWithParts(updatedParts);
+    }
+
+    setSnackbar({
+      open: true,
+      message: `Part "${part.partName}" removed and job card updated`,
+      severity: 'info'
+    });
+
+  } catch (err) {
+    console.error('Error removing part:', err);
+    setError(`Failed to remove part "${part.partName}"`);
+  }
+};
+
+// **ENHANCED: Collect all parts from all assignments for job card update**
+const getAllSelectedParts = () => {
+  const allPartsUsed = [];
+  assignments.forEach(assignment => {
+    assignment.parts.forEach(part => {
+      const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
+      const selectedQuantity = part.selectedQuantity || 1;
+      
+      if (existingPartIndex !== -1) {
+        allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+      } else {
+        allPartsUsed.push({
+          partId: part._id,
+          partName: part.partName,
+          partNumber: part.partNumber || '',
+          quantity: selectedQuantity,
+          pricePerUnit: part.pricePerUnit || 0,
+          gstPercentage: part.taxAmount || 0,
+          carName: part.carName || '',
+          model: part.model || ''
+        });
+      }
+    });
+  });
+  return allPartsUsed;
+};
+
+// **ENHANCED: Update job card with all parts from all assignments**
+const updateJobCardWithAllParts = async () => {
+  try {
+    const jobDetailsString = getJobDetailsForAPI();
+    const allParts = getAllSelectedParts();
+    
+    if (id) {
+      await updateJobCard(id, jobDetailsString, allParts);
+      console.log('Job card updated with all parts:', allParts);
+    }
+  } catch (error) {
+    console.error('Error updating job card with all parts:', error);
+    throw error;
+  }
+};
+
 
   // Updated job details functions with pricing
   const addJobPoint = () => {
@@ -547,41 +712,8 @@ const AssignEngineer = () => {
     }
   };
 
-  // Handle Part Selection (Local State Only)
-  // const handlePartSelection = (assignmentId, newParts, previousParts = []) => {
-  //   try {
-  //     // Find newly added parts
-  //     const addedParts = newParts.filter(newPart => 
-  //       !previousParts.some(prevPart => prevPart._id === newPart._id)
-  //     );
 
-  //     // Process newly added parts - only validate, don't update API
-  //     for (const addedPart of addedParts) {
-  //       // Check if part has sufficient quantity available
-  //       const availableQuantity = getAvailableQuantity(addedPart._id);
-  //       if (availableQuantity < 1) {
-  //         setError(`Part "${addedPart.partName}" is out of stock!`);
-  //         return; // Don't update the selection
-  //       }
-  //     }
-
-  //     // Update the parts with selected quantity (local state only)
-  //     const updatedParts = newParts.map(part => ({
-  //       ...part,
-  //       selectedQuantity: part.selectedQuantity || 1,
-  //       availableQuantity: part.quantity
-  //     }));
-
-  //     // Update the assignment with new parts (local state only)
-  //     updateAssignment(assignmentId, 'parts', updatedParts);
-
-  //   } catch (err) {
-  //     console.error('Error handling part selection:', err);
-  //     setError('Failed to update part selection');
-  //   }
-  // };
-
-  const handlePartSelection = (assignmentId, newParts, previousParts = []) => {
+  const handlePartSelection = async (assignmentId, newParts, previousParts = []) => {
   try {
     // Prevent selecting duplicate parts
     const uniqueParts = [];
@@ -600,75 +732,19 @@ const AssignEngineer = () => {
 
     // Update the assignment with filtered parts (no duplicates)
     updateAssignment(assignmentId, 'parts', uniqueParts);
+
+    // **NEW: Immediately update job card API with selected parts**
+    if (id && uniqueParts.length > 0) {
+      await updateJobCardWithParts(uniqueParts);
+    }
+
   } catch (err) {
     console.error('Error handling part selection:', err);
-    setError('Failed to update part selection');
+    setError('Failed to update part selection and job card');
   }
 };
 
-  // Handle Part Quantity Change (Local State Only)
-  const handlePartQuantityChange = (assignmentId, partIndex, newQuantity, oldQuantity) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
 
-    const part = assignment.parts[partIndex];
-    if (!part) return;
-
-    try {
-      // Get available quantity considering all current selections
-      const availableQuantity = getAvailableQuantity(part._id);
-      const currentlySelected = part.selectedQuantity || 1;
-      const maxSelectableQuantity = availableQuantity + currentlySelected;
-
-      // Validate maximum quantity
-      if (newQuantity > maxSelectableQuantity) {
-        setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`);
-        return;
-      }
-
-      if (newQuantity < 1) {
-        setError('Quantity must be at least 1');
-        return;
-      }
-
-      // Update the part quantity in the assignment (local state only)
-      const updatedParts = assignment.parts.map((p, idx) => 
-        idx === partIndex 
-          ? { ...p, selectedQuantity: newQuantity }
-          : p
-      );
-      
-      updateAssignment(assignmentId, 'parts', updatedParts);
-
-      // Clear any previous errors
-      if (error && error.includes(part.partName)) {
-        setError(null);
-      }
-
-    } catch (err) {
-      console.error('Error updating part quantity:', err);
-      setError(`Failed to update quantity for "${part.partName}"`);
-    }
-  };
-
-  // Handle Part Removal (Local State Only)
-  const handlePartRemoval = (assignmentId, partIndex) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
-
-    const part = assignment.parts[partIndex];
-    if (!part) return;
-
-    try {
-      // Remove part from assignment (local state only)
-      const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-      updateAssignment(assignmentId, 'parts', updatedParts);
-
-    } catch (err) {
-      console.error('Error removing part:', err);
-      setError(`Failed to remove part "${part.partName}"`);
-    }
-  };
 
   // Form Validation
   const validateForm = () => {
@@ -938,105 +1014,98 @@ const AssignEngineer = () => {
     }
   };
 
-  // Enhanced Add New Part - Based on InventoryManagement
-  const handleAddPart = async () => {
-    // Validation - Similar to InventoryManagement
-    if (!newPart.partName?.trim()) {
-      setPartAddError('Please fill part name');
-      return;
-    }
-
-    if (newPart.quantity <= 0) {
-      setPartAddError('Quantity must be greater than 0');
-      return;
-    }
-
-    if (newPart.pricePerUnit < 0) {
-      setPartAddError('Price cannot be negative');
-      return;
-    }
-
-    // Check for duplicate part number (if provided)
-    if (newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)) {
-      setPartAddError('Part number already exists. Please use a different part number.');
-      return;
-    }
-
-    setAddingPart(true);
-    setPartAddError(null);
-
-    try {
-      // Calculate tax amounts like in InventoryManagement
-      const sgstAmount = newPart.sgstEnabled ?
-        calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage) : 0;
-      const cgstAmount = newPart.cgstEnabled ?
-        calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage) : 0;
-
-      const taxAmount = sgstAmount + cgstAmount;
-
-      const requestData = {
-        name: newPart.name, // Default name as per InventoryManagement
-        garageId: garageId,
-        quantity: parseInt(newPart.quantity),
-        pricePerUnit: parseFloat(newPart.pricePerUnit),
-        partNumber: newPart.partNumber,
-        partName: newPart.partName,
-        carName: newPart.carName,
-        model: newPart.model,
-        taxAmount: taxAmount
-      };
-
-      console.log('Adding inventory item with data:', requestData);
-
-      const response = await axios.post(
-        'https://garage-management-zi5z.onrender.com/api/garage/inventory/add',
-        requestData,
-        {
+  // Handle Add Part
+    const handleAddPart = async () => {
+      if (!newPart.partName?.trim() || !newPart.carName?.trim() || !newPart.model?.trim()) {
+        setPartAddError('Please fill Car Name, Model, and Part Name');
+        return;
+      }
+      if (newPart.quantity <= 0) {
+        setPartAddError('Quantity must be greater than 0');
+        return;
+      }
+      if (newPart.purchasePrice < 0 || newPart.sellingPrice < 0) {
+        setPartAddError('Prices cannot be negative');
+        return;
+      }
+      if (newPart.sellingPrice < newPart.purchasePrice) {
+        setPartAddError('Selling price cannot be less than purchase price');
+        return;
+      }
+      if (newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)) {
+        setPartAddError('Part number already exists');
+        return;
+      }
+  
+      setAddingPart(true);
+      setPartAddError(null);
+  
+      try {
+        const igst = parseFloat(newPart.igst) || 0;
+        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+        const baseAmount = newPart.purchasePrice * newPart.quantity;
+        const taxAmount = newPart.taxType === 'igst'
+          ? (baseAmount * igst) / 100
+          : 2 * ((baseAmount * cgstSgst) / 100);
+  
+        const requestData = {
+          name: "abc",
+          garageId,
+          carName: newPart.carName,
+          model: newPart.model,
+          partNumber: newPart.partNumber,
+          partName: newPart.partName,
+          quantity: parseInt(newPart.quantity),
+          purchasePrice: parseFloat(newPart.purchasePrice),
+          sellingPrice: parseFloat(newPart.sellingPrice),
+          hsnNumber: newPart.hsnNumber,
+          igst: newPart.taxType === 'igst' ? igst : 0,
+          cgstSgst: newPart.taxType === 'cgstSgst' ? cgstSgst : 0,
+          taxAmount
+        };
+  
+        await axios.post(`${API_BASE_URL}/garage/inventory/add`, requestData, {
           headers: {
             'Content-Type': 'application/json',
+            Authorization: garageToken ? `Bearer ${garageToken}` : ''
           }
-        }
-      );
-
-      console.log('Add response:', response.data);
-
-      await fetchInventoryParts();
-
-      setPartAddSuccess(true);
-      setSnackbar({
-        open: true,
-        message: 'Part added successfully!',
-        severity: 'success'
-      });
-
-      // Reset form like in InventoryManagement
-      setNewPart({
-        garageId,
-        name: "abc",
-        carName: "",
-        model: "",
-        partNumber: "",
-        partName: "",
-        quantity: 1,
-        pricePerUnit: 0,
-        sgstEnabled: false,
-        sgstPercentage: '',
-        cgstEnabled: false,
-        cgstPercentage: '',
-        taxAmount: 0
-      });
-
-      setTimeout(() => {
-        setPartAddSuccess(false);
-        handleCloseAddPartDialog();
-      }, 1500);
-    } catch (err) {
-      console.error('Add part error:', err);
-      setPartAddError(err.response?.data?.message || 'Failed to add part');
-    } finally {
-      setAddingPart(false);
-    }
-  };
+        });
+  
+        await fetchInventoryParts();
+        setPartAddSuccess(true);
+        setSnackbar({
+          open: true,
+          message: 'Part added successfully!',
+          severity: 'success'
+        });
+  
+        setNewPart({
+          garageId,
+          name: "abc",
+          carName: "",
+          model: "",
+          partNumber: "",
+          partName: "",
+          quantity: 1,
+          purchasePrice: 0,
+          sellingPrice: 0,
+          hsnNumber: "",
+          igst: '',
+          cgstSgst: '',
+          taxType: 'igst'
+        });
+  
+        setTimeout(() => {
+          setPartAddSuccess(false);
+          handleCloseAddPartDialog();
+        }, 1500);
+      } catch (err) {
+        console.error('Add part error:', err);
+        setPartAddError(err.response?.data?.message || 'Failed to add part');
+      } finally {
+        setAddingPart(false);
+      }
+    };
 
   // Close Handlers
   const handleCloseAlert = () => {
@@ -1980,236 +2049,152 @@ const AssignEngineer = () => {
         </Container>
 
         {/* Enhanced Add Part Dialog - Based on InventoryManagement */}
-        <Dialog 
-          open={openAddPartDialog} 
-          onClose={handleCloseAddPartDialog}
-          maxWidth="md"
-          fullWidth
-          PaperProps={{
-            sx: { bgcolor: 'background.paper' }
-          }}
-        >
-          <DialogTitle>Add New Part to Inventory</DialogTitle>
-          <DialogContent>
-            {partAddSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                Part added successfully!
-              </Alert>
-            )}
-            {partAddError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {partAddError}
-              </Alert>
-            )}
-            
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Part Number" 
-                  name="partNumber"
-                  value={newPart.partNumber} 
-                  onChange={handlePartInputChange}
-                  error={checkDuplicatePartNumber(newPart.partNumber)}
-                  helperText={checkDuplicatePartNumber(newPart.partNumber) ? "Part number already exists" : ""}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Part Name *" 
-                  name="partName"
-                  value={newPart.partName} 
-                  onChange={handlePartInputChange}
-                  required
-                  error={!newPart.partName.trim() && !!partAddError}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Car Name" 
-                  name="carName"
-                  value={newPart.carName} 
-                  onChange={handlePartInputChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Model" 
-                  name="model"
-                  value={newPart.model} 
-                  onChange={handlePartInputChange}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Quantity *" 
-                  name="quantity"
-                  type="number" 
-                  value={newPart.quantity} 
-                  onChange={handlePartInputChange}
-                  required
-                  inputProps={{ min: 1 }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Price Per Unit" 
-                  name="pricePerUnit"
-                  type="number" 
-                  value={newPart.pricePerUnit} 
-                  onChange={handlePartInputChange}
-                  inputProps={{ min: 0, step: 0.01 }}
-                />
-              </Grid>
-            </Grid>
-
-            {/* Tax Section - Based on InventoryManagement */}
-            <Box sx={{ mt: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Tax Configuration</Typography>
-
-              <Grid container spacing={2}>
-                {/* SGST Section */}
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          name="sgstEnabled"
-                          checked={newPart.sgstEnabled}
-                          onChange={handlePartInputChange}
-                        />
-                      }
-                      label="Enable SGST"
-                    />
-                    {newPart.sgstEnabled && (
-                      <Box sx={{ mt: 2 }}>
+        <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="md" fullWidth>
+                  <DialogTitle>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="h6">Add New Part</Typography>
+                      <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
+                    </Box>
+                  </DialogTitle>
+                  <DialogContent dividers>
+                    {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
+                    {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
+        
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
-                          name="sgstPercentage"
-                          label="SGST Percentage (%)"
-                          type="number"
-                          variant="outlined"
-                          value={newPart.sgstPercentage}
-                          onChange={handlePartInputChange}
-                          required={newPart.sgstEnabled}
-                          inputProps={{ min: 0, max: 100, step: "0.01" }}
-                          fullWidth
-                          size="small"
+                          label="Car Name *" name="carName"
+                          value={newPart.carName} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
                         />
-                        {newPart.pricePerUnit && newPart.quantity && newPart.sgstPercentage && (
-                          <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                            SGST Amount: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage).toFixed(2)}
-                          </Typography>
-                        )}
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Model *" name="model"
+                          value={newPart.model} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Part Number *" name="partNumber"
+                          value={newPart.partNumber} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                          error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
+                          helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Part Name *" name="partName"
+                          value={newPart.partName} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Quantity *" name="quantity"
+                          type="number" value={newPart.quantity}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 1 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Purchase Price *" name="purchasePrice"
+                          type="number" value={newPart.purchasePrice}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Selling Price *" name="sellingPrice"
+                          type="number" value={newPart.sellingPrice}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="HSN Number" name="hsnNumber"
+                          value={newPart.hsnNumber} onChange={handlePartInputChange}
+                          fullWidth margin="normal"
+                        />
+                      </Grid>
+                    </Grid>
+        
+                    {/* Tax Type Selection */}
+                    <Box sx={{ mt: 3 }}>
+                      <FormControl fullWidth>
+                        <InputLabel>Tax Type</InputLabel>
+                        <Select
+                          name="taxType"
+                          value={newPart.taxType}
+                          onChange={handlePartInputChange}
+                          label="Tax Type"
+                        >
+                          <MenuItem value="igst">IGST</MenuItem>
+                          <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
+                        </Select>
+                      </FormControl>
+        
+                      {newPart.taxType === 'igst' ? (
+                        <TextField
+                          label="IGST (%)" name="igst"
+                          type="number" value={newPart.igst}
+                          onChange={handlePartInputChange}
+                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        />
+                      ) : (
+                        <TextField
+                          label="CGST/SGST (each %)" name="cgstSgst"
+                          type="number" value={newPart.cgstSgst}
+                          onChange={handlePartInputChange}
+                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        />
+                      )}
+                    </Box>
+        
+                    {/* Tax Preview */}
+                    {(newPart.purchasePrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
+                      <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>Tax Summary</Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              Base: ₹{(newPart.purchasePrice * newPart.quantity).toFixed(2)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="body2" color="primary">
+                              Tax: ₹{calculateTaxAmount(newPart.purchasePrice, newPart.quantity, newPart.taxType === 'igst' ? newPart.igst : newPart.cgstSgst * 2).toFixed(2)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="h6">Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}</Typography>
+                          </Grid>
+                        </Grid>
                       </Box>
                     )}
-                  </Box>
-                </Grid>
-
-                {/* CGST Section */}
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          name="cgstEnabled"
-                          checked={newPart.cgstEnabled}
-                          onChange={handlePartInputChange}
-                        />
-                      }
-                      label="Enable CGST"
-                    />
-                    {newPart.cgstEnabled && (
-                      <Box sx={{ mt: 2 }}>
-                        <TextField
-                          name="cgstPercentage"
-                          label="CGST Percentage (%)"
-                          type="number"
-                          variant="outlined"
-                          value={newPart.cgstPercentage}
-                          onChange={handlePartInputChange}
-                          required={newPart.cgstEnabled}
-                          inputProps={{ min: 0, max: 100, step: "0.01" }}
-                          fullWidth
-                          size="small"
-                        />
-                        {newPart.pricePerUnit && newPart.quantity && newPart.cgstPercentage && (
-                          <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                            CGST Amount: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage).toFixed(2)}
-                          </Typography>
-                        )}
-                      </Box>
-                    )}
-                  </Box>
-                </Grid>
-              </Grid>
-
-              {/* Total Tax and Price Display */}
-              {newPart.pricePerUnit && newPart.quantity && (
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="h6" color="primary">
-                        Total Tax: ₹{calculateTotalTaxAmount(
-                          newPart.pricePerUnit,
-                          newPart.quantity,
-                          newPart.sgstEnabled,
-                          newPart.sgstPercentage,
-                          newPart.cgstEnabled,
-                          newPart.cgstPercentage
-                        ).toFixed(2)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {newPart.sgstEnabled && newPart.sgstPercentage && (
-                          <>SGST: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage).toFixed(2)}</>
-                        )}
-                        {newPart.sgstEnabled && newPart.cgstEnabled && newPart.sgstPercentage && newPart.cgstPercentage && <> + </>}
-                        {newPart.cgstEnabled && newPart.cgstPercentage && (
-                          <>CGST: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage).toFixed(2)}</>
-                        )}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography variant="h6">
-                        Total Price: ₹{calculateTotalPrice(
-                          newPart.pricePerUnit,
-                          newPart.quantity,
-                          newPart.sgstEnabled,
-                          newPart.sgstPercentage,
-                          newPart.cgstEnabled,
-                          newPart.cgstPercentage
-                        ).toFixed(2)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Base Price: ₹{(parseFloat(newPart.pricePerUnit) * parseInt(newPart.quantity || 0)).toFixed(2)}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Box>
-              )}
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button 
-              onClick={handleCloseAddPartDialog}
-              disabled={addingPart}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddPart} 
-              disabled={addingPart || checkDuplicatePartNumber(newPart.partNumber)} 
-              variant="contained"
-              startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
-            >
-              {addingPart ? 'Adding...' : 'Add Part'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
+                    <Button
+                      onClick={handleAddPart}
+                      variant="contained"
+                      disabled={addingPart || !newPart.partName.trim()}
+                      startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
+                      sx={{ backgroundColor: '#ff4d4d', '&:hover': { backgroundColor: '#e63939' } }}
+                    >
+                      {addingPart ? 'Adding...' : 'Add Part'}
+                    </Button>
+                  </DialogActions>
+                </Dialog>
 
         {/* Add Engineer Dialog */}
         <Dialog 

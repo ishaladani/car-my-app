@@ -7,8 +7,19 @@ const AddPartDialog = ({
   isMobile, 
   newPart, 
   setNewPart, 
-  addNewPart 
+  addNewPart, 
+  includeHsnField, 
+  gstSettings, 
+  inventoryParts 
 }) => {
+  // Find selected inventory part for auto-fill
+  const selectedInv = inventoryParts?.find(p => p.name === newPart.name) || {};
+  // GST auto-fill
+  const sgst = gstSettings?.sgstPercentage || 9;
+  const cgst = gstSettings?.cgstPercentage || 9;
+  const igst = gstSettings?.gstPercentage || 18;
+  const isInterState = gstSettings?.isInterState;
+
   return (
     <Dialog
       open={showNewPartDialog}
@@ -17,20 +28,34 @@ const AddPartDialog = ({
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
     >
       <DialogTitle>
-        <Typography variant="h6" fontWeight="bold" color="primary">🔧 Add New Part</Typography>
+        <Typography variant="h6" fontWeight="bold" color="primary">Add Part from Inventory</Typography>
       </DialogTitle>
       <DialogContent sx={{ p: 3 }}>
         <Grid container spacing={2}>
           <Grid item xs={12}>
             <TextField
-              autoFocus
-              label="Part Name"
+              select
+              label="Select Part"
               fullWidth
-              variant="outlined"
+              SelectProps={{ native: true }}
               value={newPart.name}
-              onChange={(e) => setNewPart({ ...newPart, name: e.target.value })}
-              placeholder="e.g., Brake Pads, Engine Oil, Spark Plugs"
-            />
+              onChange={e => {
+                const inv = inventoryParts?.find(p => p.name === e.target.value) || {};
+                setNewPart({
+                  ...newPart,
+                  name: e.target.value,
+                  pricePerUnit: inv.sellingPrice || 0,
+                  hsnNumber: inv.hsnNumber || "8708",
+                });
+              }}
+            >
+              <option value="">-- Select --</option>
+              {inventoryParts?.map(p => (
+                <option key={p._id} value={p.name}>
+                  {p.name} (Stock: {p.stock || 0})
+                </option>
+              ))}
+            </TextField>
           </Grid>
           <Grid item xs={6}>
             <TextField
@@ -39,7 +64,7 @@ const AddPartDialog = ({
               fullWidth
               variant="outlined"
               value={newPart.quantity}
-              onChange={(e) => setNewPart({ ...newPart, quantity: e.target.value })}
+              onChange={e => setNewPart({ ...newPart, quantity: e.target.value })}
               inputProps={{ min: 1 }}
             />
           </Grid>
@@ -50,13 +75,59 @@ const AddPartDialog = ({
               fullWidth
               variant="outlined"
               value={newPart.pricePerUnit}
-              onChange={(e) => setNewPart({ ...newPart, pricePerUnit: e.target.value })}
+              onChange={e => setNewPart({ ...newPart, pricePerUnit: e.target.value })}
               InputProps={{
                 startAdornment: <InputAdornment position="start">₹</InputAdornment>,
               }}
               inputProps={{ min: 0, step: 0.01 }}
             />
           </Grid>
+          <Grid item xs={6}>
+            <TextField
+              label="HSN Code"
+              fullWidth
+              variant="outlined"
+              value={newPart.hsnNumber || "8708"}
+              onChange={e => setNewPart({ ...newPart, hsnNumber: e.target.value })}
+              inputProps={{ maxLength: 8 }}
+            />
+          </Grid>
+          {gstSettings?.billType === "gst" && (
+            <>
+              {!isInterState ? (
+                <>
+                  <Grid item xs={3}>
+                    <TextField
+                      label="SGST (%)"
+                      fullWidth
+                      variant="outlined"
+                      value={sgst}
+                      InputProps={{ readOnly: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={3}>
+                    <TextField
+                      label="CGST (%)"
+                      fullWidth
+                      variant="outlined"
+                      value={cgst}
+                      InputProps={{ readOnly: true }}
+                    />
+                  </Grid>
+                </>
+              ) : (
+                <Grid item xs={6}>
+                  <TextField
+                    label="IGST (%)"
+                    fullWidth
+                    variant="outlined"
+                    value={igst}
+                    InputProps={{ readOnly: true }}
+                  />
+                </Grid>
+              )}
+            </>
+          )}
           <Grid item xs={12}>
             <Box sx={{ p: 2, backgroundColor: 'grey.100', borderRadius: 2, textAlign: 'center' }}>
               <Typography variant="body2" fontWeight={500}>

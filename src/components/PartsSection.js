@@ -968,7 +968,6 @@ const WorkInProgress = () => {
 
                 <CardContent sx={{ p: 3 }}>
                   {/* Parts Selection */}
-                 // Updated parts selection logic - Replace the existing Autocomplete section with this:
 
 {/* Parts Selection - Updated to prevent duplicate selection */}
 <Box sx={{ mb: 3 }}>

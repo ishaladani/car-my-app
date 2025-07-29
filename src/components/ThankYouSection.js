@@ -36,9 +36,8 @@ const ThankYouSection = ({
           startIcon={<DownloadIcon />}
           onClick={downloadPdfBill}
         >
-          Download PDF Invoice
+          Print Invoice
         </Button>
-
         <Button
           variant="contained"
           sx={{ backgroundColor: '#25d366', color: 'white', minWidth: isMobile ? '100%' : 200 }}
@@ -46,9 +45,8 @@ const ThankYouSection = ({
           onClick={sendBillViaWhatsApp}
           disabled={sendingWhatsApp}
         >
-          {sendingWhatsApp ? "Preparing..." : "Send via WhatsApp"}
+          {sendingWhatsApp ? "Preparing..." : "WhatsApp Invoice"}
         </Button>
-
         <Button
           variant="contained"
           sx={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', minWidth: isMobile ? '100%' : 200 }}

@@ -24,7 +24,6 @@ const RenewPlanPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
 
-  // Extract data from navigation state
   const {
     garageId,
     garageName = 'Your Garage',
@@ -32,7 +31,6 @@ const RenewPlanPage = () => {
     message = 'Your subscription has expired. Please renew your plan.',
   } = state || {};
 
-  // Log the values
   console.log('RenewPlanPage:', { garageId, garageName, garageEmail, message });
 
   const [loading, setLoading] = useState(false);
@@ -42,39 +40,53 @@ const RenewPlanPage = () => {
   const [completed, setCompleted] = useState(false);
   const [plans, setPlans] = useState([]);
   const [fetchingPlans, setFetchingPlans] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState('64f8a1b2c3d4e5f678901235'); // default plan id
+  const [selectedPlanId, setSelectedPlanId] = useState('');
 
   const BASE_URL = 'https://garage-management-zi5z.onrender.com';
+  const RAZORPAY_KEY_ID = 'rzp_test_YOUR_KEY_ID_HERE'; // 🔥 Replace with your actual Razorpay Key ID
 
-  // Theme colors
   const colors = {
     primary: '#08197B',
     secondary: '#364ab8',
     accent: '#2196F3',
   };
 
-  // Validate required data on mount
+  // Load Razorpay SDK
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => console.log('Razorpay SDK loaded');
+    script.onerror = () => setError('Failed to load Razorpay gateway.');
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // Validate required data
   useEffect(() => {
     if (!state || !garageId) {
       setError('Access denied. Please log in again.');
     }
   }, [state, garageId]);
 
-  // Fetch all plans on mount
+  // Fetch all plans
   useEffect(() => {
     const fetchPlans = async () => {
       setFetchingPlans(true);
       try {
         const response = await fetch(`${BASE_URL}/api/plans/all`);
         const data = await response.json();
-        // The API returns { success: true, data: [...] }
         const plansArr = data?.data || [];
         setPlans(plansArr);
         if (Array.isArray(plansArr) && plansArr.length > 0) {
-          setSelectedPlanId(plansArr[0]._id); // select first plan by default
+          setSelectedPlanId(plansArr[0]._id); // select first plan
         }
       } catch (err) {
         console.error('Error fetching plans:', err);
+        setError('Failed to load available plans.');
       } finally {
         setFetchingPlans(false);
       }
@@ -89,7 +101,13 @@ const RenewPlanPage = () => {
     setLoading(true);
 
     if (!garageId) {
-      setError('Garage ID is missing. Please log in again.');
+      setError('Garage ID is missing.');
+      setLoading(false);
+      return;
+    }
+
+    if (!selectedPlanId) {
+      setError('Please select a plan.');
       setLoading(false);
       return;
     }
@@ -99,7 +117,7 @@ const RenewPlanPage = () => {
         `${BASE_URL}/api/plans/renew`,
         {
           garageId,
-          planId: selectedPlanId, // use selected plan
+          planId: selectedPlanId,
           paymentMethod: 'razorpay',
         },
         {
@@ -111,52 +129,101 @@ const RenewPlanPage = () => {
       setOrderId(orderId);
       setSuccess('Order created successfully! Proceed to payment.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create renewal order.');
+      setError(
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to create renewal order.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 2: Simulate Payment & Complete Renewal
-  const handleCompleteRenewal = async () => {
-    setError('');
-    setLoading(true);
+  // Step 2: Open Real Razorpay Payment Gateway
+  const handlePayment = async () => {
+    if (!orderId) {
+      setError('Order ID is missing. Please create an order first.');
+      return;
+    }
 
-    // Simulate Razorpay payment IDs
-    const mockPaymentId = 'pay_mock_' + Math.random().toString(36).substr(2, 9);
-    const mockSignature = 'mock_signature_' + Math.random().toString(36).substr(2, 12);
+    setLoading(true);
+    setError('');
+
+    // Check if Razorpay is loaded
+    if (!window.Razorpay) {
+      setError('Payment gateway not loaded. Please check internet connection.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      const response = await axios.post(
-        `${BASE_URL}/api/plans/complete-renewal`,
-        {
-          garageId,
-          planId: '64f8a1b2c3d4e5f678901235',
-          orderId,
-          paymentId: mockPaymentId,
-          signature: mockSignature,
-          paymentMethod: 'razorpay',
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      // Fetch order details (amount, currency)
+      const orderRes = await axios.get(`${BASE_URL}/api/plans/order/${orderId}`);
+      const { amount, currency } = orderRes.data.data;
 
-      setSuccess(response.data.message || 'Subscription renewed successfully!');
-      setCompleted(true);
+      const options = {
+        key: RAZORPAY_KEY_ID,
+        amount: amount, // in paise (₹999 → 99900)
+        currency: currency || 'INR',
+        name: 'Garage Management System',
+        description: 'Subscription Renewal',
+        order_id: orderId,
+        handler: async function (response) {
+          // Step 3: Verify payment on backend
+          try {
+            setLoading(true);
+            const verifyRes = await axios.post(
+              `${BASE_URL}/api/plans/complete-renewal`,
+              {
+                garageId,
+                planId: selectedPlanId,
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                paymentMethod: 'razorpay',
+              },
+              {
+                headers: { 'Content-Type': 'application/json' },
+              }
+            );
+            setSuccess(verifyRes.data.message || 'Subscription renewed successfully!');
+            setCompleted(true);
+          } catch (err) {
+            setError(
+              err.response?.data?.message || 'Payment verification failed. Contact support.'
+            );
+          } finally {
+            setLoading(false);
+          }
+        },
+        prefill: {
+          name: garageName || 'Customer',
+          email: garageEmail || '',
+          contact: '', // Add phone if available
+        },
+        theme: {
+          color: colors.primary,
+        },
+        modal: {
+          escape: false,
+          backdropclose: false,
+        },
+        notes: {
+          garageId,
+          planId: selectedPlanId,
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (err) {
-      setError(err.response?.data?.message || 'Payment verification failed.');
+      setError(
+        err.response?.data?.message ||
+        'Failed to load payment details. Try again.'
+      );
     } finally {
       setLoading(false);
     }
-  };
-
-  // Simulate Razorpay checkout
-  const handlePayment = () => {
-    if (!orderId) return;
-    setTimeout(() => {
-      handleCompleteRenewal();
-    }, 2000);
   };
 
   return (
@@ -169,7 +236,7 @@ const RenewPlanPage = () => {
           alignItems: 'center',
           minHeight: '100vh',
           p: 2,
-          backgroundColor: theme.palette.mode === 'dark'
+          background: theme.palette.mode === 'dark'
             ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
             : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`,
         }}
@@ -193,7 +260,6 @@ const RenewPlanPage = () => {
             >
               🔁 Renew Subscription
             </Typography>
-
             <Typography variant="body1" sx={{ mb: 3, color: theme.palette.text.secondary }}>
               {message}
             </Typography>
@@ -210,41 +276,47 @@ const RenewPlanPage = () => {
               </Alert>
             )}
 
-            {/* Display Garage Info */}
+            {/* Garage Info */}
             <List sx={{ mb: 3, textAlign: 'left' }}>
               <ListItem>
-                <ListItemIcon>
-                  <strong>🆔</strong>
-                </ListItemIcon>
+                <ListItemIcon><strong>🆔</strong></ListItemIcon>
                 <ListItemText primary="Garage ID" secondary={garageId || 'Not available'} />
               </ListItem>
               <ListItem>
-                <ListItemIcon>
-                  <strong>🏢</strong>
-                </ListItemIcon>
-                <ListItemText primary="Garage Name" secondary={garageName} />
+                <ListItemIcon><strong>🏢</strong></ListItemIcon>
+                <ListItemText primary="Name" secondary={garageName} />
               </ListItem>
               <ListItem>
-                <ListItemIcon>
-                  <strong>📧</strong>
-                </ListItemIcon>
+                <ListItemIcon><strong>📧</strong></ListItemIcon>
                 <ListItemText primary="Email" secondary={garageEmail} />
               </ListItem>
               <ListItem>
-                <ListItemIcon>
-                  <strong>📋</strong>
-                </ListItemIcon>
-                <ListItemText primary="Plan" secondary="Standard Monthly Plan" />
+                <ListItemIcon><strong>📋</strong></ListItemIcon>
+                <ListItemText
+                  primary="Selected Plan"
+                  secondary={
+                    plans.find(p => p._id === selectedPlanId)?.name || 'Loading...'
+                  }
+                />
               </ListItem>
               <ListItem>
-                <ListItemIcon>
-                  <strong>💰</strong>
-                </ListItemIcon>
-                <ListItemText primary="Amount" secondary="₹999/month" />
+                <ListItemIcon><strong>💰</strong></ListItemIcon>
+                <ListItemText
+                  primary="Amount"
+                  secondary={
+                    selectedPlanId && plans.find(p => p._id === selectedPlanId)
+                      ? `₹${plans.find(p => p._id === selectedPlanId).amount}/${
+                          plans.find(p => p._id === selectedPlanId).durationInMonths > 1
+                            ? `${plans.find(p => p._id === selectedPlanId).durationInMonths} months`
+                            : 'month'
+                        }`
+                      : '₹0'
+                  }
+                />
               </ListItem>
             </List>
 
-            {/* Plan selection */}
+            {/* Plan Selection */}
             {fetchingPlans ? (
               <Box sx={{ mb: 3 }}>
                 <CircularProgress size={24} />
@@ -300,34 +372,15 @@ const RenewPlanPage = () => {
                           }
                           secondary={
                             <Box>
-                              {plan.features && plan.features.length > 0 && (
-                                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                                  {plan.features.map((f, idx) => (
-                                    <li key={idx} style={{ fontSize: 13 }}>{f}</li>
-                                  ))}
-                                </ul>
-                              )}
-                              {plan.description && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {plan.description}
-                                </Typography>
-                              )}
+                              {plan.features?.map((f, idx) => (
+                                <li key={idx} style={{ fontSize: 13 }}>{f}</li>
+                              ))}
                             </Box>
                           }
                         />
                       </ListItem>
                     ))}
                   </List>
-                  {/* Show selected plan summary */}
-                  {plans.find(p => p._id === selectedPlanId) && (
-                    <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
-                      Selected Plan: <strong>{plans.find(p => p._id === selectedPlanId).name}</strong> - ₹
-                      {plans.find(p => p._id === selectedPlanId).amount}/
-                      {plans.find(p => p._id === selectedPlanId).durationInMonths > 1
-                        ? `${plans.find(p => p._id === selectedPlanId).durationInMonths} months`
-                        : 'month'}
-                    </Alert>
-                  )}
                 </Box>
               )
             )}
@@ -335,7 +388,6 @@ const RenewPlanPage = () => {
             <Divider sx={{ my: 3 }} />
 
             {!state ? (
-              // Safety fallback
               <Button
                 variant="contained"
                 onClick={() => navigate('/login')}

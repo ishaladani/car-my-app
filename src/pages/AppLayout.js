@@ -151,6 +151,12 @@ const handleLogout = async () => {
     { text: "Add Engineer", icon: <InventoryIcon />, path: "/add-Engineer", permission: "Add Engineer" },
     { text: "History", icon: <AssignmentIcon />, path: "/reports", permission: "Reports & Records" },
     {
+  text: "Recode & Report",
+  icon: <BuildIcon />,
+  path: "/inventory-dashboard", // ✅ Corrected
+  permission: "Reports & Records"
+},
+    {
       text: "Service Reminders",
       icon: <NotificationsIcon />,
       path: "/reminders",
