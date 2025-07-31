@@ -139,10 +139,15 @@ const RenewPlanPage = () => {
       );
 
       console.log("Order creation response:", response.data);
-      const { orderId } = response.data;
 
-      if (!orderId) {
-        console.error("No orderId in response:", response.data);
+      // Extract orderId from the correct path in response
+      let orderId;
+      if (response.data.order && response.data.order.orderId) {
+        orderId = response.data.order.orderId;
+      } else if (response.data.orderId) {
+        orderId = response.data.orderId;
+      } else {
+        console.error("No orderId found in response:", response.data);
         setError("Order created but no order ID received. Please try again.");
         setLoading(false);
         return;
@@ -216,13 +221,22 @@ const RenewPlanPage = () => {
       } else {
         // Fetch order details (amount, currency)
         console.log("Fetching order details for:", orderId);
-        const orderRes = await axios.get(
-          `${BASE_URL}/api/plans/order/${orderId}`
-        );
-        const orderData = orderRes.data.data;
-        amount = orderData.amount;
-        currency = orderData.currency;
-        console.log("Order details:", { amount, currency });
+        try {
+          const orderRes = await axios.get(
+            `${BASE_URL}/api/plans/order/${orderId}`
+          );
+          const orderData = orderRes.data.data;
+          amount = orderData.amount;
+          currency = orderData.currency;
+          console.log("Order details:", { amount, currency });
+        } catch (orderError) {
+          console.log("Could not fetch order details, using defaults...");
+          // Use the amount from the order creation response
+          const selectedPlan = plans.find((p) => p._id === selectedPlanId);
+          amount = (selectedPlan?.amount || 999) * 100; // Convert to paise
+          currency = "INR";
+          console.log("Using default order details:", { amount, currency });
+        }
       }
 
       const options = {
