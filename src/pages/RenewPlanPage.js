@@ -76,25 +76,64 @@ const RenewPlanPage = () => {
     });
   }, [location.state]);
 
+  // Load Razorpay SDK
+  useEffect(() => {
+    const loadRazorpaySDK = () => {
+      return new Promise((resolve, reject) => {
+        if (window.Razorpay) {
+          resolve();
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => {
+          console.log("Razorpay SDK loaded");
+          resolve();
+        };
+        script.onerror = () => {
+          console.error("Failed to load Razorpay SDK");
+          reject(new Error("Failed to load Razorpay gateway."));
+        };
+        document.body.appendChild(script);
+      });
+    };
+
+    loadRazorpaySDK().catch((err) => {
+      setError(err.message);
+    });
+  }, []);
+
   // Fetch available plans
   useEffect(() => {
     const fetchPlans = async () => {
       try {
         setFetchingPlans(true);
 
-        const response = await fetch(`${getBaseApiUrl()}/api/plans/all`, {
+        // Try the new endpoint first
+        let response = await fetch(`${getBaseApiUrl()}/api/plans/all`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
         });
 
+        // If new endpoint doesn't exist, try the old endpoint
+        if (!response.ok && response.status === 404) {
+          response = await fetch(`${getBaseApiUrl()}/api/admin/plan`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        setPlanData(data.data);
+        setPlanData(data.data || data);
       } catch (err) {
         setError(err.message);
         console.error("Error fetching plans:", err);
@@ -198,8 +237,8 @@ const RenewPlanPage = () => {
 
       console.log("Using Razorpay Key:", RAZORPAY_KEY_ID);
 
-      // 1. Create renewal order
-      const orderResponse = await fetch(`${getBaseApiUrl()}/api/plans/renew`, {
+      // 1. Create renewal order - try new endpoint first
+      let orderResponse = await fetch(`${getBaseApiUrl()}/api/plans/renew`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -210,6 +249,24 @@ const RenewPlanPage = () => {
           paymentMethod: "razorpay",
         }),
       });
+
+      // If new endpoint doesn't exist, try the old endpoint
+      if (!orderResponse.ok && orderResponse.status === 404) {
+        orderResponse = await fetch(
+          `${getBaseApiUrl()}/api/garage/payment/createorderforsignup`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              amount: selectedPlan.amount,
+              subscriptionType:
+                selectedPlan.subscriptionType || selectedPlan.name,
+            }),
+          }
+        );
+      }
 
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json().catch(() => ({}));
@@ -319,7 +376,8 @@ const RenewPlanPage = () => {
         paymentMethod: "razorpay",
       };
 
-      const response = await fetch(
+      // Try new endpoint first
+      let response = await fetch(
         `${getBaseApiUrl()}/api/plans/complete-renewal`,
         {
           method: "POST",
@@ -329,6 +387,30 @@ const RenewPlanPage = () => {
           body: JSON.stringify(requestBody),
         }
       );
+
+      // If new endpoint doesn't exist, try the old endpoint
+      if (!response.ok && response.status === 404) {
+        const oldRequestBody = {
+          durationInMonths: selectedPlan.durationInMonths,
+          amount: selectedPlan.amount,
+          paymentDetails: {
+            paymentId: paymentDetails.razorpayPaymentId,
+            method: "upi",
+            status: "paid",
+          },
+        };
+
+        response = await fetch(
+          `${getBaseApiUrl()}/api/garage/renewplan/${garageData.garageId}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(oldRequestBody),
+          }
+        );
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

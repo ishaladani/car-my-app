@@ -116,6 +116,34 @@ const RenewPlanFlow = () => {
     },
   ];
 
+  // Load Razorpay SDK
+  useEffect(() => {
+    const loadRazorpaySDK = () => {
+      return new Promise((resolve, reject) => {
+        if (window.Razorpay) {
+          resolve();
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => {
+          console.log("Razorpay SDK loaded");
+          resolve();
+        };
+        script.onerror = () => {
+          console.error("Failed to load Razorpay SDK");
+          reject(new Error("Failed to load Razorpay gateway."));
+        };
+        document.body.appendChild(script);
+      });
+    };
+
+    loadRazorpaySDK().catch((err) => {
+      setError(err.message);
+    });
+  }, []);
+
   // Initialize garage data
   useEffect(() => {
     const stateData = location.state;
@@ -145,19 +173,30 @@ const RenewPlanFlow = () => {
       try {
         setFetchingPlans(true);
 
-        const response = await fetch(`${getBaseApiUrl()}/api/plans/all`, {
+        // Try the new endpoint first
+        let response = await fetch(`${getBaseApiUrl()}/api/plans/all`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
         });
 
+        // If new endpoint doesn't exist, try the old endpoint
+        if (!response.ok && response.status === 404) {
+          response = await fetch(`${getBaseApiUrl()}/api/admin/plan`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+        }
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
-        setPlanData(data.data);
+        setPlanData(data.data || data);
       } catch (err) {
         setError(err.message);
 

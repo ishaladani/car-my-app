@@ -23,7 +23,8 @@ const SubscriptionChecker = ({ children }) => {
         return;
       }
 
-      const response = await fetch(
+      // Try the new endpoint first
+      let response = await fetch(
         `${getBaseApiUrl()}/api/plans/subscription-status/${garageId}`,
         {
           method: "GET",
@@ -33,6 +34,20 @@ const SubscriptionChecker = ({ children }) => {
           },
         }
       );
+
+      // If new endpoint doesn't exist, try the old endpoint
+      if (!response.ok && response.status === 404) {
+        response = await fetch(
+          `${getBaseApiUrl()}/api/garage/subscription-status/${garageId}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
