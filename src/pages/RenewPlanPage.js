@@ -76,7 +76,7 @@ const RenewPlanPage = () => {
     });
   }, [location.state]);
 
-  // Load Razorpay SDK
+  // Load Razorpay SDK with retry mechanism
   useEffect(() => {
     const loadRazorpaySDK = () => {
       return new Promise((resolve, reject) => {
@@ -86,23 +86,53 @@ const RenewPlanPage = () => {
           return;
         }
 
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => {
-          console.log("Razorpay SDK loaded successfully");
-          resolve();
+        // Try multiple CDN sources
+        const cdnSources = [
+          "https://checkout.razorpay.com/v1/checkout.js",
+          "https://cdn.razorpay.com/checkout.js",
+          "https://js.razorpay.com/v1/checkout.js",
+        ];
+
+        let currentSourceIndex = 0;
+
+        const tryLoadScript = () => {
+          if (currentSourceIndex >= cdnSources.length) {
+            reject(new Error("All Razorpay CDN sources failed to load"));
+            return;
+          }
+
+          const script = document.createElement("script");
+          script.src = cdnSources[currentSourceIndex];
+          script.async = true;
+          script.defer = true;
+
+          script.onload = () => {
+            console.log(
+              `Razorpay SDK loaded successfully from: ${cdnSources[currentSourceIndex]}`
+            );
+            resolve();
+          };
+
+          script.onerror = () => {
+            console.error(
+              `Failed to load Razorpay SDK from: ${cdnSources[currentSourceIndex]}`
+            );
+            currentSourceIndex++;
+            setTimeout(tryLoadScript, 1000); // Retry after 1 second
+          };
+
+          document.head.appendChild(script);
         };
-        script.onerror = () => {
-          console.error("Failed to load Razorpay SDK");
-          reject(new Error("Failed to load Razorpay gateway."));
-        };
-        document.body.appendChild(script);
+
+        tryLoadScript();
       });
     };
 
     loadRazorpaySDK().catch((err) => {
       console.error("Error loading Razorpay SDK:", err);
-      setError(err.message);
+      setError(
+        "Unable to load payment gateway. Please check your internet connection and try again."
+      );
     });
   }, []);
 
@@ -601,6 +631,31 @@ const RenewPlanPage = () => {
     }
   };
 
+  // Retry loading Razorpay SDK
+  const retryLoadRazorpay = () => {
+    console.log("=== Retrying Razorpay SDK load ===");
+    setError(null);
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      console.log("Razorpay SDK loaded successfully on retry");
+      showSnackbar("Payment gateway loaded successfully!", "success");
+    };
+
+    script.onerror = () => {
+      console.error("Failed to load Razorpay SDK on retry");
+      setError(
+        "Failed to load payment gateway. Please check your internet connection."
+      );
+    };
+
+    document.head.appendChild(script);
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 5 }}>
       <Box
@@ -726,7 +781,7 @@ const RenewPlanPage = () => {
 
         {/* Action Buttons */}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Button
               fullWidth
               variant="outlined"
@@ -737,7 +792,7 @@ const RenewPlanPage = () => {
               Back to Login
             </Button>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Button
               fullWidth
               variant="contained"
@@ -760,7 +815,7 @@ const RenewPlanPage = () => {
               {loading ? "Processing..." : `Pay ${selectedPlan?.price} & Renew`}
             </Button>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Button
               fullWidth
               variant="outlined"
@@ -770,6 +825,18 @@ const RenewPlanPage = () => {
               sx={{ py: 1.5 }}
             >
               Test Razorpay
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Button
+              fullWidth
+              variant="outlined"
+              color="warning"
+              size="large"
+              onClick={retryLoadRazorpay}
+              sx={{ py: 1.5 }}
+            >
+              Retry SDK Load
             </Button>
           </Grid>
         </Grid>
