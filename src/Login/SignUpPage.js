@@ -1,5 +1,5 @@
 // src/pages/EnhancedSignUpPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Box,
@@ -37,7 +37,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Visibility,
   VisibilityOff,
@@ -65,35 +65,35 @@ import {
   Done,
   ErrorOutline,
   Refresh,
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+} from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 
-const BASE_URL = 'https://garage-management-zi5z.onrender.com/api';
+const BASE_URL = "https://garage-management-zi5z.onrender.com/api";
 
 const EnhancedSignUpPage = () => {
   const navigate = useNavigate();
 
   const [darkMode, setDarkMode] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    address: '',
-    phone: '',
-    otp: '',
-    gstNum: '',
-    panNum: '',
-    taxType: 'gst',
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    address: "",
+    phone: "",
+    otp: "",
+    gstNum: "",
+    panNum: "",
+    taxType: "gst",
     durationInMonths: 12,
     isFreePlan: true,
     bankDetails: {
-      accountHolderName: '',
-      accountNumber: '',
-      ifscCode: '',
-      bankName: '',
-      branchName: '',
-      upiId: '',
+      accountHolderName: "",
+      accountNumber: "",
+      ifscCode: "",
+      bankName: "",
+      branchName: "",
+      upiId: "",
     },
   });
 
@@ -114,27 +114,27 @@ const EnhancedSignUpPage = () => {
   const [locationLoading, setLocationLoading] = useState(false);
 
   const steps = [
-    'Basic Information',
-    'Tax & Business Details',
-    'Choose Plan',
-    'Bank Details (Optional)',
-    'Complete Registration',
-    'Verify Email',
-    'Registration Status',
+    "Basic Information",
+    "Tax & Business Details",
+    "Choose Plan",
+    "Bank Details (Optional)",
+    "Complete Registration",
+    "Verify Email",
+    "Registration Status",
   ];
 
   const theme = {
     palette: {
-      mode: darkMode ? 'dark' : 'light',
-      primary: { main: '#1976d2', dark: '#115293' },
-      secondary: { main: '#dc004e' },
+      mode: darkMode ? "dark" : "light",
+      primary: { main: "#1976d2", dark: "#115293" },
+      secondary: { main: "#dc004e" },
       background: {
-        paper: darkMode ? '#424242' : '#ffffff',
-        default: darkMode ? '#121212' : '#f5f5f5',
+        paper: darkMode ? "#424242" : "#ffffff",
+        default: darkMode ? "#121212" : "#f5f5f5",
       },
       text: {
-        primary: darkMode ? '#ffffff' : '#000000',
-        secondary: darkMode ? '#cccccc' : '#666666',
+        primary: darkMode ? "#ffffff" : "#000000",
+        secondary: darkMode ? "#cccccc" : "#666666",
       },
     },
   };
@@ -143,61 +143,65 @@ const EnhancedSignUpPage = () => {
 
   // --- Field Validation ---
   const validateField = (name, value) => {
-    let error = '';
+    let error = "";
     switch (name) {
-      case 'name':
-        if (!value.trim()) error = 'Garage Name is required';
+      case "name":
+        if (!value.trim()) error = "Garage Name is required";
         break;
-      case 'email':
+      case "email":
         if (!value.trim()) {
-          error = 'Email is required';
+          error = "Email is required";
         } else if (!/\S+@\S+\.\S+/.test(value)) {
-          error = 'Email is invalid';
+          error = "Email is invalid";
         }
         break;
-      case 'password':
+      case "password":
         if (!value) {
-          error = 'Password is required';
+          error = "Password is required";
         } else if (value.length < 6) {
-          error = 'Password must be at least 6 characters';
+          error = "Password must be at least 6 characters";
         }
         break;
-      case 'confirmPassword':
+      case "confirmPassword":
         if (formData.password !== value) {
-          error = 'Passwords do not match';
+          error = "Passwords do not match";
         }
         break;
-      case 'address':
-        if (!value.trim()) error = 'Address is required';
+      case "address":
+        if (!value.trim()) error = "Address is required";
         break;
-      case 'phone':
-        const cleanedPhone = value.replace(/\D/g, '');
+      case "phone":
+        const cleanedPhone = value.replace(/\D/g, "");
         if (!value.trim()) {
-          error = 'Phone number is required';
+          error = "Phone number is required";
         } else if (cleanedPhone.length !== 10) {
-          error = 'Phone number must be 10 digits';
+          error = "Phone number must be 10 digits";
         }
         break;
-      case 'gstNum':
-        if (formData.taxType === 'gst') {
+      case "gstNum":
+        if (formData.taxType === "gst") {
           if (!value.trim()) {
-            error = 'GST Number is required';
-          } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value)) {
-            error = 'Invalid GST Number format';
+            error = "GST Number is required";
+          } else if (
+            !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+              value
+            )
+          ) {
+            error = "Invalid GST Number format";
           }
         } else {
-          error = '';
+          error = "";
         }
         break;
-      case 'panNum':
-        if (formData.taxType === 'pan') {
+      case "panNum":
+        if (formData.taxType === "pan") {
           if (!value.trim()) {
-            error = 'PAN Number is required';
+            error = "PAN Number is required";
           } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value)) {
-            error = 'Invalid PAN Number format';
+            error = "Invalid PAN Number format";
           }
         } else {
-          error = '';
+          error = "";
         }
         break;
       default:
@@ -208,14 +212,14 @@ const EnhancedSignUpPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    let processedValue = type === 'checkbox' ? checked : value;
+    let processedValue = type === "checkbox" ? checked : value;
 
-    if (name === 'email') {
+    if (name === "email") {
       processedValue = value.toLowerCase();
     }
 
-    if (name.startsWith('bankDetails.')) {
-      const fieldName = name.split('.')[1];
+    if (name.startsWith("bankDetails.")) {
+      const fieldName = name.split(".")[1];
       setFormData((prev) => ({
         ...prev,
         bankDetails: { ...prev.bankDetails, [fieldName]: processedValue },
@@ -243,12 +247,49 @@ const EnhancedSignUpPage = () => {
       const response = await fetch(`${BASE_URL}/plans/all`);
       const data = await response.json();
       if (response.ok) {
-        setPlans(data);
+        // Handle different response structures
+        const plansArray = data.data || data || [];
+        console.log("Fetched plans:", plansArray);
+        setPlans(Array.isArray(plansArray) ? plansArray : []);
       } else {
-        throw new Error(data.message || 'Failed to fetch plans');
+        throw new Error(data.message || "Failed to fetch plans");
       }
     } catch (err) {
-      console.error('Error fetching plans:', err);
+      console.error("Error fetching plans:", err);
+      // Set default plans if API fails
+      const defaultPlans = [
+        {
+          _id: "free",
+          name: "Free Plan",
+          price: "₹0/month",
+          durationInMonths: 1,
+          features: [
+            "Basic garage management",
+            "Up to 5 vehicles",
+            "Basic reporting",
+          ],
+        },
+        {
+          _id: "basic",
+          name: "Basic Plan",
+          price: "₹999/month",
+          durationInMonths: 1,
+          features: ["Basic features", "Up to 50 vehicles", "Email support"],
+        },
+        {
+          _id: "premium",
+          name: "Premium Plan",
+          price: "₹1999/3 months",
+          durationInMonths: 3,
+          features: [
+            "Advanced features",
+            "Unlimited vehicles",
+            "Priority support",
+            "Analytics",
+          ],
+        },
+      ];
+      setPlans(defaultPlans);
     } finally {
       setFetchingPlans(false);
     }
@@ -261,7 +302,7 @@ const EnhancedSignUpPage = () => {
   // --- Location Access ---
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      showSnackbar('Geolocation is not supported by your browser.', 'error');
+      showSnackbar("Geolocation is not supported by your browser.", "error");
       return;
     }
 
@@ -271,14 +312,16 @@ const EnhancedSignUpPage = () => {
         const { latitude, longitude } = position.coords;
         setFormData((prev) => ({
           ...prev,
-          address: `${prev.address} (Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)})`,
+          address: `${prev.address} (Lat: ${latitude.toFixed(
+            6
+          )}, Lng: ${longitude.toFixed(6)})`,
         }));
         setLocationLoading(false);
-        showSnackbar('Location retrieved successfully!', 'success');
+        showSnackbar("Location retrieved successfully!", "success");
       },
       (error) => {
         setLocationLoading(false);
-        showSnackbar('Unable to retrieve your location.', 'error');
+        showSnackbar("Unable to retrieve your location.", "error");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -287,15 +330,19 @@ const EnhancedSignUpPage = () => {
   // --- Form Validation ---
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Garage Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) newErrors.phone = 'Phone number must be 10 digits';
+    if (!formData.name.trim()) newErrors.name = "Garage Name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = "Email is invalid";
+    if (!formData.password) newErrors.password = "Password is required";
+    else if (formData.password.length < 6)
+      newErrors.password = "Password must be at least 6 characters";
+    if (formData.password !== formData.confirmPassword)
+      newErrors.confirmPassword = "Passwords do not match";
+    if (!formData.address.trim()) newErrors.address = "Address is required";
+    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
+    else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, "")))
+      newErrors.phone = "Phone number must be 10 digits";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -306,10 +353,18 @@ const EnhancedSignUpPage = () => {
       if (validateForm()) {
         setActiveStep(1);
       } else {
-        showSnackbar('Please fix the errors in the form before continuing.', 'error');
+        showSnackbar(
+          "Please fix the errors in the form before continuing.",
+          "error"
+        );
       }
     } else if (activeStep === 1) {
-      const taxField = formData.taxType === 'gst' ? 'gstNum' : formData.taxType === 'pan' ? 'panNum' : null;
+      const taxField =
+        formData.taxType === "gst"
+          ? "gstNum"
+          : formData.taxType === "pan"
+          ? "panNum"
+          : null;
       let isValid = true;
       let newErrors = { ...errors };
 
@@ -324,12 +379,12 @@ const EnhancedSignUpPage = () => {
         }
       } else {
         isValid = false;
-        newErrors.taxType = 'Please select a tax type';
+        newErrors.taxType = "Please select a tax type";
       }
 
       setErrors(newErrors);
       if (isValid) setActiveStep(2);
-      else showSnackbar('Please complete tax details.', 'error');
+      else showSnackbar("Please complete tax details.", "error");
     } else if (activeStep === 2) {
       setActiveStep(3);
     } else if (activeStep === 3) {
@@ -339,23 +394,27 @@ const EnhancedSignUpPage = () => {
 
       if (bd.accountHolderName || bd.accountNumber || bd.ifscCode) {
         if (bd.accountHolderName && !bd.accountNumber) {
-          newErrors['bankDetails.accountNumber'] = 'Account number is required when account holder name is provided';
+          newErrors["bankDetails.accountNumber"] =
+            "Account number is required when account holder name is provided";
           isValid = false;
         }
         if (bd.accountNumber && !bd.accountHolderName) {
-          newErrors['bankDetails.accountHolderName'] = 'Account holder name is required when account number is provided';
+          newErrors["bankDetails.accountHolderName"] =
+            "Account holder name is required when account number is provided";
           isValid = false;
         }
         if (bd.accountNumber && !bd.ifscCode) {
-          newErrors['bankDetails.ifscCode'] = 'IFSC code is required when account number is provided';
+          newErrors["bankDetails.ifscCode"] =
+            "IFSC code is required when account number is provided";
           isValid = false;
         }
         if (bd.ifscCode && !bd.accountNumber) {
-          newErrors['bankDetails.accountNumber'] = 'Account number is required when IFSC code is provided';
+          newErrors["bankDetails.accountNumber"] =
+            "Account number is required when IFSC code is provided";
           isValid = false;
         }
         if (bd.ifscCode && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bd.ifscCode)) {
-          newErrors['bankDetails.ifscCode'] = 'Invalid IFSC code format';
+          newErrors["bankDetails.ifscCode"] = "Invalid IFSC code format";
           isValid = false;
         }
       }
@@ -364,7 +423,10 @@ const EnhancedSignUpPage = () => {
       if (isValid) {
         setActiveStep(4);
       } else {
-        showSnackbar('Please fix the errors in the bank details or leave them blank to skip.', 'error');
+        showSnackbar(
+          "Please fix the errors in the bank details or leave them blank to skip.",
+          "error"
+        );
       }
     } else if (activeStep === 4) {
       setActiveStep(5);
@@ -381,17 +443,26 @@ const EnhancedSignUpPage = () => {
     }
   };
 
-  const showSnackbar = (message, severity = 'success') => {
+  const showSnackbar = (message, severity = "success") => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const renderBasicInfo = () => (
     <Fade in={true}>
       <Box>
-        <Typography variant="h5" fontWeight={600} textAlign="center" gutterBottom>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          textAlign="center"
+          gutterBottom
+        >
           Basic Garage Information
         </Typography>
         <Grid container spacing={3}>
@@ -411,7 +482,7 @@ const EnhancedSignUpPage = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
           <Grid item xs={12}>
@@ -431,7 +502,7 @@ const EnhancedSignUpPage = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -450,7 +521,7 @@ const EnhancedSignUpPage = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -458,7 +529,7 @@ const EnhancedSignUpPage = () => {
               fullWidth
               label="Password"
               name="password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleChange}
               error={!!errors.password}
@@ -471,13 +542,16 @@ const EnhancedSignUpPage = () => {
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -497,7 +571,7 @@ const EnhancedSignUpPage = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
           <Grid item xs={12}>
@@ -513,26 +587,38 @@ const EnhancedSignUpPage = () => {
               helperText={errors.address}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1 }}>
+                  <InputAdornment
+                    position="start"
+                    sx={{ alignSelf: "flex-start", mt: 1 }}
+                  >
                     <LocationOn color="action" />
                   </InputAdornment>
                 ),
                 endAdornment: (
-                  <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
+                  <InputAdornment
+                    position="end"
+                    sx={{ alignSelf: "flex-start", mt: 1 }}
+                  >
                     <Button
                       variant="outlined"
                       size="small"
                       onClick={getCurrentLocation}
                       disabled={locationLoading}
-                      startIcon={locationLoading ? <CircularProgress size={16} /> : <MyLocation />}
-                      sx={{ borderRadius: 2, minWidth: 'auto', px: 2 }}
+                      startIcon={
+                        locationLoading ? (
+                          <CircularProgress size={16} />
+                        ) : (
+                          <MyLocation />
+                        )
+                      }
+                      sx={{ borderRadius: 2, minWidth: "auto", px: 2 }}
                     >
-                      {locationLoading ? 'Getting...' : 'Get Location'}
+                      {locationLoading ? "Getting..." : "Get Location"}
                     </Button>
                   </InputAdornment>
                 ),
               }}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
             />
           </Grid>
         </Grid>
@@ -543,7 +629,12 @@ const EnhancedSignUpPage = () => {
   const renderTaxBusinessDetails = () => (
     <Fade in={true}>
       <Box>
-        <Typography variant="h5" fontWeight={600} textAlign="center" gutterBottom>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          textAlign="center"
+          gutterBottom
+        >
           Tax & Business Details
         </Typography>
         <FormControl component="fieldset" sx={{ mb: 3 }}>
@@ -552,7 +643,9 @@ const EnhancedSignUpPage = () => {
             row
             name="taxType"
             value={formData.taxType}
-            onChange={(e) => setFormData({ ...formData, taxType: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, taxType: e.target.value })
+            }
           >
             <FormControlLabel value="gst" control={<Radio />} label="GST" />
             <FormControlLabel value="pan" control={<Radio />} label="PAN" />
@@ -560,7 +653,7 @@ const EnhancedSignUpPage = () => {
         </FormControl>
 
         <Grid container spacing={3}>
-          {formData.taxType === 'gst' && (
+          {formData.taxType === "gst" && (
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -569,7 +662,7 @@ const EnhancedSignUpPage = () => {
                 value={formData.gstNum}
                 onChange={handleChange}
                 error={!!errors.gstNum}
-                helperText={errors.gstNum || 'Format: 27AABCCDDEEFFGZG'}
+                helperText={errors.gstNum || "Format: 27AABCCDDEEFFGZG"}
                 placeholder="27AABCCDDEEFFGZG"
                 InputProps={{
                   startAdornment: (
@@ -578,11 +671,11 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
           )}
-          {formData.taxType === 'pan' && (
+          {formData.taxType === "pan" && (
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -591,7 +684,7 @@ const EnhancedSignUpPage = () => {
                 value={formData.panNum}
                 onChange={handleChange}
                 error={!!errors.panNum}
-                helperText={errors.panNum || 'Format: ABCDE1234F'}
+                helperText={errors.panNum || "Format: ABCDE1234F"}
                 placeholder="ABCDE1234F"
                 InputProps={{
                   startAdornment: (
@@ -600,7 +693,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
           )}
@@ -612,10 +705,20 @@ const EnhancedSignUpPage = () => {
   const renderPlanSelection = () => (
     <Fade in={true}>
       <Box>
-        <Typography variant="h5" fontWeight={600} textAlign="center" gutterBottom>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          textAlign="center"
+          gutterBottom
+        >
           Choose Your Plan
         </Typography>
-        <Typography variant="body1" color="text.secondary" textAlign="center" paragraph>
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          textAlign="center"
+          paragraph
+        >
           Select a plan that fits your garage business needs.
         </Typography>
 
@@ -635,16 +738,24 @@ const EnhancedSignUpPage = () => {
                   <Card
                     sx={{
                       borderRadius: 2,
-                      border: formData.isFreePlan && plan.name === 'Free Plan' ? '2px solid' : '1px solid',
+                      border:
+                        formData.isFreePlan && plan.name === "Free Plan"
+                          ? "2px solid"
+                          : "1px solid",
                       borderColor:
-                        formData.isFreePlan && plan.name === 'Free Plan' ? 'primary.main' : 'divider',
-                      '&:hover': { transform: 'scale(1.03)', transition: '0.3s' },
-                      cursor: 'pointer',
+                        formData.isFreePlan && plan.name === "Free Plan"
+                          ? "primary.main"
+                          : "divider",
+                      "&:hover": {
+                        transform: "scale(1.03)",
+                        transition: "0.3s",
+                      },
+                      cursor: "pointer",
                     }}
                     onClick={() =>
                       setFormData((prev) => ({
                         ...prev,
-                        isFreePlan: plan.name === 'Free Plan',
+                        isFreePlan: plan.name === "Free Plan",
                         durationInMonths: plan.durationInMonths,
                       }))
                     }
@@ -662,7 +773,11 @@ const EnhancedSignUpPage = () => {
                       <List dense>
                         {plan.features?.map((feature, i) => (
                           <ListItem key={i} sx={{ py: 0.5 }}>
-                            <CheckCircle fontSize="small" color="success" sx={{ mr: 1 }} />
+                            <CheckCircle
+                              fontSize="small"
+                              color="success"
+                              sx={{ mr: 1 }}
+                            />
                             <ListItemText primary={feature} />
                           </ListItem>
                         ))}
@@ -681,7 +796,12 @@ const EnhancedSignUpPage = () => {
   const renderBankDetails = () => (
     <Fade in={true}>
       <Box>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={3}
+        >
           <Typography variant="h5" fontWeight={600}>
             Bank Details (Optional)
           </Typography>
@@ -692,7 +812,7 @@ const EnhancedSignUpPage = () => {
             startIcon={<Payment />}
             sx={{ borderRadius: 2 }}
           >
-            {showBankDetails ? 'Hide' : 'Add Bank Details'}
+            {showBankDetails ? "Hide" : "Add Bank Details"}
           </Button>
         </Box>
 
@@ -705,8 +825,8 @@ const EnhancedSignUpPage = () => {
                 name="bankDetails.accountHolderName"
                 value={formData.bankDetails.accountHolderName}
                 onChange={handleChange}
-                error={!!errors['bankDetails.accountHolderName']}
-                helperText={errors['bankDetails.accountHolderName']}
+                error={!!errors["bankDetails.accountHolderName"]}
+                helperText={errors["bankDetails.accountHolderName"]}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -714,7 +834,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -724,8 +844,8 @@ const EnhancedSignUpPage = () => {
                 name="bankDetails.accountNumber"
                 value={formData.bankDetails.accountNumber}
                 onChange={handleChange}
-                error={!!errors['bankDetails.accountNumber']}
-                helperText={errors['bankDetails.accountNumber']}
+                error={!!errors["bankDetails.accountNumber"]}
+                helperText={errors["bankDetails.accountNumber"]}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -733,7 +853,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -743,8 +863,10 @@ const EnhancedSignUpPage = () => {
                 name="bankDetails.ifscCode"
                 value={formData.bankDetails.ifscCode}
                 onChange={handleChange}
-                error={!!errors['bankDetails.ifscCode']}
-                helperText={errors['bankDetails.ifscCode'] || 'Format: ABCD0123456'}
+                error={!!errors["bankDetails.ifscCode"]}
+                helperText={
+                  errors["bankDetails.ifscCode"] || "Format: ABCD0123456"
+                }
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -752,7 +874,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -769,7 +891,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -786,7 +908,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -804,7 +926,7 @@ const EnhancedSignUpPage = () => {
                     </InputAdornment>
                   ),
                 }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
             </Grid>
           </Grid>
@@ -816,7 +938,7 @@ const EnhancedSignUpPage = () => {
   const renderFinalStep = () => (
     <Fade in={true}>
       <Box textAlign="center">
-        <CheckCircle sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+        <CheckCircle sx={{ fontSize: 80, color: "success.main", mb: 2 }} />
         <Typography variant="h5" fontWeight={600} gutterBottom>
           Ready to Create Your Account
         </Typography>
@@ -828,7 +950,14 @@ const EnhancedSignUpPage = () => {
           color="primary"
           size="large"
           onClick={handleContinue}
-          sx={{ px: 4, py: 1.5, borderRadius: 3, fontSize: '1.1rem', fontWeight: 600, boxShadow: 3 }}
+          sx={{
+            px: 4,
+            py: 1.5,
+            borderRadius: 3,
+            fontSize: "1.1rem",
+            fontWeight: 600,
+            boxShadow: 3,
+          }}
         >
           Create Account
         </Button>
@@ -839,7 +968,7 @@ const EnhancedSignUpPage = () => {
   const renderVerifyEmail = () => (
     <Fade in={true}>
       <Box textAlign="center">
-        <Security sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
+        <Security sx={{ fontSize: 80, color: "primary.main", mb: 2 }} />
         <Typography variant="h5" fontWeight={600} gutterBottom>
           Verify Your Email
         </Typography>
@@ -849,7 +978,10 @@ const EnhancedSignUpPage = () => {
         {garageRegistered && (
           <Box mb={3}>
             <Alert severity="success" sx={{ borderRadius: 2 }}>
-              <Typography variant="body2">Registration successful! Please verify your email to complete the process.</Typography>
+              <Typography variant="body2">
+                Registration successful! Please verify your email to complete
+                the process.
+              </Typography>
             </Alert>
           </Box>
         )}
@@ -862,14 +994,25 @@ const EnhancedSignUpPage = () => {
             onChange={handleChange}
             error={!!errors.otp}
             helperText={errors.otp}
-            sx={{ maxWidth: 300, mx: 'auto', '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            sx={{
+              maxWidth: 300,
+              mx: "auto",
+              "& .MuiOutlinedInput-root": { borderRadius: 2 },
+            }}
           />
         </Box>
         <Button
           variant="contained"
           color="primary"
           onClick={() => setOtpVerified(true)}
-          sx={{ px: 4, py: 1.5, borderRadius: 3, fontSize: '1.1rem', fontWeight: 600, boxShadow: 3 }}
+          sx={{
+            px: 4,
+            py: 1.5,
+            borderRadius: 3,
+            fontSize: "1.1rem",
+            fontWeight: 600,
+            boxShadow: 3,
+          }}
         >
           Verify Code
         </Button>
@@ -880,7 +1023,7 @@ const EnhancedSignUpPage = () => {
   const renderStatus = () => (
     <Fade in={true}>
       <Box textAlign="center">
-        <Done sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+        <Done sx={{ fontSize: 80, color: "success.main", mb: 2 }} />
         <Typography variant="h5" fontWeight={600} gutterBottom>
           Registration Complete!
         </Typography>
@@ -890,8 +1033,15 @@ const EnhancedSignUpPage = () => {
         <Button
           variant="contained"
           color="primary"
-          onClick={() => navigate('/login')}
-          sx={{ px: 4, py: 1.5, borderRadius: 3, fontSize: '1.1rem', fontWeight: 600, boxShadow: 3 }}
+          onClick={() => navigate("/login")}
+          sx={{
+            px: 4,
+            py: 1.5,
+            borderRadius: 3,
+            fontSize: "1.1rem",
+            fontWeight: 600,
+            boxShadow: 3,
+          }}
         >
           Go to Login
         </Button>
@@ -901,24 +1051,32 @@ const EnhancedSignUpPage = () => {
 
   const getStepContent = (step) => {
     switch (step) {
-      case 0: return renderBasicInfo();
-      case 1: return renderTaxBusinessDetails();
-      case 2: return renderPlanSelection();
-      case 3: return renderBankDetails();
-      case 4: return renderFinalStep();
-      case 5: return renderVerifyEmail();
-      case 6: return renderStatus();
-      default: return null;
+      case 0:
+        return renderBasicInfo();
+      case 1:
+        return renderTaxBusinessDetails();
+      case 2:
+        return renderPlanSelection();
+      case 3:
+        return renderBankDetails();
+      case 4:
+        return renderFinalStep();
+      case 5:
+        return renderVerifyEmail();
+      case 6:
+        return renderStatus();
+      default:
+        return null;
     }
   };
 
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: "100vh",
         background: darkMode
-          ? 'linear-gradient(135deg, #121212 0%, #1e1e1e 100%)'
-          : 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+          ? "linear-gradient(135deg, #121212 0%, #1e1e1e 100%)"
+          : "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
         py: 6,
         px: 2,
       }}
@@ -928,17 +1086,17 @@ const EnhancedSignUpPage = () => {
           elevation={8}
           sx={{
             borderRadius: 4,
-            overflow: 'hidden',
+            overflow: "hidden",
             bgcolor: theme.palette.background.paper,
             color: theme.palette.text.primary,
           }}
         >
           <Box
             sx={{
-              background: 'linear-gradient(45deg, #1976d2, #0d47a1)',
-              color: 'white',
+              background: "linear-gradient(45deg, #1976d2, #0d47a1)",
+              color: "white",
               p: 4,
-              textAlign: 'center',
+              textAlign: "center",
             }}
           >
             <Typography variant="h4" fontWeight="bold">
@@ -966,7 +1124,12 @@ const EnhancedSignUpPage = () => {
 
             {getStepContent(activeStep)}
 
-            <Box mt={4} display="flex" justifyContent="space-between" alignItems="center">
+            <Box
+              mt={4}
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+            >
               {activeStep > 0 && activeStep < 6 && (
                 <Button
                   onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
@@ -997,20 +1160,23 @@ const EnhancedSignUpPage = () => {
                         !!errors.password ||
                         !!errors.confirmPassword)) ||
                     (activeStep === 1 &&
-                      ((formData.taxType === 'gst' && (!formData.gstNum.trim() || !!errors.gstNum)) ||
-                        (formData.taxType === 'pan' && (!formData.panNum.trim() || !!errors.panNum)) ||
-                        (formData.taxType !== 'gst' && formData.taxType !== 'pan')))
+                      ((formData.taxType === "gst" &&
+                        (!formData.gstNum.trim() || !!errors.gstNum)) ||
+                        (formData.taxType === "pan" &&
+                          (!formData.panNum.trim() || !!errors.panNum)) ||
+                        (formData.taxType !== "gst" &&
+                          formData.taxType !== "pan")))
                   }
                   sx={{
                     px: 4,
                     py: 1.5,
                     borderRadius: 3,
-                    fontSize: '1.1rem',
+                    fontSize: "1.1rem",
                     fontWeight: 600,
                     boxShadow: 3,
                   }}
                 >
-                  {activeStep === 5 ? 'Verify' : 'Continue'}
+                  {activeStep === 5 ? "Verify" : "Continue"}
                 </Button>
               )}
             </Box>
@@ -1018,20 +1184,20 @@ const EnhancedSignUpPage = () => {
             {/* Renew Plan Link */}
             <Box mt={4} textAlign="center">
               <Typography variant="body2" color="text.secondary">
-                Already have an account?{' '}
+                Already have an account?{" "}
                 <Button
                   component="span"
                   color="primary"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate("/login")}
                   sx={{ fontWeight: 600, mx: 0.5 }}
                 >
                   Sign In
                 </Button>
-                {' | '}
+                {" | "}
                 <Button
                   component="span"
                   color="secondary"
-                  onClick={() => navigate('/renew')}
+                  onClick={() => navigate("/renew")}
                   sx={{ fontWeight: 600, mx: 0.5 }}
                 >
                   Renew Plan
@@ -1046,7 +1212,7 @@ const EnhancedSignUpPage = () => {
         open={snackbar.open}
         autoHideDuration={5000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
           {snackbar.message}
