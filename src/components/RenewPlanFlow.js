@@ -266,7 +266,7 @@ const RenewPlanFlow = () => {
     setOpenSnackbar(false);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (activeStep === 0 && !garageData.garageId) {
       showSnackbar("Please provide valid garage details", "warning");
       return;
@@ -274,6 +274,12 @@ const RenewPlanFlow = () => {
 
     if (activeStep === 1 && !selectedPlan) {
       showSnackbar("Please select a plan to continue", "warning");
+      return;
+    }
+
+    // If moving to payment step (step 2), trigger payment process
+    if (activeStep === 1) {
+      await handlePayment();
       return;
     }
 
@@ -323,6 +329,11 @@ const RenewPlanFlow = () => {
 
   const processPayment = async () => {
     try {
+      console.log("=== Starting Payment Process ===");
+      console.log("Garage ID:", garageData.garageId);
+      console.log("Selected Plan:", selectedPlan);
+      console.log("Current step:", activeStep);
+
       setLoading(true);
       setPaymentStatus("processing");
 
@@ -725,6 +736,31 @@ const RenewPlanFlow = () => {
                   plan.
                 </Typography>
                 <CircularProgress />
+
+                {/* Debug buttons */}
+                <Box mt={3} display="flex" gap={2} justifyContent="center">
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      console.log("Current payment status:", paymentStatus);
+                      console.log("Current step:", activeStep);
+                      console.log("Selected plan:", selectedPlan);
+                    }}
+                  >
+                    Debug Status
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => {
+                      setPaymentStatus("pending");
+                      setLoading(false);
+                      setActiveStep(2);
+                    }}
+                  >
+                    Reset Payment
+                  </Button>
+                </Box>
               </Box>
             )}
           </Box>

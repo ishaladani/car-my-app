@@ -437,6 +437,7 @@ const EnhancedSignUpPage = () => {
       console.log("=== Starting Registration Process ===");
       console.log("Form data:", formData);
       console.log("Selected plan:", formData.selectedPlan);
+      console.log("Current step:", activeStep);
 
       // Check if a plan is selected
       if (!formData.selectedPlan) {
