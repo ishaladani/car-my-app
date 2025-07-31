@@ -198,26 +198,37 @@ const RenewPlanPage = () => {
   };
 
   const handleSelectPlan = (plan) => {
+    console.log("=== handleSelectPlan called ===");
+    console.log("Selected plan:", plan);
     setSelectedPlan(plan);
     setOpenPlanDialog(false);
+    console.log("Plan selected and dialog closed");
   };
 
   const handleRenewPlan = async () => {
+    console.log("=== handleRenewPlan called ===");
+    console.log("Selected plan:", selectedPlan);
+    console.log("Garage data:", garageData);
+
     if (!selectedPlan) {
+      console.log("No plan selected");
       showSnackbar("Please select a plan to renew.", "warning");
       return;
     }
 
     if (!garageData.garageId) {
+      console.log("No garage ID found");
       showSnackbar("Garage ID not found. Please login again.", "error");
       navigate("/login");
       return;
     }
 
+    console.log("Starting payment process...");
     await handleRazorpayPayment();
   };
 
   const handleRazorpayPayment = async () => {
+    console.log("=== handleRazorpayPayment called ===");
     try {
       setLoading(true);
 
@@ -493,6 +504,47 @@ const RenewPlanPage = () => {
     navigate("/login");
   };
 
+  // Test function to manually trigger Razorpay
+  const testRazorpay = () => {
+    console.log("=== Testing Razorpay manually ===");
+    console.log("Razorpay available:", !!window.Razorpay);
+
+    if (window.Razorpay) {
+      const options = {
+        key: RAZORPAY_KEY_ID,
+        amount: 99900, // ₹999 in paise
+        currency: "INR",
+        name: "Garage Management",
+        description: "Test Payment",
+        order_id: "test_order_" + Date.now(),
+        handler: function (response) {
+          console.log("Test payment successful:", response);
+          alert("Test payment successful!");
+        },
+        prefill: {
+          name: garageData.garageName,
+          email: garageData.garageEmail,
+        },
+        theme: {
+          color: "#1976d2",
+        },
+      };
+
+      try {
+        const rzp = new window.Razorpay(options);
+        console.log("Test Razorpay instance created");
+        rzp.open();
+        console.log("Test Razorpay popup opened");
+      } catch (error) {
+        console.error("Test Razorpay error:", error);
+        alert("Test Razorpay error: " + error.message);
+      }
+    } else {
+      console.error("Razorpay not available for test");
+      alert("Razorpay not available for test");
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 5 }}>
       <Box
@@ -618,7 +670,7 @@ const RenewPlanPage = () => {
 
         {/* Action Buttons */}
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Button
               fullWidth
               variant="outlined"
@@ -629,17 +681,39 @@ const RenewPlanPage = () => {
               Back to Login
             </Button>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Button
               fullWidth
               variant="contained"
               size="large"
               disabled={loading || !selectedPlan || fetchingPlans}
               startIcon={<CreditCard />}
-              onClick={handleRenewPlan}
+              onClick={() => {
+                console.log("=== Button clicked ===");
+                console.log(
+                  "Button disabled:",
+                  loading || !selectedPlan || fetchingPlans
+                );
+                console.log("Loading:", loading);
+                console.log("Selected plan:", selectedPlan);
+                console.log("Fetching plans:", fetchingPlans);
+                handleRenewPlan();
+              }}
               sx={{ py: 1.5 }}
             >
               {loading ? "Processing..." : `Pay ${selectedPlan?.price} & Renew`}
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Button
+              fullWidth
+              variant="outlined"
+              color="secondary"
+              size="large"
+              onClick={testRazorpay}
+              sx={{ py: 1.5 }}
+            >
+              Test Razorpay
             </Button>
           </Grid>
         </Grid>
