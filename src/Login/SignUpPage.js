@@ -348,7 +348,7 @@ const EnhancedSignUpPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (activeStep === 0) {
       if (validateForm()) {
         setActiveStep(1);
@@ -429,9 +429,103 @@ const EnhancedSignUpPage = () => {
         );
       }
     } else if (activeStep === 4) {
-      setActiveStep(5);
+      // Step 4: Complete Registration - Send OTP
+      console.log("=== Starting Registration Process ===");
+      console.log("Form data:", formData);
+
+      setLoading(true);
+      try {
+        // Prepare registration data
+        const registrationData = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          address: formData.address,
+          gstNum: formData.gstNum,
+          panNum: formData.panNum,
+          taxType: formData.taxType,
+          durationInMonths: formData.durationInMonths,
+          isFreePlan: formData.isFreePlan,
+          bankDetails: formData.bankDetails,
+        };
+
+        console.log("Sending registration data:", registrationData);
+
+        // Call registration API
+        const response = await fetch(`${BASE_URL}/garage/signup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(registrationData),
+        });
+
+        const data = await response.json();
+        console.log("Registration response:", data);
+
+        if (response.ok) {
+          showSnackbar(
+            "Registration successful! Please check your email for OTP.",
+            "success"
+          );
+          setActiveStep(5);
+        } else {
+          throw new Error(data.message || "Registration failed");
+        }
+      } catch (error) {
+        console.error("Registration error:", error);
+        showSnackbar(
+          error.message || "Registration failed. Please try again.",
+          "error"
+        );
+      } finally {
+        setLoading(false);
+      }
     } else if (activeStep === 5) {
-      setActiveStep(6);
+      // Step 5: Verify OTP
+      if (!formData.otp || formData.otp.length < 4) {
+        showSnackbar("Please enter a valid OTP.", "error");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        console.log("=== Verifying OTP ===");
+        console.log("OTP:", formData.otp);
+
+        const response = await fetch(`${BASE_URL}/garage/verify-otp`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            otp: formData.otp,
+          }),
+        });
+
+        const data = await response.json();
+        console.log("OTP verification response:", data);
+
+        if (response.ok) {
+          showSnackbar(
+            "Email verified successfully! Your account is now active.",
+            "success"
+          );
+          setActiveStep(6);
+        } else {
+          throw new Error(data.message || "OTP verification failed");
+        }
+      } catch (error) {
+        console.error("OTP verification error:", error);
+        showSnackbar(
+          error.message || "OTP verification failed. Please try again.",
+          "error"
+        );
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -453,6 +547,44 @@ const EnhancedSignUpPage = () => {
     severity: "success",
   });
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
+
+  // Resend OTP function
+  const handleResendOTP = async () => {
+    setLoading(true);
+    try {
+      console.log("=== Resending OTP ===");
+
+      const response = await fetch(`${BASE_URL}/garage/resend-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Resend OTP response:", data);
+
+      if (response.ok) {
+        showSnackbar(
+          "OTP resent successfully! Please check your email.",
+          "success"
+        );
+      } else {
+        throw new Error(data.message || "Failed to resend OTP");
+      }
+    } catch (error) {
+      console.error("Resend OTP error:", error);
+      showSnackbar(
+        error.message || "Failed to resend OTP. Please try again.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderBasicInfo = () => (
     <Fade in={true}>
@@ -1001,21 +1133,40 @@ const EnhancedSignUpPage = () => {
             }}
           />
         </Box>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => setOtpVerified(true)}
-          sx={{
-            px: 4,
-            py: 1.5,
-            borderRadius: 3,
-            fontSize: "1.1rem",
-            fontWeight: 600,
-            boxShadow: 3,
-          }}
-        >
-          Verify Code
-        </Button>
+        <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleContinue}
+            disabled={loading}
+            sx={{
+              px: 4,
+              py: 1.5,
+              borderRadius: 3,
+              fontSize: "1.1rem",
+              fontWeight: 600,
+              boxShadow: 3,
+            }}
+          >
+            {loading ? "Verifying..." : "Verify Code"}
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={handleResendOTP}
+            disabled={loading}
+            sx={{
+              px: 4,
+              py: 1.5,
+              borderRadius: 3,
+              fontSize: "1.1rem",
+              fontWeight: 600,
+            }}
+          >
+            {loading ? "Sending..." : "Resend OTP"}
+          </Button>
+        </Box>
       </Box>
     </Fade>
   );
