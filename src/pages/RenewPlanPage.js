@@ -978,93 +978,112 @@ const RenewPlanPage = () => {
         )}
 
         {/* Action Buttons */}
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={3}>
-            <Button
-              fullWidth
-              variant="outlined"
-              size="large"
-              onClick={handleBackToLogin}
-              sx={{ py: 1.5 }}
-            >
-              Back to Login
-            </Button>
+        <Box
+          sx={{
+            mt: 4,
+            p: 3,
+            border: "2px solid #1976d2",
+            borderRadius: 2,
+            bgcolor: "#f5f5f5",
+          }}
+        >
+          <Typography variant="h6" fontWeight="bold" mb={2} textAlign="center">
+            🚀 ACTION BUTTONS - CLICK HERE! 🚀
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Button
+                fullWidth
+                variant="outlined"
+                size="large"
+                onClick={handleBackToLogin}
+                sx={{ py: 2, fontWeight: "bold", fontSize: "14px" }}
+              >
+                ← Back to Login
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                disabled={
+                  loading ||
+                  !selectedPlan ||
+                  fetchingPlans ||
+                  (selectedPlan &&
+                    (selectedPlan.amount === 0 ||
+                      selectedPlan.price === "₹0" ||
+                      selectedPlan.price === "₹0/month"))
+                }
+                startIcon={<CreditCard />}
+                onClick={() => {
+                  console.log("=== PAYMENT BUTTON CLICKED ===");
+                  console.log(
+                    "Button disabled:",
+                    loading || !selectedPlan || fetchingPlans
+                  );
+                  console.log("Loading:", loading);
+                  console.log("Selected plan:", selectedPlan);
+                  console.log("Fetching plans:", fetchingPlans);
+                  handleRenewPlan();
+                }}
+                sx={{
+                  py: 2,
+                  fontWeight: "bold",
+                  fontSize: "16px",
+                  bgcolor: "#1976d2",
+                  "&:hover": { bgcolor: "#1565c0" },
+                }}
+              >
+                {loading
+                  ? "⏳ Processing..."
+                  : selectedPlan &&
+                    (selectedPlan.amount === 0 ||
+                      selectedPlan.price === "₹0" ||
+                      selectedPlan.price === "₹0/month")
+                  ? "🆓 Free Plan - No Payment"
+                  : `💳 Pay ${selectedPlan?.price} & Renew`}
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="secondary"
+                size="large"
+                onClick={testRazorpay}
+                sx={{ py: 2, fontWeight: "bold", fontSize: "14px" }}
+              >
+                🧪 Test Razorpay
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="warning"
+                size="large"
+                onClick={retryLoadRazorpay}
+                sx={{ py: 2, fontWeight: "bold", fontSize: "14px" }}
+              >
+                🔄 Retry SDK Load
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="error"
+                size="large"
+                onClick={forceRazorpayPopup}
+                sx={{ py: 2, fontWeight: "bold", fontSize: "14px" }}
+              >
+                ⚡ Force Popup
+              </Button>
+            </Grid>
           </Grid>
-          <Grid item xs={12} sm={3}>
-            <Button
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={
-                loading ||
-                !selectedPlan ||
-                fetchingPlans ||
-                (selectedPlan &&
-                  (selectedPlan.amount === 0 ||
-                    selectedPlan.price === "₹0" ||
-                    selectedPlan.price === "₹0/month"))
-              }
-              startIcon={<CreditCard />}
-              onClick={() => {
-                console.log("=== Button clicked ===");
-                console.log(
-                  "Button disabled:",
-                  loading || !selectedPlan || fetchingPlans
-                );
-                console.log("Loading:", loading);
-                console.log("Selected plan:", selectedPlan);
-                console.log("Fetching plans:", fetchingPlans);
-                handleRenewPlan();
-              }}
-              sx={{ py: 1.5 }}
-            >
-              {loading
-                ? "Processing..."
-                : selectedPlan &&
-                  (selectedPlan.amount === 0 ||
-                    selectedPlan.price === "₹0" ||
-                    selectedPlan.price === "₹0/month")
-                ? "Free Plan - No Payment"
-                : `Pay ${selectedPlan?.price} & Renew`}
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Button
-              fullWidth
-              variant="outlined"
-              color="secondary"
-              size="large"
-              onClick={testRazorpay}
-              sx={{ py: 1.5 }}
-            >
-              Test Razorpay
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Button
-              fullWidth
-              variant="outlined"
-              color="warning"
-              size="large"
-              onClick={retryLoadRazorpay}
-              sx={{ py: 1.5 }}
-            >
-              Retry SDK Load
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Button
-              fullWidth
-              variant="outlined"
-              color="error"
-              size="large"
-              onClick={forceRazorpayPopup}
-              sx={{ py: 1.5 }}
-            >
-              Force Popup
-            </Button>
-          </Grid>
-        </Grid>
+        </Box>
       </Box>
 
       {/* Plan Selection Dialog */}
