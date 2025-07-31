@@ -38,7 +38,7 @@ const SubscriptionChecker = ({ children }) => {
       // If new endpoint doesn't exist, try the old endpoint
       if (!response.ok && response.status === 404) {
         response = await fetch(
-          `${getBaseApiUrl()}/api/garage/subscription-status/${garageId}`,
+          `${getBaseApiUrl()}/api/plans/subscription-status/${garageId}`,
           {
             method: "GET",
             headers: {
