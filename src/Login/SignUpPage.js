@@ -87,6 +87,7 @@ const EnhancedSignUpPage = () => {
     taxType: "gst",
     durationInMonths: 12,
     isFreePlan: true,
+    selectedPlan: null,
     bankDetails: {
       accountHolderName: "",
       accountNumber: "",
@@ -874,6 +875,24 @@ const EnhancedSignUpPage = () => {
         </Typography>
 
         {/* Debug: Show selected plan */}
+        <Box mb={3} p={2} bgcolor="info.light" borderRadius={2}>
+          <Typography variant="body2" color="info.dark">
+            🔍 Debug: {plans.length} plans loaded, selectedPlan:{" "}
+            {formData.selectedPlan ? formData.selectedPlan.name : "None"}
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => {
+              console.log("Current plans:", plans);
+              console.log("Current formData:", formData);
+            }}
+            sx={{ mt: 1 }}
+          >
+            Debug Plans
+          </Button>
+        </Box>
+
         {formData.selectedPlan && (
           <Box mb={3} p={2} bgcolor="success.light" borderRadius={2}>
             <Typography variant="body2" color="success.dark">
@@ -921,18 +940,23 @@ const EnhancedSignUpPage = () => {
                     onClick={() => {
                       console.log("=== Plan Selected ===");
                       console.log("Selected plan:", plan);
+                      console.log("Current formData:", formData);
 
                       const isFree =
                         plan.price === "Free" ||
                         plan.price === "₹0" ||
                         plan.price === "₹0/month";
 
-                      setFormData((prev) => ({
-                        ...prev,
+                      const updatedFormData = {
+                        ...formData,
                         isFreePlan: isFree,
                         durationInMonths: plan.durationInMonths,
                         selectedPlan: plan,
-                      }));
+                      };
+
+                      console.log("Updated formData:", updatedFormData);
+
+                      setFormData(updatedFormData);
 
                       showSnackbar(
                         `Plan "${plan.name}" selected successfully!`,
