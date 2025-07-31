@@ -18,7 +18,7 @@ import SetServiceReminder from "./pages/SetServiceReminder";
 import InsuranceManagement from "./pages/InsuranceManagement";
 import InventoryManagement from "./pages/InventoryManagement";
 import LoginPage from "./Login/LoginPage";
-import SignUpPage from "./Login/SignUpPage";
+import EnhancedSignUpPage from "./Login/SignUpPage";
 import ProtectedRoute from "./Login/ProtectedRoute";
 import BillingPage from "./pages/BillingPage";
 import UserManagement from "./pages/UserList";
@@ -37,7 +37,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup/:id" element={<SignUpPage />} />
+          <Route path="/signup" element={<EnhancedSignUpPage />} />
+          <Route path="/signup/:id" element={<EnhancedSignUpPage />} />
           <Route path="/renew-plan" element={<RenewPlanPage />} />
           <Route path="/renew-plan-flow" element={<RenewPlanFlow />} />
           <Route path="/" element={<AppLayout />}>
