@@ -33,6 +33,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import PaymentIcon from "@mui/icons-material/Payment";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import axios from "axios";
+import SubscriptionManager from "../components/SubscriptionManager";
 
 const Profile = () => {
   const [garageData, setGarageData] = useState({
@@ -50,8 +51,8 @@ const Profile = () => {
       ifscCode: "N/A",
       bankName: "N/A",
       branchName: "N/A",
-      upiId: "N/A"
-    }
+      upiId: "N/A",
+    },
   });
 
   const [editData, setEditData] = useState({});
@@ -117,8 +118,8 @@ const Profile = () => {
             ifscCode: data.bankDetails?.ifscCode || "N/A",
             bankName: data.bankDetails?.bankName || "N/A",
             branchName: data.bankDetails?.branchName || "N/A",
-            upiId: data.bankDetails?.upiId || "N/A"
-          }
+            upiId: data.bankDetails?.upiId || "N/A",
+          },
         };
 
         setGarageData(updatedData);
@@ -159,9 +160,9 @@ const Profile = () => {
   };
 
   const handleInputChange = (field, value) => {
-    if (field.includes('.')) {
+    if (field.includes(".")) {
       // Handle nested fields like bankDetails.accountHolderName
-      const [parent, child] = field.split('.');
+      const [parent, child] = field.split(".");
       setEditData((prev) => ({
         ...prev,
         [parent]: {
@@ -311,8 +312,8 @@ const Profile = () => {
           ifscCode: editData.bankDetails?.ifscCode || "",
           bankName: editData.bankDetails?.bankName || "",
           branchName: editData.bankDetails?.branchName || "",
-          upiId: editData.bankDetails?.upiId || ""
-        }
+          upiId: editData.bankDetails?.upiId || "",
+        },
       };
 
       updatePayload.logo = editData.image || "";
@@ -341,7 +342,10 @@ const Profile = () => {
       console.error("Error updating garage data:", error);
 
       if (error.response?.status === 413) {
-        showSnackbar("Payload too large. Please use a smaller image or reduce other data.", "error");
+        showSnackbar(
+          "Payload too large. Please use a smaller image or reduce other data.",
+          "error"
+        );
       } else if (error.response?.status === 400) {
         showSnackbar("Invalid data format. Please check your inputs.", "error");
       } else {
@@ -359,7 +363,11 @@ const Profile = () => {
     if (!accountNumber || accountNumber === "N/A") return accountNumber;
     const str = accountNumber.toString();
     if (str.length <= 4) return str;
-    return str.substring(0, 2) + "*".repeat(str.length - 4) + str.substring(str.length - 2);
+    return (
+      str.substring(0, 2) +
+      "*".repeat(str.length - 4) +
+      str.substring(str.length - 2)
+    );
   };
 
   if (loading) {
@@ -468,16 +476,24 @@ const Profile = () => {
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} mb={1}>
                       <PersonIcon color="action" />
-                      <Typography variant="subtitle2">Account Holder:</Typography>
+                      <Typography variant="subtitle2">
+                        Account Holder:
+                      </Typography>
                     </Box>
-                    <Typography>{garageData.bankDetails.accountHolderName}</Typography>
+                    <Typography>
+                      {garageData.bankDetails.accountHolderName}
+                    </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} mb={1}>
                       <PaymentIcon color="action" />
-                      <Typography variant="subtitle2">Account Number:</Typography>
+                      <Typography variant="subtitle2">
+                        Account Number:
+                      </Typography>
                     </Box>
-                    <Typography>{maskAccountNumber(garageData.bankDetails.accountNumber)}</Typography>
+                    <Typography>
+                      {maskAccountNumber(garageData.bankDetails.accountNumber)}
+                    </Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Box display="flex" alignItems="center" gap={1} mb={1}>
@@ -511,11 +527,25 @@ const Profile = () => {
               </AccordionDetails>
             </Accordion>
           </Box>
+
+          {/* Subscription Management */}
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              Subscription Management
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <SubscriptionManager />
+          </Box>
         </Box>
       </Paper>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleEditClose} maxWidth="lg" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleEditClose}
+        maxWidth="lg"
+        fullWidth
+      >
         <DialogTitle>Edit Garage Profile</DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
@@ -543,15 +573,28 @@ const Profile = () => {
                 onChange={handleImageUpload}
               />
               <label htmlFor="image-upload">
-                <Button variant="outlined" component="span" startIcon={<PhotoCameraIcon />} size="small">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<PhotoCameraIcon />}
+                  size="small"
+                >
                   Change Logo
                 </Button>
               </label>
-              <Typography variant="caption" display="block" sx={{ mt: 1, color: "text.secondary" }}>
+              <Typography
+                variant="caption"
+                display="block"
+                sx={{ mt: 1, color: "text.secondary" }}
+              >
                 Max 5MB, recommended 400x400px
               </Typography>
               {imageChanged && (
-                <Typography variant="caption" display="block" sx={{ mt: 1, color: "success.main" }}>
+                <Typography
+                  variant="caption"
+                  display="block"
+                  sx={{ mt: 1, color: "success.main" }}
+                >
                   ✓ New image selected
                 </Typography>
               )}
@@ -559,7 +602,9 @@ const Profile = () => {
 
             {/* Basic Information */}
             <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>Basic Information</Typography>
+              <Typography variant="h6" gutterBottom>
+                Basic Information
+              </Typography>
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
@@ -599,7 +644,9 @@ const Profile = () => {
                 fullWidth
                 label="GST Number"
                 value={editData.gstNum || ""}
-                onChange={(e) => handleInputChange("gstNum", e.target.value.toUpperCase())}
+                onChange={(e) =>
+                  handleInputChange("gstNum", e.target.value.toUpperCase())
+                }
                 variant="outlined"
                 placeholder="e.g., 27AAAPL1234C1Z5"
                 inputProps={{ maxLength: 15 }}
@@ -621,7 +668,9 @@ const Profile = () => {
 
             {/* Bank Details */}
             <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Bank Details</Typography>
+              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                Bank Details
+              </Typography>
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
@@ -630,7 +679,12 @@ const Profile = () => {
                 fullWidth
                 label="Account Holder Name"
                 value={editData.bankDetails?.accountHolderName || ""}
-                onChange={(e) => handleInputChange("bankDetails.accountHolderName", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "bankDetails.accountHolderName",
+                    e.target.value
+                  )
+                }
                 variant="outlined"
               />
             </Grid>
@@ -640,7 +694,9 @@ const Profile = () => {
                 fullWidth
                 label="Account Number"
                 value={editData.bankDetails?.accountNumber || ""}
-                onChange={(e) => handleInputChange("bankDetails.accountNumber", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("bankDetails.accountNumber", e.target.value)
+                }
                 variant="outlined"
               />
             </Grid>
@@ -650,7 +706,12 @@ const Profile = () => {
                 fullWidth
                 label="IFSC Code"
                 value={editData.bankDetails?.ifscCode || ""}
-                onChange={(e) => handleInputChange("bankDetails.ifscCode", e.target.value.toUpperCase())}
+                onChange={(e) =>
+                  handleInputChange(
+                    "bankDetails.ifscCode",
+                    e.target.value.toUpperCase()
+                  )
+                }
                 variant="outlined"
                 placeholder="e.g., SBIN0000123"
                 inputProps={{ maxLength: 11 }}
@@ -662,7 +723,9 @@ const Profile = () => {
                 fullWidth
                 label="Bank Name"
                 value={editData.bankDetails?.bankName || ""}
-                onChange={(e) => handleInputChange("bankDetails.bankName", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("bankDetails.bankName", e.target.value)
+                }
                 variant="outlined"
               />
             </Grid>
@@ -672,7 +735,9 @@ const Profile = () => {
                 fullWidth
                 label="Branch Name"
                 value={editData.bankDetails?.branchName || ""}
-                onChange={(e) => handleInputChange("bankDetails.branchName", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("bankDetails.branchName", e.target.value)
+                }
                 variant="outlined"
               />
             </Grid>
@@ -682,7 +747,9 @@ const Profile = () => {
                 fullWidth
                 label="UPI ID"
                 value={editData.bankDetails?.upiId || ""}
-                onChange={(e) => handleInputChange("bankDetails.upiId", e.target.value)}
+                onChange={(e) =>
+                  handleInputChange("bankDetails.upiId", e.target.value)
+                }
                 variant="outlined"
                 placeholder="e.g., user@paytm"
               />
@@ -690,23 +757,36 @@ const Profile = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleEditClose} startIcon={<CancelIcon />} disabled={updating}>
+          <Button
+            onClick={handleEditClose}
+            startIcon={<CancelIcon />}
+            disabled={updating}
+          >
             Cancel
           </Button>
-          <Button onClick={handleSaveChanges} variant="contained" startIcon={<SaveIcon />} disabled={updating}>
+          <Button
+            onClick={handleSaveChanges}
+            variant="contained"
+            startIcon={<SaveIcon />}
+            disabled={updating}
+          >
             {updating ? <CircularProgress size={20} /> : "Save Changes"}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
-        onClose={handleSnackbarClose} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
