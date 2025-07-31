@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Alert, Button, Typography } from "@mui/material";
 import { WarningAmber } from "@mui/icons-material";
+import { getBaseApiUrl } from "../config/api";
 
 const SubscriptionChecker = ({ children }) => {
   const [subscriptionStatus, setSubscriptionStatus] = useState("checking"); // checking, active, expired, error
@@ -23,7 +24,7 @@ const SubscriptionChecker = ({ children }) => {
       }
 
       const response = await fetch(
-        `https://garage-management-zi5z.onrender.com/api/garage/subscription-status/${garageId}`,
+        `${getBaseApiUrl()}/api/plans/subscription-status/${garageId}`,
         {
           method: "GET",
           headers: {

@@ -33,6 +33,7 @@ import {
   Refresh,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { getBaseApiUrl } from "../config/api";
 
 const SubscriptionManager = () => {
   const theme = useTheme();
@@ -57,7 +58,7 @@ const SubscriptionManager = () => {
       }
 
       const response = await fetch(
-        `https://garage-management-zi5z.onrender.com/api/garage/subscription-details/${garageId}`,
+        `${getBaseApiUrl()}/api/plans/subscription-details/${garageId}`,
         {
           method: "GET",
           headers: {

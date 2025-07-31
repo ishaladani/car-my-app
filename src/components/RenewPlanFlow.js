@@ -51,6 +51,7 @@ import {
   Storage,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
+import { getBaseApiUrl } from "../config/api";
 
 // Fixed Razorpay key configuration
 const RAZORPAY_KEY_ID =
@@ -144,15 +145,12 @@ const RenewPlanFlow = () => {
       try {
         setFetchingPlans(true);
 
-        const response = await fetch(
-          "https://garage-management-zi5z.onrender.com/api/admin/plan",
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const response = await fetch(`${getBaseApiUrl()}/api/plans/all`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -305,21 +303,18 @@ const RenewPlanFlow = () => {
         throw new Error("Razorpay key not configured. Please contact support.");
       }
 
-      // 1. Create Razorpay order
-      const orderResponse = await fetch(
-        "https://garage-management-zi5z.onrender.com/api/garage/payment/createorderforsignup",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            amount: selectedPlan.amount,
-            subscriptionType:
-              selectedPlan.subscriptionType || selectedPlan.name,
-          }),
-        }
-      );
+      // 1. Create renewal order
+      const orderResponse = await fetch(`${getBaseApiUrl()}/api/plans/renew`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          garageId: garageData.garageId,
+          planId: selectedPlan._id || selectedPlan.id,
+          paymentMethod: "razorpay",
+        }),
+      });
 
       if (!orderResponse.ok) {
         const errorData = await orderResponse.json().catch(() => ({}));
@@ -415,17 +410,16 @@ const RenewPlanFlow = () => {
       setPaymentStatus("processing");
 
       const requestBody = {
-        durationInMonths: selectedPlan.durationInMonths,
-        amount: selectedPlan.amount,
-        paymentDetails: {
-          paymentId: paymentDetails.razorpayPaymentId,
-          method: "upi",
-          status: "paid",
-        },
+        garageId: garageData.garageId,
+        planId: selectedPlan._id || selectedPlan.id,
+        orderId: paymentDetails.razorpayOrderId,
+        paymentId: paymentDetails.razorpayPaymentId,
+        signature: paymentDetails.razorpaySignature,
+        paymentMethod: "razorpay",
       };
 
       const response = await fetch(
-        `https://garage-management-zi5z.onrender.com/api/garage/renewplan/${garageData.garageId}`,
+        `${getBaseApiUrl()}/api/plans/complete-renewal`,
         {
           method: "POST",
           headers: {
