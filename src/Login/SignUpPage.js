@@ -433,6 +433,13 @@ const EnhancedSignUpPage = () => {
       // Step 4: Complete Registration - Send OTP
       console.log("=== Starting Registration Process ===");
       console.log("Form data:", formData);
+      console.log("Selected plan:", formData.selectedPlan);
+
+      // Check if a plan is selected
+      if (!formData.selectedPlan) {
+        showSnackbar("Please select a plan before continuing.", "error");
+        return;
+      }
 
       setLoading(true);
       try {
@@ -446,8 +453,12 @@ const EnhancedSignUpPage = () => {
           gstNum: formData.gstNum,
           panNum: formData.panNum,
           taxType: formData.taxType,
-          durationInMonths: formData.durationInMonths,
-          isFreePlan: formData.isFreePlan,
+          durationInMonths:
+            formData.selectedPlan?.durationInMonths ||
+            formData.durationInMonths,
+          isFreePlan:
+            formData.selectedPlan?.price === "Free" || formData.isFreePlan,
+          planDetails: formData.selectedPlan,
           bankDetails: formData.bankDetails,
         };
 
@@ -470,6 +481,7 @@ const EnhancedSignUpPage = () => {
             "Registration successful! Please check your email for OTP.",
             "success"
           );
+          setGarageRegistered(true);
           setActiveStep(5);
         } else {
           throw new Error(data.message || "Registration failed");
@@ -486,7 +498,13 @@ const EnhancedSignUpPage = () => {
     } else if (activeStep === 5) {
       // Step 5: Verify OTP
       if (!formData.otp || formData.otp.length < 4) {
-        showSnackbar("Please enter a valid OTP.", "error");
+        showSnackbar("Please enter a valid OTP (minimum 4 digits).", "error");
+        return;
+      }
+
+      // Validate OTP format (numbers only)
+      if (!/^\d+$/.test(formData.otp)) {
+        showSnackbar("OTP should contain only numbers.", "error");
         return;
       }
 
