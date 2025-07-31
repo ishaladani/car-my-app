@@ -575,18 +575,45 @@ const RenewPlanPage = () => {
 
         console.log("Opening Razorpay popup...");
 
-        // Add a small delay to ensure everything is ready
-        setTimeout(() => {
-          try {
-            rzp.open();
-            console.log("Razorpay popup opened successfully");
-          } catch (openError) {
-            console.error("Error opening Razorpay popup:", openError);
-            throw new Error(
-              `Failed to open Razorpay popup: ${openError.message}`
-            );
-          }
-        }, 500);
+        // Try to open immediately first
+        try {
+          console.log("Attempting to open Razorpay popup immediately...");
+          rzp.open();
+          console.log("Razorpay popup opened successfully");
+        } catch (immediateError) {
+          console.log(
+            "Immediate open failed, trying with delay:",
+            immediateError
+          );
+
+          // If immediate open fails, try with delay
+          setTimeout(() => {
+            try {
+              console.log("Attempting to open Razorpay popup with delay...");
+              rzp.open();
+              console.log("Razorpay popup opened successfully with delay");
+            } catch (openError) {
+              console.error("Error opening Razorpay popup:", openError);
+
+              // Try one more time with a different approach
+              setTimeout(() => {
+                try {
+                  console.log("Final attempt to open Razorpay popup...");
+                  const newRzp = new window.Razorpay(options);
+                  newRzp.open();
+                  console.log(
+                    "Razorpay popup opened successfully on final attempt"
+                  );
+                } catch (finalError) {
+                  console.error("Final attempt failed:", finalError);
+                  throw new Error(
+                    `Failed to open Razorpay popup: ${finalError.message}`
+                  );
+                }
+              }, 1000);
+            }
+          }, 500);
+        }
       } catch (error) {
         console.error("Error creating Razorpay instance:", error);
         throw new Error(`Failed to create Razorpay payment: ${error.message}`);
@@ -706,13 +733,40 @@ const RenewPlanPage = () => {
         theme: {
           color: "#1976d2",
         },
+        modal: {
+          ondismiss: () => {
+            console.log("Test payment modal dismissed");
+            alert("Test payment cancelled");
+          },
+        },
       };
 
       try {
+        console.log("Creating test Razorpay instance...");
         const rzp = new window.Razorpay(options);
-        console.log("Test Razorpay instance created");
-        rzp.open();
-        console.log("Test Razorpay popup opened");
+        console.log("Test Razorpay instance created successfully");
+
+        // Try multiple approaches to open the popup
+        try {
+          console.log("Attempting to open test Razorpay popup...");
+          rzp.open();
+          console.log("Test Razorpay popup opened successfully");
+        } catch (openError) {
+          console.error("Failed to open test popup:", openError);
+
+          // Try again with a new instance
+          setTimeout(() => {
+            try {
+              console.log("Retrying test Razorpay popup...");
+              const newRzp = new window.Razorpay(options);
+              newRzp.open();
+              console.log("Test Razorpay popup opened on retry");
+            } catch (retryError) {
+              console.error("Retry also failed:", retryError);
+              alert("Failed to open Razorpay popup: " + retryError.message);
+            }
+          }, 1000);
+        }
       } catch (error) {
         console.error("Test Razorpay error:", error);
         alert("Test Razorpay error: " + error.message);
@@ -746,6 +800,58 @@ const RenewPlanPage = () => {
     };
 
     document.head.appendChild(script);
+  };
+
+  // Force Razorpay popup without API calls
+  const forceRazorpayPopup = () => {
+    console.log("=== Force Razorpay Popup ===");
+
+    if (!window.Razorpay) {
+      alert("Razorpay SDK not loaded!");
+      return;
+    }
+
+    const options = {
+      key: RAZORPAY_KEY_ID,
+      amount: 99900, // ₹999 in paise
+      currency: "INR",
+      name: "Garage Management",
+      description: "Force Test Payment",
+      order_id: "force_order_" + Date.now(),
+      handler: function (response) {
+        console.log("Force payment successful:", response);
+        alert(
+          "Force payment successful! Order ID: " + response.razorpay_order_id
+        );
+      },
+      prefill: {
+        name: garageData.garageName || "Test User",
+        email: garageData.garageEmail || "test@gmail.com",
+      },
+      theme: {
+        color: "#1976d2",
+      },
+      modal: {
+        ondismiss: () => {
+          console.log("Force payment modal dismissed");
+          alert("Force payment cancelled");
+        },
+      },
+    };
+
+    try {
+      console.log("Creating force Razorpay instance...");
+      const rzp = new window.Razorpay(options);
+      console.log("Force Razorpay instance created");
+
+      // Force open the popup
+      console.log("Force opening Razorpay popup...");
+      rzp.open();
+      console.log("Force Razorpay popup opened");
+    } catch (error) {
+      console.error("Force Razorpay error:", error);
+      alert("Force Razorpay error: " + error.message);
+    }
   };
 
   return (
@@ -944,6 +1050,18 @@ const RenewPlanPage = () => {
               sx={{ py: 1.5 }}
             >
               Retry SDK Load
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Button
+              fullWidth
+              variant="outlined"
+              color="error"
+              size="large"
+              onClick={forceRazorpayPopup}
+              sx={{ py: 1.5 }}
+            >
+              Force Popup
             </Button>
           </Grid>
         </Grid>
