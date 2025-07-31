@@ -81,6 +81,7 @@ const RenewPlanPage = () => {
     const loadRazorpaySDK = () => {
       return new Promise((resolve, reject) => {
         if (window.Razorpay) {
+          console.log("Razorpay SDK already loaded");
           resolve();
           return;
         }
@@ -88,7 +89,7 @@ const RenewPlanPage = () => {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.onload = () => {
-          console.log("Razorpay SDK loaded");
+          console.log("Razorpay SDK loaded successfully");
           resolve();
         };
         script.onerror = () => {
@@ -100,6 +101,7 @@ const RenewPlanPage = () => {
     };
 
     loadRazorpaySDK().catch((err) => {
+      console.error("Error loading Razorpay SDK:", err);
       setError(err.message);
     });
   }, []);
@@ -221,10 +223,13 @@ const RenewPlanPage = () => {
 
       // Check if Razorpay is loaded
       if (!window.Razorpay) {
+        console.error("Razorpay SDK not available");
         throw new Error(
           "Razorpay SDK not loaded. Please refresh the page and try again."
         );
       }
+
+      console.log("Razorpay SDK is available:", !!window.Razorpay);
 
       // Validate Razorpay key
       if (
@@ -279,9 +284,17 @@ const RenewPlanPage = () => {
       const orderData = await orderResponse.json();
       console.log("Order response from server:", orderData);
 
-      // Extract order details
+      // Extract order details with better error handling
       let orderId, orderAmount;
 
+      // Check if Razorpay SDK is loaded
+      if (!window.Razorpay) {
+        throw new Error(
+          "Razorpay SDK not loaded. Please refresh the page and try again."
+        );
+      }
+
+      // Try to extract order ID from various possible structures
       if (orderData.order && typeof orderData.order === "object") {
         orderId =
           orderData.order.id ||
@@ -291,14 +304,28 @@ const RenewPlanPage = () => {
           orderData.order.amount ||
           orderData.order.amount_due ||
           selectedPlan.amount * 100;
+      } else if (orderData.data && orderData.data.order) {
+        orderId =
+          orderData.data.order.id ||
+          orderData.data.order.order_id ||
+          orderData.data.order.orderId;
+        orderAmount =
+          orderData.data.order.amount ||
+          orderData.data.order.amount_due ||
+          selectedPlan.amount * 100;
       } else {
         orderId =
           orderData.id ||
           orderData.order_id ||
           orderData.orderId ||
-          orderData.razorpayOrderId;
+          orderData.razorpayOrderId ||
+          orderData.data?.id ||
+          orderData.data?.order_id;
         orderAmount =
-          orderData.amount || orderData.amount_due || selectedPlan.amount * 100;
+          orderData.amount ||
+          orderData.amount_due ||
+          orderData.data?.amount ||
+          selectedPlan.amount * 100;
       }
 
       if (!orderId) {
@@ -313,8 +340,14 @@ const RenewPlanPage = () => {
 
       console.log("Extracted Order ID:", orderId);
       console.log("Order Amount:", orderAmount);
+      console.log("Razorpay SDK available:", !!window.Razorpay);
 
       // 2. Open Razorpay payment dialog
+      console.log("Preparing Razorpay options...");
+      console.log("Razorpay Key:", RAZORPAY_KEY_ID);
+      console.log("Order ID:", orderId);
+      console.log("Amount:", orderAmount);
+
       const options = {
         key: RAZORPAY_KEY_ID,
         amount: orderAmount,
@@ -323,6 +356,7 @@ const RenewPlanPage = () => {
         description: `${selectedPlan.name} Plan Renewal`,
         order_id: orderId,
         handler: async (response) => {
+          console.log("Payment successful:", response);
           // 3. Process renewal with payment details
           await processRenewal({
             razorpayOrderId: response.razorpay_order_id,
@@ -339,23 +373,35 @@ const RenewPlanPage = () => {
         },
         modal: {
           ondismiss: () => {
+            console.log("Payment modal dismissed");
             setLoading(false);
             showSnackbar("Payment cancelled", "info");
           },
         },
       };
 
-      const rzp = new window.Razorpay(options);
+      console.log("Razorpay options:", options);
 
-      rzp.on("payment.failed", (response) => {
-        setLoading(false);
-        showSnackbar(
-          response.error?.description || "Payment failed. Please try again.",
-          "error"
-        );
-      });
+      try {
+        const rzp = new window.Razorpay(options);
+        console.log("Razorpay instance created successfully");
 
-      rzp.open();
+        rzp.on("payment.failed", (response) => {
+          console.log("Payment failed:", response);
+          setLoading(false);
+          showSnackbar(
+            response.error?.description || "Payment failed. Please try again.",
+            "error"
+          );
+        });
+
+        console.log("Opening Razorpay popup...");
+        rzp.open();
+        console.log("Razorpay popup opened successfully");
+      } catch (error) {
+        console.error("Error creating Razorpay instance:", error);
+        throw new Error(`Failed to create Razorpay payment: ${error.message}`);
+      }
     } catch (err) {
       console.error("Payment error:", err);
       showSnackbar(err.message || "Payment processing failed", "error");
