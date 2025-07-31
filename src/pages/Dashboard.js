@@ -73,7 +73,7 @@ const JobDetailsComponent = ({
   jobDetails,
   maxItems = 2,
   showPrices = true,
-  compact = false
+  compact = false,
 }) => {
   const parseAndDisplayJobDetails = (jobDetailsString) => {
     if (!jobDetailsString) {
@@ -84,11 +84,16 @@ const JobDetailsComponent = ({
       );
     }
     // If it's already a plain string (not JSON), display it directly
-    if (typeof jobDetailsString === 'string' &&
-      !jobDetailsString.trim().startsWith('[') &&
-      !jobDetailsString.trim().startsWith('{')) {
+    if (
+      typeof jobDetailsString === "string" &&
+      !jobDetailsString.trim().startsWith("[") &&
+      !jobDetailsString.trim().startsWith("{")
+    ) {
       return (
-        <Typography variant="body2" sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}>
+        <Typography
+          variant="body2"
+          sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
+        >
           {jobDetailsString}
         </Typography>
       );
@@ -99,19 +104,22 @@ const JobDetailsComponent = ({
         return (
           <Box>
             {details.slice(0, maxItems).map((item, index) => (
-              <Box key={index} sx={{
-                mb: compact ? 0.3 : 0.5,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 1
-              }}>
+              <Box
+                key={index}
+                sx={{
+                  mb: compact ? 0.3 : 0.5,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
                 <Typography
                   variant="body2"
                   sx={{
                     flex: 1,
-                    fontSize: compact ? '0.8rem' : '0.875rem',
-                    lineHeight: 1.2
+                    fontSize: compact ? "0.8rem" : "0.875rem",
+                    lineHeight: 1.2,
                   }}
                 >
                   • {item.description || item.name || `Service ${index + 1}`}
@@ -122,12 +130,12 @@ const JobDetailsComponent = ({
                     size="small"
                     variant="outlined"
                     sx={{
-                      fontSize: '0.75rem',
-                      height: compact ? '18px' : '20px',
+                      fontSize: "0.75rem",
+                      height: compact ? "18px" : "20px",
                       fontWeight: 600,
-                      '& .MuiChip-label': {
-                        px: compact ? 0.5 : 1
-                      }
+                      "& .MuiChip-label": {
+                        px: compact ? 0.5 : 1,
+                      },
                     }}
                   />
                 )}
@@ -138,23 +146,24 @@ const JobDetailsComponent = ({
                 variant="caption"
                 color="text.secondary"
                 sx={{
-                  fontStyle: 'italic',
-                  fontSize: compact ? '0.7rem' : '0.75rem'
+                  fontStyle: "italic",
+                  fontSize: compact ? "0.7rem" : "0.75rem",
                 }}
               >
-                +{details.length - maxItems} more service{details.length - maxItems > 1 ? 's' : ''}
+                +{details.length - maxItems} more service
+                {details.length - maxItems > 1 ? "s" : ""}
               </Typography>
             )}
           </Box>
         );
-      } else if (typeof details === 'object' && details !== null) {
+      } else if (typeof details === "object" && details !== null) {
         // Handle single object case
         return (
           <Box>
             {details.description && (
               <Typography
                 variant="body2"
-                sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+                sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
               >
                 • {details.description}
               </Typography>
@@ -167,7 +176,7 @@ const JobDetailsComponent = ({
                 sx={{
                   mt: 0.5,
                   fontWeight: 600,
-                  height: compact ? '18px' : '20px'
+                  height: compact ? "18px" : "20px",
                 }}
               />
             )}
@@ -177,19 +186,19 @@ const JobDetailsComponent = ({
         return (
           <Typography
             variant="body2"
-            sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+            sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
           >
             {String(details)}
           </Typography>
         );
       }
     } catch (error) {
-      console.warn('Failed to parse job details:', error);
+      console.warn("Failed to parse job details:", error);
       // If JSON parsing fails, display the original string
       return (
         <Typography
           variant="body2"
-          sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+          sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
         >
           {jobDetailsString}
         </Typography>
@@ -219,10 +228,10 @@ const Dashboard = () => {
   const [selectedJobData, setSelectedJobData] = useState(null);
 
   // Search and Filter States
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Pagination states
   const [showAllLowStock, setShowAllLowStock] = useState(false);
@@ -294,14 +303,24 @@ const Dashboard = () => {
 
   const handleUpdate = async (id) => {
     try {
-      const response = await axios.get(`https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}` // ✅ Add token here too
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // ✅ Add token here too
+          },
         }
-      });
+      );
       const jobCard = response.data;
       const { engineerId, laborHours, qualityCheck } = jobCard;
-      if (!engineerId || engineerId.length === 0 || !engineerId[0]?._id) {
+
+      // Add safety checks for engineerId
+      if (
+        !engineerId ||
+        !Array.isArray(engineerId) ||
+        engineerId.length === 0 ||
+        !engineerId[0]?._id
+      ) {
         navigate(`/assign-engineer/${id}`);
       } else if (laborHours === null || laborHours === undefined) {
         navigate(`/work-in-progress/${id}`);
@@ -353,21 +372,24 @@ const Dashboard = () => {
 
   const applyFilters = (searchTerm, status, start, end) => {
     let filtered = [...currentJobs];
-    if (searchTerm.trim() !== '') {
+    if (searchTerm.trim() !== "") {
       filtered = filtered.filter(
-        job =>
+        (job) =>
           (job.carNumber && job.carNumber.toLowerCase().includes(searchTerm)) ||
-          (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) ||
-          (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) ||
-          (job.jobDetails && job.jobDetails.toLowerCase().includes(searchTerm)) ||
+          (job.registrationNumber &&
+            job.registrationNumber.toLowerCase().includes(searchTerm)) ||
+          (job.customerName &&
+            job.customerName.toLowerCase().includes(searchTerm)) ||
+          (job.jobDetails &&
+            job.jobDetails.toLowerCase().includes(searchTerm)) ||
           (job.type && job.type.toLowerCase().includes(searchTerm))
       );
     }
-    if (status && status !== 'All') {
-      filtered = filtered.filter(job => job.status === status);
+    if (status && status !== "All") {
+      filtered = filtered.filter((job) => job.status === status);
     }
     if (start && end) {
-      filtered = filtered.filter(job => {
+      filtered = filtered.filter((job) => {
         const jobDate = new Date(job.createdAt);
         const startDate = new Date(start);
         const endDate = new Date(end);
@@ -379,10 +401,10 @@ const Dashboard = () => {
   };
 
   const handleClearFilters = () => {
-    setSearch('');
-    setStatusFilter('All');
-    setStartDate('');
-    setEndDate('');
+    setSearch("");
+    setStatusFilter("All");
+    setStartDate("");
+    setEndDate("");
     setFilteredJobs(currentJobs);
     setJobsPage(0);
   };
@@ -406,7 +428,11 @@ const Dashboard = () => {
     return showAll ? items : items.slice(0, itemsPerPage);
   };
 
-  const shouldShowMoreButton = (items, showAll, itemsPerPage = ITEMS_PER_PAGE) => {
+  const shouldShowMoreButton = (
+    items,
+    showAll,
+    itemsPerPage = ITEMS_PER_PAGE
+  ) => {
     return items.length > itemsPerPage;
   };
 
@@ -431,10 +457,10 @@ const Dashboard = () => {
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
           {
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}` // ✅ Added token
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`, // ✅ Added token
             },
           }
         );
@@ -454,13 +480,13 @@ const Dashboard = () => {
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
-            ? data.jobCards
-            : data.data
-              ? data.data
-              : [];
+          ? data.jobCards
+          : data.data
+          ? data.data
+          : [];
 
-        const activeJobs = jobsData.filter(job =>
-          job.status === "Pending" || job.status === "In Progress"
+        const activeJobs = jobsData.filter(
+          (job) => job.status === "Pending" || job.status === "In Progress"
         );
 
         setCurrentJobs(activeJobs);
@@ -471,9 +497,10 @@ const Dashboard = () => {
         updatedStats[0].value = activeJobs.length;
         setDashboardStats(updatedStats);
 
-        const pendingDevicesFromJobs = activeJobs.map(job => ({
+        const pendingDevicesFromJobs = activeJobs.map((job) => ({
           id: job._id,
-          deviceName: job.carNumber || job.registrationNumber || "Unknown Device",
+          deviceName:
+            job.carNumber || job.registrationNumber || "Unknown Device",
           customerName: job.customerName || "N/A",
           status: job.status,
           jobType: job.jobDetails || job.type || "General Service",
@@ -508,15 +535,16 @@ const Dashboard = () => {
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
           {
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}` // ✅ Token added
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`, // ✅ Token added
             },
           }
         );
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
         console.log("Inventory API response:", data);
@@ -636,7 +664,12 @@ const Dashboard = () => {
   };
 
   const getJobProgress = (job) => {
-    if (!job.engineerId || job.engineerId.length === 0 || !job.engineerId[0]?._id) {
+    if (
+      !job.engineerId ||
+      !Array.isArray(job.engineerId) ||
+      job.engineerId.length === 0 ||
+      !job.engineerId[0]?._id
+    ) {
       return 25;
     } else if (job.laborHours === null || job.laborHours === undefined) {
       return 50;
@@ -658,7 +691,7 @@ const Dashboard = () => {
     console.log("Dashboard Debug Info:", {
       garageId,
       tokenPresent: !!token,
-      localStorageKeys: Object.keys(localStorage)
+      localStorageKeys: Object.keys(localStorage),
     });
   }, [garageId, token]);
 
@@ -756,8 +789,8 @@ const Dashboard = () => {
                                   ? "rgba(22, 163, 74, 0.2)"
                                   : "rgba(220, 38, 38, 0.2)"
                                 : card.isIncrease
-                                  ? "rgba(22, 163, 74, 0.1)"
-                                  : "rgba(220, 38, 38, 0.1)",
+                                ? "rgba(22, 163, 74, 0.1)"
+                                : "rgba(220, 38, 38, 0.1)",
                               color: card.isIncrease
                                 ? theme.palette.success.main
                                 : theme.palette.error.main,
@@ -779,7 +812,8 @@ const Dashboard = () => {
               {/* Search and Filter Section */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Active Jobs ({filteredJobs.length} of {currentJobs.length} total)
+                  Active Jobs ({filteredJobs.length} of {currentJobs.length}{" "}
+                  total)
                 </Typography>
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid item xs={12} md={4}>
@@ -801,8 +835,13 @@ const Dashboard = () => {
                             <IconButton
                               size="small"
                               onClick={() => {
-                                setSearch('');
-                                applyFilters('', statusFilter, startDate, endDate);
+                                setSearch("");
+                                applyFilters(
+                                  "",
+                                  statusFilter,
+                                  startDate,
+                                  endDate
+                                );
                               }}
                             >
                               <ClearIcon />
@@ -855,13 +894,13 @@ const Dashboard = () => {
                       onClick={handleClearFilters}
                       startIcon={<FilterListIcon />}
                       size="small"
-                      sx={{ height: '40px' }}
+                      sx={{ height: "40px" }}
                     >
                       Clear Filters
                     </Button>
                   </Grid>
                 </Grid>
-                {(search || statusFilter !== 'All' || startDate || endDate) && (
+                {(search || statusFilter !== "All" || startDate || endDate) && (
                   <Alert severity="info" sx={{ mb: 2 }}>
                     {filteredJobs.length === 0
                       ? "No jobs match your search criteria"
@@ -936,11 +975,17 @@ const Dashboard = () => {
                                 <TableCell sx={{ fontWeight: 500 }}>
                                   {index + 1}
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 500 }}>{job.createdBy}</TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>
-                                  {job.carNumber || job.registrationNumber || "N/A"}
+                                  {job.createdBy || "N/A"}
                                 </TableCell>
-                                <TableCell>{job.customerName || "N/A"}</TableCell>
+                                <TableCell sx={{ fontWeight: 500 }}>
+                                  {job.carNumber ||
+                                    job.registrationNumber ||
+                                    "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {job.customerName || "N/A"}
+                                </TableCell>
                                 <TableCell>
                                   <JobDetailsComponent
                                     jobDetails={job.jobDetails}
@@ -985,18 +1030,35 @@ const Dashboard = () => {
                                     </Box>
                                   </Box>
                                 </TableCell>
-                                <TableCell>{getStatusChip(job.status)}</TableCell>
+                                <TableCell>
+                                  {getStatusChip(job.status)}
+                                </TableCell>
                                 <TableCell>
                                   {(() => {
-                                    const { engineerId, laborHours, qualityCheck } = job;
-                                    if (!engineerId || engineerId.length === 0 || !engineerId[0]?._id) {
-                                      return 'Assign Engineer';
-                                    } else if (laborHours === null || laborHours === undefined) {
-                                      return 'Work In Progress';
-                                    } else if (!qualityCheck || !qualityCheck.billApproved) {
-                                      return 'Quality Check';
+                                    const {
+                                      engineerId,
+                                      laborHours,
+                                      qualityCheck,
+                                    } = job;
+                                    if (
+                                      !engineerId ||
+                                      !Array.isArray(engineerId) ||
+                                      engineerId.length === 0 ||
+                                      !engineerId[0]?._id
+                                    ) {
+                                      return "Assign Engineer";
+                                    } else if (
+                                      laborHours === null ||
+                                      laborHours === undefined
+                                    ) {
+                                      return "Work In Progress";
+                                    } else if (
+                                      !qualityCheck ||
+                                      !qualityCheck.billApproved
+                                    ) {
+                                      return "Quality Check";
                                     } else {
-                                      return 'Billing';
+                                      return "Billing";
                                     }
                                   })()}
                                 </TableCell>
@@ -1005,7 +1067,8 @@ const Dashboard = () => {
                                     variant="outlined"
                                     size="small"
                                     sx={{ mr: 1 }}
-                                    onClick={() => handleUpdate(job._id)}>
+                                    onClick={() => handleUpdate(job._id)}
+                                  >
                                     Update
                                   </Button>
                                 </TableCell>
@@ -1043,8 +1106,12 @@ const Dashboard = () => {
                         )}{" "}
                         of {filteredJobs.length} jobs
                       </Typography>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 2 }}
+                      >
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           <Typography variant="body2" color="text.secondary">
                             Rows per page:
                           </Typography>
@@ -1067,18 +1134,27 @@ const Dashboard = () => {
                         </Box>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <IconButton
-                            onClick={(e) => handleJobsPageChange(e, jobsPage - 1)}
+                            onClick={(e) =>
+                              handleJobsPageChange(e, jobsPage - 1)
+                            }
                             disabled={jobsPage === 0}
                             size="small"
                           >
                             <NavigateBeforeIcon />
                           </IconButton>
                           <Typography variant="body2" sx={{ mx: 2 }}>
-                            Page {jobsPage + 1} of {Math.ceil(filteredJobs.length / jobsRowsPerPage)}
+                            Page {jobsPage + 1} of{" "}
+                            {Math.ceil(filteredJobs.length / jobsRowsPerPage)}
                           </Typography>
                           <IconButton
-                            onClick={(e) => handleJobsPageChange(e, jobsPage + 1)}
-                            disabled={jobsPage >= Math.ceil(filteredJobs.length / jobsRowsPerPage) - 1}
+                            onClick={(e) =>
+                              handleJobsPageChange(e, jobsPage + 1)
+                            }
+                            disabled={
+                              jobsPage >=
+                              Math.ceil(filteredJobs.length / jobsRowsPerPage) -
+                                1
+                            }
                             size="small"
                           >
                             <NavigateNextIcon />
@@ -1159,7 +1235,10 @@ const Dashboard = () => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {getDisplayedItems(lowStockItems, showAllLowStock).map((item) => (
+                              {getDisplayedItems(
+                                lowStockItems,
+                                showAllLowStock
+                              ).map((item) => (
                                 <TableRow key={item.id}>
                                   <TableCell sx={{ fontWeight: 500 }}>
                                     {item.name}
@@ -1197,14 +1276,21 @@ const Dashboard = () => {
                           <Button
                             variant="text"
                             color="error"
-                            endIcon={showAllLowStock ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            endIcon={
+                              showAllLowStock ? (
+                                <ExpandLessIcon />
+                              ) : (
+                                <ExpandMoreIcon />
+                              )
+                            }
                             sx={{ fontWeight: 600 }}
                             onClick={() => setShowAllLowStock(!showAllLowStock)}
                           >
                             {showAllLowStock
                               ? `Show Less (${ITEMS_PER_PAGE} items)`
-                              : `Show More (${lowStockItems.length - ITEMS_PER_PAGE} more)`
-                            }
+                              : `Show More (${
+                                  lowStockItems.length - ITEMS_PER_PAGE
+                                } more)`}
                           </Button>
                         </Box>
                       )}
@@ -1275,7 +1361,10 @@ const Dashboard = () => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {getDisplayedItems(highStockItems, showAllHighStock).map((item) => (
+                              {getDisplayedItems(
+                                highStockItems,
+                                showAllHighStock
+                              ).map((item) => (
                                 <TableRow key={item.id}>
                                   <TableCell sx={{ fontWeight: 500 }}>
                                     {item.name}
@@ -1302,7 +1391,10 @@ const Dashboard = () => {
                           </Table>
                         </TableContainer>
                       )}
-                      {shouldShowMoreButton(highStockItems, showAllHighStock) && (
+                      {shouldShowMoreButton(
+                        highStockItems,
+                        showAllHighStock
+                      ) && (
                         <Box
                           sx={{
                             p: 1.5,
@@ -1313,14 +1405,23 @@ const Dashboard = () => {
                           <Button
                             variant="text"
                             color="success"
-                            endIcon={showAllHighStock ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            endIcon={
+                              showAllHighStock ? (
+                                <ExpandLessIcon />
+                              ) : (
+                                <ExpandMoreIcon />
+                              )
+                            }
                             sx={{ fontWeight: 600 }}
-                            onClick={() => setShowAllHighStock(!showAllHighStock)}
+                            onClick={() =>
+                              setShowAllHighStock(!showAllHighStock)
+                            }
                           >
                             {showAllHighStock
                               ? `Show Less (${ITEMS_PER_PAGE} items)`
-                              : `Show More (${highStockItems.length - ITEMS_PER_PAGE} more)`
-                            }
+                              : `Show More (${
+                                  highStockItems.length - ITEMS_PER_PAGE
+                                } more)`}
                           </Button>
                         </Box>
                       )}
