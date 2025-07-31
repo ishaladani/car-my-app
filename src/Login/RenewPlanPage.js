@@ -1,5 +1,5 @@
 // RenewPlanPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -15,9 +15,9 @@ import {
   Container,
   CssBaseline,
   useTheme,
-} from '@mui/material';
-import axios from 'axios';
-import { useLocation, useNavigate } from 'react-router-dom';
+} from "@mui/material";
+import axios from "axios";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const RenewPlanPage = () => {
   const { state } = useLocation();
@@ -26,38 +26,38 @@ const RenewPlanPage = () => {
 
   const {
     garageId,
-    garageName = 'Your Garage',
+    garageName = "Your Garage",
     garageEmail,
-    message = 'Your subscription has expired. Please renew your plan.',
+    message = "Your subscription has expired. Please renew your plan.",
   } = state || {};
 
-  console.log('RenewPlanPage:', { garageId, garageName, garageEmail, message });
+  console.log("RenewPlanPage:", { garageId, garageName, garageEmail, message });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [orderId, setOrderId] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [plans, setPlans] = useState([]);
   const [fetchingPlans, setFetchingPlans] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedPlanId, setSelectedPlanId] = useState("");
 
-  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
-  const RAZORPAY_KEY_ID = 'rzp_test_YOUR_KEY_ID_HERE'; // 🔥 Replace with your actual Razorpay Key ID
+  const BASE_URL = "https://garage-management-zi5z.onrender.com";
+  const RAZORPAY_KEY_ID = "rzp_test_YOUR_KEY_ID_HERE"; // 🔥 Replace with your actual Razorpay Key ID
 
   const colors = {
-    primary: '#08197B',
-    secondary: '#364ab8',
-    accent: '#2196F3',
+    primary: "#08197B",
+    secondary: "#364ab8",
+    accent: "#2196F3",
   };
 
   // Load Razorpay SDK
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
-    script.onload = () => console.log('Razorpay SDK loaded');
-    script.onerror = () => setError('Failed to load Razorpay gateway.');
+    script.onload = () => console.log("Razorpay SDK loaded");
+    script.onerror = () => setError("Failed to load Razorpay gateway.");
     document.body.appendChild(script);
 
     return () => {
@@ -68,7 +68,7 @@ const RenewPlanPage = () => {
   // Validate required data
   useEffect(() => {
     if (!state || !garageId) {
-      setError('Access denied. Please log in again.');
+      setError("Access denied. Please log in again.");
     }
   }, [state, garageId]);
 
@@ -85,8 +85,8 @@ const RenewPlanPage = () => {
           setSelectedPlanId(plansArr[0]._id); // select first plan
         }
       } catch (err) {
-        console.error('Error fetching plans:', err);
-        setError('Failed to load available plans.');
+        console.error("Error fetching plans:", err);
+        setError("Failed to load available plans.");
       } finally {
         setFetchingPlans(false);
       }
@@ -96,18 +96,18 @@ const RenewPlanPage = () => {
 
   // Step 1: Create Renewal Order
   const handleCreateOrder = async () => {
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
     setLoading(true);
 
     if (!garageId) {
-      setError('Garage ID is missing.');
+      setError("Garage ID is missing.");
       setLoading(false);
       return;
     }
 
     if (!selectedPlanId) {
-      setError('Please select a plan.');
+      setError("Please select a plan.");
       setLoading(false);
       return;
     }
@@ -118,21 +118,21 @@ const RenewPlanPage = () => {
         {
           garageId,
           planId: selectedPlanId,
-          paymentMethod: 'razorpay',
+          paymentMethod: "razorpay",
         },
         {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { "Content-Type": "application/json" },
         }
       );
 
       const { orderId } = response.data;
       setOrderId(orderId);
-      setSuccess('Order created successfully! Proceed to payment.');
+      setSuccess("Order created successfully! Proceed to payment.");
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        err.message ||
-        'Failed to create renewal order.'
+          err.message ||
+          "Failed to create renewal order."
       );
     } finally {
       setLoading(false);
@@ -142,31 +142,33 @@ const RenewPlanPage = () => {
   // Step 2: Open Real Razorpay Payment Gateway
   const handlePayment = async () => {
     if (!orderId) {
-      setError('Order ID is missing. Please create an order first.');
+      setError("Order ID is missing. Please create an order first.");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     // Check if Razorpay is loaded
     if (!window.Razorpay) {
-      setError('Payment gateway not loaded. Please check internet connection.');
+      setError("Payment gateway not loaded. Please check internet connection.");
       setLoading(false);
       return;
     }
 
     try {
       // Fetch order details (amount, currency)
-      const orderRes = await axios.get(`${BASE_URL}/api/plans/order/${orderId}`);
+      const orderRes = await axios.get(
+        `${BASE_URL}/api/plans/order/${orderId}`
+      );
       const { amount, currency } = orderRes.data.data;
 
       const options = {
         key: RAZORPAY_KEY_ID,
         amount: amount, // in paise (₹999 → 99900)
-        currency: currency || 'INR',
-        name: 'Garage Management System',
-        description: 'Subscription Renewal',
+        currency: currency || "INR",
+        name: "Garage Management System",
+        description: "Subscription Renewal",
         order_id: orderId,
         handler: async function (response) {
           // Step 3: Verify payment on backend
@@ -180,26 +182,29 @@ const RenewPlanPage = () => {
                 orderId: response.razorpay_order_id,
                 paymentId: response.razorpay_payment_id,
                 signature: response.razorpay_signature,
-                paymentMethod: 'razorpay',
+                paymentMethod: "razorpay",
               },
               {
-                headers: { 'Content-Type': 'application/json' },
+                headers: { "Content-Type": "application/json" },
               }
             );
-            setSuccess(verifyRes.data.message || 'Subscription renewed successfully!');
+            setSuccess(
+              verifyRes.data.message || "Subscription renewed successfully!"
+            );
             setCompleted(true);
           } catch (err) {
             setError(
-              err.response?.data?.message || 'Payment verification failed. Contact support.'
+              err.response?.data?.message ||
+                "Payment verification failed. Contact support."
             );
           } finally {
             setLoading(false);
           }
         },
         prefill: {
-          name: garageName || 'Customer',
-          email: garageEmail || '',
-          contact: '', // Add phone if available
+          name: garageName || "Customer",
+          email: garageEmail || "",
+          contact: "", // Add phone if available
         },
         theme: {
           color: colors.primary,
@@ -214,12 +219,37 @@ const RenewPlanPage = () => {
         },
       };
 
+      console.log("=== Creating Razorpay instance ===");
+      console.log("Razorpay options:", options);
+
       const rzp = new window.Razorpay(options);
-      rzp.open();
+      console.log("Razorpay instance created successfully");
+
+      // Try to open the popup with multiple attempts
+      try {
+        console.log("=== Attempting to open Razorpay popup ===");
+        rzp.open();
+        console.log("Razorpay popup opened successfully");
+      } catch (openError) {
+        console.error("Failed to open Razorpay popup:", openError);
+
+        // Try again with a delay
+        setTimeout(() => {
+          try {
+            console.log("=== Retrying Razorpay popup ===");
+            const newRzp = new window.Razorpay(options);
+            newRzp.open();
+            console.log("Razorpay popup opened on retry");
+          } catch (retryError) {
+            console.error("Retry also failed:", retryError);
+            setError("Failed to open payment popup. Please try again.");
+          }
+        }, 1000);
+      }
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        'Failed to load payment details. Try again.'
+          "Failed to load payment details. Try again."
       );
     } finally {
       setLoading(false);
@@ -231,14 +261,15 @@ const RenewPlanPage = () => {
       <CssBaseline />
       <Box
         sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
           p: 2,
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
-            : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`,
+          background:
+            theme.palette.mode === "dark"
+              ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
+              : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`,
         }}
       >
         <Container maxWidth="sm">
@@ -247,10 +278,13 @@ const RenewPlanPage = () => {
             sx={{
               p: 4,
               borderRadius: 3,
-              textAlign: 'center',
+              textAlign: "center",
               backgroundColor: theme.palette.background.paper,
-              backdropFilter: 'blur(10px)',
-              border: theme.palette.mode === 'dark' ? `1px solid ${theme.palette.divider}` : 'none',
+              backdropFilter: "blur(10px)",
+              border:
+                theme.palette.mode === "dark"
+                  ? `1px solid ${theme.palette.divider}`
+                  : "none",
             }}
           >
             <Typography
@@ -260,7 +294,10 @@ const RenewPlanPage = () => {
             >
               🔁 Renew Subscription
             </Typography>
-            <Typography variant="body1" sx={{ mb: 3, color: theme.palette.text.secondary }}>
+            <Typography
+              variant="body1"
+              sx={{ mb: 3, color: theme.palette.text.secondary }}
+            >
               {message}
             </Typography>
 
@@ -277,40 +314,61 @@ const RenewPlanPage = () => {
             )}
 
             {/* Garage Info */}
-            <List sx={{ mb: 3, textAlign: 'left' }}>
+            <List sx={{ mb: 3, textAlign: "left" }}>
               <ListItem>
-                <ListItemIcon><strong>🆔</strong></ListItemIcon>
-                <ListItemText primary="Garage ID" secondary={garageId || 'Not available'} />
+                <ListItemIcon>
+                  <strong>🆔</strong>
+                </ListItemIcon>
+                <ListItemText
+                  primary="Garage ID"
+                  secondary={garageId || "Not available"}
+                />
               </ListItem>
               <ListItem>
-                <ListItemIcon><strong>🏢</strong></ListItemIcon>
+                <ListItemIcon>
+                  <strong>🏢</strong>
+                </ListItemIcon>
                 <ListItemText primary="Name" secondary={garageName} />
               </ListItem>
               <ListItem>
-                <ListItemIcon><strong>📧</strong></ListItemIcon>
+                <ListItemIcon>
+                  <strong>📧</strong>
+                </ListItemIcon>
                 <ListItemText primary="Email" secondary={garageEmail} />
               </ListItem>
               <ListItem>
-                <ListItemIcon><strong>📋</strong></ListItemIcon>
+                <ListItemIcon>
+                  <strong>📋</strong>
+                </ListItemIcon>
                 <ListItemText
                   primary="Selected Plan"
                   secondary={
-                    plans.find(p => p._id === selectedPlanId)?.name || 'Loading...'
+                    plans.find((p) => p._id === selectedPlanId)?.name ||
+                    "Loading..."
                   }
                 />
               </ListItem>
               <ListItem>
-                <ListItemIcon><strong>💰</strong></ListItemIcon>
+                <ListItemIcon>
+                  <strong>💰</strong>
+                </ListItemIcon>
                 <ListItemText
                   primary="Amount"
                   secondary={
-                    selectedPlanId && plans.find(p => p._id === selectedPlanId)
-                      ? `₹${plans.find(p => p._id === selectedPlanId).amount}/${
-                          plans.find(p => p._id === selectedPlanId).durationInMonths > 1
-                            ? `${plans.find(p => p._id === selectedPlanId).durationInMonths} months`
-                            : 'month'
+                    selectedPlanId &&
+                    plans.find((p) => p._id === selectedPlanId)
+                      ? `₹${
+                          plans.find((p) => p._id === selectedPlanId).amount
+                        }/${
+                          plans.find((p) => p._id === selectedPlanId)
+                            .durationInMonths > 1
+                            ? `${
+                                plans.find((p) => p._id === selectedPlanId)
+                                  .durationInMonths
+                              } months`
+                            : "month"
                         }`
-                      : '₹0'
+                      : "₹0"
                   }
                 />
               </ListItem>
@@ -320,32 +378,52 @@ const RenewPlanPage = () => {
             {fetchingPlans ? (
               <Box sx={{ mb: 3 }}>
                 <CircularProgress size={24} />
-                <Typography variant="body2" sx={{ mt: 1 }}>Loading plans...</Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Loading plans...
+                </Typography>
               </Box>
             ) : (
               plans.length > 0 && (
                 <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ mb: 1, fontWeight: 500 }}
+                  >
                     Select a Plan
                   </Typography>
                   <List>
-                    {plans.map(plan => (
+                    {plans.map((plan) => (
                       <ListItem
                         key={plan._id}
                         button
                         selected={selectedPlanId === plan._id}
                         onClick={() => setSelectedPlanId(plan._id)}
                         sx={{
-                          border: selectedPlanId === plan._id ? `2px solid ${colors.primary}` : '1px solid #eee',
+                          border:
+                            selectedPlanId === plan._id
+                              ? `2px solid ${colors.primary}`
+                              : "1px solid #eee",
                           borderRadius: 2,
                           mb: 1,
-                          backgroundColor: selectedPlanId === plan._id ? `${colors.primary}10` : 'transparent'
+                          backgroundColor:
+                            selectedPlanId === plan._id
+                              ? `${colors.primary}10`
+                              : "transparent",
                         }}
                       >
                         <ListItemText
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <Typography
+                                variant="subtitle1"
+                                sx={{ fontWeight: 600 }}
+                              >
                                 {plan.name}
                               </Typography>
                               {plan.popular && (
@@ -355,10 +433,10 @@ const RenewPlanPage = () => {
                                     ml: 1,
                                     px: 1,
                                     py: 0.2,
-                                    background: '#ffe082',
-                                    color: '#b28704',
+                                    background: "#ffe082",
+                                    color: "#b28704",
                                     borderRadius: 1,
-                                    fontSize: '0.8em',
+                                    fontSize: "0.8em",
                                     fontWeight: 700,
                                   }}
                                 >
@@ -366,14 +444,19 @@ const RenewPlanPage = () => {
                                 </Box>
                               )}
                               <Typography variant="body2" sx={{ ml: 2 }}>
-                                ₹{plan.amount}/{plan.durationInMonths > 1 ? `${plan.durationInMonths} months` : 'month'}
+                                ₹{plan.amount}/
+                                {plan.durationInMonths > 1
+                                  ? `${plan.durationInMonths} months`
+                                  : "month"}
                               </Typography>
                             </Box>
                           }
                           secondary={
                             <Box>
                               {plan.features?.map((f, idx) => (
-                                <li key={idx} style={{ fontSize: 13 }}>{f}</li>
+                                <li key={idx} style={{ fontSize: 13 }}>
+                                  {f}
+                                </li>
                               ))}
                             </Box>
                           }
@@ -390,14 +473,14 @@ const RenewPlanPage = () => {
             {!state ? (
               <Button
                 variant="contained"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 fullWidth
                 sx={{
                   height: 48,
                   fontWeight: 600,
                   borderRadius: 2,
-                  backgroundColor: '#9c27b0',
-                  '&:hover': { backgroundColor: '#7b1fa2' },
+                  backgroundColor: "#9c27b0",
+                  "&:hover": { backgroundColor: "#7b1fa2" },
                 }}
               >
                 Go to Login
@@ -413,11 +496,15 @@ const RenewPlanPage = () => {
                   fontWeight: 600,
                   borderRadius: 2,
                   background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                  '&:hover': { backgroundColor: colors.secondary },
-                  '&:disabled': { opacity: 0.7 },
+                  "&:hover": { backgroundColor: colors.secondary },
+                  "&:disabled": { opacity: 0.7 },
                 }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Create Renewal Order'}
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  "Create Renewal Order"
+                )}
               </Button>
             ) : !completed ? (
               <Button
@@ -430,23 +517,27 @@ const RenewPlanPage = () => {
                   fontWeight: 600,
                   borderRadius: 2,
                   backgroundColor: colors.accent,
-                  '&:hover': { backgroundColor: '#1976D2' },
-                  '&:disabled': { opacity: 0.7 },
+                  "&:hover": { backgroundColor: "#1976D2" },
+                  "&:disabled": { opacity: 0.7 },
                 }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Pay Now (Razorpay)'}
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  "Pay Now (Razorpay)"
+                )}
               </Button>
             ) : (
               <Button
                 variant="contained"
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
                 fullWidth
                 sx={{
                   height: 48,
                   fontWeight: 600,
                   borderRadius: 2,
-                  backgroundColor: '#2E7D32',
-                  '&:hover': { backgroundColor: '#1B5E20' },
+                  backgroundColor: "#2E7D32",
+                  "&:hover": { backgroundColor: "#1B5E20" },
                 }}
               >
                 Go to Dashboard
@@ -454,10 +545,72 @@ const RenewPlanPage = () => {
             )}
 
             {orderId && !completed && (
-              <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              <Typography
+                variant="body2"
+                sx={{ mt: 2, color: "text.secondary" }}
+              >
                 Order ID: <strong>{orderId}</strong>
               </Typography>
             )}
+
+            {/* Debug Buttons */}
+            <Box sx={{ mt: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  console.log("=== Testing Razorpay directly ===");
+                  if (!window.Razorpay) {
+                    alert("Razorpay not loaded!");
+                    return;
+                  }
+
+                  const testOptions = {
+                    key: RAZORPAY_KEY_ID,
+                    amount: 99900,
+                    currency: "INR",
+                    name: "Test Payment",
+                    description: "Test",
+                    order_id: "test_" + Date.now(),
+                    handler: function (response) {
+                      alert("Test payment successful!");
+                    },
+                    prefill: {
+                      name: garageName || "Test",
+                      email: garageEmail || "test@test.com",
+                    },
+                    theme: { color: "#1976d2" },
+                  };
+
+                  try {
+                    const rzp = new window.Razorpay(testOptions);
+                    rzp.open();
+                  } catch (error) {
+                    alert("Test failed: " + error.message);
+                  }
+                }}
+                sx={{ fontSize: "12px" }}
+              >
+                🧪 Test Razorpay
+              </Button>
+
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  console.log("=== Checking Razorpay status ===");
+                  console.log("Razorpay available:", !!window.Razorpay);
+                  console.log("Razorpay key:", RAZORPAY_KEY_ID);
+                  console.log("Order ID:", orderId);
+                  alert(
+                    `Razorpay: ${!!window.Razorpay}\nKey: ${RAZORPAY_KEY_ID}\nOrder: ${orderId}`
+                  );
+                }}
+                sx={{ fontSize: "12px" }}
+              >
+                🔍 Check Status
+              </Button>
+            </Box>
           </Paper>
         </Container>
       </Box>
