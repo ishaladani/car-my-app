@@ -43,7 +43,8 @@ const RenewPlanPage = () => {
   const [selectedPlanId, setSelectedPlanId] = useState("");
 
   const BASE_URL = "https://garage-management-zi5z.onrender.com";
-  const RAZORPAY_KEY_ID = "rzp_test_YOUR_KEY_ID_HERE"; // 🔥 Replace with your actual Razorpay Key ID
+  const RAZORPAY_KEY_ID =
+    process.env.REACT_APP_RAZORPAY_KEY_ID || "rzp_test_YOUR_KEY_ID_HERE";
 
   const colors = {
     primary: "#08197B",
@@ -152,6 +153,13 @@ const RenewPlanPage = () => {
     // Check if Razorpay is loaded
     if (!window.Razorpay) {
       setError("Payment gateway not loaded. Please check internet connection.");
+      setLoading(false);
+      return;
+    }
+
+    // Check if Razorpay key is properly configured
+    if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID === "rzp_test_YOUR_KEY_ID_HERE") {
+      setError("Razorpay key not configured. Please contact support.");
       setLoading(false);
       return;
     }
@@ -565,6 +573,17 @@ const RenewPlanPage = () => {
                     return;
                   }
 
+                  if (
+                    !RAZORPAY_KEY_ID ||
+                    RAZORPAY_KEY_ID === "rzp_test_YOUR_KEY_ID_HERE"
+                  ) {
+                    alert(
+                      "❌ Razorpay key not configured!\n\nPlease set REACT_APP_RAZORPAY_KEY_ID in your .env file.\n\nCurrent key: " +
+                        RAZORPAY_KEY_ID
+                    );
+                    return;
+                  }
+
                   const testOptions = {
                     key: RAZORPAY_KEY_ID,
                     amount: 99900,
@@ -573,7 +592,7 @@ const RenewPlanPage = () => {
                     description: "Test",
                     order_id: "test_" + Date.now(),
                     handler: function (response) {
-                      alert("Test payment successful!");
+                      alert("✅ Test payment successful!");
                     },
                     prefill: {
                       name: garageName || "Test",
@@ -583,10 +602,17 @@ const RenewPlanPage = () => {
                   };
 
                   try {
+                    console.log(
+                      "Creating test Razorpay instance with key:",
+                      RAZORPAY_KEY_ID
+                    );
                     const rzp = new window.Razorpay(testOptions);
+                    console.log("Opening test Razorpay popup...");
                     rzp.open();
+                    console.log("Test Razorpay popup opened");
                   } catch (error) {
-                    alert("Test failed: " + error.message);
+                    console.error("Test failed:", error);
+                    alert("❌ Test failed: " + error.message);
                   }
                 }}
                 sx={{ fontSize: "12px" }}
