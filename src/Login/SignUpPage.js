@@ -470,7 +470,7 @@ const EnhancedSignUpPage = () => {
         // Call registration API with fallback
         let response;
         try {
-          response = await fetch(getGarageApiUrl("/signup"), {
+          response = await fetch(getGarageApiUrl("/submit-registration"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -480,7 +480,7 @@ const EnhancedSignUpPage = () => {
         } catch (error) {
           console.log("Primary endpoint failed, trying fallback...");
           // Fallback to direct endpoint
-          response = await fetch(`${BASE_URL}/api/garage/signup`, {
+          response = await fetch(`${BASE_URL}/api/garage/submit-registration`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -539,7 +539,7 @@ const EnhancedSignUpPage = () => {
         console.log("=== Verifying OTP ===");
         console.log("OTP:", formData.otp);
 
-        const response = await fetch(getGarageApiUrl("/verify-otp"), {
+        const response = await fetch(getGarageApiUrl("/verify-registration"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -599,15 +599,18 @@ const EnhancedSignUpPage = () => {
     try {
       console.log("=== Resending OTP ===");
 
-      const response = await fetch(getGarageApiUrl("/resend-otp"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-        }),
-      });
+      const response = await fetch(
+        getGarageApiUrl("/resend-registration-otp"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+          }),
+        }
+      );
 
       const data = await response.json();
       console.log("Resend OTP response:", data);

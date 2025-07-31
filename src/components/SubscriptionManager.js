@@ -59,7 +59,7 @@ const SubscriptionManager = () => {
 
       // Try the new endpoint first
       let response = await fetch(
-        `${getBaseApiUrl()}/api/plans/subscription-details/${garageId}`,
+        `${getBaseApiUrl()}/api/plans/subscription-status/${garageId}`,
         {
           method: "GET",
           headers: {
@@ -72,7 +72,7 @@ const SubscriptionManager = () => {
       // If new endpoint doesn't exist, try the old endpoint
       if (!response.ok && response.status === 404) {
         response = await fetch(
-          `${getBaseApiUrl()}/api/garage/subscription-details/${garageId}`,
+          `${getBaseApiUrl()}/api/plans/subscription-status/${garageId}`,
           {
             method: "GET",
             headers: {
