@@ -112,6 +112,7 @@ const EnhancedSignUpPage = () => {
   const [authToken, setAuthToken] = useState(null);
   const [registrationCompleted, setRegistrationCompleted] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const steps = [
     "Basic Information",
