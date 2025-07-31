@@ -68,7 +68,9 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
-const BASE_URL = "https://garage-management-zi5z.onrender.com/api";
+import { getGarageApiUrl, getBaseApiUrl } from "../config/api.js";
+
+const BASE_URL = "https://garage-management-zi5z.onrender.com";
 
 const EnhancedSignUpPage = () => {
   const navigate = useNavigate();
@@ -246,7 +248,7 @@ const EnhancedSignUpPage = () => {
   const fetchPlans = async () => {
     setFetchingPlans(true);
     try {
-      const response = await fetch(`${BASE_URL}/plans/all`);
+      const response = await fetch(getBaseApiUrl("/api/plans/all"));
       const data = await response.json();
       if (response.ok) {
         // Handle different response structures
@@ -465,17 +467,40 @@ const EnhancedSignUpPage = () => {
 
         console.log("Sending registration data:", registrationData);
 
-        // Call registration API
-        const response = await fetch(`${BASE_URL}/garage/signup`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(registrationData),
-        });
+        // Call registration API with fallback
+        let response;
+        try {
+          response = await fetch(getGarageApiUrl("/signup"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(registrationData),
+          });
+        } catch (error) {
+          console.log("Primary endpoint failed, trying fallback...");
+          // Fallback to direct endpoint
+          response = await fetch(`${BASE_URL}/api/garage/signup`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(registrationData),
+          });
+        }
 
-        const data = await response.json();
-        console.log("Registration response:", data);
+        console.log("Registration response status:", response.status);
+
+        let data;
+        try {
+          data = await response.json();
+          console.log("Registration response data:", data);
+        } catch (parseError) {
+          console.error("Failed to parse response as JSON:", parseError);
+          throw new Error(
+            `Server returned invalid response (${response.status}). Please try again.`
+          );
+        }
 
         if (response.ok) {
           showSnackbar(
@@ -514,7 +539,7 @@ const EnhancedSignUpPage = () => {
         console.log("=== Verifying OTP ===");
         console.log("OTP:", formData.otp);
 
-        const response = await fetch(`${BASE_URL}/garage/verify-otp`, {
+        const response = await fetch(getGarageApiUrl("/verify-otp"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -574,7 +599,7 @@ const EnhancedSignUpPage = () => {
     try {
       console.log("=== Resending OTP ===");
 
-      const response = await fetch(`${BASE_URL}/garage/resend-otp`, {
+      const response = await fetch(getGarageApiUrl("/resend-otp"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
