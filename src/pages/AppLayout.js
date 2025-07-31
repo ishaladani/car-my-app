@@ -77,93 +77,128 @@ const AppLayout = () => {
 
   // Handle logout function
   // Handle logout function
-const handleLogout = async () => {
-  if (isLoggingOut) return;
-  
-  try {
-    setIsLoggingOut(true);
-    const token = localStorage.getItem('token');
-    const headers = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
 
-    // Determine which ID to use based on usertype
-    let logoutId;
-    if (roll === "garage") {
-      logoutId = garageId;
-      console.log('Logging out garage:', logoutId);
-    } else if (roll === "user") {
-      logoutId = userId;
-      console.log('Logging out user:', logoutId);
-    } else {
-      // Fallback to userId if usertype is not explicitly "garage"
-      logoutId = userId;
-      console.log('Logging out (fallback to user):', logoutId);
-    }
+    try {
+      setIsLoggingOut(true);
+      const token = localStorage.getItem("token");
+      const headers = {};
 
-    // Check if we have a valid ID to logout
-    if (!logoutId) {
-      console.error('No valid ID found for logout');
-      throw new Error('Unable to determine user/garage ID for logout');
-    }
-    
-    await axios.post(
-      `https://garage-management-zi5z.onrender.com/api/garage/logout/${logoutId}`,
-      {},
-      { 
-        headers,
-        timeout: 10000
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
-    );
-    
-    console.log('Logout API call successful');
-  } catch (error) {
-    console.error('Error during logout:', error);
-    // Continue with local cleanup even if API call fails
-  } finally {
-    // Clear all localStorage items
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('garageId');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('garageName');
-    localStorage.removeItem('garageLogo');
-    localStorage.removeItem('profileUpdated');
-    
-    // Close menus
-    setUserMenu(null);
-    setMobileOpen(false);
-    
-    // Navigate to login
-    navigate('/login');
-    
-    setIsLoggingOut(false);
-  }
-};
+
+      // Determine which ID to use based on usertype
+      let logoutId;
+      if (roll === "garage") {
+        logoutId = garageId;
+        console.log("Logging out garage:", logoutId);
+      } else if (roll === "user") {
+        logoutId = userId;
+        console.log("Logging out user:", logoutId);
+      } else {
+        // Fallback to userId if usertype is not explicitly "garage"
+        logoutId = userId;
+        console.log("Logging out (fallback to user):", logoutId);
+      }
+
+      // Check if we have a valid ID to logout
+      if (!logoutId) {
+        console.error("No valid ID found for logout");
+        throw new Error("Unable to determine user/garage ID for logout");
+      }
+
+      await axios.post(
+        `https://garage-management-zi5z.onrender.com/api/garage/logout/${logoutId}`,
+        {},
+        {
+          headers,
+          timeout: 10000,
+        }
+      );
+
+      console.log("Logout API call successful");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // Continue with local cleanup even if API call fails
+    } finally {
+      // Clear all localStorage items
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("garageId");
+      localStorage.removeItem("userType");
+      localStorage.removeItem("garageName");
+      localStorage.removeItem("garageLogo");
+      localStorage.removeItem("profileUpdated");
+
+      // Close menus
+      setUserMenu(null);
+      setMobileOpen(false);
+
+      // Navigate to login
+      navigate("/login");
+
+      setIsLoggingOut(false);
+    }
+  };
 
   // All available nav items with permission keys
   const allNavItems = [
-    { text: "Dashboard", icon: <DashboardIcon />, path: "/", permission: "Dashboard" },
-    { text: "Create Job Cards", icon: <CarIcon />, path: "/jobs", permission: "Create Job Cards" },
-    { text: "Manage Inventory", icon: <InventoryIcon />, path: "/inventory", permission: "Manage Inventory" },
-    { text: "Add Engineer", icon: <InventoryIcon />, path: "/add-Engineer", permission: "Add Engineer" },
-    { text: "History", icon: <AssignmentIcon />, path: "/reports", permission: "Reports & Records" },
     {
-  text: "Recode & Report",
-  icon: <BuildIcon />,
-  path: "/inventory-dashboard", // ✅ Corrected
-  permission: "Reports & Records"
-},
+      text: "Dashboard",
+      icon: <DashboardIcon />,
+      path: "/",
+      permission: "Dashboard",
+    },
+    {
+      text: "Create Job Cards",
+      icon: <CarIcon />,
+      path: "/jobs",
+      permission: "Create Job Cards",
+    },
+    {
+      text: "Manage Inventory",
+      icon: <InventoryIcon />,
+      path: "/inventory",
+      permission: "Manage Inventory",
+    },
+    {
+      text: "Add Engineer",
+      icon: <InventoryIcon />,
+      path: "/add-Engineer",
+      permission: "Add Engineer",
+    },
+    {
+      text: "History",
+      icon: <AssignmentIcon />,
+      path: "/reports",
+      permission: "Reports & Records",
+    },
+    {
+      text: "Recode & Report",
+      icon: <BuildIcon />,
+      path: "/inventory-dashboard", // ✅ Corrected
+      permission: "Reports & Records",
+    },
     {
       text: "Service Reminders",
       icon: <NotificationsIcon />,
       path: "/reminders",
-      permission: "Service Reminders"
+      permission: "Service Reminders",
     },
-    { text: "Insurance", icon: <BuildIcon />, path: "/insurance", permission: "Insurance" },
-    { text: "User List", icon: <PersonIcon />, path: "/UserManagemt", permission: "User List" },
+    {
+      text: "Insurance",
+      icon: <BuildIcon />,
+      path: "/insurance",
+      permission: "Insurance",
+    },
+    {
+      text: "User List",
+      icon: <PersonIcon />,
+      path: "/UserManagemt",
+      permission: "User List",
+    },
   ];
 
   // Fetch garage profile data
@@ -175,22 +210,25 @@ const handleLogout = async () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const headers = {};
-      
+
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
       console.log("Fetching garage profile for ID:", garageId);
-      
+
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/getgaragebyid/${garageId}`,
         { headers }
       );
-      
-      console.log("Garage profile response:", response.data);
-      
+
+      console.log(
+        "Garage profile response:",
+        JSON.stringify(response.data, null, 2)
+      );
+
       if (response.data) {
         const garageData = response.data;
         setProfileData({
@@ -214,12 +252,12 @@ const handleLogout = async () => {
         message: error.message,
         status: error.response?.status,
         statusText: error.response?.statusText,
-        data: error.response?.data
+        data: error.response?.data,
       });
-      
+
       const savedName = localStorage.getItem("garageName");
       const savedImage = localStorage.getItem("garageLogo");
-      setProfileData(prev => ({
+      setProfileData((prev) => ({
         ...prev,
         name: savedName || "Garage",
         image: savedImage || "",
@@ -232,59 +270,72 @@ const handleLogout = async () => {
   // IMPROVED: Fetch user permissions with better error handling and logging
   const fetchUserPermissions = async () => {
     if (roll === "user") {
-      const token = localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '';
+      const token = localStorage.getItem("token")
+        ? `Bearer ${localStorage.getItem("token")}`
+        : "";
       try {
         console.log("Fetching user permissions...");
-        
+
         const response = await axios.get(
           "https://garage-management-zi5z.onrender.com/api/garage/user/getpermission",
           {
             headers: {
-              'Authorization': token,
-              'Content-Type': 'application/json'
+              Authorization: token,
+              "Content-Type": "application/json",
             },
           }
         );
-        
-        console.log("Permissions API response:", response.data);
-        
+
+        console.log(
+          "Permissions API response:",
+          JSON.stringify(response.data, null, 2)
+        );
+
         if (response.data && response.data.permissions) {
           const permissions = response.data.permissions;
           setUserPermissions(permissions);
-          
+
           console.log("User permissions:", permissions);
-          
+
           // IMPROVED: Filter nav items based on permissions with fallback
-          const filtered = allNavItems.filter(item => {
+          const filtered = allNavItems.filter((item) => {
             // Check both the permission field and text field for flexibility
-            const hasPermission = permissions.includes(item.permission) || 
-                                 permissions.includes(item.text);
+            const hasPermission =
+              permissions.includes(item.permission) ||
+              permissions.includes(item.text);
             console.log(`Permission check for ${item.text}:`, hasPermission);
             return hasPermission;
           });
-          
+
           // FALLBACK: If no permissions match, at least show Dashboard
           if (filtered.length === 0) {
-            console.warn("No permissions matched nav items, showing Dashboard only");
-            const dashboardItem = allNavItems.find(item => item.text === "Dashboard");
+            console.warn(
+              "No permissions matched nav items, showing Dashboard only"
+            );
+            const dashboardItem = allNavItems.find(
+              (item) => item.text === "Dashboard"
+            );
             if (dashboardItem) {
               filtered.push(dashboardItem);
             }
           }
-          
+
           console.log("Filtered nav items:", filtered);
           setFilteredNavItems(filtered);
-          
         } else {
           console.warn("No permissions data in response");
           // Show only Dashboard as fallback
-          const dashboardItem = allNavItems.find(item => item.text === "Dashboard");
+          const dashboardItem = allNavItems.find(
+            (item) => item.text === "Dashboard"
+          );
           setFilteredNavItems(dashboardItem ? [dashboardItem] : []);
         }
       } catch (error) {
         console.error("Error fetching user permissions:", error);
         // Fallback: Show only Dashboard
-        const dashboardItem = allNavItems.find(item => item.text === "Dashboard");
+        const dashboardItem = allNavItems.find(
+          (item) => item.text === "Dashboard"
+        );
         setFilteredNavItems(dashboardItem ? [dashboardItem] : []);
       }
     } else {
@@ -297,43 +348,53 @@ const handleLogout = async () => {
   // IMPROVED: Check if user has permission for current route
   const hasPermissionForRoute = (pathname) => {
     if (roll !== "user") return true; // Admin/Owner has access to everything
-    
+
     if (!permissionsLoaded) return false; // Wait for permissions to load
-    
-    const navItem = allNavItems.find(item => item.path === pathname);
+
+    const navItem = allNavItems.find((item) => item.path === pathname);
     if (!navItem) return true; // If route not in nav items, allow access
-    
-    return userPermissions.includes(navItem.permission) || 
-           userPermissions.includes(navItem.text);
+
+    return (
+      userPermissions.includes(navItem.permission) ||
+      userPermissions.includes(navItem.text)
+    );
   };
 
   // IMPROVED: Handle unauthorized access - Only redirect if user doesn't have permission
   useEffect(() => {
     if (initialLoadComplete && permissionsLoaded && roll === "user") {
       const currentPath = location.pathname;
-      
+
       if (!hasPermissionForRoute(currentPath)) {
         console.warn(`User doesn't have permission for route: ${currentPath}`);
         // Redirect to Dashboard or first available route
-        const firstAvailableRoute = filteredNavItems.length > 0 ? filteredNavItems[0].path : "/";
+        const firstAvailableRoute =
+          filteredNavItems.length > 0 ? filteredNavItems[0].path : "/";
         console.log(`Redirecting to: ${firstAvailableRoute}`);
         navigate(firstAvailableRoute, { replace: true });
       }
     }
-  }, [initialLoadComplete, permissionsLoaded, userPermissions, roll, location.pathname, filteredNavItems]);
+  }, [
+    initialLoadComplete,
+    permissionsLoaded,
+    userPermissions,
+    roll,
+    location.pathname,
+    filteredNavItems,
+  ]);
 
   // FIXED: Load initial data without unnecessary redirects
   useEffect(() => {
     const loadInitialData = async () => {
       console.log("Loading initial data...");
-      
+
       // Load profile and permissions
       await fetchGarageProfile();
       await fetchUserPermissions();
-      
+
       // Mark initial load as complete
       setInitialLoadComplete(true);
-      
+
       console.log("Initial data load completed");
     };
 
@@ -371,50 +432,56 @@ const handleLogout = async () => {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [roll, initialLoadComplete]);
 
   // Modern Theme Toggle Component
   const ThemeToggleSwitch = () => (
-    <Tooltip title={`Switch to ${darkMode ? 'Light' : 'Dark'} Mode`}>
+    <Tooltip title={`Switch to ${darkMode ? "Light" : "Dark"} Mode`}>
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'center',
+          display: "flex",
+          alignItems: "center",
           gap: 1,
           px: 1.5,
           py: 0.5,
           borderRadius: 20,
-          backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-          border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'}`,
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          cursor: 'pointer',
-          '&:hover': {
-            backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-1px)',
-            boxShadow: darkMode 
-              ? '0 4px 12px rgba(255, 255, 255, 0.1)' 
-              : '0 4px 12px rgba(0, 0, 0, 0.15)',
-          }
+          backgroundColor: darkMode
+            ? "rgba(255, 255, 255, 0.08)"
+            : "rgba(0, 0, 0, 0.04)",
+          border: `1px solid ${
+            darkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"
+          }`,
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          cursor: "pointer",
+          "&:hover": {
+            backgroundColor: darkMode
+              ? "rgba(255, 255, 255, 0.12)"
+              : "rgba(0, 0, 0, 0.08)",
+            transform: "translateY(-1px)",
+            boxShadow: darkMode
+              ? "0 4px 12px rgba(255, 255, 255, 0.1)"
+              : "0 4px 12px rgba(0, 0, 0, 0.15)",
+          },
         }}
         onClick={toggleDarkMode}
       >
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             width: 24,
             height: 24,
-            borderRadius: '50%',
-            backgroundColor: !darkMode ? '#FFA726' : 'transparent',
-            color: !darkMode ? '#fff' : theme.palette.text.secondary,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: !darkMode ? 'scale(1.1)' : 'scale(0.9)',
+            borderRadius: "50%",
+            backgroundColor: !darkMode ? "#FFA726" : "transparent",
+            color: !darkMode ? "#fff" : theme.palette.text.secondary,
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transform: !darkMode ? "scale(1.1)" : "scale(0.9)",
           }}
         >
           <LightMode sx={{ fontSize: 14 }} />
@@ -422,41 +489,41 @@ const handleLogout = async () => {
 
         <Box
           sx={{
-            position: 'relative',
+            position: "relative",
             width: 32,
             height: 16,
             borderRadius: 8,
-            backgroundColor: darkMode ? '#3f51b5' : '#e0e0e0',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            backgroundColor: darkMode ? "#3f51b5" : "#e0e0e0",
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
           <Box
             sx={{
-              position: 'absolute',
+              position: "absolute",
               top: 2,
               left: darkMode ? 18 : 2,
               width: 12,
               height: 12,
-              borderRadius: '50%',
-              backgroundColor: '#fff',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+              borderRadius: "50%",
+              backgroundColor: "#fff",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
             }}
           />
         </Box>
 
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             width: 24,
             height: 24,
-            borderRadius: '50%',
-            backgroundColor: darkMode ? '#3f51b5' : 'transparent',
-            color: darkMode ? '#fff' : theme.palette.text.secondary,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            transform: darkMode ? 'scale(1.1)' : 'scale(0.9)',
+            borderRadius: "50%",
+            backgroundColor: darkMode ? "#3f51b5" : "transparent",
+            color: darkMode ? "#fff" : theme.palette.text.secondary,
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transform: darkMode ? "scale(1.1)" : "scale(0.9)",
           }}
         >
           <DarkMode sx={{ fontSize: 14 }} />
@@ -467,24 +534,30 @@ const handleLogout = async () => {
 
   // Alternative Compact Toggle for Mobile
   const CompactThemeToggle = () => (
-    <Tooltip title={`${darkMode ? 'Light' : 'Dark'} Mode`}>
+    <Tooltip title={`${darkMode ? "Light" : "Dark"} Mode`}>
       <IconButton
         onClick={toggleDarkMode}
         sx={{
           width: 40,
           height: 40,
           borderRadius: 2,
-          backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-          border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'}`,
-          color: darkMode ? '#3f51b5' : '#FFA726',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          '&:hover': {
-            backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-1px) scale(1.05)',
-            boxShadow: darkMode 
-              ? '0 4px 12px rgba(255, 255, 255, 0.1)' 
-              : '0 4px 12px rgba(0, 0, 0, 0.15)',
-          }
+          backgroundColor: darkMode
+            ? "rgba(255, 255, 255, 0.08)"
+            : "rgba(0, 0, 0, 0.04)",
+          border: `1px solid ${
+            darkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"
+          }`,
+          color: darkMode ? "#3f51b5" : "#FFA726",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          "&:hover": {
+            backgroundColor: darkMode
+              ? "rgba(255, 255, 255, 0.12)"
+              : "rgba(0, 0, 0, 0.08)",
+            transform: "translateY(-1px) scale(1.05)",
+            boxShadow: darkMode
+              ? "0 4px 12px rgba(255, 255, 255, 0.1)"
+              : "0 4px 12px rgba(0, 0, 0, 0.15)",
+          },
         }}
       >
         {darkMode ? (
@@ -499,12 +572,21 @@ const handleLogout = async () => {
   // IMPROVED: Show loading state while initial load is happening
   if (!initialLoadComplete || !permissionsLoaded || !profileLoaded) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress />
         <Typography variant="body2" sx={{ ml: 2 }}>
-          {!profileLoaded ? "Loading profile..." : 
-           !permissionsLoaded ? "Loading permissions..." : 
-           "Initializing..."}
+          {!profileLoaded
+            ? "Loading profile..."
+            : !permissionsLoaded
+            ? "Loading permissions..."
+            : "Initializing..."}
         </Typography>
       </Box>
     );
@@ -527,7 +609,12 @@ const handleLogout = async () => {
         <Avatar
           src={profileData.image}
           alt="Garage Logo"
-          sx={{ width: 40, height: 40, mr: 1, bgcolor: profileData.image ? 'transparent' : 'primary.main' }}
+          sx={{
+            width: 40,
+            height: 40,
+            mr: 1,
+            bgcolor: profileData.image ? "transparent" : "primary.main",
+          }}
         >
           {!profileData.image && profileData.name.charAt(0).toUpperCase()}
         </Avatar>
@@ -536,8 +623,13 @@ const handleLogout = async () => {
             {profileData.name}
           </Typography>
           {profileData.isSubscribed && (
-            <Typography variant="caption" color="success.main" sx={{ fontWeight: 500 }}>
-              {profileData.subscriptionType?.replace('_', ' ').toUpperCase()} Plan
+            <Typography
+              variant="caption"
+              color="success.main"
+              sx={{ fontWeight: 500 }}
+            >
+              {profileData.subscriptionType?.replace("_", " ").toUpperCase()}{" "}
+              Plan
             </Typography>
           )}
         </Box>
@@ -558,9 +650,7 @@ const handleLogout = async () => {
                   py: 1.5,
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  {item.icon}
-                </ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
                 <ListItemText
                   primary={item.text}
                   primaryTypographyProps={{
@@ -639,8 +729,10 @@ const handleLogout = async () => {
 
           {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {location.pathname === "/" ? "Dashboard" : 
-             filteredNavItems.find(item => item.path === location.pathname)?.text || ""}
+            {location.pathname === "/"
+              ? "Dashboard"
+              : filteredNavItems.find((item) => item.path === location.pathname)
+                  ?.text || ""}
           </Typography>
 
           {/* Theme Toggle in App Bar (Mobile) */}
@@ -686,19 +778,22 @@ const handleLogout = async () => {
                 mt: 1,
                 borderRadius: 2,
                 minWidth: 180,
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-              }
+                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
+              },
             }}
           >
-            <MenuItem onClick={() => navigate('/profile')} sx={{ py: 1.5, gap: 1.5 }}>
+            <MenuItem
+              onClick={() => navigate("/profile")}
+              sx={{ py: 1.5, gap: 1.5 }}
+            >
               <PersonIcon fontSize="small" />
               <Typography variant="body2">Profile</Typography>
             </MenuItem>
             <Divider />
-            <MenuItem 
+            <MenuItem
               onClick={handleLogout}
               disabled={isLoggingOut}
-              sx={{ py: 1.5, gap: 1.5, color: 'error.main' }}
+              sx={{ py: 1.5, gap: 1.5, color: "error.main" }}
             >
               {isLoggingOut ? (
                 <CircularProgress size={16} color="inherit" />

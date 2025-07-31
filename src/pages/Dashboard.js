@@ -188,7 +188,9 @@ const JobDetailsComponent = ({
             variant="body2"
             sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
           >
-            {String(details)}
+            {typeof details === "object"
+              ? JSON.stringify(details)
+              : String(details)}
           </Typography>
         );
       }
@@ -475,7 +477,7 @@ const Dashboard = () => {
         }
 
         const data = await response.json();
-        console.log("Jobs API response:", data);
+        console.log("Jobs API response:", JSON.stringify(data, null, 2));
 
         const jobsData = Array.isArray(data)
           ? data
@@ -547,7 +549,7 @@ const Dashboard = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
-        console.log("Inventory API response:", data);
+        console.log("Inventory API response:", JSON.stringify(data, null, 2));
 
         const inventoryData = Array.isArray(data)
           ? data
@@ -691,7 +693,7 @@ const Dashboard = () => {
     console.log("Dashboard Debug Info:", {
       garageId,
       tokenPresent: !!token,
-      localStorageKeys: Object.keys(localStorage),
+      localStorageKeys: Object.keys(localStorage).length,
     });
   }, [garageId, token]);
 
