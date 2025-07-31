@@ -854,6 +854,17 @@ const EnhancedSignUpPage = () => {
           Select a plan that fits your garage business needs.
         </Typography>
 
+        {/* Debug: Show selected plan */}
+        {formData.selectedPlan && (
+          <Box mb={3} p={2} bgcolor="success.light" borderRadius={2}>
+            <Typography variant="body2" color="success.dark">
+              ✅ Selected: {formData.selectedPlan.name} -{" "}
+              {formData.selectedPlan.price}(
+              {formData.selectedPlan.durationInMonths} months)
+            </Typography>
+          </Box>
+        )}
+
         {fetchingPlans ? (
           <Box display="flex" justifyContent="center" my={4}>
             <CircularProgress />
@@ -871,31 +882,59 @@ const EnhancedSignUpPage = () => {
                     sx={{
                       borderRadius: 2,
                       border:
-                        formData.isFreePlan && plan.name === "Free Plan"
+                        formData.selectedPlan?._id === plan._id
                           ? "2px solid"
                           : "1px solid",
                       borderColor:
-                        formData.isFreePlan && plan.name === "Free Plan"
+                        formData.selectedPlan?._id === plan._id
                           ? "primary.main"
                           : "divider",
+                      backgroundColor:
+                        formData.selectedPlan?._id === plan._id
+                          ? "primary.light"
+                          : "transparent",
                       "&:hover": {
                         transform: "scale(1.03)",
                         transition: "0.3s",
                       },
                       cursor: "pointer",
                     }}
-                    onClick={() =>
+                    onClick={() => {
+                      console.log("=== Plan Selected ===");
+                      console.log("Selected plan:", plan);
+
+                      const isFree =
+                        plan.price === "Free" ||
+                        plan.price === "₹0" ||
+                        plan.price === "₹0/month";
+
                       setFormData((prev) => ({
                         ...prev,
-                        isFreePlan: plan.name === "Free Plan",
+                        isFreePlan: isFree,
                         durationInMonths: plan.durationInMonths,
-                      }))
-                    }
+                        selectedPlan: plan,
+                      }));
+
+                      showSnackbar(
+                        `Plan "${plan.name}" selected successfully!`,
+                        "success"
+                      );
+                    }}
                   >
                     <CardContent>
-                      <Typography variant="h6" fontWeight="bold">
-                        {plan.name}
-                      </Typography>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={1}
+                      >
+                        <Typography variant="h6" fontWeight="bold">
+                          {plan.name}
+                        </Typography>
+                        {formData.selectedPlan?._id === plan._id && (
+                          <CheckCircle color="primary" fontSize="small" />
+                        )}
+                      </Box>
                       <Typography variant="h5" color="primary" mt={1}>
                         {plan.price}
                       </Typography>
