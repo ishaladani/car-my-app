@@ -217,16 +217,9 @@ const AppLayout = () => {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("Fetching garage profile for ID:", garageId);
-
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/getgaragebyid/${garageId}`,
         { headers }
-      );
-
-      console.log(
-        "Garage profile response:",
-        JSON.stringify(response.data, null, 2)
       );
 
       if (response.data) {
@@ -274,8 +267,6 @@ const AppLayout = () => {
         ? `Bearer ${localStorage.getItem("token")}`
         : "";
       try {
-        console.log("Fetching user permissions...");
-
         const response = await axios.get(
           "https://garage-management-zi5z.onrender.com/api/garage/user/getpermission",
           {
@@ -286,16 +277,9 @@ const AppLayout = () => {
           }
         );
 
-        console.log(
-          "Permissions API response:",
-          JSON.stringify(response.data, null, 2)
-        );
-
         if (response.data && response.data.permissions) {
           const permissions = response.data.permissions;
           setUserPermissions(permissions);
-
-          console.log("User permissions:", permissions);
 
           // IMPROVED: Filter nav items based on permissions with fallback
           const filtered = allNavItems.filter((item) => {
@@ -303,7 +287,7 @@ const AppLayout = () => {
             const hasPermission =
               permissions.includes(item.permission) ||
               permissions.includes(item.text);
-            console.log(`Permission check for ${item.text}:`, hasPermission);
+
             return hasPermission;
           });
 
@@ -320,7 +304,6 @@ const AppLayout = () => {
             }
           }
 
-          console.log("Filtered nav items:", filtered);
           setFilteredNavItems(filtered);
         } else {
           console.warn("No permissions data in response");
@@ -370,7 +353,7 @@ const AppLayout = () => {
         // Redirect to Dashboard or first available route
         const firstAvailableRoute =
           filteredNavItems.length > 0 ? filteredNavItems[0].path : "/";
-        console.log(`Redirecting to: ${firstAvailableRoute}`);
+
         navigate(firstAvailableRoute, { replace: true });
       }
     }
@@ -386,16 +369,12 @@ const AppLayout = () => {
   // FIXED: Load initial data without unnecessary redirects
   useEffect(() => {
     const loadInitialData = async () => {
-      console.log("Loading initial data...");
-
       // Load profile and permissions
       await fetchGarageProfile();
       await fetchUserPermissions();
 
       // Mark initial load as complete
       setInitialLoadComplete(true);
-
-      console.log("Initial data load completed");
     };
 
     loadInitialData();
@@ -418,7 +397,6 @@ const AppLayout = () => {
   // Refresh permissions when role/userId changes (but don't redirect)
   useEffect(() => {
     if (initialLoadComplete) {
-      console.log("Refreshing permissions due to role/userId change");
       fetchUserPermissions();
     }
   }, [roll, userId, initialLoadComplete]);
@@ -427,7 +405,6 @@ const AppLayout = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && roll === "user" && initialLoadComplete) {
-        console.log("Page became visible, refreshing permissions");
         fetchUserPermissions();
       }
     };

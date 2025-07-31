@@ -477,7 +477,6 @@ const Dashboard = () => {
         }
 
         const data = await response.json();
-        console.log("Jobs API response:", JSON.stringify(data, null, 2));
 
         const jobsData = Array.isArray(data)
           ? data
@@ -549,7 +548,6 @@ const Dashboard = () => {
           throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
-        console.log("Inventory API response:", JSON.stringify(data, null, 2));
 
         const inventoryData = Array.isArray(data)
           ? data
@@ -688,14 +686,6 @@ const Dashboard = () => {
     if (progress >= 50) return theme.palette.warning.main;
     return theme.palette.error.main;
   };
-
-  useEffect(() => {
-    console.log("Dashboard Debug Info:", {
-      garageId,
-      tokenPresent: !!token,
-      localStorageKeys: Object.keys(localStorage).length,
-    });
-  }, [garageId, token]);
 
   return (
     <>
@@ -978,7 +968,12 @@ const Dashboard = () => {
                                   {index + 1}
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>
-                                  {job.createdBy || "N/A"}
+                                  {typeof job.createdBy === "object" &&
+                                  job.createdBy?.name
+                                    ? job.createdBy.name
+                                    : typeof job.createdBy === "string"
+                                    ? job.createdBy
+                                    : "N/A"}
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 500 }}>
                                   {job.carNumber ||

@@ -99,7 +99,6 @@ const LoginPage = () => {
 
   // Handle logout
   const handleLogout = async () => {
-    console.log("=== LOGOUT BUTTON CLICKED ===");
     setLogoutLoading(true);
     try {
       const storedUserId = localStorage.getItem("garageId");
@@ -113,7 +112,6 @@ const LoginPage = () => {
       }
 
       if (storedUserId && token) {
-        console.log("Calling logout API...");
         await axios.post(
           `${BASE_URL}/api/garage/logout/${storedUserId}`,
           {},
@@ -124,7 +122,6 @@ const LoginPage = () => {
             },
           }
         );
-        console.log("Logout API called successfully");
       }
     } catch (error) {
       console.error("Error during logout:", error);
