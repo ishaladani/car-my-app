@@ -227,9 +227,26 @@ const RenewPlanPage = () => {
     setOpenSnackbar(false);
   };
 
+  // Helper function to check if a plan is free
+  const isPlanFree = (plan) => {
+    if (!plan) return false;
+    const amount = plan.amount || plan.price || 0;
+    return amount === 0 || amount === "₹0" || amount === "₹0/month";
+  };
+
   const handleSelectPlan = (plan) => {
     console.log("=== handleSelectPlan called ===");
     console.log("Selected plan:", plan);
+
+    // Check if it's a free plan
+    if (isPlanFree(plan)) {
+      console.log("Free plan selected");
+      showSnackbar(
+        "Free plans are automatically activated. No payment required.",
+        "info"
+      );
+    }
+
     setSelectedPlan(plan);
     setOpenPlanDialog(false);
     console.log("Plan selected and dialog closed");
@@ -246,6 +263,15 @@ const RenewPlanPage = () => {
       return;
     }
 
+    // Check if plan is free (amount is 0 or null)
+    const isFreePlan = isPlanFree(selectedPlan);
+
+    if (isFreePlan) {
+      console.log("Free plan selected - activating without payment");
+      await activateFreePlan();
+      return;
+    }
+
     if (!garageData.garageId) {
       console.log("No garage ID found");
       showSnackbar("Garage ID not found. Please login again.", "error");
@@ -255,6 +281,72 @@ const RenewPlanPage = () => {
 
     console.log("Starting payment process...");
     await handleRazorpayPayment();
+  };
+
+  const activateFreePlan = async () => {
+    console.log("=== activateFreePlan called ===");
+    try {
+      setLoading(true);
+
+      // Try to activate free plan directly
+      let response = await fetch(`${getBaseApiUrl()}/api/plans/activate-free`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          garageId: garageData.garageId,
+          planId: selectedPlan._id || selectedPlan.id,
+        }),
+      });
+
+      // If new endpoint doesn't exist, try alternative approach
+      if (!response.ok && response.status === 404) {
+        response = await fetch(
+          `${getBaseApiUrl()}/api/garage/activate-free-plan`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              garageId: garageData.garageId,
+              planId: selectedPlan._id || selectedPlan.id,
+            }),
+          }
+        );
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Free plan activated successfully:", data);
+        showSnackbar(
+          "Free plan activated successfully! Redirecting to dashboard...",
+          "success"
+        );
+
+        // Redirect to dashboard after 2 seconds
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+      } else {
+        console.log(
+          "Free plan activation failed, redirecting to dashboard anyway"
+        );
+        showSnackbar("Free plan selected. Redirecting to dashboard...", "info");
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Error activating free plan:", error);
+      showSnackbar("Free plan selected. Redirecting to dashboard...", "info");
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRazorpayPayment = async () => {
@@ -797,7 +889,15 @@ const RenewPlanPage = () => {
               fullWidth
               variant="contained"
               size="large"
-              disabled={loading || !selectedPlan || fetchingPlans}
+              disabled={
+                loading ||
+                !selectedPlan ||
+                fetchingPlans ||
+                (selectedPlan &&
+                  (selectedPlan.amount === 0 ||
+                    selectedPlan.price === "₹0" ||
+                    selectedPlan.price === "₹0/month"))
+              }
               startIcon={<CreditCard />}
               onClick={() => {
                 console.log("=== Button clicked ===");
@@ -812,7 +912,14 @@ const RenewPlanPage = () => {
               }}
               sx={{ py: 1.5 }}
             >
-              {loading ? "Processing..." : `Pay ${selectedPlan?.price} & Renew`}
+              {loading
+                ? "Processing..."
+                : selectedPlan &&
+                  (selectedPlan.amount === 0 ||
+                    selectedPlan.price === "₹0" ||
+                    selectedPlan.price === "₹0/month")
+                ? "Free Plan - No Payment"
+                : `Pay ${selectedPlan?.price} & Renew`}
             </Button>
           </Grid>
           <Grid item xs={12} sm={3}>
