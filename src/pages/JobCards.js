@@ -701,6 +701,7 @@ const JobCards = () => {
     rightSide: null,
   });
   const [existingVideo, setExistingVideo] = useState(null);
+  const [jobCardData, setJobCardData] = useState(null);
 
   const generatePreviewPDF = () => {
     const doc = new jsPDF();
@@ -729,6 +730,14 @@ const JobCards = () => {
       pageWidth - margin - 50,
       19
     );
+    // Add Job Card Number
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `Job Card #${jobCardData?.jobCardNumber || id || "N/A"}`,
+      pageWidth - margin - 80,
+      19
+    );
     doc.setTextColor(...blackColor);
     yPosition = headerHeight + 10;
 
@@ -753,6 +762,7 @@ const JobCards = () => {
     // --- Customer Info ---
     addSectionHeader("CUSTOMER INFORMATION");
     const customerData = [
+      ["Job Card Number", jobCardData?.jobCardNumber || id || "N/A"],
       ["Customer Name", formData.customerName || "N/A"],
       ["Contact Number", formData.contactNumber || "N/A"],
       ["Email", formData.email || "N/A"],
@@ -936,6 +946,9 @@ const JobCards = () => {
         const jobCardData = response.data;
 
         console.log("Fetched Job Card Data:", jobCardData);
+
+        // Store the complete job card data for PDF generation
+        setJobCardData(jobCardData);
 
         setFormData({
           customerNumber: jobCardData.customerNumber || "",
