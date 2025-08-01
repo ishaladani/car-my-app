@@ -1604,12 +1604,27 @@ const AutoServeBilling = () => {
         billShipY + 100
       );
       doc.text(
-        `Date: ${carDetails.billingDate}`,
+        `Job Card No: ${jobCardIdFromUrl || jobCardData?._id || "N/A"}`,
         invoiceDetailsX,
         billShipY + 115
       );
+      doc.text(
+        `Garage No: ${garageId || "N/A"}`,
+        invoiceDetailsX,
+        billShipY + 130
+      );
+      doc.text(
+        `Email: ${garageDetails.email || "N/A"}`,
+        invoiceDetailsX,
+        billShipY + 145
+      );
+      doc.text(
+        `Date: ${carDetails.billingDate}`,
+        invoiceDetailsX,
+        billShipY + 160
+      );
 
-      currentY = billShipY + 140;
+      currentY = billShipY + 180;
 
       // Items Table
       const tableStartY = currentY;
