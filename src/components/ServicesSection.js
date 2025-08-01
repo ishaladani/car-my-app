@@ -84,7 +84,6 @@ const ServicesSection = ({
                   <TableCell>Service Description</TableCell>
                   <TableCell>Engineer</TableCell>
                   <TableCell align="center">Status</TableCell>
-                  <TableCell align="right">Service Cost (₹)</TableCell>
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -135,31 +134,7 @@ const ServicesSection = ({
                         sx={{ fontWeight: 500 }} 
                       />
                     </TableCell>
-                    <TableCell sx={{ 
-                      ...tableCellStyle, 
-                      textAlign: 'right'
-                    }}>
-                      <Box sx={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: 'flex-end' 
-                      }}>
-                        <Typography 
-                          variant="body2" 
-                          fontWeight={600} 
-                          color="primary"
-                        >
-                          ₹{service.laborCost}
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          color="primary" 
-                          onClick={() => openEditPrice(service.id, "service", "laborCost", service.laborCost)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
+
                     <TableCell sx={{ 
                       ...tableCellStyle, 
                       textAlign: 'center' 

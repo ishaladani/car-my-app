@@ -84,6 +84,8 @@ import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Styled components
 const VisuallyHiddenInput = styled('input')({
@@ -683,6 +685,157 @@ const JobCards = () => {
     rightSide: null
   });
   const [existingVideo, setExistingVideo] = useState(null);
+
+  
+const generatePreviewPDF = () => {
+  const doc = new jsPDF();
+  const primaryColor = [63, 81, 181];
+  const lightGray = [245, 245, 245];
+  const darkGray = [66, 66, 66];
+  const blackColor = [0, 0, 0];
+
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 14;
+  const sectionSpacing = 12;
+  const headerHeight = 30;
+
+  let yPosition = 20;
+
+  // --- Header ---
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('JOB CARD PREVIEW', margin, 19);
+  doc.setFontSize(12);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - margin - 50, 19);
+  doc.setTextColor(...blackColor);
+  yPosition = headerHeight + 10;
+
+  // --- Helper: Section Header ---
+  const addSectionHeader = (title) => {
+    if (yPosition > doc.internal.pageSize.height - 30) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    doc.setFillColor(...lightGray);
+    doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, 'F');
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkGray);
+    doc.text(title, margin + 3, yPosition + 7);
+    yPosition += 15;
+    doc.setTextColor(...blackColor);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+  };
+
+  // --- Customer Info ---
+  addSectionHeader('CUSTOMER INFORMATION');
+  const customerData = [
+    ['Customer Name', formData.customerName || 'N/A'],
+    ['Contact Number', formData.contactNumber || 'N/A'],
+    ['Email', formData.email || 'N/A'],
+    ['Company', formData.company || 'N/A']
+  ];
+  autoTable(doc, {
+    startY: yPosition,
+    body: customerData,
+    theme: 'plain',
+    styles: { fontSize: 12, cellPadding: 4, lineColor: [200, 200, 200], lineWidth: 0.5 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 },
+      1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: (data) => { yPosition = data.cursor.y + sectionSpacing; }
+  });
+
+  // --- Vehicle Info ---
+  addSectionHeader('VEHICLE INFORMATION');
+  const vehicleData = [
+    ['Car Number', formData.carNumber || 'N/A'],
+    ['Model', formData.model || 'N/A'],
+    ['Kilometer', formData.kilometer ? `${formData.kilometer} km` : 'N/A'],
+    ['Fuel Type', fuelTypeOptions.find(o => o.value === formData.fuelType)?.label || 'N/A'],
+    ['Fuel Level', getFuelLevelText(fuelLevel)],
+    ['Chassis Number', formData.chesiNumber || 'N/A']
+  ];
+  autoTable(doc, {
+    startY: yPosition,
+    body: vehicleData,
+    theme: 'plain',
+    styles: { fontSize: 12, cellPadding: 4, lineColor: [200, 200, 200], lineWidth: 0.5 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 },
+      1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: (data) => { yPosition = data.cursor.y + sectionSpacing; }
+  });
+
+  // --- Insurance Info ---
+  if (formData.insuranceProvider || formData.policyNumber || formData.expiryDate) {
+    addSectionHeader('INSURANCE INFORMATION');
+    const insuranceData = [
+      ['Provider', formData.insuranceProvider || 'N/A'],
+      ['Policy Number', formData.policyNumber || 'N/A'],
+      ['Expiry Date', formData.expiryDate ? new Date(formData.expiryDate).toLocaleDateString() : 'N/A'],
+      ['Type', formData.type || 'N/A'],
+      ['Excess Amount', formData.excessAmount ? `₹${formData.excessAmount}` : 'N/A']
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: insuranceData,
+      theme: 'plain',
+      styles: { fontSize: 12, cellPadding: 4, lineColor: [200, 200, 200], lineWidth: 0.5 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+      },
+      margin: { left: margin, right: margin },
+      didDrawPage: (data) => { yPosition = data.cursor.y + sectionSpacing; }
+    });
+  }
+
+  // --- Job Details ---
+  if (jobPoints.length > 0) {
+    addSectionHeader('JOB DETAILS & SERVICES');
+    const jobDetailsData = jobPoints.map((item, index) => [
+      index + 1,
+      item.description || 'N/A'
+    ]);
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['S.No.', 'Description']],
+      body: jobDetailsData,
+      theme: 'striped',
+      styles: { fontSize: 12, cellPadding: 5 },
+      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 25, halign: 'center' },
+        1: { cellWidth: pageWidth - 2 * margin - 25 - 15 }
+      },
+      margin: { left: margin, right: margin },
+      didDrawPage: (data) => { yPosition = data.cursor.y + sectionSpacing; }
+    });
+  }
+
+  // --- Footer ---
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, doc.internal.pageSize.height - 10, { align: 'right' });
+    doc.text('Generated by Job Management System', margin, doc.internal.pageSize.height - 10);
+  }
+
+  // --- Save PDF ---
+  const fileName = `JobCardPreview_${formData.carNumber || 'N/A'}_${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(fileName);
+};
 
   useEffect(() => {
     if (!garageId) {
@@ -1598,25 +1751,35 @@ const JobCards = () => {
           )}
         </Box>
       </DialogContent>
-      
       <DialogActions sx={{ p: 3, borderTop: `1px solid ${theme.palette.divider}` }}>
-        <Button 
-          onClick={() => setShowPreview(false)} 
-          startIcon={<ArrowBackIcon />}
-          sx={{ mr: 2 }}
-        >
-          Back to Edit
-        </Button>
-        <Button 
-          onClick={handleActualSubmit}
-          variant="contained"
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
-          sx={{ px: 4 }}
-        >
-          {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Confirm Update' : 'Confirm Save')}
-        </Button>
-      </DialogActions>
+  <Button 
+    onClick={() => setShowPreview(false)} 
+    startIcon={<ArrowBackIcon />}
+    sx={{ mr: 2 }}
+  >
+    Back to Edit
+  </Button>
+
+  {/* New Download PDF Button */}
+  <Button
+    onClick={generatePreviewPDF}
+    variant="outlined"
+    // startIcon={<DownloadIcon />}
+    sx={{ mr: 2 }}
+  >
+    Download PDF
+  </Button>
+
+  <Button 
+    onClick={handleActualSubmit}
+    variant="contained"
+    disabled={loading}
+    startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
+    sx={{ px: 4 }}
+  >
+    {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Confirm Update' : 'Confirm Save')}
+  </Button>
+</DialogActions>
     </PreviewDialog>
   );
 

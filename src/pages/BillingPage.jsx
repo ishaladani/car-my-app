@@ -41,23 +41,23 @@ const AutoServeBilling = () => {
   const today = new Date().toISOString().split("T")[0];
 
   // UPDATED: State declarations with complete bank details
-  const [garageDetails, setGarageDetails] = useState({
-    name: "",
-    address: "",
-    phone: "",
-    gstNumber: "",
-    email: "",
-    website: "",
-    // NEW: Added complete bank details structure
-    bankDetails: {
-      bankName: "",
-      accountNumber: "",
-      ifscCode: "",
-      accountHolderName: "",
-      branchName: "",
-      upiId: ""
-    }
-  });
+ const [garageDetails, setGarageDetails] = useState({
+  name: "",
+  address: "",
+  phone: "",
+  gstNumber: "",
+  email: "",
+  website: "",
+  logoUrl: "", // NEW: Add logo field
+  bankDetails: {
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+    accountHolderName: "",
+    branchName: "",
+    upiId: ""
+  }
+});
 
   const [isLoading, setIsLoading] = useState(true);
   const [jobCardData, setJobCardData] = useState(null);
@@ -91,7 +91,9 @@ const AutoServeBilling = () => {
     // NEW: Added bill type and party details
     billType: 'gst', // 'gst' or 'non-gst'
     billToParty: '',
-    shiftToParty: ''
+    shiftToParty: '',
+    insuranceProvider:''
+    
   });
 
   const [carDetails, setCarDetails] = useState({
@@ -187,23 +189,23 @@ const AutoServeBilling = () => {
         );
         const data = response.data;
         
-        // UPDATED: Handle both old and new bank details structure
-        setGarageDetails({
-          name: data.name || "",
-          address: data.address || "",
-          phone: data.phone || "",
-          gstNumber: data.gstNum || data.gstNumber || "",
-          email: data.email || "",
-          website: data.website || "",
-          bankDetails: {
-            bankName: data.bankDetails?.bankName || data.bankName || "",
-            accountNumber: data.bankDetails?.accountNumber || data.accountNumber || "",
-            ifscCode: data.bankDetails?.ifscCode || data.ifscCode || "",
-            accountHolderName: data.bankDetails?.accountHolderName || data.accountHolderName || "",
-            branchName: data.bankDetails?.branchName || data.branchName || "",
-            upiId: data.bankDetails?.upiId || data.upiId || ""
-          }
-        });
+setGarageDetails({
+  name: data.name || "",
+  address: data.address || "",
+  phone: data.phone || "",
+  gstNumber: data.gstNum || data.gstNumber || "",
+  email: data.email || "",
+  website: data.website || "",
+  logoUrl: data.logoUrl || data.logo || "", // Support multiple field names
+  bankDetails: {
+  bankName: data.bankDetails?.bankName || data.bankName || "",
+  accountNumber: data.bankDetails?.accountNumber || data.accountNumber || "",
+  ifscCode: data.bankDetails?.ifscCode || data.ifscCode || "",
+  accountHolderName: data.bankDetails?.accountHolderName || data.accountHolderName || "",
+  branchName: data.bankDetails?.branchName || data.branchName || "",
+  upiId: data.bankDetails?.upiId || data.upiId || ""
+}
+});
       } catch (error) {
         console.error("Error fetching garage data:", error);
       }
@@ -251,7 +253,17 @@ const AutoServeBilling = () => {
           });
         }
         
-        const invoiceNo = data.invoiceNumber || `INV-${Date.now()}`;
+        // Generate invoice number if not already generated
+        let invoiceNo = data.invoiceNumber;
+        if (!invoiceNo) {
+          try {
+            invoiceNo = await generateInvoiceNumber();
+            console.log('Generated invoice number:', invoiceNo);
+          } catch (error) {
+            console.error('Error generating invoice number:', error);
+            invoiceNo = `INV${Date.now().toString().slice(-6)}`;
+          }
+        }
 
         setCarDetails({
           carNumber: data.carNumber || data.registrationNumber || "",
@@ -267,10 +279,11 @@ const AutoServeBilling = () => {
 
         // UPDATED: Set bill to party and shift to party from job card data
         setGstSettings(prev => ({
-          ...prev,
-          billToParty: data.customerName || data.customer?.name || "",
-          shiftToParty: data.insuranceCompany || data.insurance?.company || "N/A"
-        }));
+  ...prev,
+  billToParty: data.customerName || data.customer?.name || "",
+  shiftToParty: data.insuranceCompany || data.insurance?.company || "N/A",
+  insuranceProvider: data.insuranceProvider || data.insurance?.company || "N/A"
+}));
 
         // UPDATED: Process parts with HSN numbers
         if (data.partsUsed?.length > 0) {
@@ -498,6 +511,47 @@ const AutoServeBilling = () => {
     setSummary(prev => ({ ...prev, discount }));
   };
 
+  const handleLaborCostChange = (value) => {
+    const totalLaborCost = parseFloat(value) || 0;
+    setSummary(prev => ({ ...prev, totalLaborCost }));
+  };
+
+  // Generate invoice number starting from INV001 for each garage
+  const generateInvoiceNumber = async () => {
+    try {
+      // Get the last invoice number for this garage
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/garage/jobCards?garageId=${garageId}&generateBill=true`
+      );
+      
+      const bills = response.data || [];
+      let lastInvoiceNumber = 0;
+      
+      // Find the highest invoice number
+      bills.forEach(bill => {
+        if (bill.invoiceNumber) {
+          const match = bill.invoiceNumber.match(/INV(\d+)/);
+          if (match) {
+            const num = parseInt(match[1]);
+            if (num > lastInvoiceNumber) {
+              lastInvoiceNumber = num;
+            }
+          }
+        }
+      });
+      
+      // Generate next invoice number
+      const nextNumber = lastInvoiceNumber + 1;
+      const invoiceNumber = `INV${nextNumber.toString().padStart(3, '0')}`;
+      
+      return invoiceNumber;
+    } catch (error) {
+      console.error('Error generating invoice number:', error);
+      // Fallback to timestamp-based invoice number
+      return `INV${Date.now().toString().slice(-6)}`;
+    }
+  };
+
   const removePart = (id) => {
     setParts(prev => prev.filter(part => part.id !== id));
   };
@@ -536,32 +590,88 @@ const AutoServeBilling = () => {
   };
 
   // Function to update bill and job status
-  const updateBillAndJobStatus = async (jobCardId) => {
-    try {
-      const billStatusResponse = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`
-      );
-      
-      if (billStatusResponse.status === 200) {
-        console.log('Bill status updated successfully');
-        setBillGenerated(true);
-        
-        const statusUpdateResponse = await axios.put(
-          `https://garage-management-zi5z.onrender.com/api/jobcards/updatestatus/${jobCardId}`,
-          { status: 'Completed' }
-        );
-        
-        if (statusUpdateResponse.status === 200) {
-          console.log('Job card status updated to completed');
-          if (jobCardData) {
-            setJobCardData(prev => ({ ...prev, status: 'Completed' }));
+ const updateBillAndJobStatus = async (jobCardId) => {
+  // Get token from localStorage
+  const token = localStorage.getItem('token');
+  
+  if (!token) {
+    console.error('No authentication token found');
+    setSnackbar({
+      open: true,
+      message: 'Authentication failed. Please log in again.',
+      severity: 'error'
+    });
+    return;
+  }
+
+  try {
+    // Headers with Authorization
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    };
+
+    // Update bill status with invoice number
+    const billStatusResponse = await axios.put(
+      `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`,
+      { 
+        invoiceNumber: carDetails.invoiceNo,
+        generateBill: true 
+      },
+      config
+    );
+
+    if (billStatusResponse.status === 200) {
+      console.log('✅ Bill status updated successfully');
+      setBillGenerated(true);
+
+      // Update job card status to Completed
+      const statusUpdateResponse = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/jobcards/updatestatus/${jobCardId}`,
+        { status: 'Completed' },
+         {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
         }
+      );
+
+      if (statusUpdateResponse.status === 200) {
+        console.log('✅ Job card status updated to Completed');
+        if (jobCardData) {
+          setJobCardData(prev => ({ ...prev, status: 'Completed' }));
+        }
       }
-    } catch (error) {
-      console.error('Error updating bill and job status:', error);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error updating bill and job status:', error);
+
+    // Handle specific error cases
+    if (error.response) {
+      const errorMsg = error.response.data.message || 'Unknown error';
+      // setSnackbar({
+      //   open: true,
+      //   message: `Update failed: ${errorMsg}`,
+      //   severity: 'error'
+      // });
+    } else if (error.request) {
+      setSnackbar({
+        open: true,
+        message: 'No response from server. Check your network.',
+        severity: 'error'
+      });
+    } else {
+      setSnackbar({
+        open: true,
+        message: 'Request error: ' + error.message,
+        severity: 'error'
+      });
+    }
+  }
+};
 
   // NEW: Function to test API endpoints and provide diagnostics
   const testApiEndpoints = async () => {
@@ -649,66 +759,84 @@ const AutoServeBilling = () => {
   };
 
   // UPDATED: Generate bill function with enhanced validation
-  const generateBill = () => {
-    if (isBillAlreadyGenerated || billGenerated) {
+const generateBill = () => {
+  if (isBillAlreadyGenerated || billGenerated) {
+    setSnackbar({
+      open: true,
+      message: 'Bill has already been generated for this job card',
+      severity: 'warning'
+    });
+    return;
+  }
+
+  const validation = validateJobCompletion();
+  if (!validation.isValid) {
+    setSnackbar({
+      open: true,
+      message: `Please complete: ${validation.issues.join(', ')}`,
+      severity: 'error'
+    });
+    return;
+  }
+
+  // ✅ Use the correct jobCardIdFromUrl and include auth token
+  const token = localStorage.getItem('token');
+  if (!token) {
+    setSnackbar({
+      open: true,
+      message: 'Authentication token not found. Please log in again.',
+      severity: 'error'
+    });
+    return;
+  }
+
+  fetch(`https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({ 
+      generateBill: true, 
+      status: "Completed" 
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('Bill generation response:', data);
+    
+    if (data.success || data.message?.includes('updated')) {
+      // ✅ Update local state
+      setBillGenerated(true);
+      setIsBillAlreadyGenerated(true);
+
+      // ✅ Show payment modal
+      setShowPaymentModal(true);
+
       setSnackbar({
         open: true,
-        message: 'Bill has already been generated for this job card',
-        severity: 'warning'
+        message: 'Bill generated successfully! Proceed with payment.',
+        severity: 'success'
       });
-      return;
+    } else {
+      throw new Error(data.message || 'Bill generation failed');
     }
-    
-    // UPDATED: Auto-fix missing data before validation
-    if (!finalInspection.trim()) {
-      const defaultInspection = `Vehicle inspected on ${today}. All work completed satisfactorily. Vehicle is ready for delivery.`;
-      setFinalInspection(defaultInspection);
-    }
-    
-    if (!gstSettings.billToParty.trim() && carDetails.customerName.trim()) {
-      setGstSettings(prev => ({ ...prev, billToParty: carDetails.customerName }));
-    }
-    
-    // Add default service if no parts or services exist
-    if (parts.length === 0 && services.length === 0) {
-      const defaultService = {
-        id: Date.now(),
-        name: 'Vehicle Inspection & General Service',
-        engineer: 'Service Engineer',
-        progress: 100,
-        status: 'Completed',
-        laborCost: 500 // Default service charge
-      };
-      setServices([defaultService]);
-      
-      // Wait for state update before validation
-      setTimeout(() => {
-        const validation = validateJobCompletion();
-        if (!validation.isValid) {
-          setSnackbar({
-            open: true,
-            message: `Please complete: ${validation.issues.join(', ')}`,
-            severity: 'error'
-          });
-          return;
-        }
-        setShowPaymentModal(true);
-      }, 100);
-      return;
-    }
-    
-    const validation = validateJobCompletion();
-    if (!validation.isValid) {
-      setSnackbar({
-        open: true,
-        message: `Please complete: ${validation.issues.join(', ')}`,
-        severity: 'error'
-      });
-      return;
-    }
-    
-    setShowPaymentModal(true);
-  };
+  })
+  .catch(error => {
+    console.error('Error generating bill:', error);
+    setSnackbar({
+      open: true,
+      message: `Failed to generate bill: ${error.message}`,
+      severity: 'error'
+    });
+  });
+};
+
 
   // Function to ensure minimum bill requirements
   const ensureMinimumBillRequirements = () => {
@@ -783,13 +911,10 @@ const AutoServeBilling = () => {
     };
 
     // List of possible API endpoints to try
-    const possibleEndpoints = [
-      `https://garage-management-zi5z.onrender.com/api/bill/generate/${jobCardIdFromUrl}`,
-      `https://garage-management-zi5z.onrender.com/api/bills/generate/${jobCardIdFromUrl}`,
-      `https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}/bill`,
-      `https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}/generate-bill`,
-      `https://garage-management-zi5z.onrender.com/api/bill/create/${jobCardIdFromUrl}`
-    ];
+      const possibleEndpoints = [
+    `https://garage-management-zi5z.onrender.com/api/billing/generate/${jobCardIdFromUrl}`,
+    `https://garage-management-zi5z.onrender.com/api/garage/billing/generate/${jobCardIdFromUrl}`
+  ];
 
     let lastError = null;
     let success = false;
@@ -859,48 +984,37 @@ const AutoServeBilling = () => {
   };
 
   // Fallback bill generation when API endpoints don't work
-  const handleFallbackBillGeneration = async (billData) => {
-    try {
-      // Try updating job card with bill data directly
-      const fallbackResponse = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobcards/update/${jobCardIdFromUrl}`,
-        {
-          ...billData,
-          generateBill: true,
-          billGeneratedAt: new Date().toISOString(),
-          status: 'Completed'
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+ const handleFallbackBillGeneration = async (billData) => {
+  try {
+    // ✅ Use the correct billing generation endpoint
+    const response = await axios.post(
+      `https://garage-management-zi5z.onrender.com/api/billing/generate/${jobCardIdFromUrl}`,
+      billData,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-      );
-
-      if (fallbackResponse.status === 200) {
-        await updateBillAndJobStatus(jobCardIdFromUrl);
-        
-        setApiResponseMessage({
-          type: "success",
-          message: "Bill generated successfully using fallback method! Job completed.",
-        });
-        setShowThankYou(true);
-        return;
       }
-      
-      throw new Error("Fallback method failed");
-      
-    } catch (error) {
-      // Last resort: Local bill generation only
-      console.log("Using local-only bill generation");
-      
-      setBillGenerated(true);
+    );
+
+    if (response.status === 200 || response.status === 201) {
+      setApiResponseMessage({
+        type: "success",
+        message: "Bill generated successfully!",
+      });
+      await updateBillAndJobStatus(jobCardIdFromUrl); // This updates jobcard status
       setShowThankYou(true);
-      
-      
     }
-  };
+  } catch (error) {
+    console.error("Fallback bill generation failed:", error);
+    setApiResponseMessage({
+      type: "error",
+      message: error.response?.data?.message || "Bill generation failed. Please contact support.",
+    });
+    setShowApiResponse(true);
+  }
+};
 
   // UPDATED: Online payment processing with multiple endpoint attempts
   const processOnlinePayment = async () => {
@@ -934,12 +1048,9 @@ const AutoServeBilling = () => {
       };
 
       // Try multiple possible endpoints for bill generation
-      const possibleEndpoints = [
-        `https://garage-management-zi5z.onrender.com/api/bill/generate/${jobCardIdFromUrl}`,
-        `https://garage-management-zi5z.onrender.com/api/bills/generate/${jobCardIdFromUrl}`,
-        `https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}/bill`,
-        `https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}/generate-bill`
-      ];
+     const possibleEndpoints = [
+  `https://garage-management-zi5z.onrender.com/api/billing/generate/${jobCardIdFromUrl}`
+];
 
       let billResponse = null;
       let lastError = null;
@@ -1208,14 +1319,36 @@ const AutoServeBilling = () => {
         doc.rect(x, y, width, height);
       };
 
-      // Header Section
+      // Header Section with Logo
       drawBorderedRect(margin, currentY, contentWidth, 80);
       
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      const companyName = garageDetails.name.toUpperCase();
-      const nameWidth = doc.getTextWidth(companyName);
-      doc.text(companyName, (pageWidth - nameWidth) / 2, currentY + 25);
+      
+      // Add garage logo if available
+      if (garageDetails.logoUrl) {
+        try {
+          const logoImg = new Image();
+          logoImg.src = garageDetails.logoUrl;
+          doc.addImage(logoImg, 'PNG', margin + 10, currentY + 10, 50, 50);
+          
+          // Move company name to right of logo
+          const companyName = garageDetails.name.toUpperCase();
+          const nameX = margin + 70;
+          doc.text(companyName, nameX, currentY + 25);
+        } catch (error) {
+          console.error('Error loading logo:', error);
+          // Fallback to text-only if logo fails
+          const companyName = garageDetails.name.toUpperCase();
+          doc.text(companyName, margin + 10, currentY + 25);
+        }
+      } else {
+        // No logo, center the company name
+        const companyName = garageDetails.name.toUpperCase();
+        const nameWidth = doc.getTextWidth(companyName);
+        const nameX = (pageWidth - nameWidth) / 2;
+        doc.text(companyName, nameX, currentY + 25);
+      }
       
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
@@ -1269,7 +1402,7 @@ const AutoServeBilling = () => {
       doc.setFont("helvetica", "bold");
       doc.text("Ship To / Insurance:", margin + billToWidth + 20, billShipY + 20);
       doc.setFont("helvetica", "normal");
-      doc.text(`Party: ${gstSettings.shiftToParty}`, margin + billToWidth + 20, billShipY + 40);
+      doc.text(`Party Name: ${gstSettings.insuranceProvider || 'N/A'}`, margin + billToWidth + 20, billShipY + 40);
       doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + billToWidth + 20, billShipY + 55);
       doc.text(`Reg No: ${carDetails.carNumber}`, margin + billToWidth + 20, billShipY + 70);
       
@@ -1353,35 +1486,34 @@ const AutoServeBilling = () => {
         return rowHeight;
       };
       
-      // Parts rows
+      // Parts rows - Ensure parts are displayed
       if (parts.length > 0) {
         parts.forEach((part) => {
           const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
           const rowData = [
             rowIndex.toString(),
             part.name,
-            part.hsnNumber || "8708",
+            part.hsnNumber || "8708", // Default HSN for auto parts
             part.quantity.toString(),
             "Nos",
             part.pricePerUnit.toFixed(2),
             gstDisplay,
             part.total.toFixed(2)
           ];
-          
           const rowHeight = drawTableRow(rowData, currentY);
           currentY += rowHeight;
           rowIndex++;
         });
       }
 
-      // Services rows
+      // Services rows - Handle services without HSN
       if (services.length > 0) {
         services.forEach((service) => {
           const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
           const rowData = [
             rowIndex.toString(),
             service.name,
-            "9954",
+            "", // No HSN for services
             "1",
             "Nos",
             service.laborCost.toFixed(2),
@@ -1481,19 +1613,20 @@ const AutoServeBilling = () => {
       currentY += 40;
 
       // UPDATED: Bank Details Section with complete information
-      if (garageDetails.bankDetails.bankName || garageDetails.bankDetails.accountNumber) {
-        drawBorderedRect(margin, currentY, contentWidth / 2, 100);
-        doc.setFont("helvetica", "bold");
-        doc.text("Bank Details:", margin + 10, currentY + 20);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Bank: ${garageDetails.bankDetails.bankName || 'N/A'}`, margin + 10, currentY + 35);
-        doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName || 'N/A'}`, margin + 10, currentY + 50);
-        doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber || 'N/A'}`, margin + 10, currentY + 65);
-        doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode || 'N/A'}`, margin + 10, currentY + 80);
-        if (garageDetails.bankDetails.upiId) {
-          doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, currentY + 95);
-        }
-      }
+      // UPDATED: Bank Details Section with complete information
+if (garageDetails.bankDetails.bankName || garageDetails.bankDetails.accountNumber) {
+  drawBorderedRect(margin, currentY, contentWidth / 2, 100);
+  doc.setFont("helvetica", "bold");
+  doc.text("Bank Details:", margin + 10, currentY + 20);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Bank: ${garageDetails.bankDetails.bankName || 'N/A'}`, margin + 10, currentY + 35);
+  doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName || 'N/A'}`, margin + 10, currentY + 50);
+  doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber || 'N/A'}`, margin + 10, currentY + 65);
+  doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode || 'N/A'}`, margin + 10, currentY + 80);
+  if (garageDetails.bankDetails.upiId) {
+    doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, currentY + 95);
+  }
+}
 
       // Terms & Conditions
       const termsX = margin + (contentWidth / 2) + 10;
@@ -1513,16 +1646,16 @@ const AutoServeBilling = () => {
       currentY += 120;
 
       // Authorized Signatory
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      currentY += 40;
-      doc.text("(Authorized Signatory)", pageWidth - margin - 200, currentY);
+      // doc.setFontSize(10);
+      // doc.setFont("helvetica", "bold");
+      // currentY += 40;
+      // doc.text("(Authorized Signatory)", pageWidth - margin - 200, currentY);
 
       // Footer
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       const timestamp = new Date().toLocaleString();
-      doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
+      // doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
       doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()}`, pageWidth - margin - 100, pageHeight - 20);
 
       return doc;
@@ -1765,25 +1898,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
           {/* Action Buttons */}
           {!isBillAlreadyGenerated && !billGenerated ? (
             <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
-              {/* <Button
-                variant="outlined"
-                color="info"
-                onClick={ensureMinimumBillRequirements}
-                fullWidth={isMobile}
-                size={isMobile ? "small" : "medium"}
-              >
-                Auto-Complete Bill
-              </Button>
-              <Button
-                variant="outlined"
-                color="warning"
-                onClick={testApiEndpoints}
-                fullWidth={isMobile}
-                size={isMobile ? "small" : "medium"}
-                sx={{ display: { xs: 'none', md: 'inline-flex' } }}
-              >
-                Debug API
-              </Button> */}
+            
               <Button
                 variant="contained"
                 color="primary"
@@ -1885,6 +2000,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               summary={summary} 
               gstSettings={gstSettings} 
               handleDiscountChange={handleDiscountChange} 
+              handleLaborCostChange={handleLaborCostChange}
               paymentMethod={paymentMethod} 
               isMobile={isMobile}
               formatAmount={formatAmount}
@@ -1931,6 +2047,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
       {!isBillAlreadyGenerated && (
         <>
           <EditPriceDialog 
+          
             showEditPriceDialog={showEditPriceDialog} 
             setShowEditPriceDialog={setShowEditPriceDialog} 
             isMobile={isMobile} 

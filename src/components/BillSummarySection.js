@@ -8,14 +8,13 @@ const BillSummarySection = ({
   handleDiscountChange, 
   paymentMethod, 
   isMobile,
-  formatAmount
+  formatAmount,
+  handleLaborCostChange
 }) => {
   const theme = useTheme();
   
   const summaryItems = [
     { label: "Parts & Materials Total:", value: formatAmount(summary.totalPartsCost), icon: "🔧" },
-    { label: "Labor & Services Total:", value: formatAmount(summary.totalLaborCost), icon: "⚙️" },
-    { label: "Subtotal (Before Tax):", value: formatAmount(summary.subtotal), bold: true },
   ];
 
   return (
@@ -82,6 +81,103 @@ const BillSummarySection = ({
                   </Typography>
                 </Box>
               ))}
+
+              {/* Manual Labor & Services Total Input */}
+              <Box sx={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center", 
+                py: 1.5, 
+                borderBottom: `1px dashed ${theme.palette.divider}`,
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: isMobile ? 1 : 0
+              }}>
+                <Typography 
+                  variant="body1" 
+                  fontWeight={400} 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    color: 'text.primary'
+                  }}
+                >
+                  <span>⚙️</span>
+                  Labor & Services Total:
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">₹</Typography>
+                  <TextField
+                    type="number"
+                    value={summary.totalLaborCost || ''}
+                    onChange={(e) => handleLaborCostChange && handleLaborCostChange(e.target.value)}
+                    size="small"
+                    sx={{ 
+                      width: isMobile ? '100%' : '120px',
+                      '& .MuiInputBase-input': {
+                        textAlign: 'right',
+                        fontWeight: 600,
+                        color: 'primary.main'
+                      }
+                    }}
+                    inputProps={{ 
+                      min: 0, 
+                      step: 0.01,
+                      style: { textAlign: 'right' }
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Labor Cost Tax Calculation */}
+              {summary.totalLaborCost > 0 && gstSettings.includeGst && (
+                <Box sx={{ 
+                  mt: 1, 
+                  p: 1, 
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(25, 118, 210, 0.15)' 
+                    : 'rgba(25, 118, 210, 0.1)', 
+                  borderRadius: 1,
+                  border: `1px solid ${theme.palette.primary.main}20`
+                }}>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Labor Cost Tax Calculation:
+                  </Typography>
+                  <Typography variant="caption" color="primary.main" display="block">
+                    Base: ₹{summary.totalLaborCost} | Tax: ₹{((summary.totalLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2)}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Subtotal */}
+              <Box sx={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center", 
+                py: 1.5, 
+                borderBottom: `1px dashed ${theme.palette.divider}`,
+                mt: 1
+              }}>
+                <Typography 
+                  variant="body1" 
+                  fontWeight={600} 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    color: 'text.primary'
+                  }}
+                >
+                  Subtotal (Before Tax):
+                </Typography>
+                <Typography 
+                  variant="body1" 
+                  fontWeight={600} 
+                  color="primary.main"
+                >
+                  {formatAmount(summary.subtotal)}
+                </Typography>
+              </Box>
 
               {gstSettings.includeGst && (
                 <Box sx={{ 

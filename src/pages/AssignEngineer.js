@@ -52,6 +52,7 @@ import {
   Save as SaveIcon,
   AttachMoney as MoneyIcon,
   Close as CloseIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -96,6 +97,68 @@ const AssignEngineer = () => {
   const [success, setSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [parsedJobDetails, setParsedJobDetails] = useState([]);
+
+  // NEW: Add state for editing part prices and GST settings
+  const [editingPartPrice, setEditingPartPrice] = useState(null);
+  const [gstSettings, setGstSettings] = useState({
+    includeGst: true,
+    billType: 'gst', // 'gst' or 'non-gst'
+  });
+
+  // NEW: Functions for editing part prices and GST logic
+  const handleEditPartPrice = (assignmentId, partIndex, currentPrice) => {
+    setEditingPartPrice({
+      assignmentId,
+      partIndex,
+      currentPrice: parseFloat(currentPrice) || 0
+    });
+  };
+
+  const handleSavePartPrice = (newPrice) => {
+    if (editingPartPrice) {
+      const { assignmentId, partIndex } = editingPartPrice;
+      const newPriceNum = parseFloat(newPrice) || 0;
+      
+      setAssignments(prev => prev.map(assignment => {
+        if (assignment.id === assignmentId) {
+          const updatedParts = [...assignment.parts];
+          updatedParts[partIndex] = {
+            ...updatedParts[partIndex],
+            sellingPrice: newPriceNum,
+            pricePerUnit: newPriceNum
+          };
+          return { ...assignment, parts: updatedParts };
+        }
+        return assignment;
+      }));
+      
+      setEditingPartPrice(null);
+    }
+  };
+
+  const handleGstToggle = (event) => {
+    setGstSettings(prev => ({
+      ...prev,
+      includeGst: event.target.checked,
+      billType: event.target.checked ? 'gst' : 'non-gst'
+    }));
+  };
+
+  const calculatePartPriceWithGst = (part, selectedQuantity) => {
+    const unitPrice = part.sellingPrice || part.pricePerUnit || 0;
+    const basePrice = unitPrice * selectedQuantity;
+    
+    if (gstSettings.billType === 'non-gst') {
+      // Remove tax for non-GST bills
+      return basePrice;
+    } else {
+      // Include tax for GST bills
+      const taxAmount = part.taxAmount || 0;
+      const originalQuantity = part.quantity || 1;
+      const calculatedTax = (selectedQuantity * taxAmount) / originalQuantity;
+      return basePrice + calculatedTax;
+    }
+  };
 
   // Enhanced Add Part Dialog States - Based on InventoryManagement
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -142,11 +205,12 @@ const AssignEngineer = () => {
 
     // Format parts for API
     const formattedParts = selectedParts.map(part => ({
+      _id: part._id,
       partId: part._id,
       partName: part.partName,
       partNumber: part.partNumber || '',
       quantity: part.selectedQuantity || 1,
-      pricePerUnit: part.pricePerUnit || 0,
+      sellingPrice: part.sellingPrice || 0,
       gstPercentage: part.taxAmount || 0,
       carName: part.carName || '',
       model: part.model || ''
@@ -259,19 +323,24 @@ const getAllSelectedParts = () => {
   const allPartsUsed = [];
   assignments.forEach(assignment => {
     assignment.parts.forEach(part => {
-      const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
+      const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
       const selectedQuantity = part.selectedQuantity || 1;
       
       if (existingPartIndex !== -1) {
         allPartsUsed[existingPartIndex].quantity += selectedQuantity;
       } else {
+        // Calculate tax amount: selectedQuantity * taxAmount / quantity
+        const calculatedTaxAmount = (selectedQuantity * part.taxAmount) / part.quantity;
+        
         allPartsUsed.push({
+          _id: part._id,
           partId: part._id,
           partName: part.partName,
           partNumber: part.partNumber || '',
           quantity: selectedQuantity,
-          pricePerUnit: part.pricePerUnit || 0,
+          sellingPrice: part.sellingPrice || 0,
           gstPercentage: part.taxAmount || 0,
+          originalQuantity: part.quantity, // Store original quantity for calculation
           carName: part.carName || '',
           model: part.model || ''
         });
@@ -777,29 +846,67 @@ const updateJobCardWithAllParts = async () => {
     try {
       console.log(`Updating job card ${jobCardId} with job details and parts:`, { jobDetails, partsUsed });
       
-      // Validate parts data before sending
-      const validatedParts = partsUsed.map(part => ({
-        partId: part.partId || part._id,
-        partName: part.partName || '',
-        partNumber: part.partNumber || '',
-        quantity: Number(part.quantity) || 1,
-        pricePerUnit: Number(part.pricePerUnit) || 0,
-        gstPercentage: Number(part.gstPercentage) || 0,
-        gstAmount: Number(((part.pricePerUnit || 0) * (part.quantity || 1) * (part.gstPercentage || 0)) / 100),
-        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1))+ (part.gstAmount),
-           carName: part.carName || '',
-        model: part.model || ''
-      }));
+      // Create array format with sellingPrice, txt, selectedQuantity, and partName as requested
+      const partsArray = partsUsed.map(part => {
+        const selectedQuantity = Number(part.quantity) || 1;
+        const sellingPrice = Number(part.sellingPrice) || 0; // Use sellingPrice from part data
+        const taxAmount = Number(part.taxAmount) || 0; // Use taxAmount from part data
+        const originalQuantity = Number(part.originalQuantity) || part.quantity || 1;
+        
+        // Calculate tax amount: selectedQuantity * taxAmount / quantity
+        const calculatedTaxAmount = (selectedQuantity * taxAmount) / originalQuantity;
+        
+        // Calculate final price: sellingPrice + calculatedTaxAmount
+        const finalPrice = sellingPrice + calculatedTaxAmount;
+        
+        return {
+          partName: part.partName || '',
+          sellingPrice: sellingPrice,
+          txt: calculatedTaxAmount, // Tax amount calculated as per requirement
+          selectedQuantity: selectedQuantity,
+          finalPrice: finalPrice
+        };
+      });
+      
+      // Validate parts data before sending with new calculation format
+      const validatedParts = partsUsed.map(part => {
+        const selectedQuantity = Number(part.quantity) || 1;
+        const sellingPrice = Number(part.sellingPrice) || 0; // Use sellingPrice from part data
+        const taxAmount = Number(part.taxAmount) || 0; // Use taxAmount from part data
+        const originalQuantity = Number(part.originalQuantity) || part.quantity || 1;
+        
+        // Calculate tax amount: selectedQuantity * taxAmount / quantity
+        const calculatedTaxAmount = (selectedQuantity * taxAmount) / originalQuantity;
+        
+        // Calculate final price: sellingPrice + calculatedTaxAmount
+        const finalPrice = sellingPrice + calculatedTaxAmount;
+        
+        return {
+          _id: part._id || part.partId, // Use _id first, then fallback to partId
+          partId: part._id || part.partId,
+          partName: part.partName || '',
+          partNumber: part.partNumber || '',
+          quantity: selectedQuantity,
+          sellingPrice: sellingPrice,
+          gstPercentage: calculatedTaxAmount,
+          totalPrice: finalPrice,
+          carName: part.carName || '',
+          model: part.model || ''
+        };
+      });
 
       const updatePayload = {
         jobDetails: jobDetails,
-        partsUsed: validatedParts
+        partsUsed: validatedParts,
+        partsArray: partsArray // New array format with sellingPrice, txt, selectedQuantity, partName
       };
 
       console.log('Sending update payload:', updatePayload);
+      console.log('Parts Array (sellingPrice, txt, selectedQuantity, partName):', partsArray);
+      console.log('All selected parts being sent to API:', validatedParts);
 
       const response = await axios.put(
-        `${API_BASE_URL}/jobCards/${id}`,
+        `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
         updatePayload,
         {
           headers: {
@@ -813,6 +920,76 @@ const updateJobCardWithAllParts = async () => {
       return response.data;
     } catch (err) {
       console.error(`Failed to update job card ${jobCardId}:`, err.response?.data || err.message);
+      throw err;
+    }
+  };
+
+  // Debug function to test API call with specific data
+  const testUpdateJobCard = async () => {
+    try {
+      const testData = {
+        jobDetails: "[]",
+        partsUsed: [
+          {
+            "_id": "688a38f62b00cd582fbc319b",
+            "partId": "688a38f62b00cd582fbc319b",
+            "partName": "breack",
+            "partNumber": "3",
+            "quantity": 1,
+            "sellingPrice": 100,
+            "gstPercentage": 0,
+            "totalPrice": 100,
+            "carName": "abc",
+            "model": "12"
+          },
+          {
+            "_id": "688a30942b00cd582fbc2efc",
+            "partId": "688a30942b00cd582fbc2efc",
+            "partName": "ok",
+            "partNumber": "32",
+            "quantity": 1,
+            "sellingPrice": 20,
+            "gstPercentage": 0,
+            "totalPrice": 20,
+            "carName": "abc",
+            "model": "12"
+          }
+        ],
+        partsArray: [
+          {
+            "partName": "breack",
+            "sellingPrice": 100,
+            "txt": 0,
+            "selectedQuantity": 1,
+            "finalPrice": 100
+          },
+          {
+            "partName": "ok",
+            "sellingPrice": 20,
+            "txt": 0,
+            "selectedQuantity": 1,
+            "finalPrice": 20
+          }
+        ]
+      };
+
+      console.log('Testing API call with data:', testData);
+
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
+        testData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+          }
+        }
+      );
+
+      console.log('Test API response:', response.data);
+      return response.data;
+    } catch (err) {
+      console.error('Test API call failed:', err.response?.data || err.message);
       throw err;
     }
   };
@@ -844,19 +1021,28 @@ const updateJobCardWithAllParts = async () => {
 
       assignments.forEach(assignment => {
         assignment.parts.forEach(part => {
-          const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
+          const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
           const selectedQuantity = part.selectedQuantity || 1;
           
           if (existingPartIndex !== -1) {
             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
           } else {
+            // Calculate tax amount: selectedQuantity * taxAmount / quantity
+            const calculatedTaxAmount = (selectedQuantity * part.taxAmount) / part.quantity;
+            
+            // Calculate final price: sellingPrice + calculatedTaxAmount
+            const finalPrice = (part.sellingPrice || 0) + calculatedTaxAmount;
+            
             allPartsUsed.push({
+              _id: part._id,
               partId: part._id,
               partName: part.partName,
               partNumber: part.partNumber || '',
               quantity: selectedQuantity,
-              pricePerUnit: part.pricePerUnit || 0,
-              gstPercentage:  part.taxAmount || 0,
+              sellingPrice: part.sellingPrice || 0, // Changed from pricePerUnit to sellingPrice
+              gstPercentage: calculatedTaxAmount, // Use calculated tax amount
+              totalPrice: finalPrice, // Add totalPrice field
+              originalQuantity: part.quantity, // Store original quantity for calculation
               carName: part.carName || '',
               model: part.model || ''
             });
@@ -876,6 +1062,9 @@ const updateJobCardWithAllParts = async () => {
           }
         });
       });
+
+      console.log('Total parts collected from all assignments:', allPartsUsed.length);
+      console.log('All parts collected:', allPartsUsed);
 
       // Update inventory for all used parts
       console.log('Updating inventory for used parts...');
@@ -1028,10 +1217,7 @@ const updateJobCardWithAllParts = async () => {
         setPartAddError('Prices cannot be negative');
         return;
       }
-      if (newPart.sellingPrice < newPart.purchasePrice) {
-        setPartAddError('Selling price cannot be less than purchase price');
-        return;
-      }
+     
       if (newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)) {
         setPartAddError('Part number already exists');
         return;
@@ -1253,6 +1439,16 @@ const updateJobCardWithAllParts = async () => {
               </Typography>
              
             </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={testUpdateJobCard}
+                size="small"
+              >
+                Test API Call
+              </Button>
+            </Box>
            
           </Box>
 
@@ -1453,6 +1649,21 @@ const updateJobCardWithAllParts = async () => {
                           : `These parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
                         }
                       </Typography>
+                      
+                      {/* Debug Information */}
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          🔍 Debug Information:
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+                          Total Parts Found: {allPartsUsed.length}
+                        </Typography>
+                        {allPartsUsed.map((part, index) => (
+                          <Typography key={index} variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                            {index + 1}. {part.partName} - ID: {part._id} - Qty: {part.quantity}
+                          </Typography>
+                        ))}
+                      </Box>
                     </>
                   );
                 }
@@ -1759,7 +1970,7 @@ const updateJobCardWithAllParts = async () => {
     part => getAvailableQuantity(part._id) > 0 && !assignment.parts.some(p => p._id === part._id)
   )}
                               getOptionLabel={(option) => 
-                                `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+                                `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}%`
                               }
                               value={assignment.parts}
                               onChange={(event, newValue) => {
@@ -1840,14 +2051,19 @@ const updateJobCardWithAllParts = async () => {
                               <List dense>
                                 {assignment.parts.map((part, partIndex) => {
                                    const selectedQuantity = part.selectedQuantity || 1;
-                                   const quantity= part.quantity;
-                                   const unitPrice = part.pricePerUnit || 0;
-                                   const gstPercentage = part.taxAmount;
-                                   const gst = (part.taxAmount * selectedQuantity)/quantity;
-                                   const totalTax= (gstPercentage * selectedQuantity)/quantity;
-                                   const totalPrice = unitPrice * selectedQuantity;
-                                   const gstAmount = (totalPrice * gstPercentage) / 100;
-                                   const finalPrice = totalPrice + totalTax;
+                                   const unitPrice = part.sellingPrice || 0;
+                                   const finalPrice = calculatePartPriceWithGst(part, selectedQuantity);
+                                   
+                                   // Log the calculated values as requested
+                                   const calculatedTax = (selectedQuantity * (part.taxAmount || 0)) / (part.quantity || 1);
+                                   console.log(`Part: ${part.partName}`, {
+                                     sellingPrice: unitPrice,
+                                     selectedQuantity: selectedQuantity,
+                                     taxAmount: part.taxAmount,
+                                     originalQuantity: part.quantity,
+                                     calculatedTax: calculatedTax,
+                                     finalPrice: finalPrice
+                                   });
                                   
                                   // Get available quantity considering all current selections
                                   const availableQuantity = getAvailableQuantity(part._id);
@@ -1878,14 +2094,26 @@ const updateJobCardWithAllParts = async () => {
                                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                             Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
                                           </Typography>
-                                          <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
-                                            Available Stock: {availableQuantity}
-                                          </Typography>
-                                          <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
-                                            Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
-                                          </Typography>
+                                          
+                                                                              <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
+                                      Selected: {selectedQuantity}
+                                    </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          {/* Edit Price Button */}
+                                          <IconButton
+                                            size="small"
+                                            color="primary"
+                                            onClick={() => handleEditPartPrice(assignment.id, partIndex, part.sellingPrice || part.pricePerUnit)}
+                                            sx={{ 
+                                              minWidth: '24px', 
+                                              width: '24px', 
+                                              height: '24px',
+                                              border: `1px solid ${theme.palette.primary.main}`
+                                            }}
+                                          >
+                                            <EditIcon fontSize="small" />
+                                          </IconButton>
                                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                             <IconButton
                                               size="small"
@@ -1981,21 +2209,23 @@ const updateJobCardWithAllParts = async () => {
                                         borderRadius: 1 
                                       }}>
                                         <Grid container spacing={1} alignItems="center">
-                                          <Grid item xs={4}>
+                                          <Grid item xs={6}>
                                             <Typography variant="caption" color="text.secondary">
                                               Price/Unit: ₹{unitPrice.toFixed(2)}
                                             </Typography>
                                           </Grid>
-                                          <Grid item xs={3}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              GST: ₹{gst}
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={5}>
+                                          <Grid item xs={6}>
                                             <Typography variant="caption" fontWeight={600} color="primary">
                                               Total: ₹{finalPrice.toFixed(2)}
                                             </Typography>
                                           </Grid>
+                                          {gstSettings.billType === 'gst' && (
+                                            <Grid item xs={12}>
+                                              <Typography variant="caption" color="text.secondary">
+                                                GST: ₹{((selectedQuantity * (part.taxAmount || 0)) / (part.quantity || 1)).toFixed(2)}
+                                              </Typography>
+                                            </Grid>
+                                          )}
                                         </Grid>
                                       </Box>
                                     </ListItem>
@@ -2028,6 +2258,38 @@ const updateJobCardWithAllParts = async () => {
                     </AccordionDetails>
                   </Accordion>
                 ))}
+
+                {/* GST Settings Section - Moved after parts management */}
+                <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      GST Settings
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={gstSettings.includeGst}
+                            onChange={handleGstToggle}
+                            color="primary"
+                          />
+                        }
+                        label="Include GST in bill"
+                      />
+                      <Chip
+                        label={gstSettings.billType === 'gst' ? 'GST Bill' : 'Non-GST Bill'}
+                        color={gstSettings.billType === 'gst' ? 'primary' : 'secondary'}
+                        size="small"
+                      />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                      {gstSettings.billType === 'gst' 
+                        ? 'Tax will be included in part prices' 
+                        : 'Tax will be removed from part prices'
+                      }
+                    </Typography>
+                  </CardContent>
+                </Card>
 
                 {/* Submit Button */}
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -2196,6 +2458,51 @@ const updateJobCardWithAllParts = async () => {
                   </DialogActions>
                 </Dialog>
 
+        {/* Edit Part Price Dialog */}
+        <Dialog 
+          open={!!editingPartPrice} 
+          onClose={() => setEditingPartPrice(null)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: 'background.paper' }
+          }}
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Edit Part Price</Typography>
+              <IconButton onClick={() => setEditingPartPrice(null)}><CloseIcon /></IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="New Price (₹)"
+              type="number"
+              value={editingPartPrice?.currentPrice || ''}
+              onChange={(e) => {
+                const newPrice = e.target.value;
+                setEditingPartPrice(prev => prev ? { ...prev, currentPrice: newPrice } : null);
+              }}
+              inputProps={{ min: 0, step: 0.01 }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">₹</InputAdornment>
+              }}
+              sx={{ mt: 2 }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditingPartPrice(null)}>Cancel</Button>
+            <Button 
+              onClick={() => handleSavePartPrice(editingPartPrice?.currentPrice)}
+              variant="contained"
+              disabled={!editingPartPrice?.currentPrice}
+            >
+              Save Price
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Add Engineer Dialog */}
         <Dialog 
           open={openAddEngineerDialog} 
@@ -2283,6 +2590,6 @@ const updateJobCardWithAllParts = async () => {
       </Box>
     </>
   );
-};
-
-export default AssignEngineer;
+  };
+  
+  export default AssignEngineer;

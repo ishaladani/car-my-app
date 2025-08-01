@@ -65,7 +65,8 @@ import {
   Edit as EditIcon,
   Source as SourceIcon,
   LibraryAdd as LibraryAddIcon,
-  People as PeopleIcon
+  People as PeopleIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -145,7 +146,12 @@ const WorkInProgress = () => {
     partNumber: "",
     partName: "",
     quantity: 1,
-    pricePerUnit: 0,
+    purchasePrice: 0,
+    sellingPrice: 0,
+    hsnNumber: "",
+    taxType: "igst",
+    igst: 0,
+    cgstSgst: 0,
     sgstEnabled: false,
     sgstPercentage: '',
     cgstEnabled: false,
@@ -168,6 +174,8 @@ const WorkInProgress = () => {
     { value: 'cancelled', label: 'Cancelled', color: 'error' },
     { value: 'on_hold', label: 'On Hold', color: 'default' }
   ];
+
+  
 
   const handlePartSelection = (newParts, previousParts = []) => {
     try {
@@ -289,27 +297,27 @@ const WorkInProgress = () => {
   };
 
   // Tax calculation functions
-  const calculateTaxAmount = (pricePerUnit, quantity, percentage) => {
-    if (!pricePerUnit || !quantity || !percentage) return 0;
-    const totalPrice = parseFloat(pricePerUnit) * parseInt(quantity);
+  const calculateTaxAmount = (sellingPrice, quantity, percentage) => {
+    if (!sellingPrice || !quantity || !percentage) return 0;
+    const totalPrice = parseFloat(sellingPrice) * parseInt(quantity);
     return (totalPrice * parseFloat(percentage)) / 100;
   };
 
-  const calculateTotalTaxAmount = (pricePerUnit, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage) => {
+  const calculateTotalTaxAmount = (sellingPrice, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage) => {
     let totalTax = 0;
     if (sgstEnabled && sgstPercentage) {
-      totalTax += calculateTaxAmount(pricePerUnit, quantity, sgstPercentage);
+      totalTax += calculateTaxAmount(sellingPrice, quantity, sgstPercentage);
     }
     if (cgstEnabled && cgstPercentage) {
-      totalTax += calculateTaxAmount(pricePerUnit, quantity, cgstPercentage);
+      totalTax += calculateTaxAmount(sellingPrice, quantity, cgstPercentage);
     }
     return totalTax;
   };
 
-  const calculateTotalPrice = (pricePerUnit, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage) => {
-    if (!pricePerUnit || !quantity) return 0;
-    const basePrice = parseFloat(pricePerUnit) * parseInt(quantity);
-    const totalTax = calculateTotalTaxAmount(pricePerUnit, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage);
+  const calculateTotalPrice = (sellingPrice, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage) => {
+    if (!sellingPrice || !quantity) return 0;
+    const basePrice = parseFloat(sellingPrice) * parseInt(quantity);
+    const totalTax = calculateTotalTaxAmount(sellingPrice, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage);
     return basePrice + totalTax;
   };
 
@@ -447,7 +455,7 @@ const WorkInProgress = () => {
       partName: inventoryPart.partName,
       partNumber: inventoryPart.partNumber || '',
       selectedQuantity: 1,
-      pricePerUnit: inventoryPart.pricePerUnit || 0,
+      sellingPrice: inventoryPart.sellingPrice || 0,
       gstPercentage: inventoryPart.gstPercentage || inventoryPart.taxAmount || 0,
       carName: inventoryPart.carName || '',
       model: inventoryPart.model || '',
@@ -522,13 +530,14 @@ const WorkInProgress = () => {
   };
 
   const calculatePartFinalPrice = (part) => {
-    const unitPrice = parseFloat(part.pricePerUnit);
-    const quantity = parseInt(part.selectedQuantity || 1);
-    const gstPercentage = parseFloat(part.gstPercentage) || 0;
+    const unitPrice = parseFloat(part.sellingPrice);
+    const selectedQuantity = parseInt(part.selectedQuantity || 1);
+    const taxAmount = parseFloat(part.taxAmount || part.gstPercentage || 0);
+    const originalQuantity = parseInt(part.quantity || 1);
 
-    const total = unitPrice * quantity;
-    const gstAmount = (total * gstPercentage) / 100;
-    return total + gstAmount;
+    const total = unitPrice * selectedQuantity;
+    const calculatedTax = (selectedQuantity * taxAmount) / originalQuantity;
+    return total + calculatedTax;
   };
   
   // Add new part to inventory
@@ -543,7 +552,7 @@ const WorkInProgress = () => {
       return;
     }
 
-    if (newPart.pricePerUnit < 0) {
+    if (newPart.sellingPrice < 0) {
       setPartAddError('Price cannot be negative');
       return;
     }
@@ -558,9 +567,9 @@ const WorkInProgress = () => {
 
     try {
       const sgstAmount = newPart.sgstEnabled ?
-        calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage) : 0;
+        calculateTaxAmount(newPart.sellingPrice, newPart.quantity, newPart.sgstPercentage) : 0;
       const cgstAmount = newPart.cgstEnabled ?
-        calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage) : 0;
+        calculateTaxAmount(newPart.sellingPrice, newPart.quantity, newPart.cgstPercentage) : 0;
 
       const taxAmount = sgstAmount + cgstAmount;
 
@@ -568,13 +577,24 @@ const WorkInProgress = () => {
         name: newPart.name,
         garageId: garageId,
         quantity: parseInt(newPart.quantity),
-        pricePerUnit: parseFloat(newPart.pricePerUnit),
+        purchasePrice: parseFloat(newPart.purchasePrice),
+        sellingPrice: parseFloat(newPart.sellingPrice),
         partNumber: newPart.partNumber,
         partName: newPart.partName,
         carName: newPart.carName,
         model: newPart.model,
+        hsnNumber: newPart.hsnNumber,
+        taxType: newPart.taxType,
+        igst: parseFloat(newPart.igst) || 0,
+        cgstSgst: parseFloat(newPart.cgstSgst) || 0,
+        sgstEnabled: newPart.sgstEnabled,
+        sgstPercentage: parseFloat(newPart.sgstPercentage) || 0,
+        cgstEnabled: newPart.cgstEnabled,
+        cgstPercentage: parseFloat(newPart.cgstPercentage) || 0,
         taxAmount: taxAmount
       };
+
+      console.log('Sending complete payload for new part:', requestData);
 
       const response = await axios.post(
         'https://garage-management-zi5z.onrender.com/api/garage/inventory/add',
@@ -603,7 +623,12 @@ const WorkInProgress = () => {
         partNumber: "",
         partName: "",
         quantity: 1,
-        pricePerUnit: 0,
+        purchasePrice: 0,
+        sellingPrice: 0,
+        hsnNumber: "",
+        taxType: "igst",
+        igst: 0,
+        cgstSgst: 0,
         sgstEnabled: false,
         sgstPercentage: '',
         cgstEnabled: false,
@@ -704,7 +729,7 @@ const WorkInProgress = () => {
             partName: part.partName || '',
             partNumber: part.partNumber || '',
             selectedQuantity: part.quantity || 1,
-            pricePerUnit: part.pricePerUnit || 0,
+            sellingPrice: part.sellingPrice || 0,
             totalPrice: part.totalPrice || 0,
             gstPercentage: part.gstPercentage || 0,
             carName: part.carName || '',
@@ -803,9 +828,10 @@ const WorkInProgress = () => {
           partName: part.partName,
           partNumber: part.partNumber || '',
           quantity: parseInt(part.selectedQuantity) || 1,
-          pricePerUnit: parseFloat(part.pricePerUnit) || 0,
+          sellingPrice: parseFloat(part.sellingPrice) || 0,
           totalPrice: part.totalPrice ? parseFloat(part.totalPrice) : calculatePartFinalPrice(part),
           gstPercentage: part.gstPercentage || 0,
+          originalQuantity: parseInt(part.quantity) || 1, // Store original quantity for calculation
           carName: part.carName || '',
           model: part.model || ''
         });
@@ -820,9 +846,10 @@ const WorkInProgress = () => {
           partName: part.partName,
           partNumber: part.partNumber || '',
           quantity: selectedQuantity,
-          pricePerUnit: part.pricePerUnit || 0,
+          sellingPrice: part.sellingPrice || 0,
           gstPercentage: part.gstPercentage || 0,
           totalPrice: calculatePartFinalPrice(part),
+          originalQuantity: parseInt(part.quantity) || 1, // Store original quantity for calculation
           carName: part.carName || '',
           model: part.model || ''
         });
@@ -847,9 +874,10 @@ const WorkInProgress = () => {
           partName: part.partName,
           partNumber: part.partNumber || '',
           quantity: selectedQuantity,
-          pricePerUnit: part.pricePerUnit || 0,
+          sellingPrice: part.sellingPrice || 0,
           gstPercentage: part.gstPercentage || part.taxAmount || 0,
           totalPrice: calculatePartFinalPrice(part),
+          originalQuantity: parseInt(part.quantity) || 1, // Store original quantity for calculation
           carName: part.carName || '',
           model: part.model || ''
         });
@@ -865,18 +893,41 @@ const WorkInProgress = () => {
         }
       }
 
+      // Create array format with sellingPrice, txt, selectedQuantity, and partName as requested
+      const partsArray = allPartsUsed.map(part => {
+        const selectedQuantity = Number(part.quantity) || 1;
+        const sellingPrice = Number(part.sellingPrice) || 0;
+        const taxAmount = Number(part.gstPercentage || part.taxAmount) || 0;
+        const originalQuantity = Number(part.originalQuantity || part.quantity) || 1;
+        
+        // Calculate tax amount: selectedQuantity * taxAmount / quantity
+        const calculatedTaxAmount = (selectedQuantity * taxAmount) / originalQuantity;
+        
+        // Calculate final price: sellingPrice + calculatedTaxAmount
+        const finalPrice = sellingPrice + calculatedTaxAmount;
+        
+        return {
+          partName: part.partName || '',
+          sellingPrice: sellingPrice,
+          txt: calculatedTaxAmount, // Tax amount calculated as per requirement
+          selectedQuantity: selectedQuantity,
+          finalPrice: finalPrice
+        };
+      });
+
       // Prepare the request data with all required fields
       const requestData = {
         engineerRemarks: remarks || '',
         status: status || 'in_progress',
         assignedEngineerId: assignedEngineers.map(eng => eng._id), // Multiple engineers
         partsUsed: allPartsUsed, // Include all parts data,
-        jobCardNumber:jobId,
-
+        partsArray: partsArray, // New array format with sellingPrice, txt, selectedQuantity, partName
+        jobCardNumber: jobId,
       };
 
       console.log("Submitting work progress:", requestData);
       console.log("Job Card Number being sent:", jobCardNumber);
+      console.log("Parts Array (sellingPrice, txt, selectedQuantity, partName):", partsArray);
 
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${id}/workprogress`,
@@ -924,7 +975,12 @@ const WorkInProgress = () => {
       partNumber: "",
       partName: "",
       quantity: 1,
-      pricePerUnit: 0,
+      purchasePrice: 0,
+      sellingPrice: 0,
+      hsnNumber: "",
+      taxType: "igst",
+      igst: 0,
+      cgstSgst: 0,
       sgstEnabled: false,
       sgstPercentage: '',
       cgstEnabled: false,
@@ -1289,7 +1345,7 @@ const WorkInProgress = () => {
                         fullWidth
                         options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
                         getOptionLabel={(option) => 
-                          `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
+                          `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.sellingPrice || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
                         }
                         value={selectedParts}
                         onChange={(event, newValue) => {
@@ -1299,7 +1355,7 @@ const WorkInProgress = () => {
                           value.map((option, index) => (
                             <Chip
                               variant="outlined"
-                              label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
+                              label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.sellingPrice || 0}`}
                               {...getTagProps({ index })}
                               key={option._id}
                             />
@@ -1313,7 +1369,7 @@ const WorkInProgress = () => {
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 Part : {option.partNumber || 'N/A'} | 
-                                Price: ₹{option.pricePerUnit || 0} | 
+                                Price: ₹{option.sellingPrice || 0} | 
                                 GST: {option.gstPercentage || option.taxAmount || 0}| 
                                 Available: {getAvailableQuantity(option._id)} | 
                                 {option.carName} - {option.model}
@@ -1362,13 +1418,22 @@ const WorkInProgress = () => {
                         <List dense>
                           {selectedParts.map((part, partIndex) => {
                             const selectedQuantity = part.selectedQuantity || 1;
-                            const quantity= part.quantity;
-                            const unitPrice = part.pricePerUnit || 0;
-                            const gstPercentage = part.taxAmount || 0;
-                            const totalTax= (gstPercentage * selectedQuantity)/quantity;
+                            const quantity = part.quantity;
+                            const unitPrice = part.sellingPrice || 0;
+                            const taxAmount = part.taxAmount || 0;
+                            const totalTax = (selectedQuantity * taxAmount) / quantity;
                             const totalPrice = unitPrice * selectedQuantity;
-                            const gstAmount = (totalPrice * gstPercentage) / 100;
                             const finalPrice = totalPrice + totalTax;
+                            
+                            // Log the calculated values as requested
+                            console.log(`Part: ${part.partName}`, {
+                              sellingPrice: unitPrice,
+                              selectedQuantity: selectedQuantity,
+                              taxAmount: taxAmount,
+                              originalQuantity: quantity,
+                              calculatedTax: totalTax,
+                              finalPrice: finalPrice
+                            });
                             
                             // Get available quantity considering all current selections
                             const availableQuantity = getAvailableQuantity(part._id);
@@ -1397,9 +1462,6 @@ const WorkInProgress = () => {
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                       Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                                    </Typography>
-                                    <Typography variant="caption" color={availableQuantity > 0 ? 'success.main' : 'error.main'} sx={{ display: 'block' }}>
-                                      Available Stock: {availableQuantity}
                                     </Typography>
                                     <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
                                       Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
@@ -1508,7 +1570,7 @@ const WorkInProgress = () => {
                                     </Grid>
                                     <Grid item xs={3}>
                                       <Typography variant="caption" color="text.secondary">
-                                        GST: {gstPercentage}
+                                        GST: ₹{totalTax.toFixed(2)}
                                       </Typography>
                                     </Grid>
                                     <Grid item xs={5}>
@@ -1543,7 +1605,7 @@ const WorkInProgress = () => {
                             fullWidth
                             options={inventoryParts.filter(part => getAvailableQuantity(part._id) > 0)}
                             getOptionLabel={(option) =>
-                              `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | Available: ${getAvailableQuantity(option._id)}`
+                              `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.sellingPrice || 0} | Available: ${getAvailableQuantity(option._id)}`
                             }
                             renderOption={(props, option) => (
                               <Box component="li" {...props}>
@@ -1553,7 +1615,7 @@ const WorkInProgress = () => {
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary">
                                     Part #: {option.partNumber || 'N/A'} |
-                                    Price: ₹{option.pricePerUnit || 0} |
+                                    Price: ₹{option.sellingPrice || 0} |
                                     GST: {option.taxAmount || 0}% |
                                     Available: {getAvailableQuantity(option._id)} |
                                     {option.carName} - {option.model}
@@ -1768,34 +1830,7 @@ const WorkInProgress = () => {
                 </Box>
                 <CardContent sx={{ p: 3 }}>
                   <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                      <FormControl fullWidth>
-                        <InputLabel id="status-label">Status</InputLabel>
-                        <Select
-                          labelId="status-label"
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value)}
-                          label="Status"
-                          startAdornment={
-                            <InputAdornment position="start">
-                              <AssignmentIcon />
-                            </InputAdornment>
-                          }
-                        >
-                          {statusOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              <Chip
-                                label={option.label}
-                                color={option.color}
-                                size="small"
-                                sx={{ mr: 1 }}
-                              />
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
+                  
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
@@ -2043,236 +2078,152 @@ const WorkInProgress = () => {
       </Container>
 
       {/* Add Part Dialog */}
-      <Dialog
-        open={openAddPartDialog}
-        onClose={handleCloseAddPartDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: { bgcolor: 'background.paper' }
-        }}
-      >
-        <DialogTitle>Add New Part to Inventory</DialogTitle>
-        <DialogContent>
-          {partAddSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Part added successfully!
-            </Alert>
-          )}
-          {partAddError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {partAddError}
-            </Alert>
-          )}
-
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Part Number"
-                name="partNumber"
-                value={newPart.partNumber}
-                onChange={handlePartInputChange}
-                error={checkDuplicatePartNumber(newPart.partNumber)}
-                helperText={checkDuplicatePartNumber(newPart.partNumber) ? "Part number already exists" : ""}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Part Name *"
-                name="partName"
-                value={newPart.partName}
-                onChange={handlePartInputChange}
-                required
-                error={!newPart.partName.trim() && !!partAddError}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Car Name"
-                name="carName"
-                value={newPart.carName}
-                onChange={handlePartInputChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Model"
-                name="model"
-                value={newPart.model}
-                onChange={handlePartInputChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Quantity *"
-                name="quantity"
-                type="number"
-                value={newPart.quantity}
-                onChange={handlePartInputChange}
-                required
-                inputProps={{ min: 1 }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Price Per Unit"
-                name="pricePerUnit"
-                type="number"
-                value={newPart.pricePerUnit}
-                onChange={handlePartInputChange}
-                inputProps={{ min: 0, step: 0.01 }}
-              />
-            </Grid>
-          </Grid>
-
-          {/* Tax Section */}
-          <Box sx={{ mt: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Tax Configuration</Typography>
-
-            <Grid container spacing={2}>
-              {/* SGST Section */}
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        name="sgstEnabled"
-                        checked={newPart.sgstEnabled}
-                        onChange={handlePartInputChange}
-                      />
-                    }
-                    label="Enable SGST"
-                  />
-                  {newPart.sgstEnabled && (
-                    <Box sx={{ mt: 2 }}>
-                      <TextField
-                        name="sgstPercentage"
-                        label="SGST Percentage (%)"
-                        type="number"
-                        variant="outlined"
-                        value={newPart.sgstPercentage}
-                        onChange={handlePartInputChange}
-                        required={newPart.sgstEnabled}
-                        inputProps={{ min: 0, max: 100, step: "0.01" }}
-                        fullWidth
-                        size="small"
-                      />
-                      {newPart.pricePerUnit && newPart.quantity && newPart.sgstPercentage && (
-                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                          SGST Amount: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage).toFixed(2)}
-                        </Typography>
+      <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="md" fullWidth>
+                  <DialogTitle>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="h6">Add New Part</Typography>
+                      <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
+                    </Box>
+                  </DialogTitle>
+                  <DialogContent dividers>
+                    {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
+                    {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
+        
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Car Name *" name="carName"
+                          value={newPart.carName} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Model *" name="model"
+                          value={newPart.model} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Part Number *" name="partNumber"
+                          value={newPart.partNumber} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                          error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
+                          helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Part Name *" name="partName"
+                          value={newPart.partName} onChange={handlePartInputChange}
+                          required fullWidth margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Quantity *" name="quantity"
+                          type="number" value={newPart.quantity}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 1 }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Purchase Price *" name="purchasePrice"
+                          type="number" value={newPart.purchasePrice}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Selling Price *" name="sellingPrice"
+                          type="number" value={newPart.sellingPrice}
+                          onChange={handlePartInputChange}
+                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="HSN Number" name="hsnNumber"
+                          value={newPart.hsnNumber} onChange={handlePartInputChange}
+                          fullWidth margin="normal"
+                        />
+                      </Grid>
+                    </Grid>
+        
+                    {/* Tax Type Selection */}
+                    <Box sx={{ mt: 3 }}>
+                      <FormControl fullWidth>
+                        <InputLabel>Tax Type</InputLabel>
+                        <Select
+                          name="taxType"
+                          value={newPart.taxType}
+                          onChange={handlePartInputChange}
+                          label="Tax Type"
+                        >
+                          <MenuItem value="igst">IGST</MenuItem>
+                          <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
+                        </Select>
+                      </FormControl>
+        
+                      {newPart.taxType === 'igst' ? (
+                        <TextField
+                          label="IGST (%)" name="igst"
+                          type="number" value={newPart.igst}
+                          onChange={handlePartInputChange}
+                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        />
+                      ) : (
+                        <TextField
+                          label="CGST/SGST (each %)" name="cgstSgst"
+                          type="number" value={newPart.cgstSgst}
+                          onChange={handlePartInputChange}
+                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                        />
                       )}
                     </Box>
-                  )}
-                </Box>
-              </Grid>
-
-              {/* CGST Section */}
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        name="cgstEnabled"
-                        checked={newPart.cgstEnabled}
-                        onChange={handlePartInputChange}
-                      />
-                    }
-                    label="Enable CGST"
-                  />
-                  {newPart.cgstEnabled && (
-                    <Box sx={{ mt: 2 }}>
-                      <TextField
-                        name="cgstPercentage"
-                        label="CGST Percentage (%)"
-                        type="number"
-                        variant="outlined"
-                        value={newPart.cgstPercentage}
-                        onChange={handlePartInputChange}
-                        required={newPart.cgstEnabled}
-                        inputProps={{ min: 0, max: 100, step: "0.01" }}
-                        fullWidth
-                        size="small"
-                      />
-                      {newPart.pricePerUnit && newPart.quantity && newPart.cgstPercentage && (
-                        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-                          CGST Amount: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage).toFixed(2)}
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
-                </Box>
-              </Grid>
-            </Grid>
-
-            {/* Total Tax and Price Display */}
-            {newPart.pricePerUnit && newPart.quantity && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="h6" color="primary">
-                      Total Tax: ₹{calculateTotalTaxAmount(
-                        newPart.pricePerUnit,
-                        newPart.quantity,
-                        newPart.sgstEnabled,
-                        newPart.sgstPercentage,
-                        newPart.cgstEnabled,
-                        newPart.cgstPercentage
-                      ).toFixed(2)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {newPart.sgstEnabled && newPart.sgstPercentage && (
-                        <>SGST: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.sgstPercentage).toFixed(2)}</>
-                      )}
-                      {newPart.sgstEnabled && newPart.cgstEnabled && newPart.sgstPercentage && newPart.cgstPercentage && <> + </>}
-                      {newPart.cgstEnabled && newPart.cgstPercentage && (
-                        <>CGST: ₹{calculateTaxAmount(newPart.pricePerUnit, newPart.quantity, newPart.cgstPercentage).toFixed(2)}</>
-                      )}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="h6">
-                      Total Price: ₹{calculateTotalPrice(
-                        newPart.pricePerUnit,
-                        newPart.quantity,
-                        newPart.sgstEnabled,
-                        newPart.sgstPercentage,
-                        newPart.cgstEnabled,
-                        newPart.cgstPercentage
-                      ).toFixed(2)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Base Price: ₹{(parseFloat(newPart.pricePerUnit) * parseInt(newPart.quantity || 0)).toFixed(2)}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Box>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={handleCloseAddPartDialog}
-            disabled={addingPart}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAddPart}
-            disabled={addingPart || checkDuplicatePartNumber(newPart.partNumber)}
-            variant="contained"
-            startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
-          >
-            {addingPart ? 'Adding...' : 'Add Part'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        
+                    {/* Tax Preview */}
+                    {(newPart.purchasePrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
+                      <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>Tax Summary</Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              Base: ₹{(newPart.purchasePrice * newPart.quantity).toFixed(2)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="body2" color="primary">
+                              Tax: ₹{calculateTaxAmount(newPart.purchasePrice, newPart.quantity, newPart.taxType === 'igst' ? newPart.igst : newPart.cgstSgst * 2).toFixed(2)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Typography variant="h6">Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}</Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
+                    <Button
+                      onClick={handleAddPart}
+                      variant="contained"
+                      disabled={addingPart || !newPart.partName.trim()}
+                      startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
+                      sx={{ backgroundColor: '#ff4d4d', '&:hover': { backgroundColor: '#e63939' } }}
+                    >
+                      {addingPart ? 'Adding...' : 'Add Part'}
+                    </Button>
+                  </DialogActions>
+                </Dialog>
 
       {/* Error Alert */}
       {error && (
