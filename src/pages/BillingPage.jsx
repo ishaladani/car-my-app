@@ -54,6 +54,8 @@ const AutoServeBilling = () => {
   let garageId =
     localStorage.getItem("garageId") || localStorage.getItem("garage_id");
 
+  const garageToken = localStorage.getItem("token");
+
   const today = new Date().toISOString().split("T")[0];
 
   // UPDATED: State declarations with complete bank details
@@ -587,26 +589,24 @@ const AutoServeBilling = () => {
   // Generate invoice number starting from INV001 for each garage
   const generateInvoiceNumber = async () => {
     try {
-      // Get the last invoice number for this garage
+      // Get the last invoice number for this garage from bills collection
       const response = await axios.get(
-        `https://garage-management-zi5z.onrender.com/api/garage/jobCards?garageId=${garageId}&generateBill=true`
+        `https://garage-management-zi5z.onrender.com/api/billing/last-invoice/${garageId}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: garageToken ? `Bearer ${garageToken}` : "",
+          },
+        }
       );
 
-      const bills = response.data || [];
       let lastInvoiceNumber = 0;
-
-      // Find the highest invoice number
-      bills.forEach((bill) => {
-        if (bill.invoiceNumber) {
-          const match = bill.invoiceNumber.match(/INV(\d+)/);
-          if (match) {
-            const num = parseInt(match[1]);
-            if (num > lastInvoiceNumber) {
-              lastInvoiceNumber = num;
-            }
-          }
+      if (response.data && response.data.lastInvoiceNo) {
+        const match = response.data.lastInvoiceNo.match(/INV(\d+)/);
+        if (match) {
+          lastInvoiceNumber = parseInt(match[1]);
         }
-      });
+      }
 
       // Generate next invoice number
       const nextNumber = lastInvoiceNumber + 1;
