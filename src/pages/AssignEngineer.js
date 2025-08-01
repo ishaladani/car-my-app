@@ -2348,9 +2348,7 @@ const AssignEngineer = () => {
                                       {option.gstPercentage ||
                                         option.taxAmount ||
                                         0}
-                                      % | Available:{" "}
-                                      {getAvailableQuantity(option._id)} |
-                                      {option.carName} - {option.model}
+                                      % | {option.carName} - {option.model}
                                     </Typography>
                                   </Box>
                                 </Box>
@@ -2373,7 +2371,7 @@ const AssignEngineer = () => {
                                   }}
                                 />
                               )}
-                              noOptionsText="No parts available in stock"
+                              noOptionsText="No parts available"
                               filterOptions={(options, { inputValue }) => {
                                 return options.filter(
                                   (option) =>
