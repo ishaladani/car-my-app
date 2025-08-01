@@ -303,7 +303,12 @@ const AutoServeBilling = () => {
           shiftToParty:
             data.insuranceCompany || data.insurance?.company || "N/A",
           insuranceProvider:
-            data.insuranceProvider || data.insurance?.company || "N/A",
+            data.insurancePolicyName ||
+            data.insurance?.policyName ||
+            data.insurancePolicy ||
+            data.insuranceProvider ||
+            data.insurance?.company ||
+            "N/A",
         }));
 
         // UPDATED: Process parts with HSN numbers
@@ -2044,7 +2049,7 @@ const AutoServeBilling = () => {
           : "Non-GST Bill";
       const body = encodeURIComponent(
         emailMessage ||
-          `Dear ${carDetails.customerName},\n\nPlease find attached your ${billTypeText} invoice for vehicle ${carDetails.carNumber}.\n\nInvoice Details:\n- Invoice No: ${carDetails.invoiceNo}\n- Date: ${carDetails.billingDate}\n- Bill Type: ${billTypeText}\n- ${gstInfo}\n- Total Amount: ₹${summary.totalAmount}\n- Bill To: ${gstSettings.billToParty}\n- Ship To: ${gstSettings.shiftToParty}\n\nThank you for choosing ${garageDetails.name}.\n\nBest regards,\n${garageDetails.name}`
+          `Dear ${carDetails.customerName},\n\nPlease find attached your ${billTypeText} invoice for vehicle ${carDetails.carNumber}.\n\nInvoice Details:\n- Invoice No: ${carDetails.invoiceNo}\n- Date: ${carDetails.billingDate}\n- Bill Type: ${billTypeText}\n- ${gstInfo}\n- Total Amount: ₹${summary.totalAmount}\n- Bill To: ${gstSettings.billToParty}\n- Insurance Policy: ${gstSettings.insuranceProvider}\n\nThank you for choosing ${garageDetails.name}.\n\nBest regards,\n${garageDetails.name}`
       );
       const recipient = encodeURIComponent(emailRecipient);
 
@@ -2127,7 +2132,7 @@ ${
 👤 Bill To: ${gstSettings.billToParty}
 📱 Contact: ${carDetails.contact}
 📧 Email: ${carDetails.email}
-🏢 Ship To: ${gstSettings.shiftToParty}
+🏢 Insurance Policy: ${gstSettings.insuranceProvider}
 ${
   gstSettings.customerGstNumber && gstSettings.billType === "gst"
     ? `🆔 Customer GST: ${gstSettings.customerGstNumber}`
