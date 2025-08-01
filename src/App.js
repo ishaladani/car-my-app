@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CssBaseline } from "@mui/material";
 import { ThemeProviderWrapper } from "./Layout/ThemeContext";
 import Dashboard from "./pages/Dashboard";
@@ -19,7 +14,7 @@ import InsuranceManagement from "./pages/InsuranceManagement";
 import InventoryManagement from "./pages/InventoryManagement";
 import LoginPage from "./Login/LoginPage";
 import EnhancedSignUpPage from "./Login/SignUpPage";
-import ProtectedRoute from "./Login/ProtectedRoute";
+
 import BillingPage from "./pages/BillingPage";
 import UserManagement from "./pages/UserList";
 import AwaitingApproval from "./pages/AwaitingApproval";

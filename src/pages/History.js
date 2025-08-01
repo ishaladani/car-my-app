@@ -61,6 +61,7 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon,
   History as HistoryIcon,
+  FileDownload as DownloadIcon,
 } from "@mui/icons-material";
 import { useThemeContext } from "../Layout/ThemeContext";
 import EditProfileButton from "../Login/EditProfileButton";

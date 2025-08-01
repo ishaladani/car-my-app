@@ -28,8 +28,6 @@ import {
 import {
   Visibility,
   VisibilityOff,
-  Business,
-  Person,
   DirectionsCar,
   AccountCircle,
   Email,
@@ -38,15 +36,13 @@ import {
   Send,
   ExitToApp,
 } from "@mui/icons-material";
-import { Snackbar } from "@mui/material";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { getAdminApiUrl } from "../config/api";
 
 const LoginPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,10 +55,6 @@ const LoginPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showError, setShowError] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
 
   // Forgot Password State
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -78,8 +70,6 @@ const LoginPage = () => {
   const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
   // API Base URL
@@ -305,7 +295,6 @@ const LoginPage = () => {
       }
 
       setForgotPasswordSuccess("OTP sent successfully! Check your email.");
-      setOtpSent(true);
       setForgotPasswordStep(1);
       setResendTimer(60);
 
@@ -353,7 +342,6 @@ const LoginPage = () => {
       }
 
       setForgotPasswordSuccess("OTP verified successfully!");
-      setOtpVerified(true);
       setForgotPasswordStep(2);
     } catch (err) {
       setForgotPasswordError(err.message);
@@ -434,8 +422,6 @@ const LoginPage = () => {
     });
     setForgotPasswordError("");
     setForgotPasswordSuccess("");
-    setOtpSent(false);
-    setOtpVerified(false);
     setResendTimer(0);
   };
 
@@ -450,15 +436,7 @@ const LoginPage = () => {
     });
     setForgotPasswordError("");
     setForgotPasswordSuccess("");
-    setOtpSent(false);
-    setOtpVerified(false);
     setResendTimer(0);
-  };
-
-  const handleResendOtp = () => {
-    if (resendTimer === 0) {
-      handleSendOtp({ preventDefault: () => {} });
-    }
   };
 
   // Theme colors - simplified for unified login
