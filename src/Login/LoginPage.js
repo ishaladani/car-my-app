@@ -234,9 +234,14 @@ const LoginPage = () => {
       );
 
       const garageId = isGarageLogin ? data.garage?._id : data.user?.garageId;
+      const userId = isGarageLogin ? data.garage?._id : data.user?._id;
 
       if (garageId) {
         localStorage.setItem("garageId", garageId);
+      }
+
+      if (userId) {
+        localStorage.setItem("userId", userId);
       }
 
       setIsLoggedIn(true);

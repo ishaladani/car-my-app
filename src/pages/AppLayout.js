@@ -172,13 +172,19 @@ const AppLayout = () => {
     {
       text: "History",
       icon: <AssignmentIcon />,
+      path: "/history",
+      permission: "Reports & Records",
+    },
+    {
+      text: "Reports",
+      icon: <BuildIcon />,
       path: "/reports",
       permission: "Reports & Records",
     },
     {
-      text: "Recode & Report",
-      icon: <BuildIcon />,
-      path: "/inventory-dashboard", // ✅ Corrected
+      text: "Inventory Dashboard",
+      icon: <InventoryIcon />,
+      path: "/inventory-dashboard",
       permission: "Reports & Records",
     },
     {

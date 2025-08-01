@@ -217,6 +217,8 @@ const Dashboard = () => {
   }
 
   const token = localStorage.getItem("token"); // ✅ Get JWT token
+  const userId = localStorage.getItem("userId"); // ✅ Get user ID for filtering
+  const userType = localStorage.getItem("userType"); // ✅ Get user type
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const [modalOpen, setModalOpen] = useState(false);
@@ -456,16 +458,21 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`, // ✅ Added token
-            },
-          }
-        );
+        // Build URL with user filtering
+        let url = `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`;
+
+        // Add user filter for subusers (not garage owners)
+        if (userType === "user" && userId) {
+          url += `?createdBy=${userId}`;
+        }
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // ✅ Added token
+          },
+        });
 
         if (!response.ok) {
           if (response.status === 401) {

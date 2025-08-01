@@ -2013,6 +2013,65 @@ const AutoServeBilling = () => {
     }
   };
 
+  // Enhanced print function with printer detection
+  const printInvoice = () => {
+    try {
+      if (!carDetails.invoiceNo) {
+        setSnackbar({
+          open: true,
+          message: "Invoice number is required to generate PDF",
+          severity: "error",
+        });
+        return;
+      }
+
+      const doc = generateProfessionalGSTInvoice();
+
+      // Create a new window for printing
+      const printWindow = window.open("", "_blank");
+      const pdfBlob = doc.output("blob");
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print Invoice</title>
+          <style>
+            body { margin: 0; padding: 0; }
+            iframe { width: 100%; height: 100vh; border: none; }
+          </style>
+        </head>
+        <body>
+          <iframe src="${pdfUrl}" onload="window.print()"></iframe>
+        </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+
+      // Clean up after printing
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+        printWindow.close();
+      }, 5000);
+
+      setSnackbar({
+        open: true,
+        message:
+          "Print dialog opened. Please select your printer and print settings.",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error("Print error:", error);
+      setSnackbar({
+        open: true,
+        message: `Failed to open print dialog: ${error.message}`,
+        severity: "error",
+      });
+    }
+  };
+
   // Enhanced email function
   const sendBillViaEmail = async () => {
     try {
@@ -2399,6 +2458,7 @@ ${
             paymentMethod={paymentMethod}
             isMobile={isMobile}
             downloadPdfBill={downloadPdfBill}
+            printInvoice={printInvoice}
             sendBillViaWhatsApp={sendBillViaWhatsApp}
             sendingWhatsApp={sendingWhatsApp}
             openEmailDialog={openEmailDialog}

@@ -29,6 +29,7 @@ import AddEngineer from "./pages/AddEngineer";
 import RenewPlanPage from "./Login/RenewPlanPage";
 import RenewPlanFlow from "./components/RenewPlanFlow";
 import InventoryDashboard from "./pages/InventoryDashboard";
+import History from "./pages/History";
 
 function App() {
   return (
@@ -60,6 +61,7 @@ function App() {
               path="inventory-dashboard"
               element={<InventoryDashboard />}
             />
+            <Route path="history" element={<History />} />
           </Route>
 
           <Route path="AwaitingApproval" element={<AwaitingApproval />} />
