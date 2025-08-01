@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -36,8 +36,10 @@ import {
   Tabs,
   Tab,
   Tooltip,
-} from '@mui/material';
-import { 
+  Badge,
+  LinearProgress,
+} from "@mui/material";
+import {
   Search as SearchIcon,
   ArrowBack as ArrowBackIcon,
   Visibility as VisibilityIcon,
@@ -46,12 +48,19 @@ import {
   Print as PrintIcon,
   Close as CloseIcon,
   Receipt as ReceiptIcon,
-} from '@mui/icons-material';
-import { useThemeContext } from '../Layout/ThemeContext';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import autoTable from 'jspdf-autotable';
-import jsPDF from 'jspdf';
+  Inventory as InventoryIcon,
+  TrendingUp as TrendingUpIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Refresh as RefreshIcon,
+  FilterList as FilterListIcon,
+  CalendarToday as CalendarTodayIcon,
+} from "@mui/icons-material";
+import { useThemeContext } from "../Layout/ThemeContext";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import autoTable from "jspdf-autotable";
+import jsPDF from "jspdf";
 
 const RecordReport = () => {
   const navigate = useNavigate();
@@ -59,23 +68,29 @@ const RecordReport = () => {
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
+  const token = localStorage.getItem("token");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const theme = useTheme();
   const { darkMode } = useThemeContext();
-  
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState(0);
+
   // Search and Filter States
-  const [search, setSearch] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [billTypeFilter, setBillTypeFilter] = useState('All'); // New state for GST/Non-GST filter
+  const [search, setSearch] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [billTypeFilter, setBillTypeFilter] = useState("All");
 
   // Data States
   const [jobsData, setJobsData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
+  const [filteredJobsData, setFilteredJobsData] = useState([]);
+  const [inventoryData, setInventoryData] = useState(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  
+
   // Pagination States
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -91,102 +106,123 @@ const RecordReport = () => {
 
   // Format date helper
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
-  // Generate PDF Function - Directly in the component
-  const generatePDFWithJsPDF = (jobData) => {
-    try {
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.setTextColor(33, 33, 33);
-      doc.text(" Job Card Details", 14, 20);
-      const tableData = [
-        ['Customer Name', jobData.customerName || 'N/A'],
-        ['Contact Number', jobData.contactNumber || 'N/A'],
-        ['Email', jobData.email || 'N/A'],
-        ['Company', jobData.company || 'N/A'],
-        ['Car Number', jobData.carNumber || jobData.registrationNumber || 'N/A'],
-        ['Model', jobData.model || 'N/A'],
-        ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
-        ['Fuel Type', jobData.fuelType || 'N/A'],
-        ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
-        ['Policy Number', jobData.policyNumber || 'N/A'],
-        ['Expiry Date', formatDate(jobData.expiryDate)],
-        ['Excess Amount', jobData.excessAmount ? `RS.${jobData.excessAmount}` : 'N/A'],
-        ['Job Type', jobData.type || 'N/A'],
-        ['Engineer', jobData.engineerId?.[0]?.name || 'Not Assigned'],
-        ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
-        ['Status', jobData.status || 'N/A'],
-        ['Created Date', formatDate(jobData.createdAt)],
-      ];
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+    }).format(amount || 0);
+  };
+
+  // Generate PDF for jobs
+  const generateJobsPDF = (jobs) => {
+    const doc = new jsPDF();
+
+    // Title
+    doc.setFontSize(20);
+    doc.text("Financial Report - Completed Jobs", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+
+    // Summary
+    const totalJobs = jobs.length;
+    const totalAmount = jobs.reduce(
+      (sum, job) => sum + (job.totalAmount || 0),
+      0
+    );
+
+    doc.setFontSize(14);
+    doc.text("Summary:", 20, 45);
+    doc.setFontSize(12);
+    doc.text(`Total Jobs: ${totalJobs}`, 20, 55);
+    doc.text(`Total Revenue: ${formatCurrency(totalAmount)}`, 20, 65);
+
+    // Table
+    const tableData = jobs.map((job) => [
+      job.jobId || "N/A",
+      job.customerName || "N/A",
+      job.carNumber || "N/A",
+      formatCurrency(job.totalAmount || 0),
+      formatDate(job.completedAt || job.updatedAt),
+    ]);
+
+    autoTable(doc, {
+      head: [["Job ID", "Customer", "Vehicle", "Amount", "Completed Date"]],
+      body: tableData,
+      startY: 80,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [25, 118, 210] },
+    });
+
+    doc.save(`financial-report-${new Date().toISOString().split("T")[0]}.pdf`);
+  };
+
+  // Generate PDF for inventory
+  const generateInventoryPDF = (inventoryData) => {
+    if (!inventoryData) return;
+
+    const doc = new jsPDF();
+
+    // Title
+    doc.setFontSize(20);
+    doc.text("Inventory Report", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+
+    // Summary
+    const summary = inventoryData.summary;
+    doc.setFontSize(14);
+    doc.text("Summary:", 20, 45);
+    doc.setFontSize(12);
+    doc.text(`Total Parts: ${summary.totalParts}`, 20, 55);
+    doc.text(`Total Available: ${summary.totalPartsAvailable}`, 20, 65);
+    doc.text(
+      `Purchase Value: ${formatCurrency(summary.totalPurchaseValue)}`,
+      20,
+      75
+    );
+    doc.text(
+      `Selling Value: ${formatCurrency(summary.totalSellingValue)}`,
+      20,
+      85
+    );
+    doc.text(
+      `Potential Profit: ${formatCurrency(summary.potentialProfit)}`,
+      20,
+      95
+    );
+    doc.text(`Low Stock Items: ${summary.lowStockCount}`, 20, 105);
+    doc.text(`Out of Stock: ${summary.outOfStockCount}`, 20, 115);
+
+    // Low stock table
+    if (inventoryData.lowStockParts && inventoryData.lowStockParts.length > 0) {
       autoTable(doc, {
-        startY: 30,
-        head: [['Field', 'Value']],
-        body: tableData,
-        theme: 'grid',
-        styles: {
-          fontSize: 10,
-          cellPadding: 3,
-        },
-        headStyles: {
-          fillColor: [25, 118, 210],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-        },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { left: 10, right: 10 },
+        head: [
+          ["Part Name", "Model", "Quantity", "Purchase Price", "Selling Price"],
+        ],
+        body: inventoryData.lowStockParts.map((part) => [
+          part.partName,
+          part.model,
+          part.quantity,
+          formatCurrency(part.purchasePrice),
+          formatCurrency(part.sellingPrice),
+        ]),
+        startY: 130,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [255, 152, 0] },
       });
-      doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (err) {
-      console.error("PDF generation failed", err);
-      alert("PDF generation failed. Please try again.");
     }
-  };
 
-  const formatJobDetails = (jobDetailsString) => {
-    if (!jobDetailsString) return 'No details available';
-    // If it's already a plain string (not JSON), return it directly
-    if (typeof jobDetailsString === 'string' && 
-        !jobDetailsString.trim().startsWith('[') && 
-        !jobDetailsString.trim().startsWith('{')) {
-      return jobDetailsString;
-    }
-    try {
-      const details = JSON.parse(jobDetailsString);
-      if (Array.isArray(details) && details.length > 0) {
-        // Show first 2 items with prices
-        const displayItems = details.slice(0, 2).map(item => {
-          const description = item.description || item.name || 'Service';
-          const price = item.price ? ` (₹${item.price})` : '';
-          return `• ${description}${price}`;
-        }).join('\n');
-        const moreCount = details.length - 2;
-        const moreText = moreCount > 0 ? `\n+${moreCount} more service${moreCount > 1 ? 's' : ''}` : '';
-        return displayItems + moreText;
-      } else if (typeof details === 'object' && details !== null) {
-        // Handle single object case
-        const description = details.description || 'Service';
-        const price = details.price ? ` (₹${details.price})` : '';
-        return `• ${description}${price}`;
-      } else {
-        return String(details);
-      }
-    } catch (error) {
-      console.warn('Failed to parse job details:', error);
-      return jobDetailsString;
-    }
-  };
-
-  // Handle Download PDF
-  const handleDownloadPDF = (job) => {
-    if (!job) return;
-    generatePDFWithJsPDF(job);
+    doc.save(`inventory-report-${new Date().toISOString().split("T")[0]}.pdf`);
   };
 
   // Fetch job data from API
@@ -202,13 +238,15 @@ const RecordReport = () => {
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
           {
-            method: 'GET',
+            method: "GET",
             headers: {
-              'Content-Type': 'application/json'
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
             },
           }
         );
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         const jobsData = Array.isArray(data)
           ? data
@@ -217,11 +255,13 @@ const RecordReport = () => {
           : data.data
           ? data.data
           : [];
-        const completedJobs = jobsData.filter(job => job.status === "Completed");
+        const completedJobs = jobsData.filter(
+          (job) => job.status === "Completed"
+        );
         // Sort jobs by completed date (most recent first)
         const sortedJobs = sortJobsByCompletedDate(completedJobs);
         setJobsData(sortedJobs);
-        setFilteredData(sortedJobs);
+        setFilteredJobsData(sortedJobs);
       } catch (error) {
         console.error("Error fetching jobs:", error);
         setError(`Failed to load jobs: ${error.message}`);
@@ -230,7 +270,57 @@ const RecordReport = () => {
       }
     };
     fetchJobs();
-  }, [garageId, navigate]);
+  }, [garageId, navigate, token]);
+
+  // Fetch inventory data
+  const fetchInventoryData = async () => {
+    try {
+      setInventoryLoading(true);
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/garage/inventory/report/${garageId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setInventoryData(response.data.report);
+    } catch (error) {
+      console.error("Error fetching inventory data:", error);
+      setError(`Failed to load inventory data: ${error.message}`);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  // Fetch financial data
+  const [financialData, setFinancialData] = useState(null);
+  const [financialLoading, setFinancialLoading] = useState(false);
+
+  const fetchFinancialData = async () => {
+    try {
+      setFinancialLoading(true);
+      const params = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+
+      const response = await axios.get(
+        `https://garage-management-zi5z.onrender.com/api/billing/financial-report/${garageId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params,
+        }
+      );
+      setFinancialData(response.data.report);
+    } catch (error) {
+      console.error("Error fetching financial data:", error);
+      setError(`Failed to load financial data: ${error.message}`);
+    } finally {
+      setFinancialLoading(false);
+    }
+  };
 
   // Handle search
   const handleSearch = (e) => {
@@ -259,188 +349,51 @@ const RecordReport = () => {
     applyFilters(search, startDate, endDate, newBillType);
   };
 
-  // Apply all filters
+  // Apply filters
   const applyFilters = (searchTerm, start, end, billType) => {
     let filtered = [...jobsData];
-    if (searchTerm.trim() !== '') {
+
+    // Search filter
+    if (searchTerm) {
       filtered = filtered.filter(
-        job => 
-          (job.carNumber && job.carNumber.toLowerCase().includes(searchTerm)) || 
-          (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) || 
-          (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) || 
-          (job.jobDetails && job.jobDetails.toLowerCase().includes(searchTerm)) ||
-          (job.type && job.type.toLowerCase().includes(searchTerm))
+        (job) =>
+          job.customerName?.toLowerCase().includes(searchTerm) ||
+          job.carNumber?.toLowerCase().includes(searchTerm) ||
+          job.jobId?.toLowerCase().includes(searchTerm) ||
+          job.customerNumber?.toLowerCase().includes(searchTerm)
       );
     }
-    
-    if (start && end) {
-      filtered = filtered.filter(job => {
-        const jobDate = new Date(job.createdAt);
-        const startDateObj = new Date(start);
-        const endDateObj = new Date(end);
-        return jobDate >= startDateObj && jobDate <= endDateObj;
-      });
+
+    // Date range filter
+    if (start) {
+      filtered = filtered.filter(
+        (job) => new Date(job.completedAt || job.updatedAt) >= new Date(start)
+      );
+    }
+    if (end) {
+      filtered = filtered.filter(
+        (job) =>
+          new Date(job.completedAt || job.updatedAt) <=
+          new Date(end + "T23:59:59")
+      );
     }
 
-    // Apply Bill Type filter
-    if (billType && billType !== 'All') {
-      if (billType === 'GST') {
-        filtered = filtered.filter(job => job.gstApplicable === true);
-      } else if (billType === 'Non-GST') {
-        filtered = filtered.filter(job => job.gstApplicable === false);
-      }
+    // Bill type filter (if implemented)
+    if (billType && billType !== "All") {
+      // This would need to be implemented based on your bill data structure
+      // filtered = filtered.filter(job => job.billType === billType);
     }
 
-    // Sort filtered data by completed date (most recent first)
-    const sortedFiltered = sortJobsByCompletedDate(filtered);
-    setFilteredData(sortedFiltered);
+    setFilteredJobsData(filtered);
     setPage(0);
   };
 
-  // Handle pagination
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const JobDetailsComponent = ({ 
-    jobDetails, 
-    maxItems = 2, 
-    showPrices = true,
-    compact = false 
-  }) => {
-    const parseAndDisplayJobDetails = (jobDetailsString) => {
-      if (!jobDetailsString) {
-        return (
-          <Typography variant="body2" color="text.secondary">
-            No details available
-          </Typography>
-        );
-      }
-      // If it's already a plain string (not JSON), display it directly
-      if (typeof jobDetailsString === 'string' && 
-          !jobDetailsString.trim().startsWith('[') && 
-          !jobDetailsString.trim().startsWith('{')) {
-        return (
-          <Typography variant="body2" sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}>
-            {jobDetailsString}
-          </Typography>
-        );
-      }
-      try {
-        const details = JSON.parse(jobDetailsString);
-        if (Array.isArray(details) && details.length > 0) {
-          return (
-            <Box>
-              {details.slice(0, maxItems).map((item, index) => (
-                <Box key={index} sx={{ 
-                  mb: compact ? 0.3 : 0.5, 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  gap: 1
-                }}>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      flex: 1, 
-                      fontSize: compact ? '0.8rem' : '0.875rem',
-                      lineHeight: 1.2
-                    }}
-                  >
-                    • {item.description || item.name || `Service ${index + 1}`}
-                  </Typography>
-                  {showPrices && item.price && (
-                    <Chip 
-                      label={`₹${item.price}`} 
-                      size="small" 
-                      variant="outlined"
-                      sx={{ 
-                        fontSize: '0.75rem',
-                        height: compact ? '18px' : '20px',
-                        fontWeight: 600,
-                        '& .MuiChip-label': {
-                          px: compact ? 0.5 : 1
-                        }
-                      }}
-                    />
-                  )}
-                </Box>
-              ))}
-              {details.length > maxItems && (
-                <Typography 
-                  variant="caption" 
-                  color="text.secondary" 
-                  sx={{ 
-                    fontStyle: 'italic',
-                    fontSize: compact ? '0.7rem' : '0.75rem'
-                  }}
-                >
-                  +{details.length - maxItems} more service{details.length - maxItems > 1 ? 's' : ''}
-                </Typography>
-              )}
-            </Box>
-          );
-        } else if (typeof details === 'object' && details !== null) {
-          // Handle single object case
-          return (
-            <Box>
-              {details.description && (
-                <Typography 
-                  variant="body2" 
-                  sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
-                >
-                  • {details.description}
-                </Typography>
-              )}
-              {showPrices && details.price && (
-                <Chip 
-                  label={`₹${details.price}`} 
-                  size="small" 
-                  variant="outlined"
-                  sx={{ 
-                    mt: 0.5, 
-                    fontWeight: 600,
-                    height: compact ? '18px' : '20px'
-                  }}
-                />
-              )}
-            </Box>
-          );
-        } else {
-          return (
-            <Typography 
-              variant="body2" 
-              sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
-            >
-              {String(details)}
-            </Typography>
-          );
-        }
-      } catch (error) {
-        console.warn('Failed to parse job details:', error);
-        // If JSON parsing fails, display the original string
-        return (
-          <Typography 
-            variant="body2" 
-            sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
-          >
-            {jobDetailsString}
-          </Typography>
-        );
-      }
-    };
-    return parseAndDisplayJobDetails(jobDetails);
-  };
-
-  // Handle view button click
-  const handleViewClick = (job) => {
-    setSelectedJob(job);
-    setOpenDialog(true);
-  };
-
-  // Close dialog
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedJob(null);
@@ -448,13 +401,13 @@ const RecordReport = () => {
 
   // Clear all filters
   const handleClearFilters = () => {
-    setSearch('');
-    setStartDate('');
-    setEndDate('');
-    setBillTypeFilter('All');
+    setSearch("");
+    setStartDate("");
+    setEndDate("");
+    setBillTypeFilter("All");
     // Re-sort the original data when clearing filters
     const sortedJobs = sortJobsByCompletedDate([...jobsData]);
-    setFilteredData(sortedJobs);
+    setFilteredJobsData(sortedJobs);
     setPage(0);
   };
 
@@ -468,482 +421,1077 @@ const RecordReport = () => {
   const getCurrentPageData = () => {
     const startIndex = page * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    return filteredData.slice(startIndex, endIndex);
+    return filteredJobsData.slice(startIndex, endIndex);
   };
 
+  // Calculate financial summary
+  const financialSummary = financialData
+    ? {
+        totalJobs: financialData.summary.totalBills,
+        totalRevenue: financialData.summary.totalRevenue,
+        averageRevenue:
+          financialData.summary.totalBills > 0
+            ? financialData.summary.totalRevenue /
+              financialData.summary.totalBills
+            : 0,
+        thisMonthJobs: financialData.currentMonth.jobs,
+        thisMonthRevenue: financialData.currentMonth.revenue,
+        grossProfit: financialData.summary.grossProfit,
+        netProfit: financialData.summary.netProfit,
+      }
+    : {
+        totalJobs: filteredJobsData.length,
+        totalRevenue: filteredJobsData.reduce(
+          (sum, job) => sum + (job.totalAmount || 0),
+          0
+        ),
+        averageRevenue:
+          filteredJobsData.length > 0
+            ? filteredJobsData.reduce(
+                (sum, job) => sum + (job.totalAmount || 0),
+                0
+              ) / filteredJobsData.length
+            : 0,
+        thisMonthJobs: filteredJobsData.filter((job) => {
+          const jobDate = new Date(job.completedAt || job.updatedAt);
+          const now = new Date();
+          return (
+            jobDate.getMonth() === now.getMonth() &&
+            jobDate.getFullYear() === now.getFullYear()
+          );
+        }).length,
+        thisMonthRevenue: filteredJobsData
+          .filter((job) => {
+            const jobDate = new Date(job.completedAt || job.updatedAt);
+            const now = new Date();
+            return (
+              jobDate.getMonth() === now.getMonth() &&
+              jobDate.getFullYear() === now.getFullYear()
+            );
+          })
+          .reduce((sum, job) => sum + (job.totalAmount || 0), 0),
+        grossProfit: 0,
+        netProfit: 0,
+      };
+
   return (
-    <Box sx={{ flexGrow: 1, mb: 4, ml: {xs: 0, sm: 35}, overflow: 'auto' }}>
+    <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: "auto" }}>
       <CssBaseline />
       <Container maxWidth="xl">
-        <Card sx={{ mb: 4, overflow: 'visible', borderRadius: 2 }}>
-          <CardContent>
-            {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Box display="flex" alignItems="center">
-                <IconButton 
-                  sx={{ mr: 1, backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }}
-                  onClick={() => navigate(-1)}
+        {/* Header */}
+        <Card
+          elevation={0}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            border: "1px solid #e2e8f0",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <IconButton
+                  onClick={() => navigate("/")}
+                  sx={{
+                    mr: 2,
+                    bgcolor: "rgba(255,255,255,0.1)",
+                    color: "white",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+                  }}
                 >
                   <ArrowBackIcon />
                 </IconButton>
-                <Typography variant="h5" color="primary">
-                  Completed Job Records & Reports
-                </Typography>
+                <Box>
+                  <Typography variant="h4" fontWeight="bold">
+                    📊 Reports & Analytics
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                    Comprehensive reports for inventory and financial analysis
+                  </Typography>
+                </Box>
               </Box>
-              <Chip 
-                icon={<WorkIcon />} 
-                label={`${filteredData.length} Completed Jobs`}
-                color="success" 
-                variant="outlined"
-                sx={{ fontWeight: 500 }}
-              />
-            </Box>
-            <Divider sx={{ my: 3 }} />
-            {/* Search and Filter Section */}
-            <Grid container spacing={2} sx={{ mb: 4 }}>
-              {/* Search Bar */}
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  value={search}
-                  onChange={handleSearch}
-                  placeholder="Search by car number, customer name, job details..."
-                  variant="outlined"
-                  size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-              {/* Start Date */}
-              <Grid item xs={12} md={2}>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="Start Date"
-                  value={startDate}
-                  onChange={handleStartDateChange}
-                  InputLabelProps={{ shrink: true }}
-                  size="small"
-                />
-              </Grid>
-              {/* End Date */}
-              <Grid item xs={12} md={2}>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="End Date"
-                  value={endDate}
-                  onChange={handleEndDateChange}
-                  InputLabelProps={{ shrink: true }}
-                  size="small"
-                />
-              </Grid>
-              {/* Bill Type Filter */}
-              <Grid item xs={12} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Bill Type</InputLabel>
-                  <Select
-                    value={billTypeFilter}
-                    onChange={handleBillTypeFilterChange}
-                    label="Bill Type"
-                  >
-                    <MenuItem value="All">All Bills</MenuItem>
-                    <MenuItem value="GST">GST</MenuItem>
-                    <MenuItem value="Non-GST">Non-GST</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              {/* Clear Filters Button */}
-              <Grid item xs={12} md={3}>
+              <Box sx={{ display: "flex", gap: 1 }}>
                 <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleClearFilters}
-                  startIcon={<FileDownloadIcon />}
-                  size="small"
-                  sx={{ height: '40px' }}
+                  variant="contained"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => {
+                    if (activeTab === 0) {
+                      fetchFinancialData();
+                    } else {
+                      fetchInventoryData();
+                    }
+                  }}
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.2)",
+                    color: "white",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.3)" },
+                  }}
                 >
-                  Clear Filters
+                  Refresh
                 </Button>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Tabs */}
+        <Card
+          elevation={0}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            border: "1px solid #e2e8f0",
+          }}
+        >
+          <CardContent sx={{ p: 0 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              sx={{
+                borderBottom: 1,
+                borderColor: "divider",
+                "& .MuiTab-root": {
+                  minHeight: 64,
+                  fontSize: "1rem",
+                  fontWeight: 500,
+                },
+              }}
+            >
+              <Tab
+                icon={<ReceiptIcon />}
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <span>Financial Report</span>
+                    <Badge
+                      badgeContent={financialSummary.totalJobs}
+                      color="primary"
+                    />
+                  </Box>
+                }
+                iconPosition="start"
+              />
+              <Tab
+                icon={<InventoryIcon />}
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <span>Inventory Report</span>
+                    {inventoryData && (
+                      <Badge
+                        badgeContent={inventoryData.summary?.lowStockCount || 0}
+                        color="warning"
+                      />
+                    )}
+                  </Box>
+                }
+                iconPosition="start"
+              />
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Financial Report Tab */}
+        {activeTab === 0 && (
+          <>
+            {/* Financial Summary Cards */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  elevation={0}
+                  sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h4"
+                          fontWeight="bold"
+                          color="primary"
+                        >
+                          {financialSummary.totalJobs}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Jobs
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: "primary.light",
+                          color: "white",
+                        }}
+                      >
+                        <WorkIcon />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  elevation={0}
+                  sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h4"
+                          fontWeight="bold"
+                          color="success.main"
+                        >
+                          {formatCurrency(financialSummary.totalRevenue)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Total Revenue
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: "success.light",
+                          color: "white",
+                        }}
+                      >
+                        <TrendingUpIcon />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  elevation={0}
+                  sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h4"
+                          fontWeight="bold"
+                          color="info.main"
+                        >
+                          {formatCurrency(financialSummary.averageRevenue)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Average Revenue
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: "info.light",
+                          color: "white",
+                        }}
+                      >
+                        <TrendingUpIcon />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card
+                  elevation={0}
+                  sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          variant="h4"
+                          fontWeight="bold"
+                          color="warning.main"
+                        >
+                          {formatCurrency(financialSummary.thisMonthRevenue)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          This Month
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: "warning.light",
+                          color: "white",
+                        }}
+                      >
+                        <CalendarTodayIcon />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
               </Grid>
             </Grid>
-            {/* Error Alert */}
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
-              </Alert>
-            )}
-            {/* Job Cards Table */}
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Completed Job Cards (Latest First)
-                </Typography>
-              </Box>
-              {loading ? (
-                <Box display="flex" justifyContent="center" alignItems="center" py={4}>
-                  <CircularProgress />
-                  <Typography sx={{ ml: 2 }}>Loading job records...</Typography>
+
+            {/* Financial Data Actions */}
+            <Card
+              elevation={0}
+              sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                  <Button
+                    variant="contained"
+                    onClick={fetchFinancialData}
+                    disabled={financialLoading}
+                    startIcon={
+                      financialLoading ? (
+                        <CircularProgress size={20} />
+                      ) : (
+                        <RefreshIcon />
+                      )
+                    }
+                  >
+                    {financialLoading ? "Loading..." : "Load Financial Data"}
+                  </Button>
+                  {financialData && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => generateJobsPDF(filteredJobsData)}
+                      startIcon={<FileDownloadIcon />}
+                    >
+                      Export PDF
+                    </Button>
+                  )}
                 </Box>
-              ) : (
-                <>
-                  <TableContainer component={Paper} elevation={0} sx={{ 
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                    overflowX: 'auto',
-                  }}>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Job ID
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Car Number
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Customer Name
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Subaccount
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Job Details
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Status
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}>
-                            Completed Date
-                          </TableCell>
-                          <TableCell sx={{ 
-                            backgroundColor: theme.palette.primary.main,
-                            color: '#fff',
-                            fontWeight: 'bold'
-                          }}
-                            align="center"
+              </CardContent>
+            </Card>
+
+            {/* Search and Filters */}
+            <Card
+              elevation={0}
+              sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      fullWidth
+                      placeholder="Search jobs..."
+                      value={search}
+                      onChange={handleSearch}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <FormControl fullWidth>
+                      <InputLabel>Bill Type</InputLabel>
+                      <Select
+                        value={billTypeFilter}
+                        onChange={handleBillTypeFilterChange}
+                        label="Bill Type"
+                      >
+                        <MenuItem value="All">All Types</MenuItem>
+                        <MenuItem value="GST">GST</MenuItem>
+                        <MenuItem value="Non-GST">Non-GST</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label="Start Date"
+                      value={startDate}
+                      onChange={handleStartDateChange}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={2}>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label="End Date"
+                      value={endDate}
+                      onChange={handleEndDateChange}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={handleClearFilters}
+                        startIcon={<FilterListIcon />}
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        variant="contained"
+                        onClick={() => generateJobsPDF(filteredJobsData)}
+                        startIcon={<FileDownloadIcon />}
+                      >
+                        Export PDF
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Jobs Table */}
+            <Card
+              elevation={0}
+              sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+            >
+              <CardContent sx={{ p: 0 }}>
+                {loading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Job ID
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Customer
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Vehicle
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Amount
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Completed Date
+                            </TableCell>
+                            <TableCell
+                              sx={{ fontWeight: 600, color: "#475569" }}
+                            >
+                              Actions
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {getCurrentPageData().map((job) => (
+                            <TableRow key={job._id} hover>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight={500}>
+                                  {job.jobId || "N/A"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={500}>
+                                    {job.customerName || "N/A"}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {job.customerNumber || "N/A"}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={500}>
+                                    {job.carNumber ||
+                                      job.registrationNumber ||
+                                      "N/A"}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {job.model || "N/A"}
+                                  </Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={500}
+                                  color="success.main"
+                                >
+                                  {formatCurrency(job.totalAmount || 0)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {formatDate(job.completedAt || job.updatedAt)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleViewBill(job._id)}
+                                  sx={{ color: "primary.main" }}
+                                >
+                                  <VisibilityIcon />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    <TablePagination
+                      component="div"
+                      count={filteredJobsData.length}
+                      page={page}
+                      onPageChange={handleChangePage}
+                      rowsPerPage={rowsPerPage}
+                      onRowsPerPageChange={handleChangeRowsPerPage}
+                      rowsPerPageOptions={[5, 10, 25, 50]}
+                    />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Inventory Report Tab */}
+        {activeTab === 1 && (
+          <>
+            {/* Inventory Summary Cards */}
+            {inventoryData && (
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    elevation={0}
+                    sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography
+                            variant="h4"
+                            fontWeight="bold"
+                            color="primary"
                           >
-                            Actions
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {getCurrentPageData().length > 0 ? (
-                          getCurrentPageData().map((job, index) => (
-                            <TableRow key={job._id || index}>
-                              <TableCell>{job._id?.slice(-6) || 'N/A'}</TableCell>
-                              <TableCell>{job.carNumber || job.registrationNumber || 'N/A'}</TableCell>
-                              <TableCell>{job.customerName || 'N/A'}</TableCell>
+                            {inventoryData.summary.totalParts}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Parts
+                          </Typography>
+                        </Box>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: "primary.light",
+                            color: "white",
+                          }}
+                        >
+                          <InventoryIcon />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    elevation={0}
+                    sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography
+                            variant="h4"
+                            fontWeight="bold"
+                            color="success.main"
+                          >
+                            {formatCurrency(
+                              inventoryData.summary.totalSellingValue
+                            )}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Total Value
+                          </Typography>
+                        </Box>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: "success.light",
+                            color: "white",
+                          }}
+                        >
+                          <TrendingUpIcon />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    elevation={0}
+                    sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography
+                            variant="h4"
+                            fontWeight="bold"
+                            color="warning.main"
+                          >
+                            {inventoryData.summary.lowStockCount}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Low Stock
+                          </Typography>
+                        </Box>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: "warning.light",
+                            color: "white",
+                          }}
+                        >
+                          <WarningIcon />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Card
+                    elevation={0}
+                    sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box>
+                          <Typography
+                            variant="h4"
+                            fontWeight="bold"
+                            color="error.main"
+                          >
+                            {inventoryData.summary.outOfStockCount}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Out of Stock
+                          </Typography>
+                        </Box>
+                        <Box
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            bgcolor: "error.light",
+                            color: "white",
+                          }}
+                        >
+                          <CloseIcon />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            )}
+
+            {/* Inventory Actions */}
+            <Card
+              elevation={0}
+              sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                  <Button
+                    variant="contained"
+                    onClick={fetchInventoryData}
+                    disabled={inventoryLoading}
+                    startIcon={
+                      inventoryLoading ? (
+                        <CircularProgress size={20} />
+                      ) : (
+                        <RefreshIcon />
+                      )
+                    }
+                  >
+                    {inventoryLoading ? "Loading..." : "Load Inventory Data"}
+                  </Button>
+                  {inventoryData && (
+                    <Button
+                      variant="outlined"
+                      onClick={() => generateInventoryPDF(inventoryData)}
+                      startIcon={<FileDownloadIcon />}
+                    >
+                      Export PDF
+                    </Button>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Inventory Data */}
+            {inventoryLoading ? (
+              <Card
+                elevation={0}
+                sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+              >
+                <CardContent sx={{ p: 4, textAlign: "center" }}>
+                  <CircularProgress />
+                  <Typography variant="body1" sx={{ mt: 2 }}>
+                    Loading inventory data...
+                  </Typography>
+                </CardContent>
+              </Card>
+            ) : inventoryData ? (
+              <>
+                {/* Low Stock Alert */}
+                {inventoryData.lowStockParts &&
+                  inventoryData.lowStockParts.length > 0 && (
+                    <Card
+                      elevation={0}
+                      sx={{
+                        mb: 3,
+                        borderRadius: 3,
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Typography
+                          variant="h6"
+                          fontWeight="bold"
+                          color="warning.main"
+                          sx={{ mb: 2 }}
+                        >
+                          ⚠️ Low Stock Alert (
+                          {inventoryData.lowStockParts.length} items)
+                        </Typography>
+                        <TableContainer>
+                          <Table>
+                            <TableHead>
+                              <TableRow sx={{ bgcolor: "#fff3e0" }}>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Part Name
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Model
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Quantity
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Purchase Price
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Selling Price
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Status
+                                </TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {inventoryData.lowStockParts.map(
+                                (part, index) => (
+                                  <TableRow key={index} hover>
+                                    <TableCell>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight={500}
+                                      >
+                                        {part.partName}
+                                      </Typography>
+                                    </TableCell>
+                                    <TableCell>{part.model}</TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        label={part.quantity}
+                                        color={
+                                          part.quantity === 0
+                                            ? "error"
+                                            : "warning"
+                                        }
+                                        size="small"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatCurrency(part.purchasePrice)}
+                                    </TableCell>
+                                    <TableCell>
+                                      {formatCurrency(part.sellingPrice)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Chip
+                                        label={
+                                          part.quantity === 0
+                                            ? "Out of Stock"
+                                            : "Low Stock"
+                                        }
+                                        color={
+                                          part.quantity === 0
+                                            ? "error"
+                                            : "warning"
+                                        }
+                                        size="small"
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                {/* All Parts Table */}
+                <Card
+                  elevation={0}
+                  sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+                >
+                  <CardContent sx={{ p: 3 }}>
+                    <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+                      All Inventory Parts ({inventoryData.allParts?.length || 0}{" "}
+                      items)
+                    </Typography>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Part Name
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Model
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Quantity
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Purchase Price
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Selling Price
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Total Value
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600 }}>
+                              Status
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {inventoryData.allParts?.map((part, index) => (
+                            <TableRow key={index} hover>
                               <TableCell>
-                                {job.subaccountId && job.subaccountId.name ? (
-                                  <Chip 
-                                    label={job.subaccountId.name} 
-                                    size="small"
-                                    variant="outlined"
-                                  />
-                                ) : (
-                                  'N/A'
-                                )}
+                                <Typography variant="body2" fontWeight={500}>
+                                  {part.partName}
+                                </Typography>
                               </TableCell>
-                              <TableCell sx={{ 
-                                maxWidth: '300px',
-                                whiteSpace: 'pre-line',
-                                fontSize: '0.875rem',
-                                lineHeight: 1.4
-                              }}>
-                                {formatJobDetails(job.jobDetails)}
-                              </TableCell>
+                              <TableCell>{part.model}</TableCell>
                               <TableCell>
-                                <Chip 
-                                  label={job.status || 'Unknown'} 
+                                <Chip
+                                  label={part.quantity}
                                   color={
-                                    job.status === 'Completed' ? 'success' :
-                                    job.status === 'In Progress' ? 'warning' :
-                                    job.status === 'Pending' ? 'info' : 'default'
+                                    part.quantity === 0
+                                      ? "error"
+                                      : part.quantity <= 3
+                                      ? "warning"
+                                      : "success"
                                   }
                                   size="small"
                                 />
                               </TableCell>
-                              <TableCell>{formatDate(job.completedAt || job.updatedAt)}</TableCell>
-                              <TableCell align="center">
-                                <Stack direction="row" spacing={1} justifyContent="center">
-                                  <Tooltip title="View Job Card">
-                                    <Button
-                                      variant="contained"
-                                      color="primary"
-                                      size="small"
-                                      onClick={() => navigate(`/jobs/${job._id}`)}
-                                    >
-                                      Job Card
-                                    </Button>
-                                  </Tooltip>
-                                  <Tooltip title="View/Download Bill">
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      startIcon={<ReceiptIcon />}
-                                      onClick={() => handleViewBill(job._id)}
-                                    >
-                                      Bill
-                                    </Button>
-                                  </Tooltip>
-                                  <Tooltip title="View Details">
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      onClick={() => handleViewClick(job)}
-                                    >
-                                      Details
-                                    </Button>
-                                  </Tooltip>
-                                </Stack>
+                              <TableCell>
+                                {formatCurrency(part.purchasePrice)}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(part.sellingPrice)}
+                              </TableCell>
+                              <TableCell>
+                                {formatCurrency(part.totalSellingValue)}
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={
+                                    part.quantity === 0
+                                      ? "Out of Stock"
+                                      : part.quantity <= 3
+                                      ? "Low Stock"
+                                      : "In Stock"
+                                  }
+                                  color={
+                                    part.quantity === 0
+                                      ? "error"
+                                      : part.quantity <= 3
+                                      ? "warning"
+                                      : "success"
+                                  }
+                                  size="small"
+                                />
                               </TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={8} sx={{ textAlign: 'center', py: 3 }}>
-                              {filteredData.length === 0 && jobsData.length > 0 
-                                ? "No jobs match your search criteria" 
-                                : "No completed job records found"}
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  {/* Pagination */}
-                  <TablePagination
-                    component="div"
-                    count={filteredData.length}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    rowsPerPageOptions={[5, 10, 25, 50]}
-                    sx={{ mt: 2 }}
-                  />
-                </>
-              )}
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card
+                elevation={0}
+                sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
+              >
+                <CardContent sx={{ p: 4, textAlign: "center" }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Click "Load Inventory Data" to view inventory report
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Job Details Dialog */}
+        <Dialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography variant="h6">Job Details</Typography>
+              <IconButton onClick={handleCloseDialog}>
+                <CloseIcon />
+              </IconButton>
             </Box>
-          </CardContent>
-        </Card>
-      </Container>
-      {/* Enhanced Job Detail Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-                Job Card Details
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {selectedJob?.carNumber || selectedJob?.registrationNumber || 'Vehicle Information'}
-              </Typography>
-            </Box>
-            <IconButton onClick={handleCloseDialog} sx={{ color: 'white' }}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          {selectedJob && (
-            <Box>
-              {/* Main Info Section */}
-              <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">
-                        Job ID
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {selectedJob._id?.slice(-8) || 'N/A'}
-                      </Typography>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">
-                        Status
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={selectedJob.status || 'Unknown'} 
-                          color={
-                            selectedJob.status === 'Completed' ? 'success' :
-                            selectedJob.status === 'In Progress' ? 'warning' :
-                            selectedJob.status === 'Pending' ? 'info' : 'default'
-                          }
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </Box>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">
-                        Bill Type
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={selectedJob.gstApplicable ? 'GST' : 'Non-GST'} 
-                          color={selectedJob.gstApplicable ? 'primary' : 'secondary'}
-                          variant="outlined"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </Box>
-              <Divider />
-              {/* Detailed Information */}
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Detailed Information
+          </DialogTitle>
+          <DialogContent>
+            {selectedJob && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  {selectedJob.customerName}
                 </Typography>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Vehicle Number
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.carNumber || selectedJob.registrationNumber || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Customer Name
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.customerName || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Subaccount
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.subaccountId && selectedJob.subaccountId.name ? selectedJob.subaccountId.name : 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Contact Number
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.contactNumber || selectedJob.phone || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Job Details
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'pre-line' }}>
-                        {formatJobDetails(selectedJob.jobDetails)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Created Date
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {formatDate(selectedJob.createdAt)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Completed Date
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {formatDate(selectedJob.completedAt || selectedJob.updatedAt)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Labor Hours
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.laborHours || 'N/A'} hours
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Engineer
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.engineerId?.[0]?.name || 'Not Assigned'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Job ID: {selectedJob.jobId}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Vehicle: {selectedJob.carNumber} - {selectedJob.model}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Status: {selectedJob.status}
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" gutterBottom>
+                  Job Details:
+                </Typography>
+                <Typography variant="body2">
+                  {selectedJob.jobDetails || "No details available"}
+                </Typography>
               </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: theme.palette.background.default }}>
-          <Button 
-            onClick={() => handleDownloadPDF(selectedJob)} 
-            variant="contained"
-            startIcon={<FileDownloadIcon />}
-            sx={{ mr: 2 }}
-          >
-            Download PDF
-          </Button>
-          <Button 
-            onClick={() => handleViewBill(selectedJob?._id)} 
-            variant="outlined"
-            startIcon={<ReceiptIcon />}
-            sx={{ mr: 2 }}
-          >
-            View Bill
-          </Button>
-          <Button 
-            onClick={handleCloseDialog} 
-            variant="outlined"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Close</Button>
+            {selectedJob && (
+              <Button
+                variant="contained"
+                onClick={() => handleViewBill(selectedJob._id)}
+              >
+                View Bill
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
+      </Container>
     </Box>
   );
 };
