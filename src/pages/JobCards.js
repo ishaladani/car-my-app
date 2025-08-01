@@ -704,6 +704,25 @@ const JobCards = () => {
   const [jobCardData, setJobCardData] = useState(null);
 
   const generatePreviewPDF = () => {
+    console.log("Generating PDF with jobCardData:", jobCardData);
+    console.log("Job Card Number from data:", jobCardData?.jobCardNumber);
+    console.log("Job Card ID:", id);
+
+    // Generate a meaningful job card number for existing job cards
+    const getJobCardNumber = () => {
+      if (jobCardData?.jobCardNumber) {
+        return jobCardData.jobCardNumber;
+      }
+      // For existing job cards without jobCardNumber, use the last 6 characters of the ID
+      if (id && id.length > 6) {
+        return parseInt(id.slice(-6), 16) || id.slice(-6);
+      }
+      return id || "N/A";
+    };
+
+    const jobCardNumber = getJobCardNumber();
+    console.log("Final Job Card Number:", jobCardNumber);
+
     const doc = new jsPDF();
     const primaryColor = [63, 81, 181];
     const lightGray = [245, 245, 245];
@@ -733,11 +752,7 @@ const JobCards = () => {
     // Add Job Card Number
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(
-      `Job Card #${jobCardData?.jobCardNumber || id || "N/A"}`,
-      pageWidth - margin - 80,
-      19
-    );
+    doc.text(`Job Card #${jobCardNumber}`, pageWidth - margin - 80, 12);
     doc.setTextColor(...blackColor);
     yPosition = headerHeight + 10;
 
@@ -762,7 +777,7 @@ const JobCards = () => {
     // --- Customer Info ---
     addSectionHeader("CUSTOMER INFORMATION");
     const customerData = [
-      ["Job Card Number", jobCardData?.jobCardNumber || id || "N/A"],
+      ["Job Card Number", jobCardNumber],
       ["Customer Name", formData.customerName || "N/A"],
       ["Contact Number", formData.contactNumber || "N/A"],
       ["Email", formData.email || "N/A"],
@@ -946,6 +961,8 @@ const JobCards = () => {
         const jobCardData = response.data;
 
         console.log("Fetched Job Card Data:", jobCardData);
+        console.log("Job Card Number:", jobCardData.jobCardNumber);
+        console.log("Job Card ID:", jobCardData._id);
 
         // Store the complete job card data for PDF generation
         setJobCardData(jobCardData);

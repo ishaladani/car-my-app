@@ -61,6 +61,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import autoTable from "jspdf-autotable";
 import jsPDF from "jspdf";
+import { getGarageApiUrl, getBaseApiUrl } from "../config/api";
 
 const RecordReport = () => {
   const navigate = useNavigate();
@@ -179,7 +180,7 @@ const RecordReport = () => {
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
 
     // Summary
-    const summary = inventoryData.summary;
+    const summary = inventoryData?.summary || {};
     doc.setFontSize(14);
     doc.text("Summary:", 20, 45);
     doc.setFontSize(12);
@@ -204,17 +205,20 @@ const RecordReport = () => {
     doc.text(`Out of Stock: ${summary.outOfStockCount}`, 20, 115);
 
     // Low stock table
-    if (inventoryData.lowStockParts && inventoryData.lowStockParts.length > 0) {
+    if (
+      inventoryData?.lowStockItems &&
+      inventoryData.lowStockItems.length > 0
+    ) {
       autoTable(doc, {
         head: [
           ["Part Name", "Model", "Quantity", "Purchase Price", "Selling Price"],
         ],
-        body: inventoryData.lowStockParts.map((part) => [
-          part.partName,
+        body: inventoryData.lowStockItems.map((part) => [
+          part.name,
           part.model,
           part.quantity,
-          formatCurrency(part.purchasePrice),
-          formatCurrency(part.sellingPrice),
+          formatCurrency(part.price),
+          formatCurrency(part.price),
         ]),
         startY: 130,
         styles: { fontSize: 10 },
@@ -236,7 +240,7 @@ const RecordReport = () => {
         setLoading(true);
         setError(null);
         const response = await fetch(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
+          `${getGarageApiUrl()}/jobCards/garage/${garageId}`,
           {
             method: "GET",
             headers: {
@@ -277,14 +281,79 @@ const RecordReport = () => {
     try {
       setInventoryLoading(true);
       const response = await axios.get(
-        `https://garage-management-zi5z.onrender.com/api/garage/inventory/report/${garageId}`,
+        `${getGarageApiUrl()}/inventory/${garageId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      setInventoryData(response.data.report);
+
+      // Transform the inventory data to match the expected format
+      const inventoryArray = Array.isArray(response.data)
+        ? response.data
+        : response.data.data || [];
+
+      // Create a report structure from the inventory data
+      const report = {
+        summary: {
+          totalParts: inventoryArray.length,
+          totalPartsAvailable: inventoryArray.reduce(
+            (sum, item) => sum + (item.quantity || 0),
+            0
+          ),
+          totalSellingValue: inventoryArray.reduce(
+            (sum, item) =>
+              sum +
+              (item.quantity || 0) *
+                (item.sellingPrice || item.pricePerUnit || 0),
+            0
+          ),
+          totalPurchaseValue: inventoryArray.reduce(
+            (sum, item) =>
+              sum +
+              (item.quantity || 0) *
+                (item.purchasePrice || item.pricePerUnit || 0),
+            0
+          ),
+          potentialProfit: inventoryArray.reduce(
+            (sum, item) =>
+              sum +
+              (item.quantity || 0) *
+                ((item.sellingPrice || item.pricePerUnit || 0) -
+                  (item.purchasePrice || item.pricePerUnit || 0)),
+            0
+          ),
+          lowStockCount: inventoryArray.filter(
+            (item) => (item.quantity || 0) < 3
+          ).length,
+          outOfStockCount: inventoryArray.filter(
+            (item) => (item.quantity || 0) === 0
+          ).length,
+        },
+        totalItems: inventoryArray.length,
+        totalValue: inventoryArray.reduce(
+          (sum, item) =>
+            sum +
+            (item.quantity || 0) *
+              (item.sellingPrice || item.pricePerUnit || 0),
+          0
+        ),
+        lowStockItems: inventoryArray.filter(
+          (item) => (item.quantity || 0) < 3
+        ),
+        allItems: inventoryArray.map((item) => ({
+          id: item._id,
+          name: item.partName || item.name,
+          quantity: item.quantity || 0,
+          price: item.sellingPrice || item.pricePerUnit || 0,
+          carName: item.carName || "",
+          model: item.model || "",
+          reorderPoint: Math.floor((item.quantity || 0) * 0.2) || 5,
+        })),
+      };
+
+      setInventoryData(report);
     } catch (error) {
       console.error("Error fetching inventory data:", error);
       setError(`Failed to load inventory data: ${error.message}`);
@@ -305,7 +374,7 @@ const RecordReport = () => {
       if (endDate) params.endDate = endDate;
 
       const response = await axios.get(
-        `https://garage-management-zi5z.onrender.com/api/billing/financial-report/${garageId}`,
+        `${getBaseApiUrl()}/api/billing/financial-report/${garageId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1032,7 +1101,7 @@ const RecordReport = () => {
                             fontWeight="bold"
                             color="primary"
                           >
-                            {inventoryData.summary.totalParts}
+                            {inventoryData?.summary?.totalParts || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Total Parts
@@ -1072,7 +1141,7 @@ const RecordReport = () => {
                             color="success.main"
                           >
                             {formatCurrency(
-                              inventoryData.summary.totalSellingValue
+                              inventoryData?.summary?.totalSellingValue || 0
                             )}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
@@ -1112,7 +1181,7 @@ const RecordReport = () => {
                             fontWeight="bold"
                             color="warning.main"
                           >
-                            {inventoryData.summary.lowStockCount}
+                            {inventoryData?.summary?.lowStockCount || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Low Stock
@@ -1151,7 +1220,7 @@ const RecordReport = () => {
                             fontWeight="bold"
                             color="error.main"
                           >
-                            {inventoryData.summary.outOfStockCount}
+                            {inventoryData?.summary?.outOfStockCount || 0}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             Out of Stock
@@ -1224,8 +1293,8 @@ const RecordReport = () => {
             ) : inventoryData ? (
               <>
                 {/* Low Stock Alert */}
-                {inventoryData.lowStockParts &&
-                  inventoryData.lowStockParts.length > 0 && (
+                {inventoryData?.lowStockItems &&
+                  inventoryData.lowStockItems.length > 0 && (
                     <Card
                       elevation={0}
                       sx={{
@@ -1242,7 +1311,7 @@ const RecordReport = () => {
                           sx={{ mb: 2 }}
                         >
                           ⚠️ Low Stock Alert (
-                          {inventoryData.lowStockParts.length} items)
+                          {inventoryData.lowStockItems.length} items)
                         </Typography>
                         <TableContainer>
                           <Table>
@@ -1269,7 +1338,7 @@ const RecordReport = () => {
                               </TableRow>
                             </TableHead>
                             <TableBody>
-                              {inventoryData.lowStockParts.map(
+                              {inventoryData.lowStockItems.map(
                                 (part, index) => (
                                   <TableRow key={index} hover>
                                     <TableCell>
@@ -1277,7 +1346,7 @@ const RecordReport = () => {
                                         variant="body2"
                                         fontWeight={500}
                                       >
-                                        {part.partName}
+                                        {part.name}
                                       </Typography>
                                     </TableCell>
                                     <TableCell>{part.model}</TableCell>
@@ -1293,10 +1362,10 @@ const RecordReport = () => {
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      {formatCurrency(part.purchasePrice)}
+                                      {formatCurrency(part.price)}
                                     </TableCell>
                                     <TableCell>
-                                      {formatCurrency(part.sellingPrice)}
+                                      {formatCurrency(part.price)}
                                     </TableCell>
                                     <TableCell>
                                       <Chip
@@ -1330,7 +1399,7 @@ const RecordReport = () => {
                 >
                   <CardContent sx={{ p: 3 }}>
                     <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-                      All Inventory Parts ({inventoryData.allParts?.length || 0}{" "}
+                      All Inventory Parts ({inventoryData.allItems?.length || 0}{" "}
                       items)
                     </Typography>
                     <TableContainer>
@@ -1361,11 +1430,11 @@ const RecordReport = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {inventoryData.allParts?.map((part, index) => (
+                          {inventoryData.allItems?.map((part, index) => (
                             <TableRow key={index} hover>
                               <TableCell>
                                 <Typography variant="body2" fontWeight={500}>
-                                  {part.partName}
+                                  {part.name}
                                 </Typography>
                               </TableCell>
                               <TableCell>{part.model}</TableCell>
@@ -1383,10 +1452,10 @@ const RecordReport = () => {
                                 />
                               </TableCell>
                               <TableCell>
-                                {formatCurrency(part.purchasePrice)}
+                                {formatCurrency(part.price)}
                               </TableCell>
                               <TableCell>
-                                {formatCurrency(part.sellingPrice)}
+                                {formatCurrency(part.price)}
                               </TableCell>
                               <TableCell>
                                 {formatCurrency(part.totalSellingValue)}
