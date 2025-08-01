@@ -2700,7 +2700,11 @@ const AssignEngineer = () => {
                                               color="text.secondary"
                                             >
                                               Price/Unit: ₹
-                                              {unitPrice.toFixed(2)}
+                                              {(
+                                                part.sellingPrice ||
+                                                part.pricePerUnit ||
+                                                0
+                                              ).toFixed(2)}
                                             </Typography>
                                           </Grid>
                                           <Grid item xs={6}>
