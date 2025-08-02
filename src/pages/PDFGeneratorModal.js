@@ -578,7 +578,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
       <DialogContent sx={{ p: 3 }}>
         <Box>
           <Typography variant="h6" gutterBottom>
-            Job Card Preview
+            Job Card
           </Typography>
           
           <Paper elevation={1} sx={{ p: 2, mb: 2 }}>

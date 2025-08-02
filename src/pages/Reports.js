@@ -230,6 +230,7 @@ const RecordReport = () => {
   };
 
   // Fetch job data from API
+   // Fetch job data from API
   useEffect(() => {
     if (!garageId) {
       navigate("/login");
@@ -259,9 +260,12 @@ const RecordReport = () => {
           : data.data
           ? data.data
           : [];
+        
+        // Filter: Only jobs where status is "Completed" AND progress is exactly 100
         const completedJobs = jobsData.filter(
-          (job) => job.status === "Completed"
+          (job) => job.status === "Completed" && job.progress === 100
         );
+
         // Sort jobs by completed date (most recent first)
         const sortedJobs = sortJobsByCompletedDate(completedJobs);
         setJobsData(sortedJobs);

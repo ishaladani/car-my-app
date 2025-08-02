@@ -11,7 +11,7 @@ const CustomerVehicleSection = ({ carDetails, handleInputChange, isMobile, today
     { id: "company", label: "Make", xs: 12, sm: 6, md: 3 },
     { id: "model", label: "Model", xs: 12, sm: 6, md: 3 },
     { id: "billingDate", label: "Service Date", type: "date", xs: 12, sm: 6, md: 3 },
-    { id: "invoiceNo", label: "Invoice Number", xs: 12, sm: 6, md: 6 },
+    { id: "invoiceNo", label: "Invoice Number", xs: 12, sm: 6, md: 6, readOnly: true }, // Invoice number set to read-only
   ];
 
   return (
@@ -38,6 +38,10 @@ const CustomerVehicleSection = ({ carDetails, handleInputChange, isMobile, today
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
                   }
+                }}
+                // Make invoiceNo field read-only
+                InputProps={{
+                  readOnly: field.readOnly || false,
                 }}
               />
             </Grid>

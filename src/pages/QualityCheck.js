@@ -55,7 +55,7 @@ const QualityCheck = () => {
   }
 
   const [parts, setParts] = useState([]);
-  const [finalInspection, setFinalInspection] = useState('');
+  const [finalInspection, setFinalInspection] = useState('Done');
   const [jobCardData, setJobCardData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -223,17 +223,15 @@ const QualityCheck = () => {
             <Typography variant="h4" component="h1" fontWeight={700} color="primary">
               Quality Check Report
             </Typography>
-            {/* <Typography variant="subtitle1" color="text.secondary">
-              Job Card ID: {id}
-            </Typography> */}
+           
           </Box>
-          <Chip 
+          {/* <Chip 
             icon={<CalendarIcon />}
             label={currentDateTime}
             color="primary"
             variant="outlined"
             sx={{ fontSize: '0.9rem', py: 2 }}
-          />
+          /> */}
         </Box>
 
         {/* Engineer and Status Info */}

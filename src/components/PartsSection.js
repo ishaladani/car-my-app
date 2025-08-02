@@ -57,7 +57,7 @@ const PartsSection = ({
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Tooltip title="Add New Part">
-            <Button
+            {/* <Button
               variant="contained"
               size="small"
               onClick={() => setShowNewPartDialog(true)}
@@ -69,7 +69,7 @@ const PartsSection = ({
               }}
             >
               Create New
-            </Button>
+            </Button> */}
           </Tooltip>
         </Box>
       </Box>

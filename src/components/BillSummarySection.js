@@ -1,204 +1,296 @@
-import React from 'react';
-import { Box, Card, CardContent, Grid, Paper, TextField, Typography, useTheme } from '@mui/material';
-import { InputAdornment } from '@mui/material';
+import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Grid,
+  Paper,
+  TextField,
+  Typography,
+  useTheme,
+  Collapse,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
-const BillSummarySection = ({ 
-  summary, 
-  gstSettings, 
-  handleDiscountChange, 
-  paymentMethod, 
+const BillSummarySection = ({
+  summary,
+  gstSettings,
+  handleDiscountChange,
+  paymentMethod,
   isMobile,
   formatAmount,
-  handleLaborCostChange
+  handleLaborCostChange,
+  jobDetails: jobDetailsString = '[]', // Accept jobDetails as prop
 }) => {
   const theme = useTheme();
-  
-  const summaryItems = [
-    { label: "Parts & Materials Total:", value: formatAmount(summary.totalPartsCost), icon: "🔧" },
-  ];
+
+  // Parse jobDetails safely
+  const [expanded, setExpanded] = useState(false);
+  const jobDetails = React.useMemo(() => {
+    try {
+      const parsed = JSON.parse(jobDetailsString);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error('Failed to parse jobDetails:', e);
+      return [];
+    }
+  }, [jobDetailsString]);
+
+  // Calculate auto labor total
+  const autoLaborTotal = jobDetails.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+  // Use manual override or auto
+  const displayLaborCost = summary.totalLaborCost ?? autoLaborTotal;
+
+  const toggleExpand = () => setExpanded(!expanded);
 
   return (
-    <Card sx={{ 
-      mb: 4, 
-      border: `2px solid ${theme.palette.primary.main}`, 
-      borderRadius: 3, 
-      background: theme.palette.mode === 'dark' 
-        ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(51, 65, 85, 0.9) 100%)'
-        : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-      bgcolor: 'background.paper'
-    }}>
+    <Card
+      sx={{
+        mb: 4,
+        border: `2px solid ${theme.palette.primary.main}`,
+        borderRadius: 3,
+        background:
+          theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(51, 65, 85, 0.9) 100%)'
+            : 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        bgcolor: 'background.paper',
+      }}
+    >
       <CardContent>
         <Typography variant="h6" color="primary" gutterBottom>
           Professional Bill Summary
         </Typography>
-        <Paper 
-          variant="outlined" 
-          sx={{ 
-            p: 3, 
-            backgroundColor: 'background.paper', 
-            borderRadius: 2, 
+
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 3,
+            backgroundColor: 'background.paper',
+            borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`,
-            borderColor: theme.palette.mode === 'dark' 
-              ? 'rgba(255, 255, 255, 0.12)' 
-              : 'rgba(25, 118, 210, 0.2)'
+            borderColor:
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.12)'
+                : 'rgba(25, 118, 210, 0.2)',
           }}
         >
           <Grid container spacing={2}>
+            {/* Left Column: Cost Breakdown */}
             <Grid item xs={12} md={8}>
-              {summaryItems.map((item, index) => (
-                <Box 
-                  key={index} 
-                  sx={{ 
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    alignItems: "center", 
-                    py: 1.5, 
-                    borderBottom: `1px dashed ${theme.palette.divider}`,
-                    '&:last-of-type': {
-                      borderBottom: 'none'
-                    }
-                  }}
-                >
-                  <Typography 
-                    variant="body1" 
-                    fontWeight={item.bold ? 600 : 400} 
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1,
-                      color: 'text.primary'
-                    }}
-                  >
-                    {item.icon && <span>{item.icon}</span>}
-                    {item.label}
-                  </Typography>
-                  <Typography 
-                    variant="body1" 
-                    fontWeight={item.bold ? 600 : 500} 
-                    color={item.bold ? "primary.main" : "text.primary"}
-                  >
-                    {item.value}
-                  </Typography>
-                </Box>
-              ))}
-
-              {/* Manual Labor & Services Total Input */}
-              <Box sx={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center", 
-                py: 1.5, 
-                borderBottom: `1px dashed ${theme.palette.divider}`,
-                flexDirection: isMobile ? 'column' : 'row',
-                gap: isMobile ? 1 : 0
-              }}>
-                <Typography 
-                  variant="body1" 
-                  fontWeight={400} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+              {/* Parts & Materials */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                }}
+              >
+                <Typography
+                  variant="body1"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 1,
-                    color: 'text.primary'
+                    color: 'text.primary',
                   }}
                 >
-                  <span>⚙️</span>
-                  Labor & Services Total:
+                  <span>🔧</span>
+                  Parts & Materials Total:
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">₹</Typography>
-                  <TextField
-                    type="number"
-                    value={summary.totalLaborCost || ''}
-                    onChange={(e) => handleLaborCostChange && handleLaborCostChange(e.target.value)}
-                    size="small"
-                    sx={{ 
-                      width: isMobile ? '100%' : '120px',
-                      '& .MuiInputBase-input': {
-                        textAlign: 'right',
-                        fontWeight: 600,
-                        color: 'primary.main'
-                      }
-                    }}
-                    inputProps={{ 
-                      min: 0, 
-                      step: 0.01,
-                      style: { textAlign: 'right' }
-                    }}
-                  />
-                </Box>
+                <Typography variant="body1" fontWeight={500} color="text.primary">
+                  {formatAmount(summary.totalPartsCost)}
+                </Typography>
               </Box>
 
-              {/* Labor Cost Tax Calculation */}
-              {summary.totalLaborCost > 0 && gstSettings.includeGst && (
-                <Box sx={{ 
-                  mt: 1, 
-                  p: 1, 
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(25, 118, 210, 0.15)' 
-                    : 'rgba(25, 118, 210, 0.1)', 
-                  borderRadius: 1,
-                  border: `1px solid ${theme.palette.primary.main}20`
-                }}>
+              {/* Labor & Services Section */}
+              <Box
+                sx={{
+                  py: 1.5,
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 0.5,
+                  }}
+                >
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      color: 'text.primary',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span>⚙️</span>
+                    Labor & Services Total:
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      ₹
+                    </Typography>
+                    <TextField
+                      type="number"
+                      value={displayLaborCost || ''}
+                      onChange={(e) =>
+                        handleLaborCostChange && handleLaborCostChange(e.target.value)
+                      }
+                      size="small"
+                      sx={{
+                        width: isMobile ? '100%' : '120px',
+                        '& .MuiInputBase-input': {
+                          textAlign: 'right',
+                          fontWeight: 600,
+                          color: 'primary.main',
+                        },
+                      }}
+                      inputProps={{
+                        min: 0,
+                        step: 0.01,
+                        style: { textAlign: 'right' },
+                      }}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Show Expand Button if jobDetails exist */}
+                {jobDetails.length > 0 && (
+                  <Box sx={{ textAlign: 'right', mt: 0.5 }}>
+                    <IconButton size="small" onClick={toggleExpand} sx={{ p: 0.5 }}>
+                      {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                    </IconButton>
+                  </Box>
+                )}
+
+                {/* Expanded Labor Details */}
+                <Collapse in={expanded}>
+                  <List dense sx={{ mt: 1, mb: 1, bgcolor: 'background.default', borderRadius: 1 }}>
+                    {jobDetails.map((item, idx) => (
+                      <React.Fragment key={idx}>
+                        <ListItem sx={{ py: 0.5 }}>
+                          <ListItemIcon sx={{ minWidth: 30 }}>
+                            <span>🔧</span>
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2" fontWeight={500}>
+                                {item.description || `Service ${idx + 1}`}
+                              </Typography>
+                            }
+                            secondary={
+                              <Typography variant="caption" color="text.secondary">
+                                {item.hours ? `${item.hours} hrs × ₹${item.rate || 0}/hr` : 'No time logged'}
+                              </Typography>
+                            }
+                          />
+                          <Typography variant="body2" fontWeight={600} color="primary.main">
+                            ₹{formatAmount(parseFloat(item.amount) || 0)}
+                          </Typography>
+                        </ListItem>
+                        {idx < jobDetails.length - 1 && <Divider component="li" />}
+                      </React.Fragment>
+                    ))}
+                  </List>
+                </Collapse>
+              </Box>
+
+              {/* Labor Tax Info */}
+              {displayLaborCost > 0 && gstSettings.includeGst && (
+                <Box
+                  sx={{
+                    mt: 1,
+                    p: 1,
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(25, 118, 210, 0.15)'
+                        : 'rgba(25, 118, 210, 0.1)',
+                    borderRadius: 1,
+                    border: `1px solid ${theme.palette.primary.main}20`,
+                  }}
+                >
                   <Typography variant="caption" color="text.secondary" display="block">
                     Labor Cost Tax Calculation:
                   </Typography>
                   <Typography variant="caption" color="primary.main" display="block">
-                    Base: ₹{summary.totalLaborCost} | Tax: ₹{((summary.totalLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2)}
+                    Base: ₹{displayLaborCost} | Tax:{' '}
+                    ₹{(((displayLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2))}
                   </Typography>
                 </Box>
               )}
 
               {/* Subtotal */}
-              <Box sx={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center", 
-                py: 1.5, 
-                borderBottom: `1px dashed ${theme.palette.divider}`,
-                mt: 1
-              }}>
-                <Typography 
-                  variant="body1" 
-                  fontWeight={600} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                  mt: 1,
+                }}
+              >
+                <Typography
+                  variant="body1"
+                  fontWeight={600}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 1,
-                    color: 'text.primary'
+                    color: 'text.primary',
                   }}
                 >
                   Subtotal (Before Tax):
                 </Typography>
-                <Typography 
-                  variant="body1" 
-                  fontWeight={600} 
-                  color="primary.main"
-                >
+                <Typography variant="body1" fontWeight={600} color="primary.main">
                   {formatAmount(summary.subtotal)}
                 </Typography>
               </Box>
 
+              {/* GST Details */}
               {gstSettings.includeGst && (
-                <Box sx={{ 
-                  mt: 2, 
-                  p: 2, 
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(25, 118, 210, 0.15)' 
-                    : 'rgba(25, 118, 210, 0.1)', 
-                  borderRadius: 2,
-                  border: `1px solid ${theme.palette.primary.main}20`
-                }}>
-                  <Typography 
-                    variant="subtitle2" 
-                    fontWeight={600} 
-                    color="primary.main" 
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(25, 118, 210, 0.15)'
+                        : 'rgba(25, 118, 210, 0.1)',
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.primary.main}20`,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={600}
+                    color="primary.main"
                     sx={{ mb: 1 }}
                   >
                     📋 Tax Details:
                   </Typography>
                   {gstSettings.isInterState ? (
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <Typography variant="body2" color="text.primary">
                         IGST ({gstSettings.gstPercentage}%):
                       </Typography>
@@ -208,7 +300,14 @@ const BillSummarySection = ({
                     </Box>
                   ) : (
                     <>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 0.5,
+                        }}
+                      >
                         <Typography variant="body2" color="text.primary">
                           CGST ({gstSettings.cgstPercentage}%):
                         </Typography>
@@ -216,7 +315,13 @@ const BillSummarySection = ({
                           {formatAmount(Math.round(summary.gstAmount / 2))}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
                         <Typography variant="body2" color="text.primary">
                           SGST ({gstSettings.sgstPercentage}%):
                         </Typography>
@@ -229,81 +334,77 @@ const BillSummarySection = ({
                 </Box>
               )}
 
-
-              {/* Show discount amount if discount is applied */}
+              {/* Discount Applied */}
               {summary.discount > 0 && (
-                <Box sx={{ 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: "center", 
-                  py: 1.5, 
-                  borderBottom: `1px dashed ${theme.palette.divider}`,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(76, 175, 80, 0.1)' 
-                    : 'rgba(76, 175, 80, 0.05)',
-                  borderRadius: 1,
-                  px: 2,
-                  mx: -1
-                }}>
-                  <Typography 
-                    variant="body1" 
-                    color="success.main" 
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    py: 1.5,
+                    borderBottom: `1px dashed ${theme.palette.divider}`,
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(76, 175, 80, 0.1)'
+                        : 'rgba(76, 175, 80, 0.05)',
+                    borderRadius: 1,
+                    px: 2,
+                    mx: -1,
+                  }}
+                >
+                  <Typography
+                    variant="body1"
+                    color="success.main"
                     fontWeight={500}
                     sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                   >
                     🎉 Discount Applied:
                   </Typography>
-                  <Typography 
-                    variant="body1" 
-                    fontWeight={600} 
-                    color="success.main"
-                  >
+                  <Typography variant="body1" fontWeight={600} color="success.main">
                     - {formatAmount(summary.discount)}
                   </Typography>
                 </Box>
               )}
 
-              {/* Subtotal after discount and before tax */}
+              {/* Subtotal After Discount */}
               {summary.discount > 0 && (
-                <Box sx={{ 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: "center", 
-                  py: 1.5, 
-                  borderBottom: `1px dashed ${theme.palette.divider}`,
-                  mt: 1
-                }}>
-                  <Typography 
-                    variant="body1" 
-                    fontWeight={600}
-                    color="text.primary"
-                  >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    py: 1.5,
+                    borderBottom: `1px dashed ${theme.palette.divider}`,
+                    mt: 1,
+                  }}
+                >
+                  <Typography variant="body1" fontWeight={600} color="text.primary">
                     Subtotal (After Discount):
                   </Typography>
-                  <Typography 
-                    variant="body1" 
-                    fontWeight={600} 
-                    color="primary.main"
-                  >
+                  <Typography variant="body1" fontWeight={600} color="primary.main">
                     {formatAmount(summary.subtotal - summary.discount)}
                   </Typography>
                 </Box>
               )}
             </Grid>
 
+            {/* Right Column: Grand Total & Summary */}
             <Grid item xs={12} md={4}>
-              <Box sx={{ 
-                p: 3, 
-                backgroundColor: 'primary.main', 
-                borderRadius: 2, 
-                textAlign: 'center', 
-                color: 'primary.contrastText',
-                boxShadow: theme.palette.mode === 'dark' 
-                  ? '0 4px 20px rgba(25, 118, 210, 0.3)' 
-                  : '0 4px 20px rgba(25, 118, 210, 0.15)'
-              }}>
+              <Box
+                sx={{
+                  p: 3,
+                  backgroundColor: 'primary.main',
+                  borderRadius: 2,
+                  textAlign: 'center',
+                  color: 'primary.contrastText',
+                  boxShadow:
+                    theme.palette.mode === 'dark'
+                      ? '0 4px 20px rgba(25, 118, 210, 0.3)'
+                      : '0 4px 20px rgba(25, 118, 210, 0.15)',
+                }}
+              >
                 <Typography variant="subtitle2" sx={{ mb: 1, opacity: 0.9 }}>
-                  {!gstSettings.includeGst ? "TOTAL (Excluding GST)" : "GRAND TOTAL (Including GST)"}
+                  {!gstSettings.includeGst ? 'TOTAL (Excluding GST)' : 'GRAND TOTAL (Including GST)'}
                 </Typography>
                 <Typography variant="h4" fontWeight="bold">
                   {formatAmount(summary.totalAmount)}
@@ -318,22 +419,26 @@ const BillSummarySection = ({
                 </Typography>
               </Box>
 
-              {/* Discount Summary Box */}
+              {/* Discount Summary */}
               {summary.discount > 0 && (
-                <Box sx={{ 
-                  mt: 2, 
-                  p: 2, 
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(76, 175, 80, 0.15)' 
-                    : 'rgba(76, 175, 80, 0.1)', 
-                  borderRadius: 2,
-                  border: `1px solid ${theme.palette.success.main}30`
-                }}>
+                <Box
+                  sx={{
+                    mt: 2,
+                    p: 2,
+                    backgroundColor:
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(76, 175, 80, 0.15)'
+                        : 'rgba(76, 175, 80, 0.1)',
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.success.main}30`,
+                  }}
+                >
                   <Typography variant="subtitle2" color="success.main" fontWeight={600} gutterBottom>
                     💸 Discount Summary
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Original Amount: {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
+                    Original Amount:{' '}
+                    {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
                   </Typography>
                   <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
                     Discount: -{formatAmount(summary.discount)}
@@ -344,20 +449,25 @@ const BillSummarySection = ({
                 </Box>
               )}
 
-              <Box sx={{ 
-                mt: 2, 
-                p: 2, 
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? 'rgba(255, 255, 255, 0.05)' 
-                  : 'rgba(0, 0, 0, 0.04)', 
-                borderRadius: 2,
-                border: `1px solid ${theme.palette.divider}`
-              }}>
+              {/* Payment Terms */}
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  backgroundColor:
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(255, 255, 255, 0.05)'
+                      : 'rgba(0, 0, 0, 0.04)',
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.divider}`,
+                }}
+              >
                 <Typography variant="caption" color="text.secondary" display="block">
                   💳 Payment Terms: Due on delivery
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block">
-                  📅 Valid until: {new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString('en-IN')}
+                  📅 Valid until:{' '}
+                  {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN')}
                 </Typography>
               </Box>
             </Grid>

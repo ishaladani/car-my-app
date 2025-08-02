@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Grid,
   Card,
   CardContent,
+  TextField,
   Button,
-  Avatar,
-  Chip,
+  InputAdornment,
+  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -15,395 +16,200 @@ import {
   TableHead,
   TableRow,
   Paper,
-  IconButton,
-  Stack,
-  LinearProgress,
   Divider,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
-  useTheme,
   Container,
   CssBaseline,
-  CircularProgress,
-  TablePagination,
-  Pagination,
-  TextField,
-  InputAdornment,
+  MenuItem,
   FormControl,
   InputLabel,
   Select,
+  useTheme,
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TablePagination,
+  Stack,
   Alert,
-} from "@mui/material";
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Add as AddIcon,
-  MoreVert as MoreVertIcon,
-  Refresh as RefreshIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Build as BuildIcon,
-  Inventory as InventoryIcon,
-  Notifications as NotificationsIcon,
-  ArrowForward as ArrowForwardIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  CalendarToday as CalendarIcon,
-  Visibility as VisibilityIcon,
-  FilterList as FilterListIcon,
-  Dashboard as DashboardIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  NavigateBefore as NavigateBeforeIcon,
-  NavigateNext as NavigateNextIcon,
+  CircularProgress,
+  Tabs,
+  Tab,
+  Tooltip,
+} from '@mui/material';
+import { 
   Search as SearchIcon,
-  Clear as ClearIcon,
-  History as HistoryIcon,
-  FileDownload as DownloadIcon,
-} from "@mui/icons-material";
-import { useThemeContext } from "../Layout/ThemeContext";
-import EditProfileButton from "../Login/EditProfileButton";
-import EditProfileModal from "../Login/EditProfileModal";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import JobDetailsModal from "./jobDetailsModal";
+  ArrowBack as ArrowBackIcon,
+  Visibility as VisibilityIcon,
+  FileDownload as FileDownloadIcon,
+  Work as WorkIcon,
+  Print as PrintIcon,
+  Close as CloseIcon,
+  Receipt as ReceiptIcon,
+} from '@mui/icons-material';
+import { useThemeContext } from '../Layout/ThemeContext';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import autoTable from 'jspdf-autotable';
+import jsPDF from 'jspdf';
 
-// Job Details Component for better parsing and display
-const JobDetailsComponent = ({
-  jobDetails,
-  maxItems = 2,
-  showPrices = true,
-  compact = false,
-}) => {
-  const parseAndDisplayJobDetails = (jobDetailsString) => {
-    if (!jobDetailsString) {
-      return (
-        <Typography variant="body2" color="text.secondary">
-          No details available
-        </Typography>
-      );
-    }
-    // If it's already a plain string (not JSON), display it directly
-    if (
-      typeof jobDetailsString === "string" &&
-      !jobDetailsString.trim().startsWith("[") &&
-      !jobDetailsString.trim().startsWith("{")
-    ) {
-      return (
-        <Typography
-          variant="body2"
-          sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
-        >
-          {jobDetailsString}
-        </Typography>
-      );
-    }
-
-    try {
-      const parsed = JSON.parse(jobDetailsString);
-      if (Array.isArray(parsed)) {
-        return (
-          <Box>
-            {parsed.slice(0, maxItems).map((item, index) => (
-              <Typography
-                key={index}
-                variant="body2"
-                sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
-              >
-                • {item}
-              </Typography>
-            ))}
-            {parsed.length > maxItems && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ fontSize: compact ? "0.7rem" : "0.75rem" }}
-              >
-                +{parsed.length - maxItems} more items
-              </Typography>
-            )}
-          </Box>
-        );
-      } else if (typeof parsed === "object") {
-        const entries = Object.entries(parsed).slice(0, maxItems);
-        return (
-          <Box>
-            {entries.map(([key, value], index) => (
-              <Typography
-                key={index}
-                variant="body2"
-                sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
-              >
-                • {key}:{" "}
-                {typeof value === "object"
-                  ? JSON.stringify(value)
-                  : String(value)}
-              </Typography>
-            ))}
-            {Object.keys(parsed).length > maxItems && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ fontSize: compact ? "0.7rem" : "0.75rem" }}
-              >
-                +{Object.keys(parsed).length - maxItems} more fields
-              </Typography>
-            )}
-          </Box>
-        );
-      }
-    } catch (error) {
-      // If parsing fails, display as plain text
-      return (
-        <Typography
-          variant="body2"
-          sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
-        >
-          {jobDetailsString}
-        </Typography>
-      );
-    }
-
-    return (
-      <Typography
-        variant="body2"
-        sx={{ fontSize: compact ? "0.8rem" : "0.875rem" }}
-      >
-        {jobDetailsString}
-      </Typography>
-    );
-  };
-
-  return parseAndDisplayJobDetails(jobDetails);
-};
-
-const History = () => {
+const RecordReport = () => {
+  const navigate = useNavigate();
   let garageId = localStorage.getItem("garageId");
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
-
-  const token = localStorage.getItem("token");
-  const userId = localStorage.getItem("userId");
-  const userType = localStorage.getItem("userType");
-  const theme = useTheme();
-  const { darkMode } = useThemeContext();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: "",
-    image: "",
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [jobDetailsModalOpen, setJobDetailsModalOpen] = useState(false);
-  const [selectedJobData, setSelectedJobData] = useState(null);
-
+  const theme = useTheme();
+  const { darkMode } = useThemeContext();
+  
   // Search and Filter States
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [billTypeFilter, setBillTypeFilter] = useState('All'); // New state for GST/Non-GST filter
 
-  // Pagination states
-  const [jobsPage, setJobsPage] = useState(0);
-  const [jobsRowsPerPage, setJobsRowsPerPage] = useState(10);
-  const ITEMS_PER_PAGE = 10;
+  // Data States
+  const [jobsData, setJobsData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  
+  // Pagination States
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const [currentJobs, setCurrentJobs] = useState([]);
-  const [filteredJobs, setFilteredJobs] = useState([]);
-
-  const [dashboardStats, setDashboardStats] = useState([
-    {
-      title: "Total Jobs",
-      value: 0,
-      change: 0,
-      isIncrease: true,
-      icon: <BuildIcon sx={{ fontSize: 40 }} />,
-      color: "#2563eb",
-      lightColor: "rgba(37, 99, 235, 0.1)",
-    },
-    {
-      title: "Completed",
-      value: 0,
-      change: 0,
-      isIncrease: true,
-      icon: <CheckCircleIcon sx={{ fontSize: 40 }} />,
-      color: "#16a34a",
-      lightColor: "rgba(22, 163, 74, 0.1)",
-    },
-    {
-      title: "In Progress",
-      value: 0,
-      change: 0,
-      isIncrease: false,
-      icon: <WarningIcon sx={{ fontSize: 40 }} />,
-      color: "#dc2626",
-      lightColor: "rgba(220, 38, 38, 0.1)",
-    },
-  ]);
-
-  const navigate = useNavigate();
-
-  const handleSaveProfile = (data) => {
-    setProfileData(data);
+  // Sort data by completed date (most recent first)
+  const sortJobsByCompletedDate = (jobs) => {
+    return jobs.sort((a, b) => {
+      const dateA = new Date(a.completedAt || a.updatedAt || a.createdAt);
+      const dateB = new Date(b.completedAt || b.updatedAt || b.createdAt);
+      return dateB - dateA; // Descending order (most recent first)
+    });
   };
 
-  const [actionMenu, setActionMenu] = useState(null);
-  const [selectedJobId, setSelectedJobId] = useState(null);
-
-  const handleActionMenuOpen = (event, jobId) => {
-    setActionMenu(event.currentTarget);
-    setSelectedJobId(jobId);
+  // Format date helper
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
-  const handleActionMenuClose = () => {
-    setActionMenu(null);
-    setSelectedJobId(null);
-  };
-
-  const handleUpdate = async (id) => {
+  // Generate PDF Function - Directly in the component
+  const generatePDFWithJsPDF = (jobData) => {
     try {
-      const response = await axios.get(
-        `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.setTextColor(33, 33, 33);
+      doc.text(" Job Card Details", 14, 20);
+      const tableData = [
+        ['Customer Name', jobData.customerName || 'N/A'],
+        ['Contact Number', jobData.contactNumber || 'N/A'],
+        ['Email', jobData.email || 'N/A'],
+        ['Company', jobData.company || 'N/A'],
+        ['Car Number', jobData.carNumber || jobData.registrationNumber || 'N/A'],
+        ['Model', jobData.model || 'N/A'],
+        ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
+        ['Fuel Type', jobData.fuelType || 'N/A'],
+        ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
+        ['Policy Number', jobData.policyNumber || 'N/A'],
+        ['Expiry Date', formatDate(jobData.expiryDate)],
+        ['Excess Amount', jobData.excessAmount ? `RS.${jobData.excessAmount}` : 'N/A'],
+        ['Job Type', jobData.type || 'N/A'],
+        ['Engineer', jobData.engineerId?.[0]?.name || 'Not Assigned'],
+        ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
+        ['Status', jobData.status || 'N/A'],
+        ['Created Date', formatDate(jobData.createdAt)],
+      ];
+      autoTable(doc, {
+        startY: 30,
+        head: [['Field', 'Value']],
+        body: tableData,
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [25, 118, 210],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 10, right: 10 },
+      });
+      doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed", err);
+      alert("PDF generation failed. Please try again.");
+    }
+  };
 
-      if (response.data) {
-        navigate(`/assign-engineer/${id}`);
+  const formatJobDetails = (jobDetailsString) => {
+    if (!jobDetailsString) return 'No details available';
+    // If it's already a plain string (not JSON), return it directly
+    if (typeof jobDetailsString === 'string' && 
+        !jobDetailsString.trim().startsWith('[') && 
+        !jobDetailsString.trim().startsWith('{')) {
+      return jobDetailsString;
+    }
+    try {
+      const details = JSON.parse(jobDetailsString);
+      if (Array.isArray(details) && details.length > 0) {
+        // Show first 2 items with prices
+        const displayItems = details.slice(0, 2).map(item => {
+          const description = item.description || item.name || 'Service';
+          const price = item.price ? ` (₹${item.price})` : '';
+          return `• ${description}${price}`;
+        }).join('\n');
+        const moreCount = details.length - 2;
+        const moreText = moreCount > 0 ? `\n+${moreCount} more service${moreCount > 1 ? 's' : ''}` : '';
+        return displayItems + moreText;
+      } else if (typeof details === 'object' && details !== null) {
+        // Handle single object case
+        const description = details.description || 'Service';
+        const price = details.price ? ` (₹${details.price})` : '';
+        return `• ${description}${price}`;
+      } else {
+        return String(details);
       }
     } catch (error) {
-      console.error("Error fetching job card:", error);
-      setError("Failed to fetch job card details");
+      console.warn('Failed to parse job details:', error);
+      return jobDetailsString;
     }
   };
 
-  const handleViewDetails = (job) => {
-    setSelectedJobData(job);
-    setJobDetailsModalOpen(true);
-  };
-
+  // Handle Download PDF
   const handleDownloadPDF = (job) => {
-    // Navigate to billing page for PDF generation
-    navigate(`/billing/${job._id}`);
+    if (!job) return;
+    generatePDFWithJsPDF(job);
   };
 
-  const handleSearch = (e) => {
-    setSearch(e.target.value);
-  };
-
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-  };
-
-  const handleStartDateChange = (e) => {
-    setStartDate(e.target.value);
-  };
-
-  const handleEndDateChange = (e) => {
-    setEndDate(e.target.value);
-  };
-
-  const applyFilters = (searchTerm, status, start, end) => {
-    let filtered = [...currentJobs];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (job) =>
-          job.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          job.carNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          job.jobId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          job.customerNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Status filter
-    if (status && status !== "All") {
-      filtered = filtered.filter((job) => job.status === status);
-    }
-
-    // Date range filter
-    if (start) {
-      filtered = filtered.filter(
-        (job) => new Date(job.createdAt) >= new Date(start)
-      );
-    }
-    if (end) {
-      filtered = filtered.filter(
-        (job) => new Date(job.createdAt) <= new Date(end + "T23:59:59")
-      );
-    }
-
-    return filtered;
-  };
-
-  const handleClearFilters = () => {
-    setSearch("");
-    setStatusFilter("All");
-    setStartDate("");
-    setEndDate("");
-  };
-
-  const handleJobsPageChange = (event, newPage) => {
-    setJobsPage(newPage);
-  };
-
-  const handleJobsRowsPerPageChange = (event) => {
-    setJobsRowsPerPage(parseInt(event.target.value, 10));
-    setJobsPage(0);
-  };
-
-  const getPaginatedJobs = () => {
-    const startIndex = jobsPage * jobsRowsPerPage;
-    const endIndex = startIndex + jobsRowsPerPage;
-    return filteredJobs.slice(startIndex, endIndex);
-  };
-
-  // Fetch job cards for the logged-in user
+  // Fetch job data from API
   useEffect(() => {
+    if (!garageId) {
+      navigate("/login");
+      return;
+    }
     const fetchJobs = async () => {
-      if (!token) {
-        setError("Authentication token not found. Please log in again.");
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setError(null);
-
-        // Build URL with user filtering
-        let url = `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`;
-
-        // Add user filter for subusers (not garage owners)
-        if (userType === "user" && userId) {
-          url += `?createdBy=${userId}`;
-        }
-
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            setError("Session expired. Please log in again.");
-            return;
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            },
           }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        );
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
-
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
@@ -411,254 +217,299 @@ const History = () => {
           : data.data
           ? data.data
           : [];
-
-        setCurrentJobs(jobsData);
-        setFilteredJobs(jobsData);
-        setJobsPage(0);
-
-        // Update stats
-        const totalJobs = jobsData.length;
-        const completedJobs = jobsData.filter(
-          (job) => job.status === "Completed"
-        ).length;
-        const inProgressJobs = jobsData.filter(
-          (job) => job.status === "In Progress" || job.status === "Pending"
-        ).length;
-
-        const updatedStats = [...dashboardStats];
-        updatedStats[0].value = totalJobs;
-        updatedStats[1].value = completedJobs;
-        updatedStats[2].value = inProgressJobs;
-        setDashboardStats(updatedStats);
+        const completedJobs = jobsData.filter(job => job.status === "Completed");
+        // Sort jobs by completed date (most recent first)
+        const sortedJobs = sortJobsByCompletedDate(completedJobs);
+        setJobsData(sortedJobs);
+        setFilteredData(sortedJobs);
       } catch (error) {
         console.error("Error fetching jobs:", error);
-        setError(`Failed to load jobs data: ${error.message}`);
+        setError(`Failed to load jobs: ${error.message}`);
       } finally {
         setLoading(false);
       }
     };
-
     fetchJobs();
-  }, [garageId, token, userId, userType, navigate]);
+  }, [garageId, navigate]);
 
-  // Update filtered jobs when currentJobs changes
-  useEffect(() => {
-    setFilteredJobs(currentJobs);
-  }, [currentJobs]);
-
-  // Apply filters when search or filters change
-  useEffect(() => {
-    const filtered = applyFilters(search, statusFilter, startDate, endDate);
-    setFilteredJobs(filtered);
-    setJobsPage(0);
-  }, [search, statusFilter, startDate, endDate, currentJobs]);
-
-  const getStatusChip = (status) => {
-    const statusConfig = {
-      "In Progress": { color: "warning", icon: <BuildIcon /> },
-      Completed: { color: "success", icon: <CheckCircleIcon /> },
-      Pending: { color: "info", icon: <WarningIcon /> },
-      Cancelled: { color: "error", icon: <WarningIcon /> },
-    };
-
-    const config = statusConfig[status] || {
-      color: "default",
-      icon: <WarningIcon />,
-    };
-
-    return (
-      <Chip
-        icon={config.icon}
-        label={status}
-        color={config.color}
-        size="small"
-        variant="outlined"
-        sx={{ fontWeight: 500 }}
-      />
-    );
+  // Handle search
+  const handleSearch = (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    setSearch(searchTerm);
+    applyFilters(searchTerm, startDate, endDate, billTypeFilter);
   };
 
-  const getJobProgress = (job) => {
-    const statusProgress = {
-      Pending: 25,
-      "In Progress": 75,
-      Completed: 100,
-      Cancelled: 0,
-    };
-    return statusProgress[job.status] || 0;
+  // Handle date changes
+  const handleStartDateChange = (e) => {
+    const newStartDate = e.target.value;
+    setStartDate(newStartDate);
+    applyFilters(search, newStartDate, endDate, billTypeFilter);
   };
 
-  const getProgressColor = (progress) => {
-    if (progress >= 100) return "success";
-    if (progress >= 75) return "warning";
-    if (progress >= 25) return "info";
-    return "error";
+  const handleEndDateChange = (e) => {
+    const newEndDate = e.target.value;
+    setEndDate(newEndDate);
+    applyFilters(search, startDate, newEndDate, billTypeFilter);
   };
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          flexGrow: 1,
-          mb: 4,
-          ml: { xs: 0, sm: 35 },
-          overflow: "auto",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "60vh",
-        }}
-      >
-        <Box sx={{ textAlign: "center" }}>
-          <CircularProgress size={60} />
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Loading History...
+  // Handle Bill Type filter change
+  const handleBillTypeFilterChange = (e) => {
+    const newBillType = e.target.value;
+    setBillTypeFilter(newBillType);
+    applyFilters(search, startDate, endDate, newBillType);
+  };
+
+  // Apply all filters
+  const applyFilters = (searchTerm, start, end, billType) => {
+    let filtered = [...jobsData];
+    if (searchTerm.trim() !== '') {
+      filtered = filtered.filter(
+        job => 
+          (job.carNumber && job.carNumber.toLowerCase().includes(searchTerm)) || 
+          (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) || 
+          (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) || 
+          (job.jobDetails && job.jobDetails.toLowerCase().includes(searchTerm)) ||
+          (job.type && job.type.toLowerCase().includes(searchTerm))
+      );
+    }
+    
+    if (start && end) {
+      filtered = filtered.filter(job => {
+        const jobDate = new Date(job.createdAt);
+        const startDateObj = new Date(start);
+        const endDateObj = new Date(end);
+        return jobDate >= startDateObj && jobDate <= endDateObj;
+      });
+    }
+
+    // Apply Bill Type filter
+    if (billType && billType !== 'All') {
+      if (billType === 'GST') {
+        filtered = filtered.filter(job => job.gstApplicable === true);
+      } else if (billType === 'Non-GST') {
+        filtered = filtered.filter(job => job.gstApplicable === false);
+      }
+    }
+
+    // Sort filtered data by completed date (most recent first)
+    const sortedFiltered = sortJobsByCompletedDate(filtered);
+    setFilteredData(sortedFiltered);
+    setPage(0);
+  };
+
+  // Handle pagination
+  const handleChangePage = (event, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const JobDetailsComponent = ({ 
+    jobDetails, 
+    maxItems = 2, 
+    showPrices = true,
+    compact = false 
+  }) => {
+    const parseAndDisplayJobDetails = (jobDetailsString) => {
+      if (!jobDetailsString) {
+        return (
+          <Typography variant="body2" color="text.secondary">
+            No details available
           </Typography>
-        </Box>
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      sx={{
-        flexGrow: 1,
-        mb: 4,
-        ml: { xs: 0, sm: 35 },
-        overflow: "auto",
-        pt: 3,
-      }}
-    >
-      <Container maxWidth="xl">
-        {/* Header */}
-        <Box
-          sx={{
-            p: 3,
-            mb: 3,
-            bgcolor: "#1976d2",
-            borderRadius: 3,
-            border: "1px solid #e2e8f0",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center" }}>
-              <IconButton
-                onClick={() => navigate("/")}
-                sx={{
-                  mr: 2,
-                  bgcolor: "rgba(255,255,255,0.1)",
-                  color: "white",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
-                }}
-              >
-                <ArrowForwardIcon />
-              </IconButton>
-              <Box>
-                <Typography variant="h4" color="white" fontWeight="bold">
-                  <HistoryIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-                  Job History
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="rgba(255,255,255,0.8)"
-                  sx={{ mt: 0.5 }}
-                >
-                  View all job cards created by you
-                </Typography>
-              </Box>
-            </Box>
-            <EditProfileButton
-              profileData={profileData}
-              onSave={handleSaveProfile}
-            />
-          </Box>
-        </Box>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Stats Cards */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          {dashboardStats.map((stat, index) => (
-            <Grid item xs={12} sm={6} md={4} key={index}>
-              <Card
-                elevation={0}
-                sx={{
-                  height: "100%",
-                  borderRadius: 3,
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
+        );
+      }
+      // If it's already a plain string (not JSON), display it directly
+      if (typeof jobDetailsString === 'string' && 
+          !jobDetailsString.trim().startsWith('[') && 
+          !jobDetailsString.trim().startsWith('{')) {
+        return (
+          <Typography variant="body2" sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}>
+            {jobDetailsString}
+          </Typography>
+        );
+      }
+      try {
+        const details = JSON.parse(jobDetailsString);
+        if (Array.isArray(details) && details.length > 0) {
+          return (
+            <Box>
+              {details.slice(0, maxItems).map((item, index) => (
+                <Box key={index} sx={{ 
+                  mb: compact ? 0.3 : 0.5, 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      flex: 1, 
+                      fontSize: compact ? '0.8rem' : '0.875rem',
+                      lineHeight: 1.2
                     }}
                   >
-                    <Box>
-                      <Typography
-                        variant="h4"
-                        fontWeight="bold"
-                        color={stat.color}
-                      >
-                        {stat.value}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 0.5 }}
-                      >
-                        {stat.title}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        p: 2,
-                        borderRadius: 2,
-                        bgcolor: stat.lightColor,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                    • {item.description || item.name || `Service ${index + 1}`}
+                  </Typography>
+                  {showPrices && item.price && (
+                    <Chip 
+                      label={`₹${item.price}`} 
+                      size="small" 
+                      variant="outlined"
+                      sx={{ 
+                        fontSize: '0.75rem',
+                        height: compact ? '18px' : '20px',
+                        fontWeight: 600,
+                        '& .MuiChip-label': {
+                          px: compact ? 0.5 : 1
+                        }
                       }}
-                    >
-                      {stat.icon}
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                    />
+                  )}
+                </Box>
+              ))}
+              {details.length > maxItems && (
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary" 
+                  sx={{ 
+                    fontStyle: 'italic',
+                    fontSize: compact ? '0.7rem' : '0.75rem'
+                  }}
+                >
+                  +{details.length - maxItems} more service{details.length - maxItems > 1 ? 's' : ''}
+                </Typography>
+              )}
+            </Box>
+          );
+        } else if (typeof details === 'object' && details !== null) {
+          // Handle single object case
+          return (
+            <Box>
+              {details.description && (
+                <Typography 
+                  variant="body2" 
+                  sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+                >
+                  • {details.description}
+                </Typography>
+              )}
+              {showPrices && details.price && (
+                <Chip 
+                  label={`₹${details.price}`} 
+                  size="small" 
+                  variant="outlined"
+                  sx={{ 
+                    mt: 0.5, 
+                    fontWeight: 600,
+                    height: compact ? '18px' : '20px'
+                  }}
+                />
+              )}
+            </Box>
+          );
+        } else {
+          return (
+            <Typography 
+              variant="body2" 
+              sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+            >
+              {String(details)}
+            </Typography>
+          );
+        }
+      } catch (error) {
+        console.warn('Failed to parse job details:', error);
+        // If JSON parsing fails, display the original string
+        return (
+          <Typography 
+            variant="body2" 
+            sx={{ fontSize: compact ? '0.8rem' : '0.875rem' }}
+          >
+            {jobDetailsString}
+          </Typography>
+        );
+      }
+    };
+    return parseAndDisplayJobDetails(jobDetails);
+  };
 
-        {/* Search and Filters */}
-        <Card
-          elevation={0}
-          sx={{
-            mb: 3,
-            borderRadius: 3,
-            border: "1px solid #e2e8f0",
-          }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6} md={3}>
+  // Handle view button click
+  const handleViewClick = (job) => {
+    setSelectedJob(job);
+    setOpenDialog(true);
+  };
+
+  // Close dialog
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedJob(null);
+  };
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setSearch('');
+    setStartDate('');
+    setEndDate('');
+    setBillTypeFilter('All');
+    // Re-sort the original data when clearing filters
+    const sortedJobs = sortJobsByCompletedDate([...jobsData]);
+    setFilteredData(sortedJobs);
+    setPage(0);
+  };
+
+  // Handle view bill button click
+  const handleViewBill = (jobId) => {
+    // Navigate to the billing page for the specific job
+    navigate(`/billing/${jobId}`);
+  };
+
+  // Get current page data
+  const getCurrentPageData = () => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filteredData.slice(startIndex, endIndex);
+  };
+
+  return (
+    <Box sx={{ flexGrow: 1, mb: 4, ml: {xs: 0, sm: 35}, overflow: 'auto' }}>
+      <CssBaseline />
+      <Container maxWidth="xl">
+        <Card sx={{ mb: 4, overflow: 'visible', borderRadius: 2 }}>
+          <CardContent>
+            {/* Header */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Box display="flex" alignItems="center">
+                <IconButton 
+                  sx={{ mr: 1, backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }}
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowBackIcon />
+                </IconButton>
+                <Typography variant="h5" color="primary">
+                  Completed Job Records & Reports
+                </Typography>
+              </Box>
+              <Chip 
+                icon={<WorkIcon />} 
+                label={`${filteredData.length} Completed Jobs`}
+                color="success" 
+                variant="outlined"
+                sx={{ fontWeight: 500 }}
+              />
+            </Box>
+            <Divider sx={{ my: 3 }} />
+            {/* Search and Filter Section */}
+            <Grid container spacing={2} sx={{ mb: 4 }}>
+              {/* Search Bar */}
+              <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
-                  placeholder="Search jobs..."
                   value={search}
                   onChange={handleSearch}
+                  placeholder="Search by car number, customer name, job details..."
+                  variant="outlined"
+                  size="small"
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -668,23 +519,8 @@ const History = () => {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={statusFilter}
-                    onChange={handleStatusFilterChange}
-                    label="Status"
-                  >
-                    <MenuItem value="All">All Status</MenuItem>
-                    <MenuItem value="Pending">Pending</MenuItem>
-                    <MenuItem value="In Progress">In Progress</MenuItem>
-                    <MenuItem value="Completed">Completed</MenuItem>
-                    <MenuItem value="Cancelled">Cancelled</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              {/* Start Date */}
+              <Grid item xs={12} md={2}>
                 <TextField
                   fullWidth
                   type="date"
@@ -692,9 +528,11 @@ const History = () => {
                   value={startDate}
                   onChange={handleStartDateChange}
                   InputLabelProps={{ shrink: true }}
+                  size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              {/* End Date */}
+              <Grid item xs={12} md={2}>
                 <TextField
                   fullWidth
                   type="date"
@@ -702,211 +540,412 @@ const History = () => {
                   value={endDate}
                   onChange={handleEndDateChange}
                   InputLabelProps={{ shrink: true }}
+                  size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleClearFilters}
-                    startIcon={<ClearIcon />}
+              {/* Bill Type Filter */}
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Bill Type</InputLabel>
+                  <Select
+                    value={billTypeFilter}
+                    onChange={handleBillTypeFilterChange}
+                    label="Bill Type"
                   >
-                    Clear
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={() => window.location.reload()}
-                    startIcon={<RefreshIcon />}
-                  >
-                    Refresh
-                  </Button>
-                </Box>
+                    <MenuItem value="All">All Bills</MenuItem>
+                    <MenuItem value="GST">GST</MenuItem>
+                    <MenuItem value="Non-GST">Non-GST</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {/* Clear Filters Button */}
+              <Grid item xs={12} md={3}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={handleClearFilters}
+                  startIcon={<FileDownloadIcon />}
+                  size="small"
+                  sx={{ height: '40px' }}
+                >
+                  Clear Filters
+                </Button>
               </Grid>
             </Grid>
+            {/* Error Alert */}
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {error}
+              </Alert>
+            )}
+            {/* Job Cards Table */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Completed Job Cards (Latest First)
+                </Typography>
+              </Box>
+              {loading ? (
+                <Box display="flex" justifyContent="center" alignItems="center" py={4}>
+                  <CircularProgress />
+                  <Typography sx={{ ml: 2 }}>Loading job records...</Typography>
+                </Box>
+              ) : (
+                <>
+                  <TableContainer component={Paper} elevation={0} sx={{ 
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    overflowX: 'auto',
+                  }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Job ID
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Car Number
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Customer Name
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Subaccount
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Job Details
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Status
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}>
+                            Completed Date
+                          </TableCell>
+                          <TableCell sx={{ 
+                            backgroundColor: theme.palette.primary.main,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                          }}
+                            align="center"
+                          >
+                            Actions
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {getCurrentPageData().length > 0 ? (
+                          getCurrentPageData().map((job, index) => (
+                            <TableRow key={job._id || index}>
+                              <TableCell>{job._id?.slice(-6) || 'N/A'}</TableCell>
+                              <TableCell>{job.carNumber || job.registrationNumber || 'N/A'}</TableCell>
+                              <TableCell>{job.customerName || 'N/A'}</TableCell>
+                              <TableCell>
+                                {job.subaccountId && job.subaccountId.name ? (
+                                  <Chip 
+                                    label={job.subaccountId.name} 
+                                    size="small"
+                                    variant="outlined"
+                                  />
+                                ) : (
+                                  'N/A'
+                                )}
+                              </TableCell>
+                              <TableCell sx={{ 
+                                maxWidth: '300px',
+                                whiteSpace: 'pre-line',
+                                fontSize: '0.875rem',
+                                lineHeight: 1.4
+                              }}>
+                                {formatJobDetails(job.jobDetails)}
+                              </TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={job.status || 'Unknown'} 
+                                  color={
+                                    job.status === 'Completed' ? 'success' :
+                                    job.status === 'In Progress' ? 'warning' :
+                                    job.status === 'Pending' ? 'info' : 'default'
+                                  }
+                                  size="small"
+                                />
+                              </TableCell>
+                              <TableCell>{formatDate(job.completedAt || job.updatedAt)}</TableCell>
+                              <TableCell align="center">
+                                <Stack direction="row" spacing={1} justifyContent="center">
+                                  <Tooltip title="View Job Card">
+                                    {/* <Button
+                                      variant="contained"
+                                      color="primary"
+                                      size="small"
+                                      onClick={() => navigate(`/jobs/${job._id}`)}
+                                    >
+                                      Job Card
+                                    </Button> */}
+                                  </Tooltip>
+                                  <Tooltip title="View/Download Bill">
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={<ReceiptIcon />}
+                                      onClick={() => handleViewBill(job._id)}
+                                    >
+                                      Bill
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip title="View Details">
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => handleViewClick(job)}
+                                    >
+                                      Details
+                                    </Button>
+                                  </Tooltip>
+                                </Stack>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={8} sx={{ textAlign: 'center', py: 3 }}>
+                              {filteredData.length === 0 && jobsData.length > 0 
+                                ? "No jobs match your search criteria" 
+                                : "No completed job records found"}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  {/* Pagination */}
+                  <TablePagination
+                    component="div"
+                    count={filteredData.length}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    sx={{ mt: 2 }}
+                  />
+                </>
+              )}
+            </Box>
           </CardContent>
         </Card>
-
-        {/* Jobs Table */}
-        <Card
-          elevation={0}
-          sx={{
-            borderRadius: 3,
-            border: "1px solid #e2e8f0",
-          }}
-        >
-          <CardContent sx={{ p: 0 }}>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Job ID
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Customer
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Vehicle
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Status
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Progress
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Created
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                      Actions
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getPaginatedJobs().map((job) => (
-                    <TableRow key={job._id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>
-                          {job.jobId || "N/A"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight={500}>
-                            {job.customerName || "N/A"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {job.customerNumber || "N/A"}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight={500}>
-                            {job.carNumber || job.registrationNumber || "N/A"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {job.model || "N/A"}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>{getStatusChip(job.status)}</TableCell>
-                      <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <Box sx={{ width: "100%", mr: 1 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={getJobProgress(job)}
-                              color={getProgressColor(getJobProgress(job))}
-                              sx={{ height: 8, borderRadius: 4 }}
-                            />
-                          </Box>
-                          <Box sx={{ minWidth: 35 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {getJobProgress(job)}%
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {new Date(job.createdAt).toLocaleDateString()}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(job.createdAt).toLocaleTimeString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={(event) =>
-                            handleActionMenuOpen(event, job._id)
-                          }
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {/* Pagination */}
-            <TablePagination
-              component="div"
-              count={filteredJobs.length}
-              page={jobsPage}
-              onPageChange={handleJobsPageChange}
-              rowsPerPage={jobsRowsPerPage}
-              onRowsPerPageChange={handleJobsRowsPerPageChange}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Action Menu */}
-        <Menu
-          anchorEl={actionMenu}
-          open={Boolean(actionMenu)}
-          onClose={handleActionMenuClose}
-        >
-          <MenuItem
-            onClick={() => {
-              handleViewDetails(
-                currentJobs.find((job) => job._id === selectedJobId)
-              );
-              handleActionMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <VisibilityIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>View Details</ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              handleUpdate(selectedJobId);
-              handleActionMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <EditIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Update Job</ListItemText>
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              handleDownloadPDF(
-                currentJobs.find((job) => job._id === selectedJobId)
-              );
-              handleActionMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <DownloadIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Download PDF</ListItemText>
-          </MenuItem>
-        </Menu>
-
-        {/* Job Details Modal */}
-        <JobDetailsModal
-          open={jobDetailsModalOpen}
-          onClose={() => setJobDetailsModalOpen(false)}
-          jobData={selectedJobData}
-        />
-
-        {/* Profile Modal */}
-        <EditProfileModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          onSave={handleSaveProfile}
-          profileData={profileData}
-        />
       </Container>
+      {/* Enhanced Job Detail Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ bgcolor: theme.palette.primary.main, color: 'white', p: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Job Card Details
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                {selectedJob?.carNumber || selectedJob?.registrationNumber || 'Vehicle Information'}
+              </Typography>
+            </Box>
+            <IconButton onClick={handleCloseDialog} sx={{ color: 'white' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {selectedJob && (
+            <Box>
+              {/* Main Info Section */}
+              <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
+                      <Typography variant="overline" color="text.secondary">
+                        Job ID
+                      </Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        {selectedJob._id?.slice(-8) || 'N/A'}
+                      </Typography>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
+                      <Typography variant="overline" color="text.secondary">
+                        Status
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Chip 
+                          label={selectedJob.status || 'Unknown'} 
+                          color={
+                            selectedJob.status === 'Completed' ? 'success' :
+                            selectedJob.status === 'In Progress' ? 'warning' :
+                            selectedJob.status === 'Pending' ? 'info' : 'default'
+                          }
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
+                      <Typography variant="overline" color="text.secondary">
+                        Bill Type
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Chip 
+                          label={selectedJob.gstApplicable ? 'GST' : 'Non-GST'} 
+                          color={selectedJob.gstApplicable ? 'primary' : 'secondary'}
+                          variant="outlined"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Box>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Box>
+              <Divider />
+              {/* Detailed Information */}
+              <Box sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+                  Detailed Information
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Vehicle Number
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.carNumber || selectedJob.registrationNumber || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Customer Name
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.customerName || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Subaccount
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.subaccountId && selectedJob.subaccountId.name ? selectedJob.subaccountId.name : 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Contact Number
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.contactNumber || selectedJob.phone || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Job Details
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'pre-line' }}>
+                        {formatJobDetails(selectedJob.jobDetails)}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Created Date
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {formatDate(selectedJob.createdAt)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Completed Date
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {formatDate(selectedJob.completedAt || selectedJob.updatedAt)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Labor Hours
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.laborHours || 'N/A'} hours
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                        Engineer
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {selectedJob.engineerId?.[0]?.name || 'Not Assigned'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, bgcolor: theme.palette.background.default }}>
+          <Button 
+            onClick={() => handleDownloadPDF(selectedJob)} 
+            variant="contained"
+            startIcon={<FileDownloadIcon />}
+            sx={{ mr: 2 }}
+          >
+            Download PDF
+          </Button>
+          <Button 
+            onClick={() => handleViewBill(selectedJob?._id)} 
+            variant="outlined"
+            startIcon={<ReceiptIcon />}
+            sx={{ mr: 2 }}
+          >
+            View Bill
+          </Button>
+          <Button 
+            onClick={handleCloseDialog} 
+            variant="outlined"
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
 
-export default History;
+export default RecordReport;
