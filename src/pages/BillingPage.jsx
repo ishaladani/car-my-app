@@ -1568,6 +1568,48 @@ const generateProfessionalGSTInvoice = () => {
   setSnackbar({ open: true, message: `${type} invoice downloaded!`, severity: 'success' });
 };
 
+const printInvoice = () => {
+  try {
+    // Generate the same PDF as in download
+    const doc = generateProfessionalGSTInvoice();
+
+    // Convert PDF to blob and open in new window for printing
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.src = url;
+
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    };
+
+    // Clean up after print
+    iframe.onload = () => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        URL.revokeObjectURL(url);
+      }, 1000);
+    };
+  } catch (error) {
+    console.error("Error printing invoice:", error);
+    setSnackbar({
+      open: true,
+      message: "Failed to print invoice. Please try again.",
+      severity: "error",
+    });
+  }
+};
+
   // Enhanced email function
  const sendBillViaEmail = async () => {
   const doc = generateProfessionalGSTInvoice();
@@ -1778,17 +1820,21 @@ Thank you!`;
 />
           </>
         ) : (
-          <ThankYouSection 
-            carDetails={carDetails} 
-            summary={summary} 
-            gstSettings={gstSettings} 
-            paymentMethod={paymentMethod} 
-            isMobile={isMobile} 
-            downloadPdfBill={downloadPdfBill} 
-            sendBillViaWhatsApp={sendBillViaWhatsApp} 
-            sendingWhatsApp={sendingWhatsApp} 
-            openEmailDialog={openEmailDialog} 
-          />
+         <ThankYouSection 
+  carDetails={carDetails} 
+  summary={summary} 
+  gstSettings={gstSettings} 
+  paymentMethod={paymentMethod} 
+  isMobile={isMobile} 
+  downloadPdfBill={downloadPdfBill} 
+  printInvoice={printInvoice}                // ← Define in AutoServeBilling
+  sendBillViaWhatsApp={sendBillViaWhatsApp} 
+  sendingWhatsApp={sendingWhatsApp} 
+  openEmailDialog={openEmailDialog} 
+  garageDetails={garageDetails}
+  parts={parts}
+  laborServicesTotal={laborServicesTotal}
+/>
         )}
       </Paper>
 
