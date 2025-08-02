@@ -93,7 +93,7 @@ const ThankYouSection = ({
         >
           Download PDF
         </Button>
-        <Button
+        {/* <Button
           variant="contained"
           sx={{
             backgroundColor: "#1976d2",
@@ -104,7 +104,7 @@ const ThankYouSection = ({
           onClick={printInvoice}
         >
           Print Invoice
-        </Button>
+        </Button> */}
         <Button
           variant="contained"
           sx={{
