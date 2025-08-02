@@ -23,6 +23,12 @@ import {
   Switch,
   FormControlLabel,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
@@ -53,7 +59,6 @@ const AppLayout = () => {
   const userId = localStorage.getItem("userId");
   const garageId = localStorage.getItem("garageId");
   const { darkMode, toggleDarkMode } = useThemeContext();
-
   const isMobile = useMediaQuery("(max-width:599px)");
   const [profileData, setProfileData] = useState({
     name: "",
@@ -64,32 +69,33 @@ const AppLayout = () => {
     subscriptionType: "",
     isSubscribed: false,
   });
-
   const [userPermissions, setUserPermissions] = useState([]);
   const [filteredNavItems, setFilteredNavItems] = useState([]);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // NEW: Track complete initial load
-
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false); // For confirmation dialog
 
-  // Handle logout function
-  // Handle logout function
-  const handleLogout = async () => {
+  // Handle logout: Show confirmation first
+  const handleLogoutClick = () => {
+    setLogoutDialogOpen(true);
+  };
+
+  // Confirm and perform logout
+  const confirmLogout = async () => {
+    setLogoutDialogOpen(false);
     if (isLoggingOut) return;
-
     try {
       setIsLoggingOut(true);
       const token = localStorage.getItem("token");
       const headers = {};
-
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Determine which ID to use based on usertype
       let logoutId;
       if (roll === "garage") {
         logoutId = garageId;
@@ -98,12 +104,10 @@ const AppLayout = () => {
         logoutId = userId;
         console.log("Logging out user:", logoutId);
       } else {
-        // Fallback to userId if usertype is not explicitly "garage"
         logoutId = userId;
         console.log("Logging out (fallback to user):", logoutId);
       }
 
-      // Check if we have a valid ID to logout
       if (!logoutId) {
         console.error("No valid ID found for logout");
         throw new Error("Unable to determine user/garage ID for logout");
@@ -117,13 +121,10 @@ const AppLayout = () => {
           timeout: 10000,
         }
       );
-
       console.log("Logout API call successful");
     } catch (error) {
       console.error("Error during logout:", error);
-      // Continue with local cleanup even if API call fails
     } finally {
-      // Clear all localStorage items
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
       localStorage.removeItem("garageId");
@@ -132,18 +133,14 @@ const AppLayout = () => {
       localStorage.removeItem("garageLogo");
       localStorage.removeItem("profileUpdated");
 
-      // Close menus
       setUserMenu(null);
       setMobileOpen(false);
-
-      // Navigate to login
       navigate("/login");
-
       setIsLoggingOut(false);
     }
   };
 
-  // All available nav items with permission keys
+  // All available nav items
   const allNavItems = [
     {
       text: "Dashboard",
@@ -176,7 +173,7 @@ const AppLayout = () => {
       permission: "Reports & Records",
     },
     {
-      text: "Reports",
+      text: "Reports And Report",
       icon: <BuildIcon />,
       path: "/reports",
       permission: "Reports & Records",
@@ -207,27 +204,19 @@ const AppLayout = () => {
     },
   ];
 
-  // Fetch garage profile data
+  // Fetch garage profile
   const fetchGarageProfile = async () => {
     if (!garageId) {
-      console.error("No garageId found in localStorage");
       setProfileLoaded(true);
       return;
     }
-
     try {
       const token = localStorage.getItem("token");
-      const headers = {};
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/garage/getgaragebyid/${garageId}`,
         { headers }
       );
-
       if (response.data) {
         const garageData = response.data;
         setProfileData({
@@ -239,7 +228,6 @@ const AppLayout = () => {
           subscriptionType: garageData.subscriptionType || "",
           isSubscribed: garageData.isSubscribed || false,
         });
-
         localStorage.setItem("garageName", garageData.name || "Garage");
         if (garageData.logo) {
           localStorage.setItem("garageLogo", garageData.logo);
@@ -247,13 +235,6 @@ const AppLayout = () => {
       }
     } catch (error) {
       console.error("Error fetching garage profile:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-      });
-
       const savedName = localStorage.getItem("garageName");
       const savedImage = localStorage.getItem("garageLogo");
       setProfileData((prev) => ({
@@ -266,7 +247,7 @@ const AppLayout = () => {
     }
   };
 
-  // IMPROVED: Fetch user permissions with better error handling and logging
+  // Fetch user permissions
   const fetchUserPermissions = async () => {
     if (roll === "user") {
       const token = localStorage.getItem("token")
@@ -282,84 +263,42 @@ const AppLayout = () => {
             },
           }
         );
-
         if (response.data && response.data.permissions) {
           const permissions = response.data.permissions;
           setUserPermissions(permissions);
-
-          // IMPROVED: Filter nav items based on permissions with fallback
-          const filtered = allNavItems.filter((item) => {
-            // Check both the permission field and text field for flexibility
-            const hasPermission =
-              permissions.includes(item.permission) ||
-              permissions.includes(item.text);
-
-            return hasPermission;
-          });
-
-          // FALLBACK: If no permissions match, at least show Dashboard
-          if (filtered.length === 0) {
-            console.warn(
-              "No permissions matched nav items, showing Dashboard only"
-            );
-            const dashboardItem = allNavItems.find(
-              (item) => item.text === "Dashboard"
-            );
-            if (dashboardItem) {
-              filtered.push(dashboardItem);
-            }
-          }
-
-          setFilteredNavItems(filtered);
-        } else {
-          console.warn("No permissions data in response");
-          // Show only Dashboard as fallback
-          const dashboardItem = allNavItems.find(
-            (item) => item.text === "Dashboard"
+          const filtered = allNavItems.filter((item) =>
+            permissions.includes(item.permission) || permissions.includes(item.text)
           );
-          setFilteredNavItems(dashboardItem ? [dashboardItem] : []);
+          setFilteredNavItems(filtered.length > 0 ? filtered : [allNavItems[0]]);
+        } else {
+          setFilteredNavItems([allNavItems[0]]);
         }
       } catch (error) {
-        console.error("Error fetching user permissions:", error);
-        // Fallback: Show only Dashboard
-        const dashboardItem = allNavItems.find(
-          (item) => item.text === "Dashboard"
-        );
-        setFilteredNavItems(dashboardItem ? [dashboardItem] : []);
+        console.error("Error fetching permissions:", error);
+        setFilteredNavItems([allNavItems[0]]);
       }
     } else {
-      // Admin/Owner gets all nav items
       setFilteredNavItems(allNavItems);
     }
     setPermissionsLoaded(true);
   };
 
-  // IMPROVED: Check if user has permission for current route
   const hasPermissionForRoute = (pathname) => {
-    if (roll !== "user") return true; // Admin/Owner has access to everything
-
-    if (!permissionsLoaded) return false; // Wait for permissions to load
-
+    if (roll !== "user") return true;
+    if (!permissionsLoaded) return false;
     const navItem = allNavItems.find((item) => item.path === pathname);
-    if (!navItem) return true; // If route not in nav items, allow access
-
+    if (!navItem) return true;
     return (
       userPermissions.includes(navItem.permission) ||
       userPermissions.includes(navItem.text)
     );
   };
 
-  // IMPROVED: Handle unauthorized access - Only redirect if user doesn't have permission
   useEffect(() => {
     if (initialLoadComplete && permissionsLoaded && roll === "user") {
       const currentPath = location.pathname;
-
       if (!hasPermissionForRoute(currentPath)) {
-        console.warn(`User doesn't have permission for route: ${currentPath}`);
-        // Redirect to Dashboard or first available route
-        const firstAvailableRoute =
-          filteredNavItems.length > 0 ? filteredNavItems[0].path : "/";
-
+        const firstAvailableRoute = filteredNavItems.length > 0 ? filteredNavItems[0].path : "/";
         navigate(firstAvailableRoute, { replace: true });
       }
     }
@@ -372,57 +311,41 @@ const AppLayout = () => {
     filteredNavItems,
   ]);
 
-  // FIXED: Load initial data without unnecessary redirects
   useEffect(() => {
     const loadInitialData = async () => {
-      // Load profile and permissions
       await fetchGarageProfile();
       await fetchUserPermissions();
-
-      // Mark initial load as complete
       setInitialLoadComplete(true);
     };
-
     loadInitialData();
 
-    // Handle storage changes for profile updates
     const handleStorageChange = () => {
       if (localStorage.getItem("profileUpdated") === "true") {
         fetchGarageProfile();
         localStorage.removeItem("profileUpdated");
       }
     };
-
     window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [garageId, roll, userId]);
 
-  // Refresh permissions when role/userId changes (but don't redirect)
   useEffect(() => {
     if (initialLoadComplete) {
       fetchUserPermissions();
     }
   }, [roll, userId, initialLoadComplete]);
 
-  // Handle page visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden && roll === "user" && initialLoadComplete) {
         fetchUserPermissions();
       }
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [roll, initialLoadComplete]);
 
-  // Modern Theme Toggle Component
+  // Theme Toggle Components
   const ThemeToggleSwitch = () => (
     <Tooltip title={`Switch to ${darkMode ? "Light" : "Dark"} Mode`}>
       <Box
@@ -463,13 +386,12 @@ const AppLayout = () => {
             borderRadius: "50%",
             backgroundColor: !darkMode ? "#FFA726" : "transparent",
             color: !darkMode ? "#fff" : theme.palette.text.secondary,
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "all 0.3s",
             transform: !darkMode ? "scale(1.1)" : "scale(0.9)",
           }}
         >
           <LightMode sx={{ fontSize: 14 }} />
         </Box>
-
         <Box
           sx={{
             position: "relative",
@@ -477,7 +399,7 @@ const AppLayout = () => {
             height: 16,
             borderRadius: 8,
             backgroundColor: darkMode ? "#3f51b5" : "#e0e0e0",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "all 0.3s",
           }}
         >
           <Box
@@ -489,12 +411,11 @@ const AppLayout = () => {
               height: 12,
               borderRadius: "50%",
               backgroundColor: "#fff",
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+              transition: "all 0.3s",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
             }}
           />
         </Box>
-
         <Box
           sx={{
             display: "flex",
@@ -505,7 +426,7 @@ const AppLayout = () => {
             borderRadius: "50%",
             backgroundColor: darkMode ? "#3f51b5" : "transparent",
             color: darkMode ? "#fff" : theme.palette.text.secondary,
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "all 0.3s",
             transform: darkMode ? "scale(1.1)" : "scale(0.9)",
           }}
         >
@@ -515,7 +436,6 @@ const AppLayout = () => {
     </Tooltip>
   );
 
-  // Alternative Compact Toggle for Mobile
   const CompactThemeToggle = () => (
     <Tooltip title={`${darkMode ? "Light" : "Dark"} Mode`}>
       <IconButton
@@ -531,38 +451,23 @@ const AppLayout = () => {
             darkMode ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"
           }`,
           color: darkMode ? "#3f51b5" : "#FFA726",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           "&:hover": {
-            backgroundColor: darkMode
-              ? "rgba(255, 255, 255, 0.12)"
-              : "rgba(0, 0, 0, 0.08)",
             transform: "translateY(-1px) scale(1.05)",
             boxShadow: darkMode
-              ? "0 4px 12px rgba(255, 255, 255, 0.1)"
-              : "0 4px 12px rgba(0, 0, 0, 0.15)",
+              ? "0 4px 12px rgba(255,255,255,0.1)"
+              : "0 4px 12px rgba(0,0,0,0.15)",
           },
         }}
       >
-        {darkMode ? (
-          <LightMode sx={{ fontSize: 20 }} />
-        ) : (
-          <DarkMode sx={{ fontSize: 20 }} />
-        )}
+        {darkMode ? <LightMode sx={{ fontSize: 20 }} /> : <DarkMode sx={{ fontSize: 20 }} />}
       </IconButton>
     </Tooltip>
   );
 
-  // IMPROVED: Show loading state while initial load is happening
+  // Loading state
   if (!initialLoadComplete || !permissionsLoaded || !profileLoaded) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
         <CircularProgress />
         <Typography variant="body2" sx={{ ml: 2 }}>
           {!profileLoaded
@@ -578,7 +483,6 @@ const AppLayout = () => {
   // Drawer content
   const drawerContent = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Logo and Branding */}
       <Box
         sx={{
           p: 3,
@@ -602,23 +506,17 @@ const AppLayout = () => {
           {!profileData.image && profileData.name.charAt(0).toUpperCase()}
         </Avatar>
         <Box sx={{ ml: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
             {profileData.name}
           </Typography>
           {profileData.isSubscribed && (
-            <Typography
-              variant="caption"
-              color="success.main"
-              sx={{ fontWeight: 500 }}
-            >
-              {profileData.subscriptionType?.replace("_", " ").toUpperCase()}{" "}
-              Plan
+            <Typography variant="caption" color="success.main" sx={{ fontWeight: 500 }}>
+              {profileData.subscriptionType?.replace("_", " ").toUpperCase()} Plan
             </Typography>
           )}
         </Box>
       </Box>
 
-      {/* Navigation Items */}
       <Box sx={{ flexGrow: 1, p: 2, overflowY: "auto" }}>
         <List>
           {filteredNavItems.map((item) => (
@@ -628,10 +526,7 @@ const AppLayout = () => {
                 to={item.path}
                 selected={location.pathname === item.path}
                 onClick={() => isMobile && setMobileOpen(false)}
-                sx={{
-                  borderRadius: 2,
-                  py: 1.5,
-                }}
+                sx={{ borderRadius: 2, py: 1.5 }}
               >
                 <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
                 <ListItemText
@@ -646,24 +541,17 @@ const AppLayout = () => {
         </List>
       </Box>
 
-      {/* Theme Toggle and Logout in Sidebar */}
       <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
         <ListItemButton
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
           disabled={isLoggingOut}
           sx={{
             borderRadius: 2,
             py: 1.5,
             bgcolor: "error.light",
             color: "error.dark",
-            "&:hover": {
-              bgcolor: "error.main",
-              color: "white",
-            },
-            "&.Mui-disabled": {
-              bgcolor: "action.disabledBackground",
-              color: "action.disabled",
-            },
+            "&:hover": { bgcolor: "error.main", color: "white" },
+            "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "action.disabled" },
           }}
         >
           <ListItemIcon sx={{ minWidth: 40 }}>
@@ -689,8 +577,8 @@ const AppLayout = () => {
         position="fixed"
         color="default"
         sx={{
-          width: isMobile ? "100%" : `calc(100% - ${280}px)`,
-          ml: isMobile ? 0 : `280px`,
+          width: isMobile ? "100%" : `calc(100% - 280px)`,
+          ml: isMobile ? 0 : 280,
           boxShadow: 1,
           bgcolor: "background.paper",
           borderBottom: "1px solid",
@@ -698,83 +586,45 @@ const AppLayout = () => {
         }}
       >
         <Toolbar>
-          {/* Mobile menu toggle */}
           {isMobile && (
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={() => setMobileOpen(!mobileOpen)}
-              sx={{ mr: 2 }}
-            >
+            <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 2 }}>
               <MenuIcon />
             </IconButton>
           )}
 
-          {/* Page title */}
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
             {location.pathname === "/"
               ? "Dashboard"
-              : filteredNavItems.find((item) => item.path === location.pathname)
-                  ?.text || ""}
+              : filteredNavItems.find((item) => item.path === location.pathname)?.text || ""}
           </Typography>
 
-          {/* Theme Toggle in App Bar (Mobile) */}
-          {isMobile && (
-            <Box sx={{ mr: 1 }}>
-              <CompactThemeToggle />
-            </Box>
-          )}
+          {isMobile && <CompactThemeToggle />}
+          {!isMobile && <ThemeToggleSwitch />}
 
-          {/* Theme Toggle in App Bar (Desktop) */}
-          {!isMobile && (
-            <Box sx={{ mr: 2 }}>
-              <ThemeToggleSwitch />
-            </Box>
-          )}
-
-          {/* User Profile Section in App Bar */}
           <Box sx={{ display: "flex", alignItems: "center" }}>
             <Tooltip title="User Profile">
-              <IconButton
-                onClick={(event) => setUserMenu(event.currentTarget)}
-                sx={{ p: 0 }}
-              >
-                <Avatar
-                  src={profileData.image}
-                  alt={profileData.name}
-                  sx={{ width: 32, height: 32 }}
-                >
+              <IconButton onClick={(event) => setUserMenu(event.currentTarget)} sx={{ p: 0 }}>
+                <Avatar src={profileData.image} alt={profileData.name} sx={{ width: 32, height: 32 }}>
                   {profileData.name.charAt(0)}
                 </Avatar>
               </IconButton>
             </Tooltip>
           </Box>
 
-          {/* User Menu */}
           <Menu
             anchorEl={userMenu}
             open={Boolean(userMenu)}
             onClose={() => setUserMenu(null)}
             onClick={() => setUserMenu(null)}
-            PaperProps={{
-              sx: {
-                mt: 1,
-                borderRadius: 2,
-                minWidth: 180,
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.12)",
-              },
-            }}
+            PaperProps={{ sx: { mt: 1, borderRadius: 2, minWidth: 180, boxShadow: "0 8px 24px rgba(0,0,0,0.12)" } }}
           >
-            <MenuItem
-              onClick={() => navigate("/profile")}
-              sx={{ py: 1.5, gap: 1.5 }}
-            >
+            <MenuItem onClick={() => navigate("/profile")} sx={{ py: 1.5, gap: 1.5 }}>
               <PersonIcon fontSize="small" />
               <Typography variant="body2">Profile</Typography>
             </MenuItem>
             <Divider />
             <MenuItem
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               disabled={isLoggingOut}
               sx={{ py: 1.5, gap: 1.5, color: "error.main" }}
             >
@@ -791,7 +641,7 @@ const AppLayout = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Side Drawer - Mobile */}
+      {/* Mobile Drawer */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -799,18 +649,18 @@ const AppLayout = () => {
         ModalProps={{ keepMounted: true }}
         sx={{
           display: isMobile ? "block" : "none",
-          "& .MuiDrawer-paper": { width: 280, boxSizing: "border-box" },
+          "& .MuiDrawer-paper": { width: 280 },
         }}
       >
         {drawerContent}
       </Drawer>
 
-      {/* Side Drawer - Desktop */}
+      {/* Desktop Drawer */}
       <Drawer
         variant="permanent"
         sx={{
           display: isMobile ? "none" : "block",
-          "& .MuiDrawer-paper": { width: 280, boxSizing: "border-box" },
+          "& .MuiDrawer-paper": { width: 280 },
         }}
         open
       >
@@ -832,6 +682,29 @@ const AppLayout = () => {
       >
         <Outlet />
       </Box>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutDialogOpen}
+        onClose={() => setLogoutDialogOpen(false)}
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
+      >
+        <DialogTitle id="logout-dialog-title">Confirm Logout</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="logout-dialog-description">
+            Are you sure you want to log out? You will be redirected to the login page.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLogoutDialogOpen(false)} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={confirmLogout} color="error" autoFocus disabled={isLoggingOut}>
+            {isLoggingOut ? "Logging out..." : "Yes, Logout"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

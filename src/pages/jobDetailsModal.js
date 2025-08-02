@@ -494,7 +494,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">Excess Amount</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A'}
+                      {jobData.excessAmount ? `${jobData.excessAmount.toLocaleString()}` : 'N/A'}
                     </Typography>
                   </Box>
                 </CardContent>

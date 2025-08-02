@@ -69,22 +69,3 @@ function App() {
 
 export default App;
 
-// import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-// // import GarageLogin from './components/GarageLogin';
-// // import GarageDashboard from './components/GarageDashboard';
-// import GarageLogin from './Login/LoginPage';
-// import Dashboard from '../../master-admin/src/pages/Dashboard';
-
-// function App() {
-//   return (
-//     <Router>
-//       <Routes>
-//         <Route path="/login" element={<GarageLogin />} />
-//         <Route path="/dashboard" element={<Dashboard />} />
-//         {/* Other routes */}
-//       </Routes>
-//     </Router>
-//   );
-// }
-
-// export default App;

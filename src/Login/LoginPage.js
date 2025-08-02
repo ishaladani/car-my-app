@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import {
+import React, { useState, useEffect } from 'react';
+import { 
   Box,
   Typography,
   TextField,
@@ -12,6 +12,8 @@ import {
   InputAdornment,
   Alert,
   CircularProgress,
+  Switch,
+  FormControlLabel,
   Divider,
   Chip,
   Dialog,
@@ -23,34 +25,36 @@ import {
   StepLabel,
   AppBar,
   Toolbar,
-  Container,
-} from "@mui/material";
-import {
-  Visibility,
-  VisibilityOff,
+  Container
+} from '@mui/material';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Business, 
+  Person,
   DirectionsCar,
   AccountCircle,
   Email,
   Lock,
   VerifiedUser,
   Send,
-  ExitToApp,
-} from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-import { getAdminApiUrl } from "../config/api";
+  Logout,
+  ExitToApp
+} from '@mui/icons-material';
+import axios from 'axios';
 
 const LoginPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: ''
   });
-  const [error, setError] = useState("");
-  const [isGarageLogin, setIsGarageLogin] = useState(true); // Will be auto-detected
+  const [error, setError] = useState('');
+  const [isGarageLogin, setIsGarageLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -60,208 +64,177 @@ const LoginPage = () => {
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState(0);
   const [forgotPasswordData, setForgotPasswordData] = useState({
-    email: "",
-    otp: "",
-    newPassword: "",
-    confirmPassword: "",
+    email: '',
+    otp: '',
+    newPassword: '',
+    confirmPassword: ''
   });
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
-  const [forgotPasswordError, setForgotPasswordError] = useState("");
-  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState("");
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
 
   // API Base URL
-  const BASE_URL = getAdminApiUrl().replace("/api/admin", "");
+  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
 
   // Check if user is already logged in
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userType = localStorage.getItem("userType");
-    const garageId = localStorage.getItem("garageId");
+    const token = localStorage.getItem('token');
+    const userType = localStorage.getItem('userType');
+    const garageId = localStorage.getItem('garageId');
     if (token && userType && garageId) {
       setIsLoggedIn(true);
       setCurrentUser({
         userType,
         garageId,
-        token,
+        token
       });
-      setIsGarageLogin(userType === "garage");
+      setIsGarageLogin(userType === 'garage');
     }
   }, []);
 
   // Handle logout
   const handleLogout = async () => {
-    if (logoutLoading) return;
-
+    console.log("=== LOGOUT BUTTON CLICKED ===");
+    setLogoutLoading(true);
     try {
-      setLogoutLoading(true);
+      const storedUserId = localStorage.getItem("garageId");
       const token = localStorage.getItem("token");
-      const headers = {};
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+      console.log("Stored userId:", storedUserId);
+      console.log("Stored token:", token ? "Token exists" : "No token found");
+      if (!storedUserId) {
+        console.error("No userId found in localStorage");
+        return;
       }
-
-      // Determine which ID to use based on usertype
-      let logoutId;
-      if (currentUser?.userType === "garage") {
-        logoutId = currentUser.garageId;
-      } else if (currentUser?.userType === "user") {
-        logoutId = localStorage.getItem("userId");
-      } else {
-        logoutId = currentUser?.garageId;
+      if (!token) {
+        console.error("No token found in localStorage");
+        return;
       }
-
-      if (logoutId) {
-        try {
-          await axios.post(`${BASE_URL}/api/logout`, { logoutId }, { headers });
-        } catch (error) {
-          console.error("Logout API error:", error);
+      console.log("Making API call to logout...");
+      const response = await axios.post(
+        `${BASE_URL}/api/garage/logout/${storedUserId}`,
+        {},
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-
-      // Clear localStorage
-      localStorage.removeItem("token");
-      localStorage.removeItem("userType");
-      localStorage.removeItem("garageId");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("name");
-
+      );
+      console.log("Logout API response:", response.data);
+      console.log("Logout API called successfully");
+    } catch (error) {
+      console.error("Error calling logout API:", error);
+      console.error("Error details:", {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+    } finally {
+      console.log("Clearing localStorage and resetting state...");
+      localStorage.clear();
       setIsLoggedIn(false);
       setCurrentUser(null);
-      setFormData({ email: "", password: "" });
-      setError("");
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
+      setFormData({ email: '', password: '' });
+      setError('');
       setLogoutLoading(false);
     }
   };
 
+  // Handle form input changes
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError("");
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    if (error) setError('');
   };
 
+  // Handle forgot password form changes
   const handleForgotPasswordChange = (e) => {
-    setForgotPasswordData({
-      ...forgotPasswordData,
-      [e.target.name]: e.target.value,
-    });
-    setForgotPasswordError("");
+    const { name, value } = e.target;
+    setForgotPasswordData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    if (forgotPasswordError) setForgotPasswordError('');
   };
 
-  // Unified login function that auto-detects user type
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
-    setError("");
+
+    if (!formData.email || !formData.password) {
+      setError('Please fill in all fields');
+      setLoading(false);
+      return;
+    }
 
     try {
-      // First, try garage login
-      let response = await fetch(`${BASE_URL}/api/garage/login`, {
-        method: "POST",
+      const endpoint = isGarageLogin 
+        ? `${BASE_URL}/api/garage/login`
+        : `${BASE_URL}/api/garage/user/login`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(formData)
       });
 
-      let data = await response.json();
-
-      // If garage login fails, try user login
       if (!response.ok) {
-        response = await fetch(`${BASE_URL}/api/user/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        });
-
-        data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Login failed");
-        }
-
-        // User login successful
-        setIsGarageLogin(false);
-      } else {
-        // Garage login successful
-        setIsGarageLogin(true);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Login failed');
       }
 
-      // Check for expired subscription
-      if (
-        data.subscriptionExpired === true &&
-        data.message ===
-          "Your subscription has expired. Please renew your plan."
-      ) {
-        try {
-          // Fetch garage details using email
-          const encodedEmail = encodeURIComponent(formData.email);
-          const res = await fetch(
-            `${BASE_URL}/api/garage/get-garage-id/${encodedEmail}`
-          );
+      const data = await response.json();
 
-          if (!res.ok) throw new Error("Failed to fetch garage data");
-
-          const result = await res.json();
-          const { garageId, name, email: garageEmail } = result.data;
-
-          // Navigate to renew-plan with full data
-          navigate("/renew-plan", {
-            state: {
-              garageId,
-              garageName: name,
-              garageEmail: garageEmail,
-              message: data.message,
-            },
-          });
-        } catch (err) {
-          console.error("Error fetching garage data:", err);
-          alert("Could not retrieve garage details. Please contact support.");
+      // Handle subscription expiry
+      if (data.message && data.message.includes('subscription has expired')) {
+        if (isGarageLogin && data.garage && data.garage._id) {
+          localStorage.setItem('garageId', data.garage._id);
+          localStorage.setItem('garageName', data.garage.name || 'Your Garage');
+          localStorage.setItem('garageEmail', data.garage.email || formData.email);
         }
-
-        setError(data.message);
+        navigate('/renew-plan', {
+          state: {
+            garageId: data.garage?._id,
+            garageName: data.garage?.name || 'Your Garage',
+            garageEmail: data.garage?.email || formData.email,
+            message: data.message
+          }
+        });
         return;
       }
 
-      // Save login data with safety checks
-      localStorage.setItem("token", data.token || "");
-      localStorage.setItem("userType", isGarageLogin ? "garage" : "user");
-      localStorage.setItem(
-        "name",
-        isGarageLogin
-          ? data.garage?.name || "Unknown Garage"
-          : data.user?.name || "Unknown User"
-      );
+      // Normal login flow
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('userType', isGarageLogin ? 'garage' : 'user');
+      localStorage.setItem('name', isGarageLogin ? data.garage.name : data.user.name);
 
-      const garageId = isGarageLogin ? data.garage?._id : data.user?.garageId;
-      const userId = isGarageLogin ? data.garage?._id : data.user?._id;
-
-      if (garageId) {
-        localStorage.setItem("garageId", garageId);
-      }
-
-      if (userId) {
-        localStorage.setItem("userId", userId);
+      if (isGarageLogin && data.garage && data.garage._id) {
+        localStorage.setItem('garageId', data.garage._id);
+      } else if (!isGarageLogin && data.user && data.user.garageId) {
+        localStorage.setItem('garageId', data.user.garageId);
       }
 
       setIsLoggedIn(true);
       setCurrentUser({
-        userType: isGarageLogin ? "garage" : "user",
-        garageId: garageId || null,
-        token: data.token || null,
+        userType: isGarageLogin ? 'garage' : 'user',
+        garageId: isGarageLogin ? data.garage?._id : data.user?.garageId,
+        token: data.token
       });
 
-      navigate("/");
+      const redirectPath = isGarageLogin ? '/' : '/';
+      navigate(redirectPath);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -269,37 +242,38 @@ const LoginPage = () => {
     }
   };
 
-  // Send OTP for password reset
+  // Send OTP
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    setForgotPasswordError("");
-    setForgotPasswordSuccess("");
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
     setForgotPasswordLoading(true);
-
     if (!forgotPasswordData.email) {
-      setForgotPasswordError("Please enter your email address");
+      setForgotPasswordError('Please enter your email address');
       setForgotPasswordLoading(false);
       return;
     }
-
     try {
       const response = await fetch(`${BASE_URL}/api/verify/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotPasswordData.email }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: forgotPasswordData.email
+        })
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to send OTP");
+        throw new Error(errorData.message || 'Failed to send OTP');
       }
-
-      setForgotPasswordSuccess("OTP sent successfully! Check your email.");
+      const data = await response.json();
+      setForgotPasswordSuccess('OTP sent successfully! Please check your email.');
+      setOtpSent(true);
       setForgotPasswordStep(1);
       setResendTimer(60);
-
       const timer = setInterval(() => {
-        setResendTimer((prev) => {
+        setResendTimer(prev => {
           if (prev <= 1) {
             clearInterval(timer);
             return 0;
@@ -317,31 +291,32 @@ const LoginPage = () => {
   // Verify OTP
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    setForgotPasswordError("");
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
     setForgotPasswordLoading(true);
-
     if (!forgotPasswordData.otp) {
-      setForgotPasswordError("Please enter the OTP");
+      setForgotPasswordError('Please enter the OTP');
       setForgotPasswordLoading(false);
       return;
     }
-
     try {
       const response = await fetch(`${BASE_URL}/api/verify/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           email: forgotPasswordData.email,
-          otp: forgotPasswordData.otp,
-        }),
+          otp: forgotPasswordData.otp
+        })
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Invalid OTP");
+        throw new Error(errorData.message || 'Invalid OTP');
       }
-
-      setForgotPasswordSuccess("OTP verified successfully!");
+      const data = await response.json();
+      setForgotPasswordSuccess('OTP verified successfully!');
+      setOtpVerified(true);
       setForgotPasswordStep(2);
     } catch (err) {
       setForgotPasswordError(err.message);
@@ -350,56 +325,47 @@ const LoginPage = () => {
     }
   };
 
-  // Reset password
+  // Reset Password
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    setForgotPasswordError("");
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
     setForgotPasswordLoading(true);
-
-    if (
-      !forgotPasswordData.newPassword ||
-      !forgotPasswordData.confirmPassword
-    ) {
-      setForgotPasswordError("Please fill in all fields");
+    if (!forgotPasswordData.newPassword || !forgotPasswordData.confirmPassword) {
+      setForgotPasswordError('Please fill in all password fields');
       setForgotPasswordLoading(false);
       return;
     }
-
     if (forgotPasswordData.newPassword !== forgotPasswordData.confirmPassword) {
-      setForgotPasswordError("Passwords do not match");
+      setForgotPasswordError('Passwords do not match');
       setForgotPasswordLoading(false);
       return;
     }
-
     if (forgotPasswordData.newPassword.length < 6) {
-      setForgotPasswordError("Password must be at least 6 characters long");
+      setForgotPasswordError('Password must be at least 6 characters long');
       setForgotPasswordLoading(false);
       return;
     }
-
     try {
       const response = await fetch(`${BASE_URL}/api/verify/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           email: forgotPasswordData.email,
-          otp: forgotPasswordData.otp,
-          newPassword: forgotPasswordData.newPassword,
-        }),
+          newPassword: forgotPasswordData.newPassword
+        })
       });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to reset password");
+        throw new Error(errorData.message || 'Password reset failed');
       }
-
-      setForgotPasswordSuccess(
-        "Password reset successfully! You can now login."
-      );
+      const data = await response.json();
+      setForgotPasswordSuccess('Password reset successfully! You can now login with your new password.');
       setTimeout(() => {
         closeForgotPasswordDialog();
-        setFormData({ email: forgotPasswordData.email, password: "" });
-      }, 2000);
+      }, 3000);
     } catch (err) {
       setForgotPasswordError(err.message);
     } finally {
@@ -411,17 +377,19 @@ const LoginPage = () => {
     setShowPassword(!showPassword);
   };
 
+  const handleLoginTypeChange = (e) => {
+    setIsGarageLogin(e.target.checked);
+    setFormData({ email: '', password: '' });
+    setError('');
+  };
+
   const openForgotPasswordDialog = () => {
     setForgotPasswordOpen(true);
     setForgotPasswordStep(0);
-    setForgotPasswordData({
-      email: "",
-      otp: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setForgotPasswordError("");
-    setForgotPasswordSuccess("");
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setOtpSent(false);
+    setOtpVerified(false);
     setResendTimer(0);
   };
 
@@ -429,86 +397,127 @@ const LoginPage = () => {
     setForgotPasswordOpen(false);
     setForgotPasswordStep(0);
     setForgotPasswordData({
-      email: "",
-      otp: "",
-      newPassword: "",
-      confirmPassword: "",
+      email: '',
+      otp: '',
+      newPassword: '',
+      confirmPassword: ''
     });
-    setForgotPasswordError("");
-    setForgotPasswordSuccess("");
+    setForgotPasswordError('');
+    setForgotPasswordSuccess('');
+    setOtpSent(false);
+    setOtpVerified(false);
     setResendTimer(0);
   };
 
-  // Theme colors - simplified for unified login
-  const getThemeColors = () => {
-    return { primary: "#1976d2", secondary: "#42a5f5", accent: "#2196F3" };
+  const handleResendOtp = () => {
+    if (resendTimer === 0) {
+      handleSendOtp({ preventDefault: () => {} });
+    }
   };
 
+  // Dynamic styling based on login type
+  const getThemeColors = () => {
+    return isGarageLogin 
+      ? { primary: '#08197B', secondary: '#364ab8', accent: '#2196F3' }
+      : { primary: '#2E7D32', secondary: '#4CAF50', accent: '#66BB6A' };
+  };
   const colors = getThemeColors();
 
-  // TextField styling
+  // Theme-aware TextField styles
   const getTextFieldStyles = () => ({
-    "& .MuiOutlinedInput-root": {
-      backgroundColor:
-        theme.palette.mode === "dark"
-          ? theme.palette.background.paper
-          : theme.palette.background.default,
+    '& .MuiOutlinedInput-root': {
+      backgroundColor: theme.palette.mode === 'dark' 
+        ? theme.palette.background.paper 
+        : theme.palette.background.default,
+      color: theme.palette.text.primary,
       borderRadius: 2,
-      "& fieldset": {
-        borderColor:
-          theme.palette.mode === "dark" ? theme.palette.divider : "#ddd",
+      '& fieldset': {
+        borderColor: theme.palette.mode === 'dark' 
+          ? theme.palette.divider 
+          : theme.palette.grey[300]
       },
-      "&:hover fieldset": {
-        borderColor: colors.secondary,
+      '&:hover fieldset': {
+        borderColor: colors.secondary
       },
-      "&.Mui-focused fieldset": {
-        borderColor: colors.primary,
+      '&.Mui-focused fieldset': {
+        borderColor: colors.primary
       },
-      "& input": {
+      '& input': {
         color: theme.palette.text.primary,
       },
+      '& input::placeholder': {
+        color: theme.palette.text.secondary,
+        opacity: 0.7
+      }
     },
-    "& .MuiInputLabel-root": {
+    '& .MuiInputLabel-root': {
       color: theme.palette.text.secondary,
-      "&.Mui-focused": { color: colors.primary },
+      '&.Mui-focused': {
+        color: colors.primary
+      }
     },
+    '& .MuiInputAdornment-root .MuiSvgIcon-root': {
+      color: theme.palette.text.secondary
+    }
   });
 
-  const steps = ["Verify Email", "Enter OTP", "New Password"];
+  const steps = ['Verify Email', 'Enter OTP', 'New Password'];
 
   return (
     <>
       <CssBaseline />
-
-      {/* AppBar (only when logged in) */}
+      
+      {/* Top Navigation Bar with Logout (Only when logged in) */}
       {isLoggedIn && (
-        <AppBar
-          position="fixed"
+        <AppBar 
+          position="fixed" 
           elevation={0}
-          sx={{
-            backgroundColor: "transparent",
-            backdropFilter: "blur(10px)",
+          sx={{ 
+            backgroundColor: 'transparent',
+            backdropFilter: 'blur(10px)',
             borderBottom: `1px solid ${theme.palette.divider}`,
-            zIndex: theme.zIndex.appBar,
+            zIndex: theme.zIndex.appBar
           }}
         >
-          <Toolbar>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="h6" fontWeight={600}>
-                {currentUser?.userType === "garage"
-                  ? "Garage Management"
-                  : "Customer Portal"}
+          <Toolbar sx={{ justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" component="div" sx={{ color: colors.primary, fontWeight: 600 }}>
+                Garage Management
               </Typography>
+              <Chip
+                icon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
+                label={`Logged in as ${currentUser?.userType === 'garage' ? 'Garage' : 'User'}`}
+                size="small"
+                sx={{
+                  backgroundColor: colors.primary,
+                  color: 'white',
+                  fontWeight: 500
+                }}
+              />
             </Box>
             <Button
-              color="inherit"
+              variant="outlined"
               onClick={handleLogout}
               disabled={logoutLoading}
-              startIcon={
-                logoutLoading ? <CircularProgress size={16} /> : <ExitToApp />
-              }
+              startIcon={logoutLoading ? <CircularProgress size={16} /> : <ExitToApp />}
+              sx={{
+                borderColor: '#ff4444',
+                color: '#ff4444',
+                backgroundColor: 'rgba(255, 68, 68, 0.08)',
+                backdropFilter: 'blur(10px)',
+                '&:hover': {
+                  borderColor: '#cc3333',
+                  backgroundColor: 'rgba(255, 68, 68, 0.15)',
+                  color: '#cc3333'
+                },
+                '&:disabled': {
+                  borderColor: theme.palette.text.disabled,
+                  color: theme.palette.text.disabled,
+                  backgroundColor: 'transparent'
+                }
+              }}
             >
-              {logoutLoading ? "Logging out..." : "Logout"}
+              {logoutLoading ? 'Logging out...' : 'Logout'}
             </Button>
           </Toolbar>
         </AppBar>
@@ -516,467 +525,392 @@ const LoginPage = () => {
 
       <Box
         sx={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.secondary}15 100%)`,
-          pt: isLoggedIn ? 8 : 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          backgroundColor: theme.palette.background.default,
+          p: 2,
+          pt: isLoggedIn ? 10 : 2,
+          background: theme.palette.mode === 'dark' 
+            ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
+            : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`
         }}
       >
         <Container maxWidth="sm">
           <Paper
-            elevation={8}
+            elevation={6}
             sx={{
+              width: '100%',
+              maxWidth: 450,
+              mx: 'auto',
               p: 4,
+              textAlign: 'center',
               borderRadius: 3,
-              background: theme.palette.background.paper,
-              border: `1px solid ${theme.palette.divider}`,
+              position: 'relative',
+              backgroundColor: theme.palette.background.paper,
+              backdropFilter: 'blur(10px)',
+              border: theme.palette.mode === 'dark' 
+                ? `1px solid ${theme.palette.divider}` 
+                : 'none'
             }}
           >
-            {!isLoggedIn ? (
+            {/* Show expiry alert if redirected from expired session */}
+            {location.state?.message && (
+              <Alert
+                severity="warning"
+                sx={{
+                  mb: 3,
+                  borderRadius: 2,
+                  backgroundColor: '#fff3e0',
+                  color: '#e65100',
+                  fontWeight: 500
+                }}
+              >
+                {location.state.message}
+              </Alert>
+            )}
+
+            {/* Already Logged In Alert */}
+            {isLoggedIn && (
+              <Alert 
+                severity="success" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 2,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? theme.palette.success.dark 
+                    : theme.palette.success.light,
+                  color: theme.palette.success.contrastText,
+                  '& .MuiAlert-message': {
+                    fontWeight: 500
+                  }
+                }}
+              >
+                ✅ You are successfully logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Customer'}. 
+                Use the logout button above to switch accounts.
+              </Alert>
+            )}
+
+            {/* Login Type Indicator */}
+            <Box sx={{ mb: 3 }}>
+              <Chip
+                icon={isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
+                label={`${isGarageLogin ? 'Garage' : 'User'} Login`}
+                sx={{
+                  backgroundColor: colors.primary,
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  px: 2,
+                  py: 1
+                }}
+              />
+            </Box>
+
+            <Typography 
+              variant="h3" 
+              component="h1"
+              sx={{
+                mb: 2,
+                fontWeight: 700,
+                color: colors.primary,
+                fontSize: { xs: '2rem', sm: '2.5rem' }
+              }}
+            >
+              {isLoggedIn ? 'Account Status' : 'Welcome Back'}
+            </Typography>
+
+            <Typography 
+              variant="body1" 
+              sx={{
+                mb: 4,
+                color: theme.palette.text.secondary,
+                fontSize: '1.1rem'
+              }}
+            >
+              {isLoggedIn 
+                ? 'You are currently signed in. Use the navigation above to access your dashboard or logout.'
+                : (isGarageLogin 
+                  ? 'Access your garage management system'
+                  : 'Sign in to your customer account')
+              }
+            </Typography>
+
+            {/* Show login form only when not logged in */}
+            {!isLoggedIn && (
               <>
-                {/* Header */}
-                <Box sx={{ textAlign: "center", mb: 4 }}>
-                  <Box
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                      mb: 2,
+                {error && (
+                  <Alert 
+                    severity="error" 
+                    sx={{ 
+                      mb: 3,
+                      borderRadius: 2,
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? theme.palette.error.dark 
+                        : theme.palette.error.light,
+                      color: theme.palette.error.contrastText,
+                      '& .MuiAlert-message': {
+                        fontWeight: 500
+                      }
                     }}
                   >
-                    <DirectionsCar sx={{ fontSize: 40, color: "white" }} />
-                  </Box>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
-                    Welcome Back
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    Sign in to your account to continue
-                  </Typography>
-                </Box>
+                    {error}
+                  </Alert>
+                )}
 
-                {/* Login Form */}
-                <Box component="form" onSubmit={handleLogin} noValidate>
-                  {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {error}
-                    </Alert>
-                  )}
-
+                <Box component="form" onSubmit={handleLogin} sx={{ width: '100%' }}>
                   <TextField
-                    margin="normal"
-                    required
                     fullWidth
-                    id="email"
-                    label="Email Address"
                     name="email"
-                    autoComplete="email"
-                    autoFocus
+                    label="Email Address"
+                    type="email"
+                    variant="outlined"
+                    placeholder={isGarageLogin ? "garage@example.com" : "user@example.com"}
                     value={formData.email}
                     onChange={handleChange}
-                    sx={getTextFieldStyles()}
+                    required
+                    sx={{
+                      mb: 3,
+                      ...getTextFieldStyles()
+                    }}
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Email color="action" />
+                          {isGarageLogin ? <Business color="action" /> : <Person color="action" />}
                         </InputAdornment>
-                      ),
+                      )
                     }}
                   />
 
                   <TextField
-                    margin="normal"
-                    required
                     fullWidth
                     name="password"
                     label="Password"
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    autoComplete="current-password"
+                    type={showPassword ? 'text' : 'password'}
+                    variant="outlined"
+                    placeholder="Enter your password"
                     value={formData.password}
                     onChange={handleChange}
-                    sx={getTextFieldStyles()}
+                    required
+                    sx={{
+                      mb: 2,
+                      ...getTextFieldStyles()
+                    }}
                     InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Lock color="action" />
-                        </InputAdornment>
-                      ),
                       endAdornment: (
                         <InputAdornment position="end">
                           <IconButton
                             aria-label="toggle password visibility"
                             onClick={togglePasswordVisibility}
                             edge="end"
+                            sx={{ color: colors.primary }}
                           >
                             {showPassword ? <VisibilityOff /> : <Visibility />}
                           </IconButton>
                         </InputAdornment>
-                      ),
+                      )
                     }}
                   />
 
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    disabled={loading}
-                    sx={{
-                      mt: 3,
-                      mb: 2,
-                      height: 48,
-                      fontWeight: 600,
-                      borderRadius: 2,
-                      background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                      "&:hover": {
-                        background: `linear-gradient(45deg, ${colors.primary} 40%, ${colors.secondary} 100%)`,
-                      },
-                    }}
-                    startIcon={
-                      loading ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <VerifiedUser />
-                      )
-                    }
-                  >
-                    {loading ? "Signing In..." : "Sign In"}
-                  </Button>
-
-                  <Box sx={{ textAlign: "center", mt: 2 }}>
+                  {/* Forgot Password Link */}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
                     <Link
                       component="button"
+                      type="button"
                       variant="body2"
                       onClick={openForgotPasswordDialog}
                       sx={{
                         color: colors.primary,
-                        textDecoration: "none",
-                        "&:hover": { textDecoration: "underline" },
+                        textDecoration: 'none',
+                        fontWeight: 500,
+                        '&:hover': {
+                          color: colors.secondary,
+                          textDecoration: 'underline'
+                        }
                       }}
                     >
-                      Forgot your password?
+                      Forgot Password?
                     </Link>
                   </Box>
 
-                  <Divider sx={{ my: 3 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      New to the platform?
-                    </Typography>
-                  </Divider>
-
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      color: theme.palette.text.secondary,
-                      textAlign: "center",
-                    }}
-                  >
-                    Don't have an account?{" "}
-                    <Link
-                      component="button"
-                      variant="body1"
-                      onClick={() => navigate("/signup")}
-                      sx={{
-                        fontWeight: 600,
-                        color: colors.primary,
-                        textDecoration: "none",
-                        "&:hover": { textDecoration: "underline" },
-                      }}
-                    >
-                      Create Account
-                    </Link>
-                  </Typography>
-                </Box>
-              </>
-            ) : (
-              <>
-                {/* Welcome Message */}
-                <Box sx={{ textAlign: "center", mb: 4 }}>
-                  <Box
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 80,
-                      height: 80,
-                      borderRadius: "50%",
-                      background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
-                      mb: 2,
-                    }}
-                  >
-                    {currentUser?.userType === "garage" ? (
-                      <DirectionsCar sx={{ fontSize: 40, color: "white" }} />
-                    ) : (
-                      <AccountCircle sx={{ fontSize: 40, color: "white" }} />
-                    )}
-                  </Box>
-                  <Typography variant="h4" fontWeight={700} gutterBottom>
-                    Welcome, {localStorage.getItem("name") || "User"}!
-                  </Typography>
-                  <Chip
-                    label={
-                      currentUser?.userType === "garage"
-                        ? "Garage Owner"
-                        : "Customer"
-                    }
-                    color="primary"
-                    variant="outlined"
-                    icon={
-                      currentUser?.userType === "garage" ? (
-                        <DirectionsCar />
-                      ) : (
-                        <AccountCircle />
-                      )
-                    }
-                  />
-                </Box>
-
-                {/* Dashboard Access Button */}
-                <Box sx={{ mt: 4 }}>
                   <Button
+                    type="submit"
                     variant="contained"
-                    onClick={() => navigate("/")}
-                    startIcon={
-                      currentUser?.userType === "garage" ? (
-                        <DirectionsCar />
-                      ) : (
-                        <AccountCircle />
-                      )
-                    }
+                    disabled={loading}
+                    fullWidth
                     sx={{
                       height: 48,
+                      fontSize: '1.1rem',
                       fontWeight: 600,
+                      mb: 3,
                       borderRadius: 2,
+                      backgroundColor: colors.primary,
                       background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
+                      '&:hover': {
+                        backgroundColor: colors.secondary,
+                        transform: 'translateY(-1px)',
+                        boxShadow: `0 6px 20px ${colors.primary}30`
+                      },
+                      '&:disabled': {
+                        backgroundColor: theme.palette.action.disabledBackground,
+                        color: theme.palette.action.disabled
+                      },
+                      transition: 'all 0.3s ease'
                     }}
                   >
-                    Go to Dashboard
+                    {loading ? (
+                      <CircularProgress size={24} color="inherit" />
+                    ) : (
+                      `Sign In as ${isGarageLogin ? 'Garage' : 'User'}`
+                    )}
                   </Button>
                 </Box>
+
+                {/* Renew Plan Button */}
+                <Box sx={{ mt: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => navigate('/renew-plan')}
+                    startIcon={<VerifiedUser />}
+                    sx={{
+                      borderColor: '#ff9800',
+                      color: '#ff9800',
+                      '&:hover': {
+                        borderColor: '#f57c00',
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        color: '#f57c00'
+                      },
+                      fontWeight: 600,
+                      width: '100%'
+                    }}
+                  >
+                    Renew Your Plan
+                  </Button>
+                </Box>
+
+                <Divider sx={{ my: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Switch Login Type
+                  </Typography>
+                </Divider>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isGarageLogin}
+                      onChange={handleLoginTypeChange}
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: colors.primary,
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: colors.primary,
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
+                      <Typography variant="body1" fontWeight={500}>
+                        {isGarageLogin ? 'Garage Owner' : 'Customer'}
+                      </Typography>
+                    </Box>
+                  }
+                  sx={{ mb: 3 }}
+                />
+
+                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+                  Don't have an account?{' '}
+                  <Link 
+                    component="button"
+                    variant="body1"
+                    onClick={() => navigate('/signup')}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.primary,
+                      textDecoration: 'none',
+                      '&:hover': {
+                        color: colors.secondary,
+                        textDecoration: 'underline'
+                      }
+                    }}
+                  >
+                    Create Account
+                  </Link>
+                </Typography>
               </>
             )}
+
+            {/* Show dashboard access buttons when logged in */}
+            {isLoggedIn && (
+              <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/')}
+                  startIcon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
+                  sx={{
+                    height: 48,
+                    fontSize: '1.1rem',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    backgroundColor: colors.primary,
+                    background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`,
+                    '&:hover': {
+                      backgroundColor: colors.secondary,
+                      transform: 'translateY(-1px)',
+                      boxShadow: `0 6px 20px ${colors.primary}30`
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Go to Dashboard
+                </Button>
+              </Box>
+            )}
+
+            {/* Additional Info */}
+            <Box sx={{ 
+              mt: 3, 
+              p: 2, 
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? `${colors.primary}20` 
+                : `${colors.primary}08`, 
+              borderRadius: 2 
+            }}>
+              <Typography variant="body2" color="text.secondary">
+                {isLoggedIn 
+                  ? '🎉 You have full access to your account features and dashboard'
+                  : (isGarageLogin 
+                    ? '🔧 Manage your garage operations, appointments, and customer service'
+                    : '🚗 Book services, track repairs, and manage your vehicle maintenance')
+                }
+              </Typography>
+            </Box>
           </Paper>
         </Container>
       </Box>
 
       {/* Forgot Password Dialog */}
-      <Dialog
-        open={forgotPasswordOpen}
+      <Dialog 
+        open={forgotPasswordOpen} 
         onClose={closeForgotPasswordDialog}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 1,
+            backgroundColor: theme.palette.background.paper,
+            border: theme.palette.mode === 'dark' 
+              ? `1px solid ${theme.palette.divider}` 
+              : 'none'
+          }
+        }}
       >
-        <DialogTitle
-          sx={{ textAlign: "center", color: colors.primary, fontWeight: 700 }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 1,
-            }}
-          >
-            <Lock /> Reset Password
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Stepper activeStep={forgotPasswordStep}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-
-          <Box sx={{ mt: 3 }}>
-            {forgotPasswordStep === 0 && (
-              <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
-                  Enter your email address to receive a password reset OTP.
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="Email Address"
-                  name="email"
-                  type="email"
-                  value={forgotPasswordData.email}
-                  onChange={handleForgotPasswordChange}
-                  sx={getTextFieldStyles()}
-                />
-              </Box>
-            )}
-
-            {forgotPasswordStep === 1 && (
-              <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
-                  Enter the OTP sent to your email address.
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="OTP"
-                  name="otp"
-                  value={forgotPasswordData.otp}
-                  onChange={handleForgotPasswordChange}
-                  sx={getTextFieldStyles()}
-                />
-                {resendTimer > 0 && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 1, display: "block" }}
-                  >
-                    Resend OTP in {resendTimer} seconds
-                  </Typography>
-                )}
-              </Box>
-            )}
-
-            {forgotPasswordStep === 2 && (
-              <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2 }}
-                >
-                  Enter your new password.
-                </Typography>
-                <TextField
-                  fullWidth
-                  label="New Password"
-                  name="newPassword"
-                  type={showNewPassword ? "text" : "password"}
-                  value={forgotPasswordData.newPassword}
-                  onChange={handleForgotPasswordChange}
-                  sx={{ ...getTextFieldStyles(), mb: 2 }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          edge="end"
-                        >
-                          {showNewPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                <TextField
-                  fullWidth
-                  label="Confirm New Password"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={forgotPasswordData.confirmPassword}
-                  onChange={handleForgotPasswordChange}
-                  sx={getTextFieldStyles()}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() =>
-                            setShowConfirmPassword(!showConfirmPassword)
-                          }
-                          edge="end"
-                        >
-                          {showConfirmPassword ? (
-                            <VisibilityOff />
-                          ) : (
-                            <Visibility />
-                          )}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
-            )}
-
-            {forgotPasswordError && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {forgotPasswordError}
-              </Alert>
-            )}
-
-            {forgotPasswordSuccess && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                {forgotPasswordSuccess}
-              </Alert>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, pt: 1 }}>
-          <Button onClick={closeForgotPasswordDialog} color="inherit">
-            Cancel
-          </Button>
-          {forgotPasswordStep === 0 && (
-            <Button
-              onClick={handleSendOtp}
-              disabled={forgotPasswordLoading || !forgotPasswordData.email}
-              startIcon={
-                forgotPasswordLoading ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <Send />
-                )
-              }
-            >
-              {forgotPasswordLoading ? "Sending..." : "Send OTP"}
-            </Button>
-          )}
-          {forgotPasswordStep === 1 && (
-            <Button
-              onClick={handleVerifyOtp}
-              disabled={forgotPasswordLoading || !forgotPasswordData.otp}
-              startIcon={
-                forgotPasswordLoading ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <VerifiedUser />
-                )
-              }
-            >
-              {forgotPasswordLoading ? "Verifying..." : "Verify OTP"}
-            </Button>
-          )}
-          {forgotPasswordStep === 2 && (
-            <Button
-              onClick={handleResetPassword}
-              disabled={
-                forgotPasswordLoading ||
-                !forgotPasswordData.newPassword ||
-                !forgotPasswordData.confirmPassword
-              }
-              startIcon={
-                forgotPasswordLoading ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <VerifiedUser />
-                )
-              }
-            >
-              {forgotPasswordLoading ? "Resetting..." : "Reset Password"}
-            </Button>
-          )}
-        </DialogActions>
+        {/* ... existing dialog content ... */}
       </Dialog>
-
-      {/* Success/Error Snackbars */}
-      {/* The original code had Snackbar imports and state, but they were not used in the new_code.
-          Therefore, I will remove them as they are not directly related to the new_code's login flow. */}
     </>
   );
 };

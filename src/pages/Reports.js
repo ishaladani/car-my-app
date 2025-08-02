@@ -584,7 +584,7 @@ const RecordReport = () => {
                 </IconButton>
                 <Box>
                   <Typography variant="h4" fontWeight="bold">
-                    📊 Reports & Analytics
+                    📊 Reports And Report
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
                     Comprehensive reports for inventory and financial analysis
