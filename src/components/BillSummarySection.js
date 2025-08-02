@@ -26,13 +26,13 @@ const BillSummarySection = ({
   paymentMethod,
   isMobile,
   formatAmount,
-  handleLaborCostChange,
-  jobDetails: jobDetailsString = '[]', // Accept jobDetails as prop
+  onLaborChange, // ✅ Correct prop name
+  jobDetails: jobDetailsString = '[]',
 }) => {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
 
   // Parse jobDetails safely
-  const [expanded, setExpanded] = useState(false);
   const jobDetails = React.useMemo(() => {
     try {
       const parsed = JSON.parse(jobDetailsString);
@@ -43,11 +43,11 @@ const BillSummarySection = ({
     }
   }, [jobDetailsString]);
 
-  // Calculate auto labor total
+  // Auto-calculated labor from jobDetails
   const autoLaborTotal = jobDetails.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
-  // Use manual override or auto
-  const displayLaborCost = summary.totalLaborCost ?? autoLaborTotal;
+  // Use summary.totalLaborCost (which may be manually set) or fallback to auto
+  const displayLaborCost = summary.totalLaborCost !== undefined ? summary.totalLaborCost : autoLaborTotal;
 
   const toggleExpand = () => setExpanded(!expanded);
 
@@ -112,7 +112,7 @@ const BillSummarySection = ({
                 </Typography>
               </Box>
 
-              {/* Labor & Services Section */}
+              {/* Labor & Services (Editable) */}
               <Box
                 sx={{
                   py: 1.5,
@@ -145,30 +145,36 @@ const BillSummarySection = ({
                       ₹
                     </Typography>
                     <TextField
-                      type="number"
-                      value={displayLaborCost || ''}
-                      onChange={(e) =>
-                        handleLaborCostChange && handleLaborCostChange(e.target.value)
-                      }
-                      size="small"
-                      sx={{
-                        width: isMobile ? '100%' : '120px',
-                        '& .MuiInputBase-input': {
-                          textAlign: 'right',
-                          fontWeight: 600,
-                          color: 'primary.main',
-                        },
-                      }}
-                      inputProps={{
-                        min: 0,
-                        step: 0.01,
-                        style: { textAlign: 'right' },
-                      }}
-                    />
+  type="number"
+  value={displayLaborCost || ''}
+  onChange={(e) => {
+    const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+    if (onLaborChange) {
+  onLaborChange(value);
+}
+  }}
+  size="small"
+  placeholder="0.00"
+  sx={{
+    width: isMobile ? '100%' : '120px',
+    '& .MuiInputBase-input': {
+      textAlign: 'right',
+      fontWeight: 600,
+      color: 'primary.main',
+    },
+  }}
+  inputProps={{
+    min: 0,
+    step: 0.01,
+    style: { textAlign: 'right' },
+  }}
+  disabled={false} // This allows editing
+/>
+
                   </Box>
                 </Box>
 
-                {/* Show Expand Button if jobDetails exist */}
+                {/* Expand Button if jobDetails exist */}
                 {jobDetails.length > 0 && (
                   <Box sx={{ textAlign: 'right', mt: 0.5 }}>
                     <IconButton size="small" onClick={toggleExpand} sx={{ p: 0.5 }}>
@@ -194,7 +200,9 @@ const BillSummarySection = ({
                             }
                             secondary={
                               <Typography variant="caption" color="text.secondary">
-                                {item.hours ? `${item.hours} hrs × ₹${item.rate || 0}/hr` : 'No time logged'}
+                                {item.hours
+                                  ? `${item.hours} hrs × ₹${parseFloat(item.rate).toFixed(2)}/hr`
+                                  : 'No time logged'}
                               </Typography>
                             }
                           />
@@ -224,11 +232,10 @@ const BillSummarySection = ({
                   }}
                 >
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Labor Cost Tax Calculation:
+                    Labor Tax Calculation:
                   </Typography>
                   <Typography variant="caption" color="primary.main" display="block">
-                    Base: ₹{displayLaborCost} | Tax:{' '}
-                    ₹{(((displayLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2))}
+                    Base: ₹{displayLaborCost} | Tax: ₹{((displayLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2)}
                   </Typography>
                 </Box>
               )}
@@ -437,8 +444,7 @@ const BillSummarySection = ({
                     💸 Discount Summary
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Original Amount:{' '}
-                    {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
+                    Original Amount: {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
                   </Typography>
                   <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
                     Discount: -{formatAmount(summary.discount)}

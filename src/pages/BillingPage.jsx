@@ -39,6 +39,7 @@ const AutoServeBilling = () => {
   let garageId = localStorage.getItem("garageId") || localStorage.getItem("garage_id");
   
   const today = new Date().toISOString().split("T")[0];
+  const [laborServicesTotal, setLaborServicesTotal] = useState(0);
 
   // UPDATED: State declarations with complete bank details
  const [garageDetails, setGarageDetails] = useState({
@@ -404,40 +405,35 @@ setGarageDetails({
   }, [jobCardIdFromUrl, today, garageId, navigate]);
 
   // Calculate totals
-  const calculateTotals = () => {
-    const totalPartsCost = parts.reduce((sum, part) => sum + (part.total || 0), 0);
-    const totalLaborCost = services.reduce(
-      (sum, service) => sum + (service.laborCost || 0),
-      0
-    );
-    const subtotal = totalPartsCost + totalLaborCost;
-    const discount = summary.discount || 0;
-    
-    let gstAmount = 0;
-    let totalAmount = subtotal - discount;
-    
-    if (gstSettings.includeGst && gstSettings.billType === 'gst') {
-      if (gstSettings.gstType === 'percentage') {
-        gstAmount = Math.round(subtotal * (gstSettings.gstPercentage / 100));
-      } else {
-        gstAmount = gstSettings.gstAmount || 0;
-      }
-      totalAmount = subtotal + gstAmount - discount;
+ const calculateTotals = () => {
+  const totalPartsCost = parts.reduce((sum, part) => sum + (part.total || 0), 0);
+  const subtotal = totalPartsCost + laborServicesTotal;
+  const discount = summary.discount || 0;
+  let gstAmount = 0;
+  let totalAmount = subtotal - discount;
+
+  if (gstSettings.includeGst && gstSettings.billType === 'gst') {
+    if (gstSettings.gstType === 'percentage') {
+      gstAmount = Math.round(subtotal * (gstSettings.gstPercentage / 100));
+    } else {
+      gstAmount = gstSettings.gstAmount || 0;
     }
+    totalAmount = subtotal + gstAmount - discount;
+  }
 
-    setSummary({
-      totalPartsCost,
-      totalLaborCost,
-      subtotal,
-      gstAmount,
-      discount,
-      totalAmount,
-    });
-  };
+  setSummary({
+    totalPartsCost,
+    totalLaborCost: laborServicesTotal, // Reflects manual input
+    subtotal,
+    gstAmount,
+    discount,
+    totalAmount,
+  });
+};
 
-  useEffect(() => {
-    calculateTotals();
-  }, [parts, services, summary.discount, gstSettings]);
+useEffect(() => {
+  calculateTotals();
+}, [laborServicesTotal, parts, summary.discount, gstSettings]);
 
   // UPDATED: Handler functions with new GST settings
   const handleInputChange = (e) => {
@@ -460,6 +456,56 @@ setGarageDetails({
       billType,
       includeGst: billType === 'gst'
     }));
+  };
+
+    const updateLaborAndTax = async () => {
+    if (!jobCardIdFromUrl) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setSnackbar({
+        open: true,
+        message: 'Authentication token not found.',
+        severity: 'error'
+      });
+      return;
+    }
+
+    const laborServicesTotal = summary.totalLaborCost;
+    let laborServicesTax = 0;
+
+    if (gstSettings.billType === 'gst') {
+      laborServicesTax = Math.round(laborServicesTotal * (gstSettings.gstPercentage / 100));
+    }
+
+    const updateData = {
+      laborServicesTotal,
+      laborServicesTax
+    };
+
+    try {
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${jobCardIdFromUrl}`,
+        updateData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        console.log('✅ Labor and tax updated successfully:', response.data);
+      }
+    } catch (error) {
+      console.error('❌ Error updating labor and tax:', error);
+      setSnackbar({
+        open: true,
+        message: `Failed to update labor/tax: ${error.response?.data?.message || error.message}`,
+        severity: 'warning'
+      });
+    }
   };
 
   const handleBillToPartyChange = (event) => {
@@ -538,23 +584,14 @@ setGarageDetails({
     }
   };
 
-  // Function to update bill and job status
- const updateBillAndJobStatus = async (jobCardId) => {
-  // Get token from localStorage
+const updateBillAndJobStatus = async (jobCardId) => {
   const token = localStorage.getItem('token');
-  
   if (!token) {
     console.error('No authentication token found');
-    setSnackbar({
-      open: true,
-      message: 'Authentication failed. Please log in again.',
-      severity: 'error'
-    });
     return;
   }
 
   try {
-    // Headers with Authorization
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -562,60 +599,27 @@ setGarageDetails({
       }
     };
 
-    // Update bill status
-    const billStatusResponse = await axios.put(
+    // ✅ Step 1: Update bill status
+    await axios.put(
       `https://garage-management-zi5z.onrender.com/api/jobcards/updatebillstatus/${jobCardId}`,
-      {}, // Empty body if backend doesn't expect data
+      {}, 
       config
     );
 
-    if (billStatusResponse.status === 200) {
-      console.log('✅ Bill status updated successfully');
-      setBillGenerated(true);
+    // ✅ Step 2: Update job card status to "Completed"
+    const statusUpdateResponse = await axios.put(
+      `https://garage-management-zi5z.onrender.com/api/jobcards/updatestatus/${jobCardId}`,
+      { status: 'Completed' },
+      config
+    );
 
-      // Update job card status to Completed
-      const statusUpdateResponse = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/jobcards/updatestatus/${jobCardId}`,
-        { status: 'Completed' },
-         {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (statusUpdateResponse.status === 200) {
-        console.log('✅ Job card status updated to Completed');
-        if (jobCardData) {
-          setJobCardData(prev => ({ ...prev, status: 'Completed' }));
-        }
-      }
+    if (statusUpdateResponse.status === 200) {
+      console.log('✅ Job card status updated to Completed');
+      setJobCardData(prev => ({ ...prev, status: 'Completed' }));
     }
   } catch (error) {
     console.error('❌ Error updating bill and job status:', error);
-
-    // Handle specific error cases
-    if (error.response) {
-      const errorMsg = error.response.data.message || 'Unknown error';
-      // setSnackbar({
-      //   open: true,
-      //   message: `Update failed: ${errorMsg}`,
-      //   severity: 'error'
-      // });
-    } else if (error.request) {
-      setSnackbar({
-        open: true,
-        message: 'No response from server. Check your network.',
-        severity: 'error'
-      });
-    } else {
-      setSnackbar({
-        open: true,
-        message: 'Request error: ' + error.message,
-        severity: 'error'
-      });
-    }
+    // Snackbar error handling...
   }
 };
 
@@ -704,83 +708,82 @@ setGarageDetails({
     };
   };
 
-  // UPDATED: Generate bill function with enhanced validation
-const generateBill = () => {
-  if (isBillAlreadyGenerated || billGenerated) {
-    setSnackbar({
-      open: true,
-      message: 'Bill has already been generated for this job card',
-      severity: 'warning'
-    });
+const generateBill = async () => {
+  if (billGenerated) return;
+
+  const { isValid, issues } = validateJobCompletion();
+  if (!isValid) {
+    setSnackbar({ open: true, message: issues.join(', '), severity: 'error' });
     return;
   }
 
-  const validation = validateJobCompletion();
-  if (!validation.isValid) {
+  // Check if jobCardIdFromUrl exists before proceeding
+  if (!jobCardIdFromUrl) {
     setSnackbar({
       open: true,
-      message: `Please complete: ${validation.issues.join(', ')}`,
+      message: 'Job card ID is missing.',
       severity: 'error'
     });
     return;
   }
 
-  // ✅ Use the correct jobCardIdFromUrl and include auth token
+  // Check if token exists before proceeding
   const token = localStorage.getItem('token');
   if (!token) {
     setSnackbar({
       open: true,
-      message: 'Authentication token not found. Please log in again.',
+      message: 'Authentication token not found.',
       severity: 'error'
     });
     return;
   }
 
-  fetch(`https://garage-management-zi5z.onrender.com/api/jobcards/${jobCardIdFromUrl}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ 
-      generateBill: true, 
-      status: "Completed" 
-    })
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
-  })
-  .then(data => {
-    console.log('Bill generation response:', data);
-    
-    if (data.success || data.message?.includes('updated')) {
-      // ✅ Update local state
-      setBillGenerated(true);
-      setIsBillAlreadyGenerated(true);
+  updateLaborAndTax(); // Updates labor & tax in DB
+  updateBillAndJobStatus(jobCardIdFromUrl); // Key function
+  setBillGenerated(true);
+  setShowPaymentModal(true);
+  setSnackbar({ open: true, message: 'Bill generated!', severity: 'success' });
 
-      // ✅ Show payment modal
-      setShowPaymentModal(true);
+  try {
+    const response = await axios.put(
+      `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${jobCardIdFromUrl}`,
+      {
+        status: "completed",
+        generateBill: true,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      }
+    );
 
+    if (response.status === 200) {
       setSnackbar({
         open: true,
-        message: 'Bill generated successfully! Proceed with payment.',
+        message: 'Bill generated and job marked as completed!',
         severity: 'success'
       });
+
+      // Update local state
+      setBillGenerated(true);
+      setIsBillAlreadyGenerated(true);
+      setJobCardData(prev => ({ ...prev, status: 'completed', generateBill: true })); 
+
+      // Open payment modal
+      setShowPaymentModal(true);
     } else {
-      throw new Error(data.message || 'Bill generation failed');
+      throw new Error('Failed to update job status');
     }
-  })
-  .catch(error => {
-    console.error('Error generating bill:', error);
+  } catch (error) {
+    console.error('Error updating job card:', error);
     setSnackbar({
       open: true,
-      message: `Failed to generate bill: ${error.message}`,
+      message: `Failed to generate bill: ${error.response?.data?.message || error.message}`,
       severity: 'error'
     });
-  });
+  }
 };
 
 
@@ -1201,604 +1204,417 @@ const generateBill = () => {
     }
   };
 
-  // UPDATED: Professional GST PDF generation with bank details
-  const generateProfessionalGSTInvoice = () => {
-    try {
-      const doc = new jsPDF('p', 'pt', 'a4');
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 30;
-      const contentWidth = pageWidth - (margin * 2);
-      let currentY = 40;
+  // ===================================================================
+// 1. PROFESSIONAL GST INVOICE GENERATION (PDF)
+// ===================================================================
+const generateProfessionalGSTInvoice = () => {
+  try {
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 30;
+    const contentWidth = pageWidth - (margin * 2);
+    let currentY = 40;
 
-      // Helper functions remain the same...
-      const numberToWords = (num) => {
-        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-        const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-        
-        if (num === 0) return 'Zero';
-        
-        let words = '';
-        
-        if (num >= 10000000) {
-          words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
-          num %= 10000000;
-        }
-        
-        if (num >= 100000) {
-          words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
-          num %= 100000;
-        }
-        
-        if (num >= 1000) {
-          words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
-          num %= 1000;
-        }
-        
-        if (num >= 100) {
-          words += ones[Math.floor(num / 100)] + ' Hundred ';
-          num %= 100;
-        }
-        
-        if (num >= 20) {
-          words += tens[Math.floor(num / 10)];
-          if (num % 10 !== 0) {
-            words += ' ' + ones[num % 10];
-          }
-        } else if (num >= 10) {
-          words += teens[num - 10];
-        } else if (num > 0) {
-          words += ones[num];
-        }
-        
-        return words.trim();
-      };
-
-      const drawBorderedRect = (x, y, width, height, fillColor = null) => {
-        if (fillColor) {
-          doc.setFillColor(fillColor);
-          doc.rect(x, y, width, height, 'F');
-        }
-        doc.setLineWidth(0.5);
-        doc.setDrawColor(0, 0, 0);
-        doc.rect(x, y, width, height);
-      };
-
-      // Header Section
-      drawBorderedRect(margin, currentY, contentWidth, 80);
-      
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      // After doc.setFontSize(16); add:
-if (garageDetails.logoUrl) {
-  const logoImg = new Image();
-  logoImg.src = garageDetails.logoUrl;
-  doc.addImage(logoImg, 'PNG', margin + 10, currentY + 10, 50, 50); // Adjust size/position
-}
-
-// Move company name to right of logo
-const companyName = garageDetails.name.toUpperCase();
-const nameX = margin + 70; // After logo
-doc.text(companyName, nameX, currentY + 25);
-  
-doc.setFontSize(9);
-doc.setFont("helvetica", "normal");
-
-if (garageDetails.phone) {
-  const phoneLine = `Phone: ${garageDetails.phone}`;
-  const phoneWidth = doc.getTextWidth(phoneLine);
-  doc.text(phoneLine, (pageWidth - phoneWidth) / 2, currentY + 80);
-}
-
-if (garageDetails.email) {
-  const emailLine = `Email: ${garageDetails.email}`;
-  const emailWidth = doc.getTextWidth(emailLine);
-  doc.text(emailLine, (pageWidth - emailWidth) / 2, currentY + 95);
-}
-
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      const addressLine = `${garageDetails.address}`;
-      const addressWidth = doc.getTextWidth(addressLine);
-      doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 45);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      const gstLine = `GST No: ${garageDetails.gstNumber || 'N/A'}`;
-      const gstWidth = doc.getTextWidth(gstLine);
-      doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 65);
-      
-      currentY += 100;
-
-      // Bill Type Section
-      const billTypeText = gstSettings.billType === 'gst' ? 'GST Tax Invoice' : 'Non-GST Invoice';
-      const docTypeY = currentY;
-      drawBorderedRect(margin, docTypeY, 120, 25);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(billTypeText, margin + 10, docTypeY + 17);
-      
-      drawBorderedRect(pageWidth - margin - 80, docTypeY, 80, 25);
-      doc.text("Original", pageWidth - margin - 70, docTypeY + 17);
-      
-      currentY += 35;
-
-      // Bill To and Ship To Section
-      const billShipY = currentY;
-      const billToWidth = contentWidth / 2 - 5;
-      
-      // Bill To Section
-      drawBorderedRect(margin, billShipY, billToWidth, 120);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill to:", margin + 10, billShipY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Name: ${gstSettings.billToParty || carDetails.customerName}`, margin + 10, billShipY + 40);
-      doc.text(`Contact: ${carDetails.contact}`, margin + 10, billShipY + 55);
-      if (carDetails.email) {
-        doc.text(`Email: ${carDetails.email}`, margin + 10, billShipY + 70);
+    // Helper: Draw bordered rectangle
+    const drawBorderedRect = (x, y, width, height, fillColor = null) => {
+      if (fillColor) {
+        doc.setFillColor(fillColor);
+        doc.rect(x, y, width, height, 'F');
       }
-      if (gstSettings.customerGstNumber && gstSettings.billType === 'gst') {
-        doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, billShipY + 85);
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(0, 0, 0);
+      doc.rect(x, y, width, height);
+    };
+
+    // Number to Words (for amount in words)
+    const numberToWords = (num) => {
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+      const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+      if (num === 0) return 'Zero';
+      let words = '';
+      if (num >= 10000000) {
+        words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
+        num %= 10000000;
       }
-      
-      // Ship To Section
-      const shipToWidth = contentWidth / 2 - 5;
-      drawBorderedRect(margin + billToWidth + 10, billShipY, shipToWidth, 120);
-      doc.setFont("helvetica", "bold");
-      doc.text("Ship To / Insurance:", margin + billToWidth + 20, billShipY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Insurance Compny: ${gstSettings.insuranceProvider}`, margin + billToWidth + 20, billShipY + 40);
-      doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + billToWidth + 20, billShipY + 55);
-      doc.text(`Reg No: ${carDetails.carNumber}`, margin + billToWidth + 20, billShipY + 70);
-      
-      const invoiceDetailsX = margin + billToWidth + 20;
-      doc.setFontSize(9);
-      doc.text(`Invoice No: ${carDetails.invoiceNo}`, invoiceDetailsX, billShipY + 100);
-      doc.text(`Date: ${carDetails.billingDate}`, invoiceDetailsX, billShipY + 115);
-      
-      currentY = billShipY + 140;
-
-      // Items Table
-      const tableStartY = currentY;
-      const colWidths = {
-        srNo: 40,
-        productName: 180,
-        hsnSac: 60,
-        qty: 35,
-        unit: 40,
-        rate: 70,
-        gstPercent: 50,
-        amount: 70
-      };
-      
-      const totalTableWidth = Object.values(colWidths).reduce((sum, width) => sum + width, 0);
-      
-      // Table header
-      let headerY = tableStartY;
-      drawBorderedRect(margin, headerY, totalTableWidth, 30, '#f0f0f0');
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      
-      let colX = margin;
-      const headers = ["Sr.No", "Product/Service Name", "HSN/SAC", "Qty", "Unit", "Rate", "GST%", "Amount"];
-      const columnKeys = Object.keys(colWidths);
-      
-      headers.forEach((header, index) => {
-        const colWidth = colWidths[columnKeys[index]];
-        const textWidth = doc.getTextWidth(header);
-        const textX = colX + (colWidth - textWidth) / 2;
-        doc.text(header, textX, headerY + 20);
-        
-        if (index < headers.length - 1) {
-          doc.line(colX + colWidth, headerY, colX + colWidth, headerY + 30);
-        }
-        colX += colWidth;
-      });
-
-      currentY = headerY + 30;
-
-      // Table rows
-      doc.setFont("helvetica", "normal");
-      let rowIndex = 1;
-      
-      const drawTableRow = (rowData, rowY) => {
-        const rowHeight = 25;
-        drawBorderedRect(margin, rowY, totalTableWidth, rowHeight);
-        
-        colX = margin;
-        rowData.forEach((cellData, index) => {
-          const colWidth = colWidths[columnKeys[index]];
-          let displayText = cellData.toString();
-          
-          if (index === 1 && displayText.length > 20) {
-            displayText = displayText.substring(0, 18) + "...";
-          }
-          
-          if (index === 0 || index >= 3) {
-            const textWidth = doc.getTextWidth(displayText);
-            doc.text(displayText, colX + colWidth - textWidth - 5, rowY + 17);
-          } else {
-            doc.text(displayText, colX + 5, rowY + 17);
-          }
-          
-          if (index < rowData.length - 1) {
-            doc.line(colX + colWidth, rowY, colX + colWidth, rowY + rowHeight);
-          }
-          colX += colWidth;
-        });
-        
-        return rowHeight;
-      };
-      
-      // Parts rows
-     // Inside table rows loop
-if (parts.length > 0) {
-  parts.forEach((part) => {
-    const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
-    const rowData = [
-      rowIndex.toString(),
-      part.name,
-      part.hsnNumber || "8708",
-      part.quantity.toString(),
-      "Nos",
-      part.pricePerUnit.toFixed(2),
-      gstDisplay,
-      part.total.toFixed(2)
-    ];
-    const rowHeight = drawTableRow(rowData, currentY);
-    currentY += rowHeight;
-    rowIndex++;
-  });
-}
-
-// For services, show HSN as blank or "9954" but hide in UI?
-// If you want to hide HSN column for services, skip it in display
-
-      // Services rows
-      if (services.length > 0) {
-        services.forEach((service) => {
-          const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
-          const rowData = [
-            rowIndex.toString(),
-            service.name,
-            "9954",
-            "1",
-            "Nos",
-            service.laborCost.toFixed(2),
-            gstDisplay,
-            service.laborCost.toFixed(2)
-          ];
-          
-          const rowHeight = drawTableRow(rowData, currentY);
-          currentY += rowHeight;
-          rowIndex++;
-        });
+      if (num >= 100000) {
+        words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
+        num %= 100000;
       }
-
-      // Empty rows
-      const minRows = 8;
-      const currentRows = parts.length + services.length;
-      if (currentRows < minRows) {
-        for (let i = currentRows; i < minRows; i++) {
-          const emptyRowData = ["", "", "", "", "", "", "", ""];
-          const rowHeight = drawTableRow(emptyRowData, currentY);
-          currentY += rowHeight;
-        }
+      if (num >= 1000) {
+        words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
+        num %= 1000;
       }
+      if (num >= 100) {
+        words += ones[Math.floor(num / 100)] + ' Hundred ';
+        num %= 100;
+      }
+      if (num >= 20) {
+        words += tens[Math.floor(num / 10)];
+        if (num % 10 !== 0) words += ' ' + ones[num % 10];
+      } else if (num >= 10) {
+        words += teens[num - 10];
+      } else if (num > 0) {
+        words += ones[num];
+      }
+      return words.trim();
+    };
 
-      currentY += 10;
+    // -----------------------------
+    // HEADER SECTION
+    // -----------------------------
+    drawBorderedRect(margin, currentY, contentWidth, 100);
 
-      // Summary Section
-      const summaryWidth = 200;
-      const summaryX = pageWidth - margin - summaryWidth;
-      
-      // Sub Total
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "bold");
-      doc.text("Sub Total", summaryX + 10, currentY + 17);
-      doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-      currentY += 25;
-      
-      // Taxable Amount
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.text("Taxable Amount", summaryX + 10, currentY + 17);
-      doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-      currentY += 25;
+    // Logo
+    if (garageDetails.logoUrl) {
+      const logoImg = new Image();
+      logoImg.src = garageDetails.logoUrl;
+      doc.addImage(logoImg, 'PNG', margin + 10, currentY + 10, 50, 50);
+    }
 
-      // GST Details (only if GST bill type)
-      if (gstSettings.billType === 'gst' && summary.gstAmount > 0) {
-        if (gstSettings.isInterState) {
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text(summary.gstAmount.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
+    // Company Name
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    const companyName = garageDetails.name.toUpperCase();
+    doc.text(companyName, margin + (garageDetails.logoUrl ? 70 : 10), currentY + 25);
+
+    // Address
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    const addressLine = `${garageDetails.address}`;
+    const addressWidth = doc.getTextWidth(addressLine);
+    doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 45);
+
+    // GST Number
+    const gstLine = `GST No: ${garageDetails.gstNumber || 'N/A'}`;
+    const gstWidth = doc.getTextWidth(gstLine);
+    doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 65);
+
+    // Phone & Email
+    if (garageDetails.phone) {
+      const phoneLine = `Phone: ${garageDetails.phone}`;
+      const phoneWidth = doc.getTextWidth(phoneLine);
+      doc.text(phoneLine, (pageWidth - phoneWidth) / 2, currentY + 80);
+    }
+    if (garageDetails.email) {
+      const emailLine = `Email: ${garageDetails.email}`;
+      const emailWidth = doc.getTextWidth(emailLine);
+      doc.text(emailLine, (pageWidth - emailWidth) / 2, currentY + 95);
+    }
+
+    currentY += 100;
+
+    // -----------------------------
+    // BILL TYPE & INVOICE LABEL
+    // -----------------------------
+    // const billTypeText = gstSettings.billType === 'gst' ? 'GST Tax Invoice' : 'Non-GST Invoice';
+    // const docTypeY = currentY;
+    // drawBorderedRect(margin, docTypeY, 120, 25);
+    // doc.setFont("helvetica", "bold");
+    // doc.text(billTypeText, margin + 10, docTypeY + 17);
+    // drawBorderedRect(pageWidth - margin - 80, docTypeY, 80, 25);
+    // doc.text("Original", pageWidth - margin - 70, docTypeY + 17);
+    // currentY += 35;
+
+    // -----------------------------
+    // BILL TO & SHIP TO
+    // -----------------------------
+    const billShipY = currentY;
+    const sectionWidth = contentWidth / 2 - 5;
+
+    // Bill To
+    drawBorderedRect(margin, billShipY, sectionWidth, 120);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill to:", margin + 10, billShipY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Name: ${gstSettings.billToParty || carDetails.customerName}`, margin + 10, billShipY + 40);
+    doc.text(`Contact: ${carDetails.contact}`, margin + 10, billShipY + 55);
+    if (carDetails.email) doc.text(`Email: ${carDetails.email}`, margin + 10, billShipY + 70);
+    if (gstSettings.customerGstNumber && gstSettings.billType === 'gst') {
+      doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, billShipY + 85);
+    }
+
+    // Ship To
+    drawBorderedRect(margin + sectionWidth + 10, billShipY, sectionWidth, 120);
+    doc.setFont("helvetica", "bold");
+    doc.text("Ship To / Insurance:", margin + sectionWidth + 20, billShipY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Insurance: ${gstSettings.shiftToParty}`, margin + sectionWidth + 20, billShipY + 40);
+    doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + sectionWidth + 20, billShipY + 55);
+    doc.text(`Reg No: ${carDetails.carNumber}`, margin + sectionWidth + 20, billShipY + 70);
+    doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + sectionWidth + 20, billShipY + 100);
+    doc.text(`Date: ${carDetails.billingDate}`, margin + sectionWidth + 20, billShipY + 115);
+
+    currentY = billShipY + 140;
+
+    // -----------------------------
+    // ITEMS TABLE
+    // -----------------------------
+    const tableStartY = currentY;
+    const colWidths = { srNo: 40, productName: 180, hsnSac: 60, qty: 35, unit: 40, rate: 70, gstPercent: 50, amount: 70 };
+    const totalTableWidth = Object.values(colWidths).reduce((a, b) => a + b, 0);
+
+    // Header
+    const headerY = tableStartY;
+    drawBorderedRect(margin, headerY, totalTableWidth, 30, '#f0f0f0');
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    let colX = margin;
+    ["Sr.No", "Product/Service Name", "HSN/SAC", "Qty", "Unit", "Rate", "GST%", "Amount"].forEach((text, i) => {
+      const w = colWidths[Object.keys(colWidths)[i]];
+      const txtW = doc.getTextWidth(text);
+      doc.text(text, colX + (w - txtW) / 2, headerY + 20);
+      if (i < 7) doc.line(colX + w, headerY, colX + w, headerY + 30);
+      colX += w;
+    });
+    currentY = headerY + 30;
+
+    // Rows
+    doc.setFont("helvetica", "normal");
+    let rowIndex = 1;
+
+    const drawTableRow = (rowData, y) => {
+      const rowHeight = 25;
+      drawBorderedRect(margin, y, totalTableWidth, rowHeight);
+      colX = margin;
+      rowData.forEach((cell, i) => {
+        const w = colWidths[Object.keys(colWidths)[i]];
+        const display = cell.toString();
+        const txtW = doc.getTextWidth(display);
+        if (i === 0 || i >= 3) {
+          doc.text(display, colX + w - txtW - 5, y + 17);
         } else {
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`CGST ${gstSettings.cgstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
-          
-          drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-          doc.text(`SGST ${gstSettings.sgstPercentage}%`, summaryX + 10, currentY + 17);
-          doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-          currentY += 25;
+          doc.text(display, colX + 5, y + 17);
         }
-      }
+        if (i < 7) doc.line(colX + w, y, colX + w, y + rowHeight);
+        colX += w;
+      });
+      return rowHeight;
+    };
 
-      // Discount
-      if (summary.discount > 0) {
+    // Parts
+    parts.forEach(part => {
+      const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
+      const row = [
+        rowIndex++,
+        part.name,
+        part.hsnNumber || "8708",
+        part.quantity,
+        "Nos",
+        part.pricePerUnit.toFixed(2),
+        gstDisplay,
+        part.total.toFixed(2)
+      ];
+      currentY += drawTableRow(row, currentY);
+    });
+
+    // Labor & Services
+    if (laborServicesTotal > 0) {
+      const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
+      const row = [
+        rowIndex++,
+        "Labor & Services",
+        "9954",
+        "1",
+        "Nos",
+        laborServicesTotal.toFixed(2),
+        gstDisplay,
+        laborServicesTotal.toFixed(2)
+      ];
+      currentY += drawTableRow(row, currentY);
+    }
+
+    // Empty rows
+    const minRows = 8;
+    const filledRows = parts.length + (laborServicesTotal > 0 ? 1 : 0);
+    for (let i = filledRows; i < minRows; i++) {
+      currentY += drawTableRow(["", "", "", "", "", "", "", ""], currentY);
+    }
+
+    currentY += 10;
+
+    // -----------------------------
+    // SUMMARY
+    // -----------------------------
+    const summaryWidth = 200;
+    const summaryX = pageWidth - margin - summaryWidth;
+
+    // Sub Total
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sub Total", summaryX + 10, currentY + 17);
+    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    currentY += 25;
+
+    // Taxable Amount
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.text("Taxable Amount", summaryX + 10, currentY + 17);
+    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    currentY += 25;
+
+    // GST
+    if (gstSettings.billType === 'gst' && summary.gstAmount > 0) {
+      if (gstSettings.isInterState) {
         drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.text("Discount", summaryX + 10, currentY + 17);
-        doc.text(`-${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 80, currentY + 17);
+        doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text(summary.gstAmount.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        currentY += 25;
+      } else {
+        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+        doc.text(`CGST ${gstSettings.cgstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        currentY += 25;
+        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+        doc.text(`SGST ${gstSettings.sgstPercentage}%`, summaryX + 10, currentY + 17);
+        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
         currentY += 25;
       }
+    }
 
-      // Round Off
-      const roundOff = Math.round(summary.totalAmount) - summary.totalAmount;
-      if (Math.abs(roundOff) > 0.01) {
-        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.text("Round Off", summaryX + 10, currentY + 17);
-        doc.text(roundOff.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-        currentY += 25;
-      }
+    // Discount
+    if (summary.discount > 0) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.text("Discount", summaryX + 10, currentY + 17);
+      doc.text(`-${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 80, currentY + 17);
+      currentY += 25;
+    }
 
-      // Grand Total
-      drawBorderedRect(summaryX, currentY, summaryWidth, 30, '#f0f0f0');
-      doc.setFontSize(12);
+    // Round Off
+    const roundOff = Math.round(summary.totalAmount) - summary.totalAmount;
+    if (Math.abs(roundOff) > 0.01) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.text("Round Off", summaryX + 10, currentY + 17);
+      doc.text(roundOff.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+      currentY += 25;
+    }
+
+    // Grand Total
+    drawBorderedRect(summaryX, currentY, summaryWidth, 30, '#f0f0f0');
+    doc.setFontSize(12);
+    doc.text("Grand Total", summaryX + 10, currentY + 20);
+    doc.text(Math.round(summary.totalAmount).toFixed(2), summaryX + summaryWidth - 80, currentY + 20);
+    currentY += 40;
+
+    // Amount in Words
+    const amountInWords = numberToWords(Math.round(summary.totalAmount)) + " Only";
+    drawBorderedRect(margin, currentY, contentWidth, 30);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill Amount:", margin + 10, currentY + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(amountInWords, margin + 80, currentY + 15);
+    currentY += 40;
+
+    // -----------------------------
+    // BANK DETAILS
+    // -----------------------------
+    if (garageDetails.bankDetails.bankName) {
+      drawBorderedRect(margin, currentY, contentWidth / 2, 100);
       doc.setFont("helvetica", "bold");
-      doc.text("Grand Total", summaryX + 10, currentY + 20);
-      doc.text(Math.round(summary.totalAmount).toFixed(2), summaryX + summaryWidth - 80, currentY + 20);
-      currentY += 40;
-
-      // Amount in Words
-      const amountInWords = numberToWords(Math.round(summary.totalAmount)) + " Only";
-      drawBorderedRect(margin, currentY, contentWidth, 30);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill Amount:", margin + 10, currentY + 15);
+      doc.text("Bank Details:", margin + 10, currentY + 20);
       doc.setFont("helvetica", "normal");
-      doc.text(amountInWords, margin + 80, currentY + 15);
-      currentY += 40;
+      doc.text(`Bank: ${garageDetails.bankDetails.bankName}`, margin + 10, currentY + 35);
+      doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName}`, margin + 10, currentY + 50);
+      doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber}`, margin + 10, currentY + 65);
+      doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode}`, margin + 10, currentY + 80);
+      if (garageDetails.bankDetails.upiId) {
+        doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, currentY + 95);
+      }
+    }
 
-      // UPDATED: Bank Details Section with complete information
-      // UPDATED: Bank Details Section with complete information
-if (garageDetails.bankDetails.bankName || garageDetails.bankDetails.accountNumber) {
-  drawBorderedRect(margin, currentY, contentWidth / 2, 100);
-  doc.setFont("helvetica", "bold");
-  doc.text("Bank Details:", margin + 10, currentY + 20);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Bank: ${garageDetails.bankDetails.bankName || 'N/A'}`, margin + 10, currentY + 35);
-  doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName || 'N/A'}`, margin + 10, currentY + 50);
-  doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber || 'N/A'}`, margin + 10, currentY + 65);
-  doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode || 'N/A'}`, margin + 10, currentY + 80);
-  if (garageDetails.bankDetails.upiId) {
-    doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, currentY + 95);
+    // Terms
+    const termsX = margin + (contentWidth / 2) + 10;
+    drawBorderedRect(termsX, currentY, contentWidth / 2 - 10, 100);
+    doc.setFont("helvetica", "bold");
+    doc.text("Terms & Conditions:", termsX + 10, currentY + 20);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("1. Goods once sold will not be taken back.", termsX + 10, currentY + 35);
+    doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, currentY + 47);
+    doc.text("3. Subject to local jurisdiction only.", termsX + 10, currentY + 59);
+    doc.text("4. E. & O.E.", termsX + 10, currentY + 71);
+    if (gstSettings.billType === 'gst') {
+      doc.text("5. GST as applicable.", termsX + 10, currentY + 83);
+    }
+
+    currentY += 120;
+
+    // Footer
+    doc.setFontSize(8);
+    doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()}`, pageWidth - margin - 100, pageHeight - 20);
+
+    return doc;
+  } catch (error) {
+    console.error('PDF Generation Error:', error);
+    throw new Error('Failed to generate invoice');
   }
-}
+};
 
-      // Terms & Conditions
-      const termsX = margin + (contentWidth / 2) + 10;
-      drawBorderedRect(termsX, currentY, contentWidth / 2 - 10, 100);
-      doc.setFont("helvetica", "bold");
-      doc.text("Terms & Conditions:", termsX + 10, currentY + 20);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text("1. Goods once sold will not be taken back.", termsX + 10, currentY + 35);
-      doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, currentY + 47);
-      doc.text("3. Subject to local jurisdiction only.", termsX + 10, currentY + 59);
-      doc.text("4. E. & O.E.", termsX + 10, currentY + 71);
-      if (gstSettings.billType === 'gst') {
-        doc.text("5. GST as applicable.", termsX + 10, currentY + 83);
-      }
-      
-      currentY += 120;
 
-      // Authorized Signatory
-      // doc.setFontSize(10);
-      // doc.setFont("helvetica", "bold");
-      // currentY += 40;
-      // doc.text("(Authorized Signatory)", pageWidth - margin - 200, currentY);
-
-      // Footer
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      const timestamp = new Date().toLocaleString();
-      // doc.text(`Generated on: ${timestamp}`, margin, pageHeight - 20);
-      doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()}`, pageWidth - margin - 100, pageHeight - 20);
-
-      return doc;
-      
-    } catch (error) {
-      console.error('Professional GST PDF Generation Error:', error);
-      throw new Error('Failed to generate professional invoice: ' + error.message);
-    }
-  };
-
-  // Enhanced download function
   const downloadPdfBill = () => {
-    try {
-      if (!carDetails.invoiceNo) {
-        setSnackbar({
-          open: true,
-          message: 'Invoice number is required to generate PDF',
-          severity: 'error'
-        });
-        return;
-      }
-
-      if (!carDetails.customerName) {
-        setSnackbar({
-          open: true,
-          message: 'Customer name is required to generate PDF',
-          severity: 'error'
-        });
-        return;
-      }
-
-      const doc = generateProfessionalGSTInvoice();
-      const billTypeText = gstSettings.billType === 'gst' ? 'GST' : 'Non-GST';
-      const fileName = `${billTypeText}_Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-      
-      doc.save(fileName);
-      
-      setSnackbar({
-        open: true,
-        message: `Professional ${billTypeText} invoice PDF downloaded successfully!`,
-        severity: 'success'
-      });
-      
-    } catch (error) {
-      console.error('Download error:', error);
-      setSnackbar({
-        open: true,
-        message: `Failed to download PDF: ${error.message}`,
-        severity: 'error'
-      });
-    }
-  };
+  if (!carDetails.invoiceNo || !carDetails.customerName) {
+    setSnackbar({
+      open: true,
+      message: 'Invoice number and customer name are required.',
+      severity: 'error'
+    });
+    return;
+  }
+  const doc = generateProfessionalGSTInvoice();
+  const type = gstSettings.billType === 'gst' ? 'GST' : 'Non-GST';
+  const fileName = `${type}_Invoice_${carDetails.invoiceNo}_${carDetails.carNumber}.pdf`;
+  doc.save(fileName);
+  setSnackbar({ open: true, message: `${type} invoice downloaded!`, severity: 'success' });
+};
 
   // Enhanced email function
-  const sendBillViaEmail = async () => {
-    try {
-      setSendingEmail(true);
-      
-      if (!emailRecipient || !emailRecipient.includes('@')) {
-        setSnackbar({
-          open: true,
-          message: 'Please enter a valid email address',
-          severity: 'error'
-        });
-        return;
-      }
+ const sendBillViaEmail = async () => {
+  const doc = generateProfessionalGSTInvoice();
+  const pdfBlob = doc.output('blob');
+  const url = URL.createObjectURL(pdfBlob);
 
-      const doc = generateProfessionalGSTInvoice();
-      const pdfBlob = doc.output('blob');
-      
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = pdfUrl;
-      const billTypeText = gstSettings.billType === 'gst' ? 'GST' : 'Non-GST';
-      downloadLink.download = `${billTypeText}_Invoice_${carDetails.invoiceNo}_${carDetails.carNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      downloadLink.click();
-      
-      const subject = encodeURIComponent(emailSubject || `${billTypeText} Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`);
-      const gstInfo = gstSettings.billType === 'gst' ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}` : 'Non-GST Bill';
-      const body = encodeURIComponent(
-        emailMessage || 
-        `Dear ${carDetails.customerName},\n\nPlease find attached your ${billTypeText} invoice for vehicle ${carDetails.carNumber}.\n\nInvoice Details:\n- Invoice No: ${carDetails.invoiceNo}\n- Date: ${carDetails.billingDate}\n- Bill Type: ${billTypeText}\n- ${gstInfo}\n- Total Amount: ₹${summary.totalAmount}\n- Bill To: ${gstSettings.billToParty}\n- Ship To: ${gstSettings.shiftToParty}\n\nThank you for choosing ${garageDetails.name}.\n\nBest regards,\n${garageDetails.name}`
-      );
-      const recipient = encodeURIComponent(emailRecipient);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
+  link.click();
 
-      const mailtoLink = `mailto:${recipient}?subject=${subject}&body=${body}`;
-      window.open(mailtoLink, '_blank');
+  const subject = `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`;
+  const body = `Dear ${carDetails.customerName},\n\nPlease find your invoice attached.\n\nTotal: ₹${summary.totalAmount}\n\nRegards,\n${garageDetails.name}`;
+  window.open(`mailto:${carDetails.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
 
-      setSnackbar({
-        open: true,
-        message: `Email client opened with ${billTypeText} invoice details. PDF has been downloaded for manual attachment.`,
-        severity: 'success'
-      });
-
-      setShowEmailDialog(false);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-      
-    } catch (error) {
-      console.error('Email send error:', error);
-      setSnackbar({
-        open: true,
-        message: `Failed to prepare email: ${error.message}`,
-        severity: 'error'
-      });
-    } finally {
-      setSendingEmail(false);
-    }
-  };
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+};
 
   // UPDATED: WhatsApp function with bill type information
-  const sendBillViaWhatsApp = async () => {
-    setSendingWhatsApp(true);
-    try {
-      if (!carDetails.contact || carDetails.contact.length < 10) {
-        throw new Error("Valid contact number is required");
-      }
+ const sendBillViaWhatsApp = () => {
+  const gstInfo = gstSettings.billType === 'gst'
+    ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}`
+    : 'Non-GST Bill';
 
-      const today = new Date();
-      const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-
-      let gstInfo = '';
-      if (gstSettings.billType === 'gst') {
-        if (gstSettings.isInterState) {
-          gstInfo = `*TAX DETAILS:*\n🔸 IGST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}\n🔸 Total Tax: ₹${summary.gstAmount}`;
-        } else {
-          gstInfo = `*TAX DETAILS:*\n🔸 CGST (${gstSettings.cgstPercentage}%): ₹${Math.round(summary.gstAmount / 2)}\n🔸 SGST (${gstSettings.sgstPercentage}%): ₹${Math.round(summary.gstAmount / 2)}\n🔸 Total GST: ₹${summary.gstAmount}`;
-        }
-      } else {
-        gstInfo = '*BILL TYPE: Non-GST Invoice*';
-      }
-
-      const billTypeText = gstSettings.billType === 'gst' ? 'GST TAX INVOICE' : 'NON-GST INVOICE';
-
-      const billMessage = `🚗 *${billTypeText}*
-━━━━━━━━━━━━━━━━━━━━━
+  const msg = `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*
 *${garageDetails.name}*
-📍 ${garageDetails.address}
 📞 ${garageDetails.phone}
-📧 ${garageDetails.email}
-${gstSettings.billType === 'gst' ? `🆔 GST: ${garageDetails.gstNumber}` : '🆔 Non-GST Business'}
-━━━━━━━━━━━━━━━━━━━━━
-*INVOICE DETAILS:*
-🧾 Invoice No: *${carDetails.invoiceNo}*
-📅 Date: ${formattedDate}
-💳 Payment: ${paymentMethod || 'Cash Payment'}
-━━━━━━━━━━━━━━━━━━━━━
-*BILLING DETAILS:*
-👤 Bill To: ${gstSettings.billToParty}
-📱 Contact: ${carDetails.contact}
-📧 Email: ${carDetails.email}
-🏢 Ship To: ${gstSettings.shiftToParty}
-${gstSettings.customerGstNumber && gstSettings.billType === 'gst' ? `🆔 Customer GST: ${gstSettings.customerGstNumber}` : ''}
-━━━━━━━━━━━━━━━━━━━━━
-*VEHICLE DETAILS:*
-🚙 ${carDetails.company} ${carDetails.model}
-🔖 Registration: ${carDetails.carNumber}
-━━━━━━━━━━━━━━━━━━━━━
-${parts.length > 0 ? `*PARTS USED:*\n${parts.map(part => `🔧 ${part.name} (${part.quantity}) - HSN: ${part.hsnNumber}: ₹${part.total}`).join('\n')}\n` : ''}
-${services.length > 0 ? `*SERVICES PROVIDED:*\n${services.map(service => `⚙️ ${service.name}: ₹${service.laborCost}`).join('\n')}\n` : ''}
-━━━━━━━━━━━━━━━━━━━━━
-*BILL SUMMARY:*
-💰 Subtotal: ₹${summary.subtotal}
+📍 ${garageDetails.address}
+
+*Invoice No:* ${carDetails.invoiceNo}
+*Date:* ${carDetails.billingDate}
+*Customer:* ${carDetails.customerName}
+*Vehicle:* ${carDetails.company} ${carDetails.model}
+*Reg:* ${carDetails.carNumber}
+
+*Parts:* ₹${summary.totalPartsCost}
+*Labor:* ₹${laborServicesTotal}
+*Subtotal:* ₹${summary.subtotal}
 ${gstInfo}
-${summary.discount > 0 ? `💸 Discount: -₹${summary.discount}` : ''}
-*💳 GRAND TOTAL: ₹${summary.totalAmount}*
-━━━━━━━━━━━━━━━━━━━━━
-${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━━━━━━━━━━━━━━━━━━\n` : ''}
-🙏 *Thank you for choosing our service!*
-*Visit us again for quality automotive care.*`;
+${summary.discount > 0 ? `*Discount:* -₹${summary.discount}` : ''}
+*Total:* *₹${summary.totalAmount}*
 
-      let phoneNumber = carDetails.contact.replace(/\D/g, '');
-      if (phoneNumber.length === 10) phoneNumber = `91${phoneNumber}`;
+Thank you!`;
 
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(billMessage)}`;
-      window.open(whatsappUrl, '_blank');
-
-      setApiResponseMessage({
-        type: "success",
-        message: `WhatsApp ${gstSettings.billType.toUpperCase()} invoice prepared for ${carDetails.customerName}.`,
-      });
-    } catch (error) {
-      console.error("WhatsApp send error:", error);
-      setApiResponseMessage({
-        type: "warning",
-        message: error.message || "Couldn't send WhatsApp message.",
-      });
-    } finally {
-      setSendingWhatsApp(false);
-      setShowApiResponse(true);
-    }
-  };
+  const phone = `91${carDetails.contact.replace(/\D/g, '')}`;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+};
 
   const openEmailDialog = () => setShowEmailDialog(true);
 
@@ -1858,6 +1674,7 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
                 onClick={generateBill}
                 fullWidth={isMobile}
                 size={isMobile ? "small" : "medium"}
+                
               >
                 Generate {gstSettings.billType.toUpperCase()} Bill
               </Button>
@@ -1948,15 +1765,17 @@ ${finalInspection ? `*INSPECTION NOTES:*\n📝 ${finalInspection}\n━━━━�
               setFinalInspection={setFinalInspection}
               disabled={isBillAlreadyGenerated}
             />
-            <BillSummarySection 
-              summary={summary} 
-              gstSettings={gstSettings} 
-              handleDiscountChange={handleDiscountChange} 
-              paymentMethod={paymentMethod} 
-              isMobile={isMobile}
-              formatAmount={formatAmount}
-              disabled={isBillAlreadyGenerated}
-            />
+          <BillSummarySection 
+  summary={summary} 
+  gstSettings={gstSettings} 
+  handleDiscountChange={handleDiscountChange} 
+  paymentMethod={paymentMethod} 
+  isMobile={isMobile}
+  formatAmount={formatAmount}
+  disabled={isBillAlreadyGenerated}
+  laborServicesTotal={laborServicesTotal}
+  onLaborChange={setLaborServicesTotal} // 👈 Add this
+/>
           </>
         ) : (
           <ThankYouSection 

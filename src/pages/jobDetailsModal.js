@@ -239,7 +239,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       ['Policy Number', jobData.policyNumber || 'N/A'],
       ['Insurance Type', jobData.type || 'N/A'],
       ['Expiry Date', formatDate(jobData.expiryDate)],
-      ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount.toLocaleString()}` : 'N/A']
+      ['Excess Amount', jobData.excessAmount ? `${jobData.excessAmount.toLocaleString()}` : 'N/A']
     ];
     autoTable(doc, {
       startY: yPosition,
