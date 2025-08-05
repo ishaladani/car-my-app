@@ -743,7 +743,7 @@ const JobCards = () => {
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("JOB CARD PREVIEW", margin, 19);
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text(
       `Generated: ${new Date().toLocaleDateString("en-IN")}`,
       pageWidth - margin - 50,
@@ -1642,466 +1642,415 @@ const JobCards = () => {
 
   // Preview Component
   const PreviewModal = () => (
-    <PreviewDialog
-      open={showPreview}
-      onClose={() => setShowPreview(false)}
-      maxWidth="md"
-      fullWidth
+  <PreviewDialog
+    open={showPreview}
+    onClose={() => setShowPreview(false)}
+    maxWidth="md"
+    fullWidth
+    // Make full screen on small devices
+    sx={{
+      "& .MuiDialog-paper": {
+        borderRadius: { xs: 0, sm: "16px" }, // Full screen on xs
+      },
+    }}
+    fullScreen={{ xs: true, sm: false }}
+  >
+    <DialogTitle
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        py: 2,
+        px: { xs: 2, sm: 3 },
+      }}
     >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          pb: 2,
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <VisibilityIcon sx={{ mr: 1, color: "primary.main" }} />
-          <Typography variant="h5" component="div">
-            Job Card Preview
-          </Typography>
-        </Box>
-        <IconButton onClick={() => setShowPreview(false)}>
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent sx={{ p: 3 }}>
-        <Box sx={{ maxHeight: "70vh", overflowY: "auto" }}>
-          {/* Header Info */}
-
-          {/* Customer Details */}
-          <PreviewCard>
-            <CardContent>
-              <Typography
-                variant="h6"
-                gutterBottom
-                sx={{ display: "flex", alignItems: "center" }}
-              >
-                <Person sx={{ mr: 1 }} />
-                Customer Details
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Customer Name:
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {formData.customerName}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Contact Number:
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {formData.contactNumber}
-                  </Typography>
-                </Grid>
-                {formData.email && (
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">
-                      Email:
-                    </Typography>
-                    <Typography variant="body1" fontWeight={500}>
-                      {formData.email}
-                    </Typography>
-                  </Grid>
-                )}
-              </Grid>
-            </CardContent>
-          </PreviewCard>
-
-          {/* Vehicle Details */}
-          <PreviewCard>
-            <CardContent>
-              <Typography
-                variant="h6"
-                gutterBottom
-                sx={{ display: "flex", alignItems: "center" }}
-              >
-                <DirectionsCar sx={{ mr: 1 }} />
-                Vehicle Details
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Car Number:
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {formData.carNumber}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Model:
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {formData.model}
-                  </Typography>
-                </Grid>
-                {formData.company && (
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Company:
-                    </Typography>
-                    <Typography variant="body1" fontWeight={500}>
-                      {formData.company}
-                    </Typography>
-                  </Grid>
-                )}
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Fuel Type:
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {fuelTypeOptions.find(
-                      (option) => option.value === formData.fuelType
-                    )?.label || formData.fuelType}
-                  </Typography>
-                </Grid>
-                {formData.kilometer && (
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Kilometer:
-                    </Typography>
-                    <Typography variant="body1" fontWeight={500}>
-                      {formData.kilometer} km
-                    </Typography>
-                  </Grid>
-                )}
-                {formData.chesiNumber && (
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">
-                      Chassis Number:
-                    </Typography>
-                    <Typography variant="body1" fontWeight={500}>
-                      {formData.chesiNumber}
-                    </Typography>
-                  </Grid>
-                )}
-              </Grid>
-            </CardContent>
-          </PreviewCard>
-
-          {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
-          {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
-            <PreviewCard>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <LocalGasStation sx={{ mr: 1 }} />
-                  Fuel Level
-                </Typography>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Rating
-                    name="fuel-level-preview"
-                    value={fuelLevel}
-                    readOnly
-                    max={5}
-                    size="large"
-                    icon={<LocalGasStation fontSize="inherit" />}
-                    emptyIcon={<LocalGasStation fontSize="inherit" />}
+      <Box sx={{ display: "flex", alignItems: "center" }}>
+        <VisibilityIcon sx={{ mr: 1, color: "primary.main" }} />
+        <Typography variant="h6" component="div">
+          Job Card Preview
+        </Typography>
+      </Box>
+      <IconButton onClick={() => setShowPreview(false)} size="small">
+        <CloseIcon />
+      </IconButton>
+    </DialogTitle>
+    <DialogContent sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
+      <Box sx={{ maxHeight: "70vh", overflowY: "auto" }}>
+        {/* Customer Details */}
+        <PreviewCard>
+          <CardContent sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+              <Person sx={{ mr: 1, fontSize: "1.2rem" }} />
+              Customer Details
+            </Typography>
+            <List dense>
+              <ListItem>
+                <ListItemText
+                  primary="Customer Name"
+                  secondary={formData.customerName || "N/A"}
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText
+                  primary="Contact Number"
+                  secondary={formData.contactNumber || "N/A"}
+                />
+              </ListItem>
+              {formData.email && (
+                <ListItem>
+                  <ListItemText
+                    primary="Email"
+                    secondary={formData.email || "N/A"}
                   />
-                  <Typography variant="body1" fontWeight={500}>
-                    {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </PreviewCard>
-          )}
+                </ListItem>
+              )}
+            </List>
+          </CardContent>
+        </PreviewCard>
 
-          {/* Insurance Details */}
-          {(formData.insuranceProvider ||
-            formData.policyNumber ||
-            formData.expiryDate ||
-            formData.type ||
-            formData.excessAmount) && (
-            <PreviewCard>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <Policy sx={{ mr: 1 }} />
-                  Insurance Details
+        {/* Vehicle Details */}
+        <PreviewCard>
+          <CardContent sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+              <DirectionsCar sx={{ mr: 1, fontSize: "1.2rem" }} />
+              Vehicle Details
+            </Typography>
+            <List dense>
+              <ListItem>
+                <ListItemText
+                  primary="Car Number"
+                  secondary={formData.carNumber || "N/A"}
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText
+                  primary="Model"
+                  secondary={formData.model || "N/A"}
+                />
+              </ListItem>
+              {formData.company && (
+                <ListItem>
+                  <ListItemText
+                    primary="Company"
+                    secondary={formData.company || "N/A"}
+                  />
+                </ListItem>
+              )}
+              <ListItem>
+                <ListItemText
+                  primary="Fuel Type"
+                  secondary={
+                    fuelTypeOptions.find(
+                      (o) => o.value === formData.fuelType
+                    )?.label || "N/A"
+                  }
+                />
+              </ListItem>
+              {formData.kilometer && (
+                <ListItem>
+                  <ListItemText
+                    primary="Kilometer"
+                    secondary={`${formData.kilometer} km`}
+                  />
+                </ListItem>
+              )}
+              {formData.chesiNumber && (
+                <ListItem>
+                  <ListItemText
+                    primary="Chassis Number"
+                    secondary={formData.chesiNumber || "N/A"}
+                  />
+                </ListItem>
+              )}
+            </List>
+          </CardContent>
+        </PreviewCard>
+
+        {/* Fuel Level */}
+        {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
+          <PreviewCard>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+                <LocalGasStation sx={{ mr: 1, fontSize: "1.2rem" }} />
+                Fuel Level
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Rating
+                  value={fuelLevel}
+                  readOnly
+                  max={5}
+                  size="medium"
+                  icon={<LocalGasStation fontSize="inherit" />}
+                  emptyIcon={<LocalGasStation fontSize="inherit" />}
+                />
+                <Typography variant="body2">
+                  {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
                 </Typography>
-                <Grid container spacing={2}>
-                  {formData.insuranceProvider && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Insurance Provider:
-                      </Typography>
-                      <Typography variant="body1" fontWeight={500}>
-                        {formData.insuranceProvider}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {formData.policyNumber && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Policy Number:
-                      </Typography>
-                      <Typography variant="body1" fontWeight={500}>
-                        {formData.policyNumber}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {formData.expiryDate && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Expiry Date:
-                      </Typography>
-                      <Typography variant="body1" fontWeight={500}>
-                        {new Date(formData.expiryDate).toLocaleDateString()}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {formData.type && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Type:
-                      </Typography>
-                      <Typography variant="body1" fontWeight={500}>
-                        {formData.type}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {formData.excessAmount && (
-                    <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary">
-                        Excess Amount:
-                      </Typography>
-                      <Typography variant="body1" fontWeight={500}>
-                        ₹{formData.excessAmount}
-                      </Typography>
-                    </Grid>
-                  )}
-                </Grid>
-              </CardContent>
-            </PreviewCard>
-          )}
+              </Box>
+            </CardContent>
+          </PreviewCard>
+        )}
 
-          {/* Job Details with pricing table */}
-          {jobPoints.length > 0 && (
-            <PreviewCard>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <Description sx={{ mr: 1 }} />
-                  Job Details & Pricing
-                </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>
-                          <strong>S.No.</strong>
-                        </TableCell>
-                        <TableCell>
-                          <strong>Description</strong>
-                        </TableCell>
-                        {/* <TableCell align="right"><strong>Price (₹)</strong></TableCell> */}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {jobPoints.map((point, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell sx={{ wordBreak: "break-word" }}>
-                            {point.description}
-                          </TableCell>
-                          {/* <TableCell align="right">
-                            {point.price ? `₹${parseFloat(point.price).toLocaleString('en-IN')}` : '₹0'}
-                          </TableCell> */}
-                        </TableRow>
-                      ))}
-                      {/* <TableRow>
-                        <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
-                        <TableCell align="right">
-                          <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
-                        </TableCell>
-                      </TableRow> */}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </CardContent>
-            </PreviewCard>
-          )}
-
-          {/* Images Preview */}
-          {(Object.values(carImages).some((img) => img) ||
-            Object.values(existingImages).some((img) => img)) && (
-            <PreviewCard>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <PhotoCamera sx={{ mr: 1 }} />
-                  Car Images
-                </Typography>
-                <Grid container spacing={2}>
-                  {[
-                    { key: "frontView", label: "Front View" },
-                    { key: "rearView", label: "Rear View" },
-                    { key: "leftSide", label: "Left Side" },
-                    { key: "rightSide", label: "Right Side" },
-                  ].map((imageType) => {
-                    const hasNewImage = carImages[imageType.key];
-                    const hasExistingImage = existingImages[imageType.key];
-
-                    if (hasNewImage || hasExistingImage) {
-                      return (
-                        <Grid item xs={6} sm={3} key={imageType.key}>
-                          <Box sx={{ textAlign: "center" }}>
-                            <Typography variant="subtitle2" gutterBottom>
-                              {imageType.label}
-                            </Typography>
-                            <img
-                              src={
-                                hasNewImage
-                                  ? URL.createObjectURL(hasNewImage)
-                                  : hasExistingImage
-                              }
-                              alt={imageType.label}
-                              style={{
-                                width: "100%",
-                                height: "120px",
-                                objectFit: "cover",
-                                borderRadius: "8px",
-                                border: hasNewImage
-                                  ? "2px solid #4caf50"
-                                  : "1px solid #ddd",
-                              }}
-                            />
-                            {hasNewImage && (
-                              <Typography
-                                variant="caption"
-                                color="success.main"
-                                sx={{ display: "block", mt: 0.5 }}
-                              >
-                                {hasNewImage.name &&
-                                hasNewImage.name.includes("captured")
-                                  ? "Camera Captured"
-                                  : "New Image"}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Grid>
-                      );
-                    }
-                    return null;
-                  })}
-                </Grid>
-              </CardContent>
-            </PreviewCard>
-          )}
-
-          {/* Video Preview */}
-          {(videoFile || existingVideo) && (
-            <PreviewCard>
-              <CardContent>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ display: "flex", alignItems: "center" }}
-                >
-                  <Videocam sx={{ mr: 1 }} />
-                  Video
-                </Typography>
-                <Box sx={{ maxWidth: 400, mx: "auto" }}>
-                  <video
-                    controls
-                    style={{
-                      width: "100%",
-                      height: "auto",
-                      borderRadius: "8px",
-                      border: videoFile
-                        ? "2px solid #4caf50"
-                        : "1px solid #ddd",
-                    }}
-                  >
-                    <source
-                      src={
-                        videoFile
-                          ? URL.createObjectURL(videoFile)
-                          : existingVideo
-                      }
-                      type="video/mp4"
+        {/* Insurance Details */}
+        {(formData.insuranceProvider ||
+          formData.policyNumber ||
+          formData.expiryDate ||
+          formData.type ||
+          formData.excessAmount) && (
+          <PreviewCard>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+                <Policy sx={{ mr: 1, fontSize: "1.2rem" }} />
+                Insurance Details
+              </Typography>
+              <List dense>
+                {formData.insuranceProvider && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Insurance Provider"
+                      secondary={formData.insuranceProvider || "N/A"}
                     />
-                    Your browser does not support the video tag.
-                  </video>
-                  {videoFile && (
-                    <Typography
-                      variant="caption"
-                      color="success.main"
-                      sx={{ display: "block", mt: 1, textAlign: "center" }}
-                    >
-                      New Video: {videoFile.name}
-                    </Typography>
-                  )}
-                </Box>
-              </CardContent>
-            </PreviewCard>
-          )}
-        </Box>
-      </DialogContent>
-      <DialogActions
-        sx={{ p: 3, borderTop: `1px solid ${theme.palette.divider}` }}
+                  </ListItem>
+                )}
+                {formData.policyNumber && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Policy Number"
+                      secondary={formData.policyNumber || "N/A"}
+                    />
+                  </ListItem>
+                )}
+                {formData.expiryDate && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Expiry Date"
+                      secondary={
+                        new Date(formData.expiryDate).toLocaleDateString() ||
+                        "N/A"
+                      }
+                    />
+                  </ListItem>
+                )}
+                {formData.type && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Type"
+                      secondary={formData.type || "N/A"}
+                    />
+                  </ListItem>
+                )}
+                {formData.excessAmount && (
+                  <ListItem>
+                    <ListItemText
+                      primary="Excess Amount"
+                      secondary={`₹${formData.excessAmount}`}
+                    />
+                  </ListItem>
+                )}
+              </List>
+            </CardContent>
+          </PreviewCard>
+        )}
+
+        {/* Job Details */}
+        {jobPoints.length > 0 && (
+          <PreviewCard>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+                <Description sx={{ mr: 1, fontSize: "1.2rem" }} />
+                Job Details & Pricing
+              </Typography>
+              <TableContainer
+                component={Paper}
+                variant="outlined"
+                sx={{ mt: 1, overflowX: "auto" }}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>#</TableCell>
+                      <TableCell>Description</TableCell>
+                      {/* <TableCell align="right">Price</TableCell> */}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {jobPoints.map((point, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell sx={{ maxWidth: 150 }}>
+                          <Typography variant="body2" noWrap={false}>
+                            {point.description}
+                          </Typography>
+                        </TableCell>
+                        {/* <TableCell align="right">
+                          ₹{parseFloat(point.price || 0).toLocaleString('en-IN')}
+                        </TableCell> */}
+                      </TableRow>
+                    ))}
+                    {/* <TableRow>
+                      <TableCell colSpan={2} align="right">
+                        <strong>Total:</strong>
+                      </TableCell>
+                      <TableCell align="right">
+                        <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
+                      </TableCell>
+                    </TableRow> */}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </PreviewCard>
+        )}
+
+        {/* Images */}
+        {(Object.values(carImages).some((img) => img) ||
+          Object.values(existingImages).some((img) => img)) && (
+          <PreviewCard>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+                <PhotoCamera sx={{ mr: 1, fontSize: "1.2rem" }} />
+                Car Images
+              </Typography>
+              <Grid container spacing={1}>
+                {[
+                  { key: "frontView", label: "Front" },
+                  { key: "rearView", label: "Rear" },
+                  { key: "leftSide", label: "Left" },
+                  { key: "rightSide", label: "Right" },
+                ].map((imageType) => {
+                  const hasNew = carImages[imageType.key];
+                  const hasOld = existingImages[imageType.key];
+                  if (!hasNew && !hasOld) return null;
+                  return (
+                    <Grid item xs={6} key={imageType.key}>
+                      <Box sx={{ textAlign: "center" }}>
+                        <Typography variant="caption">
+                          {imageType.label}
+                        </Typography>
+                        <img
+                          src={hasNew ? URL.createObjectURL(hasNew) : hasOld}
+                          alt={imageType.label}
+                          style={{
+                            width: "100%",
+                            height: 100,
+                            objectFit: "cover",
+                            borderRadius: "8px",
+                            border: hasNew ? "2px solid #4caf50" : "1px solid #ddd",
+                          }}
+                        />
+                        {hasNew && (
+                          <Typography
+                            variant="caption"
+                            color="success.main"
+                            sx={{ display: "block" }}
+                          >
+                            New
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </CardContent>
+          </PreviewCard>
+        )}
+
+        {/* Video */}
+        {(videoFile || existingVideo) && (
+          <PreviewCard>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
+                <Videocam sx={{ mr: 1, fontSize: "1.2rem" }} />
+                Video
+              </Typography>
+              <Box sx={{ position: "relative", pt: "56.25%", height: 0 }}>
+                <video
+                  controls
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: "8px",
+                    border: videoFile ? "2px solid #4caf50" : "1px solid #ddd",
+                  }}
+                >
+                  <source
+                    src={videoFile ? URL.createObjectURL(videoFile) : existingVideo}
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </Box>
+              {videoFile && (
+                <Typography
+                  variant="caption"
+                  color="success.main"
+                  sx={{ mt: 1, display: "block" }}
+                >
+                  New Video: {videoFile.name}
+                </Typography>
+              )}
+            </CardContent>
+          </PreviewCard>
+        )}
+      </Box>
+    </DialogContent>
+
+    <DialogActions
+      sx={{
+        flexDirection: { xs: "column", sm: "row" },
+        gap: 1,
+        p: 3,
+        borderTop: `1px solid ${theme.palette.divider}`,
+      }}
+    >
+      <Button
+        onClick={() => setShowPreview(false)}
+        startIcon={<ArrowBackIcon />}
+        fullWidth
+        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
       >
-        <Button
-          onClick={() => setShowPreview(false)}
-          startIcon={<ArrowBackIcon />}
-          sx={{ mr: 2 }}
-        >
-          Back to Edit
-        </Button>
+        Back to Edit
+      </Button>
+      <Button
+        onClick={generatePreviewPDF}
+        variant="outlined"
+        startIcon={<DownloadIcon />}
+        fullWidth
+        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
+      >
+        Download PDF
+      </Button>
+      <Button
+        onClick={handleActualSubmit}
+        variant="contained"
+        disabled={loading}
+        startIcon={
+          loading ? (
+            <CircularProgress size={16} color="inherit" />
+          ) : (
+            <CheckIcon />
+          )
+        }
+        fullWidth
+        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
+      >
+        {loading
+          ? isEditMode
+            ? "Updating..."
+            : "Saving..."
+          : isEditMode
+          ? "Confirm Update"
+          : "Confirm Save"}
+      </Button>
+    </DialogActions>
+  </PreviewDialog>
+);
 
-        {/* New Download PDF Button */}
-        <Button
-          onClick={generatePreviewPDF}
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          sx={{ mr: 2 }}
-        >
-          Download PDF
-        </Button>
-
-        <Button
-          onClick={handleActualSubmit}
-          variant="contained"
-          disabled={loading}
-          startIcon={
-            loading ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <CheckIcon />
-            )
-          }
-          sx={{ px: 4 }}
-        >
-          {loading
-            ? isEditMode
-              ? "Updating..."
-              : "Saving..."
-            : isEditMode
-            ? "Confirm Update"
-            : "Confirm Save"}
-        </Button>
-      </DialogActions>
-    </PreviewDialog>
-  );
 
   if (fetchingData) {
     return (
@@ -2130,10 +2079,11 @@ const JobCards = () => {
   return (
     <Box
       sx={{
-        flexGrow: 1,
-        mb: 4,
-        ml: { xs: 0, sm: 35 },
-        overflow: "auto",
+         flexGrow: 1,
+    mb: 4,
+    ml: { xs: 0, sm: 35 },
+    overflow: "auto",
+    px: { xs: 1, sm: 3 },
       }}
     >
       <CssBaseline />

@@ -56,7 +56,7 @@ import {
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
-const API_BASE_URL = 'https://garage-management-zi5z.onrender.com/api'; 
+const API_BASE_URL = 'https://garage-management-zi5z.onrender.com/api';
 
 const AssignEngineer = () => {
   const { darkMode } = useThemeContext();
@@ -64,7 +64,7 @@ const AssignEngineer = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  
+
   // Updated job details state to include pricing
   const [jobPoints, setJobPoints] = useState([]);
   const [currentJobPoint, setCurrentJobPoint] = useState({
@@ -136,166 +136,166 @@ const AssignEngineer = () => {
 
 
   const updateJobCardWithParts = async (selectedParts) => {
-  try {
-    // Get existing job details
-    const jobDetailsString = getJobDetailsForAPI();
+    try {
+      // Get existing job details
+      const jobDetailsString = getJobDetailsForAPI();
 
-    // Format parts for API
-    const formattedParts = selectedParts.map(part => ({
-      partId: part._id,
-      partName: part.partName,
-      partNumber: part.partNumber || '',
-      quantity: part.selectedQuantity || 1,
-      pricePerUnit: part.pricePerUnit || 0,
-      gstPercentage: part.taxAmount || 0,
-      carName: part.carName || '',
-      model: part.model || ''
-    }));
+      // Format parts for API
+      const formattedParts = selectedParts.map(part => ({
+        partId: part._id,
+        partName: part.partName,
+        partNumber: part.partNumber || '',
+        quantity: part.selectedQuantity || 1,
+        pricePerUnit: part.pricePerUnit || 0,
+        gstPercentage: part.taxAmount || 0,
+        carName: part.carName || '',
+        model: part.model || ''
+      }));
 
-    console.log('Updating job card immediately with parts:', formattedParts);
+      console.log('Updating job card immediately with parts:', formattedParts);
 
-    // Update job card with current job details and newly selected parts
-    await updateJobCard(id, jobDetailsString, formattedParts);
+      // Update job card with current job details and newly selected parts
+      await updateJobCard(id, jobDetailsString, formattedParts);
 
-    // Show success notification
-    setSnackbar({
-      open: true,
-      message: `✅ Job card updated with ${formattedParts.length} part(s)`,
-      severity: 'success'
-    });
+      // Show success notification
+      setSnackbar({
+        open: true,
+        message: `✅ Job card updated with ${formattedParts.length} part(s)`,
+        severity: 'success'
+      });
 
-  } catch (error) {
-    console.error('Error updating job card with parts:', error);
-    setSnackbar({
-      open: true,
-      message: 'Failed to update job card with selected parts',
-      severity: 'error'
-    });
-  }
-};
-
-// **ALTERNATIVE: Update job card when part quantity changes**
-const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity, oldQuantity) => {
-  const assignment = assignments.find(a => a.id === assignmentId);
-  if (!assignment) return;
-
-  const part = assignment.parts[partIndex];
-  if (!part) return;
-
-  try {
-    // Get available quantity considering all current selections
-    const availableQuantity = getAvailableQuantity(part._id);
-    const currentlySelected = part.selectedQuantity || 1;
-    const maxSelectableQuantity = availableQuantity + currentlySelected;
-
-    // Validate maximum quantity
-    if (newQuantity > maxSelectableQuantity) {
-      setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`);
-      return;
+    } catch (error) {
+      console.error('Error updating job card with parts:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update job card with selected parts',
+        severity: 'error'
+      });
     }
+  };
 
-    if (newQuantity < 1) {
-      setError('Quantity must be at least 1');
-      return;
-    }
+  // **ALTERNATIVE: Update job card when part quantity changes**
+  const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity, oldQuantity) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
 
-    // Update the part quantity in the assignment (local state)
-    const updatedParts = assignment.parts.map((p, idx) => 
-      idx === partIndex 
-        ? { ...p, selectedQuantity: newQuantity }
-        : p
-    );
-    
-    updateAssignment(assignmentId, 'parts', updatedParts);
+    const part = assignment.parts[partIndex];
+    if (!part) return;
 
-    // **NEW: Update job card API with updated quantities**
-    if (id) {
-      await updateJobCardWithParts(updatedParts);
-    }
+    try {
+      // Get available quantity considering all current selections
+      const availableQuantity = getAvailableQuantity(part._id);
+      const currentlySelected = part.selectedQuantity || 1;
+      const maxSelectableQuantity = availableQuantity + currentlySelected;
 
-    // Clear any previous errors
-    if (error && error.includes(part.partName)) {
-      setError(null);
-    }
-
-  } catch (err) {
-    console.error('Error updating part quantity:', err);
-    setError(`Failed to update quantity for "${part.partName}"`);
-  }
-};
-
-// **ENHANCED: Update job card when parts are removed**
-const handlePartRemoval = async (assignmentId, partIndex) => {
-  const assignment = assignments.find(a => a.id === assignmentId);
-  if (!assignment) return;
-
-  const part = assignment.parts[partIndex];
-  if (!part) return;
-
-  try {
-    // Remove part from assignment (local state)
-    const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-    updateAssignment(assignmentId, 'parts', updatedParts);
-
-    // **NEW: Update job card API with remaining parts**
-    if (id) {
-      await updateJobCardWithParts(updatedParts);
-    }
-
-    setSnackbar({
-      open: true,
-      message: `Part "${part.partName}" removed and job card updated`,
-      severity: 'info'
-    });
-
-  } catch (err) {
-    console.error('Error removing part:', err);
-    setError(`Failed to remove part "${part.partName}"`);
-  }
-};
-
-// **ENHANCED: Collect all parts from all assignments for job card update**
-const getAllSelectedParts = () => {
-  const allPartsUsed = [];
-  assignments.forEach(assignment => {
-    assignment.parts.forEach(part => {
-      const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
-      const selectedQuantity = part.selectedQuantity || 1;
-      
-      if (existingPartIndex !== -1) {
-        allPartsUsed[existingPartIndex].quantity += selectedQuantity;
-      } else {
-        allPartsUsed.push({
-          partId: part._id,
-          partName: part.partName,
-          partNumber: part.partNumber || '',
-          quantity: selectedQuantity,
-          pricePerUnit: part.pricePerUnit || 0,
-          gstPercentage: part.taxAmount || 0,
-          carName: part.carName || '',
-          model: part.model || ''
-        });
+      // Validate maximum quantity
+      if (newQuantity > maxSelectableQuantity) {
+        setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`);
+        return;
       }
-    });
-  });
-  return allPartsUsed;
-};
 
-// **ENHANCED: Update job card with all parts from all assignments**
-const updateJobCardWithAllParts = async () => {
-  try {
-    const jobDetailsString = getJobDetailsForAPI();
-    const allParts = getAllSelectedParts();
-    
-    if (id) {
-      await updateJobCard(id, jobDetailsString, allParts);
-      console.log('Job card updated with all parts:', allParts);
+      if (newQuantity < 1) {
+        setError('Quantity must be at least 1');
+        return;
+      }
+
+      // Update the part quantity in the assignment (local state)
+      const updatedParts = assignment.parts.map((p, idx) =>
+        idx === partIndex
+          ? { ...p, selectedQuantity: newQuantity }
+          : p
+      );
+
+      updateAssignment(assignmentId, 'parts', updatedParts);
+
+      // **NEW: Update job card API with updated quantities**
+      if (id) {
+        await updateJobCardWithParts(updatedParts);
+      }
+
+      // Clear any previous errors
+      if (error && error.includes(part.partName)) {
+        setError(null);
+      }
+
+    } catch (err) {
+      console.error('Error updating part quantity:', err);
+      setError(`Failed to update quantity for "${part.partName}"`);
     }
-  } catch (error) {
-    console.error('Error updating job card with all parts:', error);
-    throw error;
-  }
-};
+  };
+
+  // **ENHANCED: Update job card when parts are removed**
+  const handlePartRemoval = async (assignmentId, partIndex) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+
+    const part = assignment.parts[partIndex];
+    if (!part) return;
+
+    try {
+      // Remove part from assignment (local state)
+      const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
+      updateAssignment(assignmentId, 'parts', updatedParts);
+
+      // **NEW: Update job card API with remaining parts**
+      if (id) {
+        await updateJobCardWithParts(updatedParts);
+      }
+
+      setSnackbar({
+        open: true,
+        message: `Part "${part.partName}" removed and job card updated`,
+        severity: 'info'
+      });
+
+    } catch (err) {
+      console.error('Error removing part:', err);
+      setError(`Failed to remove part "${part.partName}"`);
+    }
+  };
+
+  // **ENHANCED: Collect all parts from all assignments for job card update**
+  const getAllSelectedParts = () => {
+    const allPartsUsed = [];
+    assignments.forEach(assignment => {
+      assignment.parts.forEach(part => {
+        const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
+        const selectedQuantity = part.selectedQuantity || 1;
+
+        if (existingPartIndex !== -1) {
+          allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+        } else {
+          allPartsUsed.push({
+            partId: part._id,
+            partName: part.partName,
+            partNumber: part.partNumber || '',
+            quantity: selectedQuantity,
+            pricePerUnit: part.pricePerUnit || 0,
+            gstPercentage: part.taxAmount || 0,
+            carName: part.carName || '',
+            model: part.model || ''
+          });
+        }
+      });
+    });
+    return allPartsUsed;
+  };
+
+  // **ENHANCED: Update job card with all parts from all assignments**
+  const updateJobCardWithAllParts = async () => {
+    try {
+      const jobDetailsString = getJobDetailsForAPI();
+      const allParts = getAllSelectedParts();
+
+      if (id) {
+        await updateJobCard(id, jobDetailsString, allParts);
+        console.log('Job card updated with all parts:', allParts);
+      }
+    } catch (error) {
+      console.error('Error updating job card with all parts:', error);
+      throw error;
+    }
+  };
 
 
   // Updated job details functions with pricing
@@ -305,14 +305,14 @@ const updateJobCardWithAllParts = async () => {
         id: Date.now(), // Simple ID generation
         description: currentJobPoint.description.trim()
       };
-      
+
       setJobPoints(prev => [...prev, newJobPoint]);
-      
+
       // Clear the input fields
       setCurrentJobPoint({ description: '' });
     }
   };
-  
+
   const removeJobPoint = (indexToRemove) => {
     setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -332,23 +332,23 @@ const updateJobCardWithAllParts = async () => {
     }
   };
 
-  
+
 
   // Updated function to get job details for API
   const getJobDetailsForAPI = () => {
     // Combine existing and new job details
     let combinedJobDetails = [];
-    
+
     // Add existing job details from parsed data
     if (parsedJobDetails.length > 0) {
       combinedJobDetails = [...parsedJobDetails];
     }
-    
+
     // Add new job details from current input
     if (jobPoints.length > 0) {
       combinedJobDetails = [...combinedJobDetails, ...jobPoints];
     }
-    
+
     return JSON.stringify(combinedJobDetails);
   };
 
@@ -424,7 +424,7 @@ const updateJobCardWithAllParts = async () => {
     if (!garageId) {
       return;
     }
-    
+
     try {
       setIsLoadingInventory(true);
       const res = await apiCall(`/garage/inventory/${garageId}`, { method: 'GET' });
@@ -438,8 +438,8 @@ const updateJobCardWithAllParts = async () => {
   }, [garageId, apiCall]);
 
   const removeExistingJobPoint = (indexToRemove) => {
-  setParsedJobDetails(prev => prev.filter((_, index) => index !== indexToRemove));
-};
+    setParsedJobDetails(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
 
   // Helper function to get available quantity considering all current selections
   const getAvailableQuantity = (partId) => {
@@ -463,7 +463,7 @@ const updateJobCardWithAllParts = async () => {
   const updatePartQuantity = useCallback(async (partId, newQuantity) => {
     try {
       console.log(`Updating part ${partId} to quantity: ${newQuantity}`);
-      
+
       if (newQuantity === 0) {
         // When quantity reaches 0, use DELETE API
         await apiCall(`/garage/inventory/delete/${partId}`, {
@@ -478,10 +478,10 @@ const updateJobCardWithAllParts = async () => {
         });
         console.log(`Part ${partId} updated to quantity: ${newQuantity}`);
       }
-      
+
       // Refresh inventory after updating
       await fetchInventoryParts();
-      
+
     } catch (err) {
       console.error(`Failed to update quantity for part ${partId}:`, err);
       throw new Error(`Failed to update part quantity: ${err.response?.data?.message || err.message}`);
@@ -491,15 +491,15 @@ const updateJobCardWithAllParts = async () => {
   // Initialize job card IDs
   useEffect(() => {
     const initialJobCardIds = [];
-    
+
     if (id) {
       initialJobCardIds.push(id);
     }
-    
+
     if (jobCardId && jobCardId !== id) {
       initialJobCardIds.push(jobCardId);
     }
-    
+
     setJobCardIds(initialJobCardIds);
   }, [id, jobCardId]);
 
@@ -508,7 +508,7 @@ const updateJobCardWithAllParts = async () => {
     if (!garageId) {
       return;
     }
-    
+
     try {
       setIsLoading(true);
       const res = await apiCall(`/garage/engineers/${garageId}`, { method: 'GET' });
@@ -531,31 +531,31 @@ const updateJobCardWithAllParts = async () => {
   useEffect(() => {
     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
       console.log('🔄 Setting assignments with job card data:', jobCardDataTemp);
-      
+
       // Set engineer and parts in assignments if they exist
       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
         const assignedEngineer = jobCardDataTemp.engineerId[0]; // Get first engineer
-        
+
         // Find the full engineer object from the engineers list
         const fullEngineerData = engineers.find(eng => eng._id === assignedEngineer._id);
-        
+
         console.log('👤 Found assigned engineer:', assignedEngineer);
         console.log('👤 Full engineer data:', fullEngineerData);
-        
+
         if (fullEngineerData || assignedEngineer) {
           // Convert partsUsed from job card to format expected by the form
           let formattedParts = [];
           if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
             console.log('🔧 Processing parts used:', jobCardDataTemp.partsUsed);
-            
+
             formattedParts = jobCardDataTemp.partsUsed.map(usedPart => {
               // Find the part in inventory to get full details
-              const inventoryPart = inventoryParts.find(invPart => 
-                invPart.partName === usedPart.partName || 
+              const inventoryPart = inventoryParts.find(invPart =>
+                invPart.partName === usedPart.partName ||
                 invPart._id === usedPart.partId ||
                 invPart._id === usedPart._id
               );
-              
+
               if (inventoryPart) {
                 console.log(`✅ Found part in inventory: ${usedPart.partName}`);
                 return {
@@ -597,10 +597,10 @@ const updateJobCardWithAllParts = async () => {
           console.log('✅ Successfully set engineer:', fullEngineerData || assignedEngineer);
           console.log('✅ Successfully set parts:', formattedParts);
           console.log('📋 Assignment created:', newAssignment);
-          
+
           // Clear temp data
           setJobCardDataTemp(null);
-          
+
           setSnackbar({
             open: true,
             message: `✅ Job card data populated! Engineer: ${assignedEngineer.name || assignedEngineer.email || 'Unknown Engineer'}, Parts: ${formattedParts.length} items`,
@@ -619,7 +619,7 @@ const updateJobCardWithAllParts = async () => {
       setIsEditMode(true);
       try {
         const response = await axios.get(
-          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`, 
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
           {
             headers: {
               Authorization: localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : '',
@@ -648,16 +648,16 @@ const updateJobCardWithAllParts = async () => {
             console.log('Job details is in old string format, converting...');
             const lines = jobCardData.jobDetails.split('\n');
             const cleanLines = lines.map(line => line.replace(/^\d+\.\s*/, '').trim())
-                                    .filter(line => line.length > 0);
-            
+              .filter(line => line.length > 0);
+
             // Convert old format to new format with default price of 0
             const convertedJobDetails = cleanLines.map(line => ({
               description: line,
               price: 0
             }));
-            
+
             setParsedJobDetails(convertedJobDetails);
-            
+
             // Set jobPoints to empty array for new input
             setJobPoints([]);
           }
@@ -698,77 +698,77 @@ const updateJobCardWithAllParts = async () => {
 
   // Update assignment
   const updateAssignment = (assignmentId, field, value) => {
-    setAssignments(prev => prev.map(assignment => 
-      assignment.id === assignmentId 
+    setAssignments(prev => prev.map(assignment =>
+      assignment.id === assignmentId
         ? { ...assignment, [field]: value }
         : assignment
     ));
 
     if (formErrors[`assignment_${assignmentId}_${field}`]) {
-      setFormErrors(prev => ({ 
-        ...prev, 
-        [`assignment_${assignmentId}_${field}`]: null 
+      setFormErrors(prev => ({
+        ...prev,
+        [`assignment_${assignmentId}_${field}`]: null
       }));
     }
   };
 
 
   const handlePartSelection = async (assignmentId, newParts, previousParts = []) => {
-  try {
-    // Prevent selecting duplicate parts
-    const uniqueParts = [];
-    const seenIds = new Set();
+    try {
+      // Prevent selecting duplicate parts
+      const uniqueParts = [];
+      const seenIds = new Set();
 
-    for (const part of newParts) {
-      if (!seenIds.has(part._id)) {
-        seenIds.add(part._id);
-        uniqueParts.push({
-          ...part,
-          selectedQuantity: part.selectedQuantity || 1,
-          availableQuantity: part.quantity
-        });
+      for (const part of newParts) {
+        if (!seenIds.has(part._id)) {
+          seenIds.add(part._id);
+          uniqueParts.push({
+            ...part,
+            selectedQuantity: part.selectedQuantity || 1,
+            availableQuantity: part.quantity
+          });
+        }
       }
+
+      // Update the assignment with filtered parts (no duplicates)
+      updateAssignment(assignmentId, 'parts', uniqueParts);
+
+      // **NEW: Immediately update job card API with selected parts**
+      if (id && uniqueParts.length > 0) {
+        await updateJobCardWithParts(uniqueParts);
+      }
+
+    } catch (err) {
+      console.error('Error handling part selection:', err);
+      setError('Failed to update part selection and job card');
     }
-
-    // Update the assignment with filtered parts (no duplicates)
-    updateAssignment(assignmentId, 'parts', uniqueParts);
-
-    // **NEW: Immediately update job card API with selected parts**
-    if (id && uniqueParts.length > 0) {
-      await updateJobCardWithParts(uniqueParts);
-    }
-
-  } catch (err) {
-    console.error('Error handling part selection:', err);
-    setError('Failed to update part selection and job card');
-  }
-};
+  };
 
 
 
   // Form Validation
   const validateForm = () => {
     const errors = {};
-    
+
     assignments.forEach((assignment, index) => {
       const assignmentKey = `assignment_${assignment.id}`;
-      
+
       if (!assignment.engineer) {
         errors[`${assignmentKey}_engineer`] = 'Please select an engineer';
       }
     });
-    
+
     if (!id && (!jobCardIds || jobCardIds.length === 0)) {
       errors.jobCards = 'No job cards to assign';
     }
-    
+
     setFormErrors(errors);
-    
+
     if (Object.keys(errors).length > 0) {
       setError('Please fix the form errors');
       return false;
     }
-    
+
     return true;
   };
 
@@ -776,7 +776,7 @@ const updateJobCardWithAllParts = async () => {
   const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
     try {
       console.log(`Updating job card ${jobCardId} with job details and parts:`, { jobDetails, partsUsed });
-      
+
       // Validate parts data before sending
       const validatedParts = partsUsed.map(part => ({
         partId: part.partId || part._id,
@@ -786,8 +786,8 @@ const updateJobCardWithAllParts = async () => {
         pricePerUnit: Number(part.pricePerUnit) || 0,
         gstPercentage: Number(part.gstPercentage) || 0,
         gstAmount: Number(((part.pricePerUnit || 0) * (part.quantity || 1) * (part.gstPercentage || 0)) / 100),
-        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1))+ (part.gstAmount),
-           carName: part.carName || '',
+        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1)) + (part.gstAmount),
+        carName: part.carName || '',
         model: part.model || ''
       }));
 
@@ -820,7 +820,7 @@ const updateJobCardWithAllParts = async () => {
   // Updated handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setIsSubmitting(true);
@@ -846,7 +846,7 @@ const updateJobCardWithAllParts = async () => {
         assignment.parts.forEach(part => {
           const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
           const selectedQuantity = part.selectedQuantity || 1;
-          
+
           if (existingPartIndex !== -1) {
             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
           } else {
@@ -856,7 +856,7 @@ const updateJobCardWithAllParts = async () => {
               partNumber: part.partNumber || '',
               quantity: selectedQuantity,
               pricePerUnit: part.pricePerUnit || 0,
-              gstPercentage:  part.taxAmount || 0,
+              gstPercentage: part.taxAmount || 0,
               carName: part.carName || '',
               model: part.model || ''
             });
@@ -886,7 +886,7 @@ const updateJobCardWithAllParts = async () => {
           if (newQuantity < 0) {
             throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
           }
-          
+
           console.log(`Updating ${partUpdate.partName}: ${currentPart.quantity} -> ${newQuantity}`);
           await updatePartQuantity(partUpdate.partId, newQuantity);
         }
@@ -894,7 +894,7 @@ const updateJobCardWithAllParts = async () => {
 
       // Update job card with job details and parts used
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
-      
+
       const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
         if (jobCardId) {
           return updateJobCard(jobCardId, jobDetailsString, allPartsUsed);
@@ -917,7 +917,7 @@ const updateJobCardWithAllParts = async () => {
         };
 
         console.log(`Assigning to engineer ${assignment.engineer._id}:`, payload);
-        
+
         return axios.put(
           `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
           payload,
@@ -939,25 +939,25 @@ const updateJobCardWithAllParts = async () => {
       // Execute all assignments
       console.log('Assigning to engineers...');
       const results = await Promise.all(assignmentPromises);
-      
+
       console.log('All assignments completed:', results.map(r => r.data));
       console.log('Job details updated with combined data:', jobDetailsString);
       console.log('Total job details cost:', totalJobDetailsCost);
       console.log('Parts used in job cards:', allPartsUsed);
       console.log('Inventory updated for parts:', partUpdates);
-      
+
       // Show success message with totals
       setSnackbar({
         open: true,
         message: `✅ Assignment completed! Job Details Cost: ₹${totalJobDetailsCost.toFixed(2)}, Parts: ${allPartsUsed.length} items`,
         severity: 'success'
       });
-      
+
       setSuccess(true);
       setTimeout(() => {
         navigate(`/Work-In-Progress/${id}`);
       }, 2000);
-      
+
     } catch (err) {
       console.error('Assignment error:', err.response?.data || err.message);
       setError(err.response?.data?.message || err.message || 'Failed to assign to engineers');
@@ -1015,94 +1015,94 @@ const updateJobCardWithAllParts = async () => {
   };
 
   // Handle Add Part
-    const handleAddPart = async () => {
-      if (!newPart.partName?.trim() || !newPart.carName?.trim() || !newPart.model?.trim()) {
-        setPartAddError('Please fill Car Name, Model, and Part Name');
-        return;
-      }
-      if (newPart.quantity <= 0) {
-        setPartAddError('Quantity must be greater than 0');
-        return;
-      }
-      if (newPart.purchasePrice < 0 || newPart.sellingPrice < 0) {
-        setPartAddError('Prices cannot be negative');
-        return;
-      }
-      
-      if (newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)) {
-        setPartAddError('Part number already exists');
-        return;
-      }
-  
-      setAddingPart(true);
-      setPartAddError(null);
-  
-      try {
-        const igst = parseFloat(newPart.igst) || 0;
-        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
-        const baseAmount = newPart.sellingPrice * newPart.quantity;
-        const taxAmount = newPart.taxType === 'igst'
-          ? (baseAmount * igst) / 100
-          : 2 * ((baseAmount * cgstSgst) / 100);
-  
-        const requestData = {
-          name: "abc",
-          garageId,
-          carName: newPart.carName,
-          model: newPart.model,
-          partNumber: newPart.partNumber,
-          partName: newPart.partName,
-          quantity: parseInt(newPart.quantity),
-          purchasePrice: parseFloat(newPart.purchasePrice),
-          sellingPrice: parseFloat(newPart.sellingPrice),
-          hsnNumber: newPart.hsnNumber,
-          igst: newPart.taxType === 'igst' ? igst : 0,
-          cgstSgst: newPart.taxType === 'cgstSgst' ? cgstSgst : 0,
-          taxAmount
-        };
-  
-        await axios.post(`${API_BASE_URL}/garage/inventory/add`, requestData, {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: garageToken ? `Bearer ${garageToken}` : ''
-          }
-        });
-  
-        await fetchInventoryParts();
-        setPartAddSuccess(true);
-        setSnackbar({
-          open: true,
-          message: 'Part added successfully!',
-          severity: 'success'
-        });
-  
-        setNewPart({
-          garageId,
-          name: "abc",
-          carName: "",
-          model: "",
-          partNumber: "",
-          partName: "",
-          quantity: 1,
-          purchasePrice: 0,
-          sellingPrice: 0,
-          hsnNumber: "",
-          igst: '',
-          cgstSgst: '',
-          taxType: 'igst'
-        });
-  
-        setTimeout(() => {
-          setPartAddSuccess(false);
-          handleCloseAddPartDialog();
-        }, 1500);
-      } catch (err) {
-        console.error('Add part error:', err);
-        setPartAddError(err.response?.data?.message || 'Failed to add part');
-      } finally {
-        setAddingPart(false);
-      }
-    };
+  const handleAddPart = async () => {
+    if (!newPart.partName?.trim() || !newPart.carName?.trim() || !newPart.model?.trim()) {
+      setPartAddError('Please fill Car Name, Model, and Part Name');
+      return;
+    }
+    if (newPart.quantity <= 0) {
+      setPartAddError('Quantity must be greater than 0');
+      return;
+    }
+    if (newPart.purchasePrice < 0 || newPart.sellingPrice < 0) {
+      setPartAddError('Prices cannot be negative');
+      return;
+    }
+
+    if (newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)) {
+      setPartAddError('Part number already exists');
+      return;
+    }
+
+    setAddingPart(true);
+    setPartAddError(null);
+
+    try {
+      const igst = parseFloat(newPart.igst) || 0;
+      const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+      const baseAmount = newPart.sellingPrice * newPart.quantity;
+      const taxAmount = newPart.taxType === 'igst'
+        ? (baseAmount * igst) / 100
+        : 2 * ((baseAmount * cgstSgst) / 100);
+
+      const requestData = {
+        name: "abc",
+        garageId,
+        carName: newPart.carName,
+        model: newPart.model,
+        partNumber: newPart.partNumber,
+        partName: newPart.partName,
+        quantity: parseInt(newPart.quantity),
+        purchasePrice: parseFloat(newPart.purchasePrice),
+        sellingPrice: parseFloat(newPart.sellingPrice),
+        hsnNumber: newPart.hsnNumber,
+        igst: newPart.taxType === 'igst' ? igst : 0,
+        cgstSgst: newPart.taxType === 'cgstSgst' ? cgstSgst : 0,
+        taxAmount
+      };
+
+      await axios.post(`${API_BASE_URL}/garage/inventory/add`, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: garageToken ? `Bearer ${garageToken}` : ''
+        }
+      });
+
+      await fetchInventoryParts();
+      setPartAddSuccess(true);
+      setSnackbar({
+        open: true,
+        message: 'Part added successfully!',
+        severity: 'success'
+      });
+
+      setNewPart({
+        garageId,
+        name: "abc",
+        carName: "",
+        model: "",
+        partNumber: "",
+        partName: "",
+        quantity: 1,
+        purchasePrice: 0,
+        sellingPrice: 0,
+        hsnNumber: "",
+        igst: '',
+        cgstSgst: '',
+        taxType: 'igst'
+      });
+
+      setTimeout(() => {
+        setPartAddSuccess(false);
+        handleCloseAddPartDialog();
+      }, 1500);
+    } catch (err) {
+      console.error('Add part error:', err);
+      setPartAddError(err.response?.data?.message || 'Failed to add part');
+    } finally {
+      setAddingPart(false);
+    }
+  };
 
   // Close Handlers
   const handleCloseAlert = () => {
@@ -1119,12 +1119,12 @@ const updateJobCardWithAllParts = async () => {
     setOpenAddEngineerDialog(false);
     setEngineerAddError(null);
     setEngineerAddSuccess(false);
-    setNewEngineer({ 
-      name: "", 
-      garageId, 
-      email: "", 
-      phone: "", 
-      specialty: "" 
+    setNewEngineer({
+      name: "",
+      garageId,
+      email: "",
+      phone: "",
+      specialty: ""
     });
   };
 
@@ -1178,9 +1178,9 @@ const updateJobCardWithAllParts = async () => {
   return (
     <>
       {/* Error & Success Alerts */}
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
         onClose={handleCloseAlert}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
@@ -1188,19 +1188,8 @@ const updateJobCardWithAllParts = async () => {
           {error}
         </Alert>
       </Snackbar>
-      
-      {/* <Snackbar 
-        open={success} 
-        autoHideDuration={3000} 
-        onClose={() => setSuccess(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert severity="success" onClose={() => setSuccess(false)}>
-          Assignment completed successfully!
-        </Alert>
-      </Snackbar> */}
 
-      {/* Form Data Snackbar */}
+    
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -1219,27 +1208,28 @@ const updateJobCardWithAllParts = async () => {
 
       {/* Main Content */}
       <Box
-        sx={{
-          flexGrow: 1,
-          mb: 4,
-          ml: { xs: 0, sm: 35 },
-          overflow: "auto",
-        }}
+         sx={{
+         flexGrow: 1,
+    mb: 4,
+    ml: { xs: 0, sm: 35 },
+    overflow: "auto",
+    px: { xs: 1, sm: 3 },
+      }}
       >
         <CssBaseline />
-        <Container maxWidth="lg">
+        <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3 } }}>
           {/* Header */}
-          <Box sx={{ 
-            mb: 3, 
-            display: 'flex', 
-            alignItems: 'center', 
+          <Box sx={{
+            mb: 3,
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: 2
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton 
-                onClick={() => navigate(`/jobs/${id}`)} 
+              <IconButton
+                onClick={() => navigate(`/jobs/${id}`)}
                 sx={{ mr: 2 }}
                 aria-label="Go back"
               >
@@ -1248,9 +1238,9 @@ const updateJobCardWithAllParts = async () => {
               <Typography variant="h5" fontWeight={600}>
                 Assign Engineer & Job Details
               </Typography>
-             
+
             </Box>
-           
+
           </Box>
 
           {/* Updated Assignment Summary Card with Job Details Cost */}
@@ -1259,10 +1249,10 @@ const updateJobCardWithAllParts = async () => {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Assignment Summary
                 {isEditMode && (
-                  <Chip 
-                    label="Editing Existing Job Card" 
-                    color="info" 
-                    size="small" 
+                  <Chip
+                    label="Editing Existing Job Card"
+                    color="info"
+                    size="small"
                     sx={{ ml: 2 }}
                   />
                 )}
@@ -1329,7 +1319,7 @@ const updateJobCardWithAllParts = async () => {
                   </Box>
                 </Grid>
               </Grid>
-              
+
               {/* Pre-loaded Engineer Info */}
               {isEditMode && assignments[0]?.engineer && (
                 <>
@@ -1372,7 +1362,7 @@ const updateJobCardWithAllParts = async () => {
                   )}
                 </>
               )}
-              
+
               {/* Job Details Cost Breakdown */}
               {(parsedJobDetails.length > 0 || jobPoints.length > 0) && (
                 <>
@@ -1409,7 +1399,7 @@ const updateJobCardWithAllParts = async () => {
                   </Box>
                 </>
               )}
-              
+
               {/* Parts Summary */}
               {(() => {
                 const allPartsUsed = [];
@@ -1417,7 +1407,7 @@ const updateJobCardWithAllParts = async () => {
                   assignment.parts.forEach(part => {
                     const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
                     const selectedQuantity = part.selectedQuantity || 1;
-                    
+
                     if (existingPartIndex !== -1) {
                       allPartsUsed[existingPartIndex].quantity += selectedQuantity;
                     } else {
@@ -1425,7 +1415,7 @@ const updateJobCardWithAllParts = async () => {
                     }
                   });
                 });
-                
+
                 if (allPartsUsed.length > 0) {
                   return (
                     <>
@@ -1445,7 +1435,7 @@ const updateJobCardWithAllParts = async () => {
                         ))}
                       </Box>
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        {isEditMode 
+                        {isEditMode
                           ? `These parts were previously used in job card: ${id}`
                           : `These parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
                         }
@@ -1459,112 +1449,112 @@ const updateJobCardWithAllParts = async () => {
           </Card>
 
           {/* Enhanced Job Details Section with Price */}
-<Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
-  <CardContent>
-    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-      Job Details (Point-wise)
-    </Typography>
-    <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-       
-          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-            <TextField
-              fullWidth
-              placeholder="Enter job detail description..."
-              value={currentJobPoint.description}
-              onChange={(e) => handleJobPointInputChange('description', e.target.value)}
-              onKeyPress={handleJobPointKeyPress}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <DescriptionIcon />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ flex: 2, minWidth: '200px' }}
-            />
-            <Button
-              variant="contained"
-              onClick={addJobPoint}
-              disabled={!currentJobPoint.description.trim()}
-              startIcon={<AddIcon />}
-              sx={{ minWidth: 120 }}
-            >
-              Add Point
-            </Button>
-          </Box>
-
-        
-          {jobPoints.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Current Job Details Points:
+          <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Job Details (Point-wise)
               </Typography>
-              <List sx={{ 
-                bgcolor: 'background.paper', 
-                border: 1, 
-                borderColor: 'divider', 
-                borderRadius: 1,
-                mb: 2
-              }}>
-                {jobPoints.map((point, index) => (
-                  <ListItem key={index} divider>
-                    <ListItemText 
-                      primary={point.description}
-                      sx={{ wordBreak: 'break-word' }}
-                    />
-                    <ListItemSecondaryAction>
-                      <IconButton 
-                        edge="end" 
-                        onClick={() => removeJobPoint(index)} 
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
+              <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
 
-         
-          {parsedJobDetails.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main' }}>
-                📋 Existing Job Details from Job Card:
-              </Typography>
-              <List sx={{ 
-                bgcolor: 'background.paper', 
-                border: 1, 
-                borderColor: 'info.main', 
-                borderRadius: 1 
-              }}>
-                {parsedJobDetails.map((item, index) => (
-                  <ListItem key={index} divider>
-                    <ListItemText 
-                      primary={`Description: ${item.description}`} 
-                    />
-                    <ListItemSecondaryAction>
-                      <IconButton 
-                        edge="end" 
-                        onClick={() => removeExistingJobPoint(index)} 
-                        color="error"
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                      <TextField
+                        fullWidth
+                        placeholder="Enter job detail description..."
+                        value={currentJobPoint.description}
+                        onChange={(e) => handleJobPointInputChange('description', e.target.value)}
+                        onKeyPress={handleJobPointKeyPress}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <DescriptionIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ flex: 2, minWidth: '200px' }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={addJobPoint}
+                        disabled={!currentJobPoint.description.trim()}
+                        startIcon={<AddIcon />}
+                        sx={{ minWidth: 120 }}
                       >
-                        <DeleteIcon />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
-        </Grid>
-      </Grid>
-    </Paper>
-  </CardContent>
-</Card>
+                        Add Point
+                      </Button>
+                    </Box>
+
+
+                    {jobPoints.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Current Job Details Points:
+                        </Typography>
+                        <List sx={{
+                          bgcolor: 'background.paper',
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          mb: 2
+                        }}>
+                          {jobPoints.map((point, index) => (
+                            <ListItem key={index} divider>
+                              <ListItemText
+                                primary={point.description}
+                                sx={{ wordBreak: 'break-word' }}
+                              />
+                              <ListItemSecondaryAction>
+                                <IconButton
+                                  edge="end"
+                                  onClick={() => removeJobPoint(index)}
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </ListItemSecondaryAction>
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    )}
+
+
+                    {parsedJobDetails.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main' }}>
+                          📋 Existing Job Details from Job Card:
+                        </Typography>
+                        <List sx={{
+                          bgcolor: 'background.paper',
+                          border: 1,
+                          borderColor: 'info.main',
+                          borderRadius: 1
+                        }}>
+                          {parsedJobDetails.map((item, index) => (
+                            <ListItem key={index} divider>
+                              <ListItemText
+                                primary={`Description: ${item.description}`}
+                              />
+                              <ListItemSecondaryAction>
+                                <IconButton
+                                  edge="end"
+                                  onClick={() => removeExistingJobPoint(index)}
+                                  color="error"
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </ListItemSecondaryAction>
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    )}
+                  </Grid>
+                </Grid>
+              </Paper>
+            </CardContent>
+          </Card>
 
           {/* Main Form Card */}
           <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
@@ -1574,27 +1564,27 @@ const updateJobCardWithAllParts = async () => {
                   <Typography variant="h6" fontWeight={600}>
                     Engineer Assignments
                   </Typography>
-                  
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenAddEngineerDialog(true)}
-                size="small"
-              >
-                Add Engineer
-              </Button>
-            </Box>
+
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddIcon />}
+                      onClick={() => setOpenAddEngineerDialog(true)}
+                      size="small"
+                    >
+                      Add Engineer
+                    </Button>
+                  </Box>
                 </Box>
 
                 {/* Assignments */}
                 {assignments.map((assignment, index) => (
-                  <Accordion 
-                    key={assignment.id} 
-                    defaultExpanded 
-                    sx={{ 
-                      mb: 2, 
+                  <Accordion
+                    key={assignment.id}
+                    defaultExpanded
+                    sx={{
+                      mb: 2,
                       border: `1px solid ${theme.palette.divider}`,
                       bgcolor: 'background.paper'
                     }}
@@ -1605,24 +1595,24 @@ const updateJobCardWithAllParts = async () => {
                         <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
                           Assignment #{index + 1}
                           {assignment.engineer && (
-                            <Chip 
-                              label={assignment.engineer.name || assignment.engineer.email || 'Unknown Engineer'} 
-                              size="small" 
-                              sx={{ ml: 1 }} 
+                            <Chip
+                              label={assignment.engineer.name || assignment.engineer.email || 'Unknown Engineer'}
+                              size="small"
+                              sx={{ ml: 1 }}
                               color="primary"
                             />
                           )}
-                          <Chip 
-                            label={assignment.priority} 
-                            size="small" 
-                            sx={{ ml: 1 }} 
+                          <Chip
+                            label={assignment.priority}
+                            size="small"
+                            sx={{ ml: 1 }}
                             color={getPriorityColor(assignment.priority)}
                           />
                           {assignment.parts.length > 0 && (
-                            <Chip 
-                              label={`${assignment.parts.length} parts`} 
-                              size="small" 
-                              sx={{ ml: 1 }} 
+                            <Chip
+                              label={`${assignment.parts.length} parts`}
+                              size="small"
+                              sx={{ ml: 1 }}
                               color="info"
                             />
                           )}
@@ -1720,10 +1710,10 @@ const updateJobCardWithAllParts = async () => {
 
                         {/* Parts Selection with Quantity Management */}
                         <Grid item xs={12}>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center', 
+                          <Box sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
                             mb: 1,
                             flexWrap: 'wrap',
                             gap: 1
@@ -1743,13 +1733,13 @@ const updateJobCardWithAllParts = async () => {
                               </Button>
                             </Tooltip>
                           </Box>
-                          
+
                           {isLoadingInventory ? (
-                            <Box sx={{ 
-                              display: 'flex', 
-                              justifyContent: 'center', 
+                            <Box sx={{
+                              display: 'flex',
+                              justifyContent: 'center',
                               alignItems: 'center',
-                              py: 2 
+                              py: 2
                             }}>
                               <CircularProgress size={20} />
                               <Typography sx={{ ml: 2 }}>
@@ -1760,10 +1750,10 @@ const updateJobCardWithAllParts = async () => {
                             <Autocomplete
                               multiple
                               fullWidth
-                               options={inventoryParts.filter(
-    part => getAvailableQuantity(part._id) > 0 && !assignment.parts.some(p => p._id === part._id)
-  )}
-                              getOptionLabel={(option) => 
+                              options={inventoryParts.filter(
+                                part => getAvailableQuantity(part._id) > 0 && !assignment.parts.some(p => p._id === part._id)
+                              )}
+                              getOptionLabel={(option) =>
                                 `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
                               }
                               isOptionEqualToValue={(option, value) => {
@@ -1785,42 +1775,28 @@ const updateJobCardWithAllParts = async () => {
                                 ))
                               }
                               renderOption={(props, option) => (
-                                <Box component="li" {...props}>
-                                  <Box sx={{ width: '100%' }}>
-                                    <Typography variant="body2" fontWeight={500}>
-                                      {option.partName}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      Part #: {option.partNumber || 'N/A'} | 
-                                      Price: ₹{option.pricePerUnit || 0} | 
-                                      GST: {option.gstPercentage || option.taxAmount || 0}% | 
-                                      Available: {getAvailableQuantity(option._id)} | 
-                                      {option.carName} - {option.model}
-                                    </Typography>
-                                  </Box>
+                                <Box component="li" {...props} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                  <Typography variant="body2" noWrap sx={{ width: '100%', textOverflow: 'ellipsis' }}>
+                                    {option.partName}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
+                                    #{option.partNumber} | ₹{option.pricePerUnit} | GST: {option.taxAmount}% | Avail: {getAvailableQuantity(option._id)}
+                                  </Typography>
                                 </Box>
                               )}
                               renderInput={(params) => (
                                 <TextField
                                   {...params}
-                                  placeholder="Select parts needed"
-                                  variant="outlined"
                                   InputProps={{
                                     ...params.InputProps,
-                                    startAdornment: (
-                                      <>
-                                        <InputAdornment position="start">
-                                          <InventoryIcon color="action" />
-                                        </InputAdornment>
-                                        {params.InputProps.startAdornment}
-                                      </>
-                                    ),
+                                    sx: { borderRadius: 1 }
                                   }}
                                 />
                               )}
+                              sx={{ '& .MuiAutocomplete-popper': { maxHeight: 300 } }}
                               noOptionsText="No parts available in stock"
                               filterOptions={(options, { inputValue }) => {
-                                return options.filter(option => 
+                                return options.filter(option =>
                                   getAvailableQuantity(option._id) > 0 && (
                                     option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
                                     option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
@@ -1831,47 +1807,47 @@ const updateJobCardWithAllParts = async () => {
                               }}
                             />
                           )}
-                          
+
                           {/* Selected Parts with Enhanced Quantity Management */}
                           {assignment.parts.length > 0 && (
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                                 Selected Parts with Details:
                                 {isEditMode && (
-                                  <Chip 
-                                    label="Pre-loaded from Job Card" 
-                                    size="small" 
-                                    color="secondary" 
+                                  <Chip
+                                    label="Pre-loaded from Job Card"
+                                    size="small"
+                                    color="secondary"
                                     sx={{ ml: 1 }}
                                   />
                                 )}
                               </Typography>
                               <List dense>
                                 {assignment.parts.map((part, partIndex) => {
-                                   const selectedQuantity = part.selectedQuantity || 1;
-                                   const quantity= part.quantity;
-                                   const unitPrice = part.sellingPrice || 0;
-                                   const gstPercentage = part.taxAmount;
-                                   const gst = (part.taxAmount * selectedQuantity)/quantity;
-                                   const totalTax= (gstPercentage * selectedQuantity)/quantity;
-                                   const totalPrice = unitPrice * selectedQuantity;
-                                   const gstAmount = (totalPrice * gstPercentage) / 100;
-                                   const finalPrice = totalPrice + totalTax;
-                                  
+                                  const selectedQuantity = part.selectedQuantity || 1;
+                                  const quantity = part.quantity;
+                                  const unitPrice = part.sellingPrice || 0;
+                                  const gstPercentage = part.taxAmount;
+                                  const gst = (part.taxAmount * selectedQuantity) / quantity;
+                                  const totalTax = (gstPercentage * selectedQuantity) / quantity;
+                                  const totalPrice = unitPrice * selectedQuantity;
+                                  const gstAmount = (totalPrice * gstPercentage) / 100;
+                                  const finalPrice = totalPrice + totalTax;
+
                                   // Get available quantity considering all current selections
                                   const availableQuantity = getAvailableQuantity(part._id);
-                                  
+
                                   // Calculate the maximum quantity user can select
                                   // This is the current available quantity + already selected quantity for this specific part
                                   const maxSelectableQuantity = availableQuantity + selectedQuantity;
                                   const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
 
                                   return (
-                                    <ListItem 
-                                      key={part._id} 
-                                      sx={{ 
-                                        border: `1px solid ${theme.palette.divider}`, 
-                                        borderRadius: 1, 
+                                    <ListItem
+                                      key={part._id}
+                                      sx={{
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        borderRadius: 1,
                                         mb: 1,
                                         py: 1,
                                         flexDirection: 'column',
@@ -1887,7 +1863,7 @@ const updateJobCardWithAllParts = async () => {
                                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                                             Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
                                           </Typography>
-                                          
+
                                           <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
                                             Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
                                           </Typography>
@@ -1903,9 +1879,9 @@ const updateJobCardWithAllParts = async () => {
                                                 }
                                               }}
                                               disabled={selectedQuantity <= 1}
-                                              sx={{ 
-                                                minWidth: '24px', 
-                                                width: '24px', 
+                                              sx={{
+                                                minWidth: '24px',
+                                                width: '24px',
                                                 height: '24px',
                                                 border: `1px solid ${theme.palette.divider}`
                                               }}
@@ -1920,12 +1896,12 @@ const updateJobCardWithAllParts = async () => {
                                               onChange={(e) => {
                                                 const newQuantity = parseInt(e.target.value) || 1;
                                                 const oldQuantity = selectedQuantity;
-                                                
+
                                                 // Validate quantity limits
                                                 if (newQuantity < 1) {
                                                   return;
                                                 }
-                                                
+
                                                 if (newQuantity > maxSelectableQuantity) {
                                                   setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
                                                   return;
@@ -1933,13 +1909,13 @@ const updateJobCardWithAllParts = async () => {
 
                                                 handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
                                               }}
-                                              inputProps={{ 
-                                                min: 1, 
+                                              inputProps={{
+                                                min: 1,
                                                 max: maxSelectableQuantity,
                                                 style: { width: '50px', textAlign: 'center' },
                                                 readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
                                               }}
-                                              sx={{ 
+                                              sx={{
                                                 width: '70px',
                                                 '& .MuiInputBase-input': {
                                                   textAlign: 'center',
@@ -1960,9 +1936,9 @@ const updateJobCardWithAllParts = async () => {
                                                 }
                                               }}
                                               disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
-                                              sx={{ 
-                                                minWidth: '24px', 
-                                                width: '24px', 
+                                              sx={{
+                                                minWidth: '24px',
+                                                width: '24px',
                                                 height: '24px',
                                                 border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
                                                 color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
@@ -1981,11 +1957,11 @@ const updateJobCardWithAllParts = async () => {
                                         </Box>
                                       </Box>
                                       {/* Price Details */}
-                                      <Box sx={{ 
-                                        mt: 1, 
-                                        p: 1, 
-                                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)', 
-                                        borderRadius: 1 
+                                      <Box sx={{
+                                        mt: 1,
+                                        p: 1,
+                                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                        borderRadius: 1
                                       }}>
                                         <Grid container spacing={1} alignItems="center">
                                           <Grid item xs={4}>
@@ -2056,156 +2032,156 @@ const updateJobCardWithAllParts = async () => {
         </Container>
 
         {/* Enhanced Add Part Dialog - Based on InventoryManagement */}
-        <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="md" fullWidth>
-                  <DialogTitle>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="h6">Add New Part</Typography>
-                      <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
-                    </Box>
-                  </DialogTitle>
-                  <DialogContent dividers>
-                    {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
-                    {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
-        
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Car Name *" name="carName"
-                          value={newPart.carName} onChange={handlePartInputChange}
-                          required fullWidth margin="normal"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Model *" name="model"
-                          value={newPart.model} onChange={handlePartInputChange}
-                          required fullWidth margin="normal"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Part Number *" name="partNumber"
-                          value={newPart.partNumber} onChange={handlePartInputChange}
-                          required fullWidth margin="normal"
-                          error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
-                          helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Part Name *" name="partName"
-                          value={newPart.partName} onChange={handlePartInputChange}
-                          required fullWidth margin="normal"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Quantity *" name="quantity"
-                          type="number" value={newPart.quantity}
-                          onChange={handlePartInputChange}
-                          required fullWidth margin="normal" inputProps={{ min: 1 }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Purchase Price *" name="purchasePrice"
-                          type="number" value={newPart.purchasePrice}
-                          onChange={handlePartInputChange}
-                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
-                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="Selling Price *" name="sellingPrice"
-                          type="number" value={newPart.sellingPrice}
-                          onChange={handlePartInputChange}
-                          required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
-                          InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          label="HSN Number" name="hsnNumber"
-                          value={newPart.hsnNumber} onChange={handlePartInputChange}
-                          fullWidth margin="normal"
-                        />
-                      </Grid>
-                    </Grid>
-        
-                    {/* Tax Type Selection */}
-                    <Box sx={{ mt: 3 }}>
-                      <FormControl fullWidth>
-                        <InputLabel>Tax Type</InputLabel>
-                        <Select
-                          name="taxType"
-                          value={newPart.taxType}
-                          onChange={handlePartInputChange}
-                          label="Tax Type"
-                        >
-                          <MenuItem value="igst">IGST</MenuItem>
-                          <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
-                        </Select>
-                      </FormControl>
-        
-                      {newPart.taxType === 'igst' ? (
-                        <TextField
-                          label="IGST (%)" name="igst"
-                          type="number" value={newPart.igst}
-                          onChange={handlePartInputChange}
-                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
-                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                        />
-                      ) : (
-                        <TextField
-                          label="CGST/SGST (each %)" name="cgstSgst"
-                          type="number" value={newPart.cgstSgst}
-                          onChange={handlePartInputChange}
-                          fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
-                          InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                        />
-                      )}
-                    </Box>
-        
-                    {/* Tax Preview */}
-                    {(newPart.purchasePrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
-                      <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>Tax Summary</Typography>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={4}>
-                            <Typography variant="body2" color="text.secondary">
-                              Base: ₹{(newPart.purchasePrice * newPart.quantity).toFixed(2)}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} sm={4}>
-                            <Typography variant="body2" color="primary">
-                              Tax: ₹{calculateTaxAmount(newPart.purchasePrice, newPart.quantity, newPart.taxType === 'igst' ? newPart.igst : newPart.cgstSgst * 2).toFixed(2)}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} sm={4}>
-                            <Typography variant="h6">Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}</Typography>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    )}
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
-                    <Button
-                      onClick={handleAddPart}
-                      variant="contained"
-                      disabled={addingPart || !newPart.partName.trim()}
-                      startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
-                      sx={{ backgroundColor: '#ff4d4d', '&:hover': { backgroundColor: '#e63939' } }}
-                    >
-                      {addingPart ? 'Adding...' : 'Add Part'}
-                    </Button>
-                  </DialogActions>
-                </Dialog>
+        <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="sm" fullWidth fullScreen={{ xs: true, sm: false }}>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Add New Part</Typography>
+              <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent dividers>
+            {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
+            {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
+
+            <Grid container spacing={2}>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Car Name *" name="carName"
+                  value={newPart.carName} onChange={handlePartInputChange}
+                  required fullWidth margin="normal"
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Model *" name="model"
+                  value={newPart.model} onChange={handlePartInputChange}
+                  required fullWidth margin="normal"
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Part Number *" name="partNumber"
+                  value={newPart.partNumber} onChange={handlePartInputChange}
+                  required fullWidth margin="normal"
+                  error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
+                  helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Part Name *" name="partName"
+                  value={newPart.partName} onChange={handlePartInputChange}
+                  required fullWidth margin="normal"
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Quantity *" name="quantity"
+                  type="number" value={newPart.quantity}
+                  onChange={handlePartInputChange}
+                  required fullWidth margin="normal" inputProps={{ min: 1 }}
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Purchase Price *" name="purchasePrice"
+                  type="number" value={newPart.purchasePrice}
+                  onChange={handlePartInputChange}
+                  required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="Selling Price *" name="sellingPrice"
+                  type="number" value={newPart.sellingPrice}
+                  onChange={handlePartInputChange}
+                  required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                />
+              </Grid>
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  label="HSN Number" name="hsnNumber"
+                  value={newPart.hsnNumber} onChange={handlePartInputChange}
+                  fullWidth margin="normal"
+                />
+              </Grid>
+            </Grid>
+
+            {/* Tax Type Selection */}
+            <Box sx={{ mt: 3 }}>
+              <FormControl fullWidth>
+                <InputLabel>Tax Type</InputLabel>
+                <Select
+                  name="taxType"
+                  value={newPart.taxType}
+                  onChange={handlePartInputChange}
+                  label="Tax Type"
+                >
+                  <MenuItem value="igst">IGST</MenuItem>
+                  <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
+                </Select>
+              </FormControl>
+
+              {newPart.taxType === 'igst' ? (
+                <TextField
+                  label="IGST (%)" name="igst"
+                  type="number" value={newPart.igst}
+                  onChange={handlePartInputChange}
+                  fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                />
+              ) : (
+                <TextField
+                  label="CGST/SGST (each %)" name="cgstSgst"
+                  type="number" value={newPart.cgstSgst}
+                  onChange={handlePartInputChange}
+                  fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                />
+              )}
+            </Box>
+
+            {/* Tax Preview */}
+            {(newPart.purchasePrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Tax Summary</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="text.secondary">
+                      Base: ₹{(newPart.purchasePrice * newPart.quantity).toFixed(2)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="body2" color="primary">
+                      Tax: ₹{calculateTaxAmount(newPart.purchasePrice, newPart.quantity, newPart.taxType === 'igst' ? newPart.igst : newPart.cgstSgst * 2).toFixed(2)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Typography variant="h6">Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
+            <Button
+              onClick={handleAddPart}
+              variant="contained"
+              disabled={addingPart || !newPart.partName.trim()}
+              startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
+              sx={{ backgroundColor: '#ff4d4d', '&:hover': { backgroundColor: '#e63939' } }}
+            >
+              {addingPart ? 'Adding...' : 'Add Part'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Add Engineer Dialog */}
-        <Dialog 
-          open={openAddEngineerDialog} 
+        <Dialog
+          open={openAddEngineerDialog}
           onClose={handleCloseAddEngineerDialog}
           maxWidth="sm"
           fullWidth
@@ -2225,32 +2201,32 @@ const updateJobCardWithAllParts = async () => {
                 {engineerAddError}
               </Alert>
             )}
-            
+
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12}>
-                <TextField 
-                  fullWidth 
-                  label="Name *" 
-                  value={newEngineer.name} 
+                <TextField
+                  fullWidth
+                  label="Name *"
+                  value={newEngineer.name}
                   onChange={(e) => handleEngineerInputChange('name', e.target.value)}
                   error={!newEngineer.name.trim() && !!engineerAddError}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Email *" 
-                  type="email" 
-                  value={newEngineer.email} 
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  fullWidth
+                  label="Email *"
+                  type="email"
+                  value={newEngineer.email}
                   onChange={(e) => handleEngineerInputChange('email', e.target.value)}
                   error={!newEngineer.email.trim() && !!engineerAddError}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField 
-                  fullWidth 
-                  label="Phone *" 
-                  value={newEngineer.phone} 
+              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+                <TextField
+                  fullWidth
+                  label="Phone *"
+                  value={newEngineer.phone}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                     handleEngineerInputChange('phone', value);
@@ -2260,10 +2236,10 @@ const updateJobCardWithAllParts = async () => {
                 />
               </Grid>
               <Grid item xs={12}>
-                <TextField 
-                  fullWidth 
-                  label="Specialty" 
-                  value={newEngineer.specialty} 
+                <TextField
+                  fullWidth
+                  label="Specialty"
+                  value={newEngineer.specialty}
                   onChange={(e) => handleEngineerInputChange('specialty', e.target.value)}
                   placeholder="e.g., Engine Specialist, Brake Expert"
                 />
@@ -2271,15 +2247,15 @@ const updateJobCardWithAllParts = async () => {
             </Grid>
           </DialogContent>
           <DialogActions>
-            <Button 
+            <Button
               onClick={handleCloseAddEngineerDialog}
               disabled={addingEngineer}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleAddEngineer} 
-              disabled={addingEngineer} 
+            <Button
+              onClick={handleAddEngineer}
+              disabled={addingEngineer}
               variant="contained"
               startIcon={addingEngineer ? <CircularProgress size={16} color="inherit" /> : null}
             >

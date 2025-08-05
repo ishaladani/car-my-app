@@ -124,112 +124,154 @@ const RecordReport = () => {
     }).format(amount || 0);
   };
 
+  const formatCurrencyForPDF = (amount) => {
+  const number = amount || 0;
+  const formattedNumber = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+  })
+    .format(number)
+    .replace("₹", "Rs "); // Replace ₹ with Rs
+  return formattedNumber;
+};
+
   // Generate PDF for jobs
   const generateJobsPDF = (jobs) => {
-    const doc = new jsPDF();
+  const doc = new jsPDF();
 
-    // Title
-    doc.setFontSize(20);
-    doc.text("Financial Report - Completed Jobs", 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+  const formatCurrencyForPDF = (amount) => {
+    const number = amount || 0;
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+    })
+      .format(number)
+      .replace("₹", "Rs ");
+  };
 
-    // Summary
-    const totalJobs = jobs.length;
-    const totalAmount = jobs.reduce(
-      (sum, job) => sum + (job.totalAmount || 0),
-      0
-    );
+  // Title
+  doc.setFontSize(20);
+  doc.text("Financial Report - Completed Jobs", 20, 20);
+  doc.setFontSize(12);
+  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
 
-    doc.setFontSize(14);
-    doc.text("Summary:", 20, 45);
-    doc.setFontSize(12);
-    doc.text(`Total Jobs: ${totalJobs}`, 20, 55);
-    doc.text(`Total Revenue: ${formatCurrency(totalAmount)}`, 20, 65);
+  // Summary
+  const totalJobs = jobs.length;
+  const totalAmount = jobs.reduce((sum, job) => sum + (job.totalAmount || 0), 0);
 
-    // Table
-    const tableData = jobs.map((job) => [
-      job.jobId || "N/A",
-      job.customerName || "N/A",
-      job.carNumber || "N/A",
-      formatCurrency(job.totalAmount || 0),
-      formatDate(job.completedAt || job.updatedAt),
-    ]);
+  doc.setFontSize(14);
+  doc.text("Summary:", 20, 45);
+  doc.setFontSize(12);
+  doc.text(`Total Jobs: ${totalJobs}`, 20, 55);
+  doc.text(`Total Revenue: ${formatCurrencyForPDF(totalAmount)}`, 20, 65);
 
+  // Table
+  const tableData = jobs.map((job) => [
+    job.jobId || "N/A",
+    job.customerName || "N/A",
+    job.carNumber || "N/A",
+    formatCurrencyForPDF(job.totalAmount || 0),
+    new Date(job.completedAt || job.updatedAt).toLocaleDateString("en-IN"),
+  ]);
+
+  autoTable(doc, {
+    head: [["Job ID", "Customer", "Vehicle", "Amount", "Completed Date"]],
+    body: tableData,
+    startY: 80,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [25, 118, 210] },
+  });
+
+  doc.save(`financial-report-${new Date().toISOString().split("T")[0]}.pdf`);
+};
+
+
+const generateInventoryPDF = (inventoryData) => {
+  if (!inventoryData) return;
+
+  const doc = new jsPDF();
+  const formatCurrencyForPDF = (amount) => {
+    const number = amount || 0;
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 2,
+    })
+      .format(number)
+      .replace("₹", "Rs ");
+  };
+
+  // Title
+  doc.setFontSize(20);
+  doc.text("Inventory Report", 20, 20);
+  doc.setFontSize(12);
+  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+
+  // Summary
+  const summary = inventoryData?.summary || {};
+  let yPos = 45;
+
+  doc.setFontSize(14);
+  doc.text("Summary:", 20, yPos);
+  yPos += 12;
+
+  doc.setFontSize(12);
+  doc.text(`Total Parts: ${summary.totalParts}`, 20, yPos);
+  yPos += 10;
+
+  doc.text(`Total Available: ${summary.totalPartsAvailable}`, 20, yPos);
+  yPos += 10;
+
+  doc.text(
+    `Purchase Value: ${formatCurrencyForPDF(summary.totalPurchaseValue)}`,
+    20,
+    yPos
+  );
+  yPos += 10;
+
+  doc.text(
+    `Selling Value: ${formatCurrencyForPDF(summary.totalSellingValue)}`,
+    20,
+    yPos
+  );
+  yPos += 10;
+
+  doc.text(
+    `Potential Profit: ${formatCurrencyForPDF(summary.potentialProfit)}`,
+    20,
+    yPos
+  );
+  yPos += 10;
+
+  doc.text(`Low Stock Items: ${summary.lowStockCount}`, 20, yPos);
+  yPos += 10;
+
+  doc.text(`Out of Stock: ${summary.outOfStockCount}`, 20, yPos);
+  yPos += 20;
+
+  // Low Stock Table
+  if (inventoryData.lowStockItems?.length > 0) {
     autoTable(doc, {
-      head: [["Job ID", "Customer", "Vehicle", "Amount", "Completed Date"]],
-      body: tableData,
-      startY: 80,
+      head: [["Part Name", "Model", "Quantity", "Purchase Price", "Selling Price"]],
+      body: inventoryData.lowStockItems.map((part) => [
+        part.name,
+        part.model,
+        part.quantity,
+        formatCurrencyForPDF(part.price),
+        formatCurrencyForPDF(part.price),
+      ]),
+      startY: yPos,
       styles: { fontSize: 10 },
-      headStyles: { fillColor: [25, 118, 210] },
+      headStyles: { fillColor: [255, 152, 0] },
     });
+  }
 
-    doc.save(`financial-report-${new Date().toISOString().split("T")[0]}.pdf`);
-  };
+  doc.save(`inventory-report-${new Date().toISOString().split("T")[0]}.pdf`);
+};
 
-  // Generate PDF for inventory
-  const generateInventoryPDF = (inventoryData) => {
-    if (!inventoryData) return;
 
-    const doc = new jsPDF();
-
-    // Title
-    doc.setFontSize(20);
-    doc.text("Inventory Report", 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
-
-    // Summary
-    const summary = inventoryData?.summary || {};
-    doc.setFontSize(14);
-    doc.text("Summary:", 20, 45);
-    doc.setFontSize(12);
-    doc.text(`Total Parts: ${summary.totalParts}`, 20, 55);
-    doc.text(`Total Available: ${summary.totalPartsAvailable}`, 20, 65);
-    doc.text(
-      `Purchase Value: ${formatCurrency(summary.totalPurchaseValue)}`,
-      20,
-      75
-    );
-    doc.text(
-      `Selling Value: ${formatCurrency(summary.totalSellingValue)}`,
-      20,
-      85
-    );
-    doc.text(
-      `Potential Profit: ${formatCurrency(summary.potentialProfit)}`,
-      20,
-      95
-    );
-    doc.text(`Low Stock Items: ${summary.lowStockCount}`, 20, 105);
-    doc.text(`Out of Stock: ${summary.outOfStockCount}`, 20, 115);
-
-    // Low stock table
-    if (
-      inventoryData?.lowStockItems &&
-      inventoryData.lowStockItems.length > 0
-    ) {
-      autoTable(doc, {
-        head: [
-          ["Part Name", "Model", "Quantity", "Purchase Price", "Selling Price"],
-        ],
-        body: inventoryData.lowStockItems.map((part) => [
-          part.name,
-          part.model,
-          part.quantity,
-          formatCurrency(part.price),
-          formatCurrency(part.price),
-        ]),
-        startY: 130,
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [255, 152, 0] },
-      });
-    }
-
-    doc.save(`inventory-report-${new Date().toISOString().split("T")[0]}.pdf`);
-  };
-
-  // Fetch job data from API
    // Fetch job data from API
   useEffect(() => {
     if (!garageId) {

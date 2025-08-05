@@ -197,7 +197,7 @@ const InventoryDashboard = () => {
   };
 
   const formatCurrency = (amount) => {
-    return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount || 0)}`;
+    return `${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount || 0)}`;
   };
 
   const formatDate = (date) => {

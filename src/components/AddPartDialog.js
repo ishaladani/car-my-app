@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  Dialog, 
-  DialogActions, 
-  DialogContent, 
-  DialogTitle, 
-  Grid, 
-  TextField, 
-  Typography, 
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  TextField,
+  Typography,
   InputAdornment,
   FormControlLabel,
   Checkbox,
@@ -19,19 +19,19 @@ import {
 import { Close as CloseIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const AddPartDialog = ({ 
-  showNewPartDialog, 
-  setShowNewPartDialog, 
-  isMobile, 
-  newPart, 
-  setNewPart, 
-  addNewPart, 
+const AddPartDialog = ({
+  showNewPartDialog,
+  setShowNewPartDialog,
+  isMobile,
+  newPart,
+  setNewPart,
+  addNewPart,
   includeHsnField = true
 }) => {
   const [addingPart, setAddingPart] = useState(false);
   const [partAddError, setPartAddError] = useState(null);
   const [partAddSuccess, setPartAddSuccess] = useState(false);
-  
+
   let garageId = localStorage.getItem("garageId");
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
@@ -141,7 +141,7 @@ const AddPartDialog = ({
       );
 
       setPartAddSuccess(true);
-      
+
       // Reset form
       setNewPart({
         garageId,
@@ -230,7 +230,7 @@ const AddPartDialog = ({
             {partAddError}
           </Alert>
         )}
-        
+
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}>
             <TextField
@@ -453,7 +453,7 @@ const AddPartDialog = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ p: 3 }}>
-        <Button 
+        <Button
           onClick={handleCloseAddPartDialog}
           disabled={addingPart}
           sx={{ width: isMobile ? "100%" : "auto" }}
@@ -466,9 +466,9 @@ const AddPartDialog = ({
           variant="contained"
           color="primary"
           startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : null}
-          sx={{ 
-            width: isMobile ? "100%" : "auto", 
-            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)' 
+          sx={{
+            width: isMobile ? "100%" : "auto",
+            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)'
           }}
         >
           {addingPart ? 'Adding...' : 'Add Part'}

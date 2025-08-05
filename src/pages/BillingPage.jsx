@@ -1570,28 +1570,17 @@ const generateProfessionalGSTInvoice = () => {
 
 const printInvoice = () => {
   try {
-    // Generate the same PDF as in download
     const doc = generateProfessionalGSTInvoice();
-
-    // Convert PDF to blob and open in new window for printing
     const pdfBlob = doc.output('blob');
     const url = URL.createObjectURL(pdfBlob);
-
     const iframe = document.createElement('iframe');
     iframe.style.position = 'absolute';
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = 'none';
     iframe.src = url;
-
     document.body.appendChild(iframe);
 
-    iframe.onload = () => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    };
-
-    // Clean up after print
     iframe.onload = () => {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -1820,14 +1809,14 @@ Thank you!`;
 />
           </>
         ) : (
-         <ThankYouSection 
+        <ThankYouSection 
   carDetails={carDetails} 
   summary={summary} 
   gstSettings={gstSettings} 
   paymentMethod={paymentMethod} 
   isMobile={isMobile} 
-  downloadPdfBill={downloadPdfBill} 
-  printInvoice={printInvoice}                // ← Define in AutoServeBilling
+  downloadPdfBill={downloadPdfBill}      
+  printInvoice={printInvoice}             // ← Add this
   sendBillViaWhatsApp={sendBillViaWhatsApp} 
   sendingWhatsApp={sendingWhatsApp} 
   openEmailDialog={openEmailDialog} 
