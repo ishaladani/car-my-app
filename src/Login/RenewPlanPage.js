@@ -89,7 +89,6 @@ const RenewPlanPage = () => {
     setError("");
 
     try {
-      console.log("Fetching garage info for email:", email);
       
       const response = await axios.get(
         `${BASE_URL}/api/garage/get-garage-id/${encodeURIComponent(email)}`,
@@ -98,7 +97,6 @@ const RenewPlanPage = () => {
         }
       );
 
-      console.log("Garage info response:", response.data);
 
       if (response.data && response.data.data && response.data.data.garageId) {
         const garageInfo = response.data.data;
@@ -138,7 +136,6 @@ const RenewPlanPage = () => {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
-    script.onload = () => console.log("Razorpay SDK loaded");
     script.onerror = () => setError("Failed to load Razorpay gateway.");
     document.body.appendChild(script);
 
@@ -173,10 +170,6 @@ const RenewPlanPage = () => {
 
   // Step 1: Create Renewal Order
   const handleCreateOrder = async () => {
-    console.log("=== Creating Renewal Order ===");
-    console.log("Garage ID:", garageData?.garageId);
-    console.log("Selected Plan ID:", selectedPlanId);
-    console.log("Base URL:", BASE_URL);
 
     setError("");
     setSuccess("");
@@ -195,12 +188,7 @@ const RenewPlanPage = () => {
     }
 
     try {
-      console.log("Making API call to:", `${BASE_URL}/api/plans/renew`);
-      console.log("Request body:", {
-        garageId: garageData.garageId,
-        planId: selectedPlanId,
-        paymentMethod: "razorpay",
-      });
+    
 
       const response = await axios.post(
         `${BASE_URL}/api/plans/renew`,
@@ -214,7 +202,6 @@ const RenewPlanPage = () => {
         }
       );
 
-      console.log("Order creation response:", response.data);
 
       // Extract orderId from the correct path in response
       let orderId;
@@ -232,7 +219,6 @@ const RenewPlanPage = () => {
       setOrderId(orderId);
       setSuccess("Order created successfully! Proceed to payment.");
       setStep("payment");
-      console.log("Order ID set to:", orderId);
     } catch (err) {
       console.error("Order creation error:", err);
       console.error("Error response:", err.response?.data);
@@ -240,14 +226,12 @@ const RenewPlanPage = () => {
 
       // If API fails, create a test order for debugging
       if (err.response?.status === 404 || err.response?.status >= 500) {
-        console.log("API failed, creating test order for debugging...");
         const testOrderId = "test_order_" + Date.now();
         setOrderId(testOrderId);
         setSuccess(
           "Test order created for debugging. You can now test the payment flow."
         );
         setStep("payment");
-        console.log("Test order ID set to:", testOrderId);
       } else {
         setError(
           err.response?.data?.message ||
@@ -289,12 +273,10 @@ const RenewPlanPage = () => {
 
       // Check if this is a test order
       if (orderId.startsWith("test_order_")) {
-        console.log("Using test order, setting default values...");
         amount = 99900; // ₹999 in paise
         currency = "INR";
       } else {
         // Fetch order details (amount, currency)
-        console.log("Fetching order details for:", orderId);
         try {
           const orderRes = await axios.get(
             `${BASE_URL}/api/plans/order/${orderId}`
@@ -302,14 +284,11 @@ const RenewPlanPage = () => {
           const orderData = orderRes.data.data;
           amount = orderData.amount;
           currency = orderData.currency;
-          console.log("Order details:", { amount, currency });
         } catch (orderError) {
-          console.log("Could not fetch order details, using defaults...");
           // Use the amount from the order creation response
           const selectedPlan = plans.find((p) => p._id === selectedPlanId);
           amount = (selectedPlan?.amount || 999) * 100; // Convert to paise
           currency = "INR";
-          console.log("Using default order details:", { amount, currency });
         }
       }
 
@@ -370,27 +349,21 @@ const RenewPlanPage = () => {
         },
       };
 
-      console.log("=== Creating Razorpay instance ===");
-      console.log("Razorpay options:", options);
+ 
 
       const rzp = new window.Razorpay(options);
-      console.log("Razorpay instance created successfully");
 
       // Try to open the popup with multiple attempts
       try {
-        console.log("=== Attempting to open Razorpay popup ===");
         rzp.open();
-        console.log("Razorpay popup opened successfully");
       } catch (openError) {
         console.error("Failed to open Razorpay popup:", openError);
 
         // Try again with a delay
         setTimeout(() => {
           try {
-            console.log("=== Retrying Razorpay popup ===");
             const newRzp = new window.Razorpay(options);
             newRzp.open();
-            console.log("Razorpay popup opened on retry");
           } catch (retryError) {
             console.error("Retry also failed:", retryError);
             setError("Failed to open payment popup. Please try again.");
@@ -825,7 +798,6 @@ const RenewPlanPage = () => {
           variant="outlined"
           size="small"
           onClick={() => {
-            console.log("=== Testing Razorpay directly ===");
             if (!window.Razorpay) {
               alert("Razorpay not loaded!");
               return;
@@ -860,14 +832,9 @@ const RenewPlanPage = () => {
             };
 
             try {
-              console.log(
-                "Creating test Razorpay instance with key:",
-                RAZORPAY_KEY_ID
-              );
+            
               const rzp = new window.Razorpay(testOptions);
-              console.log("Opening test Razorpay popup...");
               rzp.open();
-              console.log("Test Razorpay popup opened");
             } catch (error) {
               console.error("Test failed:", error);
               alert("❌ Test failed: " + error.message);
@@ -882,10 +849,7 @@ const RenewPlanPage = () => {
           variant="outlined"
           size="small"
           onClick={() => {
-            console.log("=== Checking Razorpay status ===");
-            console.log("Razorpay available:", !!window.Razorpay);
-            console.log("Razorpay key:", RAZORPAY_KEY_ID);
-            console.log("Order ID:", orderId);
+         
             alert(
               `Razorpay: ${!!window.Razorpay}\nKey: ${RAZORPAY_KEY_ID}\nOrder: ${orderId}`
             );

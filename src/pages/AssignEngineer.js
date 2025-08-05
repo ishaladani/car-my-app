@@ -137,33 +137,20 @@ const AssignEngineer = () => {
 
   const updateJobCardWithParts = async (selectedParts) => {
     try {
-      // Get existing job details
-      const jobDetailsString = getJobDetailsForAPI();
-
-      // Format parts for API
       const formattedParts = selectedParts.map(part => ({
-        partId: part._id,
-        partName: part.partName,
-        partNumber: part.partNumber || '',
-        quantity: part.selectedQuantity || 1,
-        pricePerUnit: part.pricePerUnit || 0,
-        gstPercentage: part.taxAmount || 0,
-        carName: part.carName || '',
-        model: part.model || ''
+        partName: part.partName || '',
+        quantity: Number(part.selectedQuantity) || 1,
+        pricePerPiece: Number(part.pricePerUnit || part.sellingPrice) || 0,
+        totalPrice: Number(part.pricePerUnit || part.sellingPrice || 0) * Number(part.selectedQuantity || 1)
       }));
 
-      console.log('Updating job card immediately with parts:', formattedParts);
+      await updateJobCard(id, null, formattedParts);
 
-      // Update job card with current job details and newly selected parts
-      await updateJobCard(id, jobDetailsString, formattedParts);
-
-      // Show success notification
       setSnackbar({
         open: true,
         message: `✅ Job card updated with ${formattedParts.length} part(s)`,
         severity: 'success'
       });
-
     } catch (error) {
       console.error('Error updating job card with parts:', error);
       setSnackbar({
@@ -259,21 +246,19 @@ const AssignEngineer = () => {
     const allPartsUsed = [];
     assignments.forEach(assignment => {
       assignment.parts.forEach(part => {
-        const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
-        const selectedQuantity = part.selectedQuantity || 1;
+        const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
+        const qty = part.selectedQuantity || 1;
+        const pricePerPiece = part.sellingPrice || part.pricePerUnit || 0;
 
-        if (existingPartIndex !== -1) {
-          allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+        if (existingIndex !== -1) {
+          allPartsUsed[existingIndex].quantity += qty;
+          allPartsUsed[existingIndex].totalPrice = allPartsUsed[existingIndex].pricePerPiece * allPartsUsed[existingIndex].quantity;
         } else {
           allPartsUsed.push({
-            partId: part._id,
             partName: part.partName,
-            partNumber: part.partNumber || '',
-            quantity: selectedQuantity,
-            pricePerUnit: part.pricePerUnit || 0,
-            gstPercentage: part.taxAmount || 0,
-            carName: part.carName || '',
-            model: part.model || ''
+            quantity: qty,
+            pricePerPiece: pricePerPiece,
+            totalPrice: pricePerPiece * qty
           });
         }
       });
@@ -284,12 +269,10 @@ const AssignEngineer = () => {
   // **ENHANCED: Update job card with all parts from all assignments**
   const updateJobCardWithAllParts = async () => {
     try {
-      const jobDetailsString = getJobDetailsForAPI();
       const allParts = getAllSelectedParts();
 
       if (id) {
-        await updateJobCard(id, jobDetailsString, allParts);
-        console.log('Job card updated with all parts:', allParts);
+        await updateJobCard(id, null, allParts);
       }
     } catch (error) {
       console.error('Error updating job card with all parts:', error);
@@ -462,21 +445,18 @@ const AssignEngineer = () => {
   // Update Part Quantity using PUT API, DELETE only when qty = 0
   const updatePartQuantity = useCallback(async (partId, newQuantity) => {
     try {
-      console.log(`Updating part ${partId} to quantity: ${newQuantity}`);
 
       if (newQuantity === 0) {
         // When quantity reaches 0, use DELETE API
         await apiCall(`/garage/inventory/delete/${partId}`, {
           method: 'DELETE'
         });
-        console.log(`Part ${partId} deleted (quantity reached 0)`);
       } else {
         // Use PUT API to update quantity
         await apiCall(`/garage/inventory/update/${partId}`, {
           method: 'PUT',
           data: { quantity: newQuantity }
         });
-        console.log(`Part ${partId} updated to quantity: ${newQuantity}`);
       }
 
       // Refresh inventory after updating
@@ -530,7 +510,7 @@ const AssignEngineer = () => {
   // Set assignments after engineers and inventory are loaded
   useEffect(() => {
     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
-      console.log('🔄 Setting assignments with job card data:', jobCardDataTemp);
+     
 
       // Set engineer and parts in assignments if they exist
       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
@@ -539,14 +519,12 @@ const AssignEngineer = () => {
         // Find the full engineer object from the engineers list
         const fullEngineerData = engineers.find(eng => eng._id === assignedEngineer._id);
 
-        console.log('👤 Found assigned engineer:', assignedEngineer);
-        console.log('👤 Full engineer data:', fullEngineerData);
 
         if (fullEngineerData || assignedEngineer) {
           // Convert partsUsed from job card to format expected by the form
           let formattedParts = [];
           if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
-            console.log('🔧 Processing parts used:', jobCardDataTemp.partsUsed);
+          
 
             formattedParts = jobCardDataTemp.partsUsed.map(usedPart => {
               // Find the part in inventory to get full details
@@ -557,7 +535,6 @@ const AssignEngineer = () => {
               );
 
               if (inventoryPart) {
-                console.log(`✅ Found part in inventory: ${usedPart.partName}`);
                 return {
                   ...inventoryPart,
                   selectedQuantity: usedPart.quantity || 1,
@@ -565,7 +542,6 @@ const AssignEngineer = () => {
                 };
               } else {
                 // If part not found in inventory, create a mock part object
-                console.log(`⚠️ Part not found in inventory, creating mock: ${usedPart.partName}`);
                 return {
                   _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName}`,
                   partName: usedPart.partName || 'Unknown Part',
@@ -594,9 +570,7 @@ const AssignEngineer = () => {
 
           setAssignments([newAssignment]);
 
-          console.log('✅ Successfully set engineer:', fullEngineerData || assignedEngineer);
-          console.log('✅ Successfully set parts:', formattedParts);
-          console.log('📋 Assignment created:', newAssignment);
+      
 
           // Clear temp data
           setJobCardDataTemp(null);
@@ -628,7 +602,6 @@ const AssignEngineer = () => {
         );
 
         const jobCardData = response.data;
-        console.log('📋 Fetched Job Card Data:', jobCardData);
 
         // Enhanced job details parsing
         if (jobCardData.jobDetails) {
@@ -645,7 +618,6 @@ const AssignEngineer = () => {
             }
           } catch (e) {
             // If JSON parsing fails, treat as old string format
-            console.log('Job details is in old string format, converting...');
             const lines = jobCardData.jobDetails.split('\n');
             const cleanLines = lines.map(line => line.replace(/^\d+\.\s*/, '').trim())
               .filter(line => line.length > 0);
@@ -775,31 +747,20 @@ const AssignEngineer = () => {
   // Updated updateJobCard function to handle job details with prices
   const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
     try {
-      console.log(`Updating job card ${jobCardId} with job details and parts:`, { jobDetails, partsUsed });
-
-      // Validate parts data before sending
-      const validatedParts = partsUsed.map(part => ({
-        partId: part.partId || part._id,
+      // Format parts data according to the workprogress API structure
+      const formattedParts = partsUsed.map(part => ({
         partName: part.partName || '',
-        partNumber: part.partNumber || '',
         quantity: Number(part.quantity) || 1,
-        pricePerUnit: Number(part.pricePerUnit) || 0,
-        gstPercentage: Number(part.gstPercentage) || 0,
-        gstAmount: Number(((part.pricePerUnit || 0) * (part.quantity || 1) * (part.gstPercentage || 0)) / 100),
-        totalPrice: Number((part.pricePerUnit || 0) * (part.quantity || 1)) + (part.gstAmount),
-        carName: part.carName || '',
-        model: part.model || ''
+        pricePerPiece: Number(part.pricePerUnit) || 0,
+        totalPrice: Number(part.pricePerUnit || 0) * Number(part.quantity || 1)
       }));
 
       const updatePayload = {
-        jobDetails: jobDetails,
-        partsUsed: validatedParts
+        partsUsed: formattedParts
       };
 
-      console.log('Sending update payload:', updatePayload);
-
       const response = await axios.put(
-        `${API_BASE_URL}/jobCards/${id}`,
+        `${API_BASE_URL}/garage/jobcards/${jobCardId}/workprogress`,
         updatePayload,
         {
           headers: {
@@ -809,7 +770,6 @@ const AssignEngineer = () => {
         }
       );
 
-      console.log(`Job card ${jobCardId} updated successfully:`, response.data);
       return response.data;
     } catch (err) {
       console.error(`Failed to update job card ${jobCardId}:`, err.response?.data || err.message);
@@ -851,14 +811,10 @@ const AssignEngineer = () => {
             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
           } else {
             allPartsUsed.push({
-              partId: part._id,
               partName: part.partName,
-              partNumber: part.partNumber || '',
               quantity: selectedQuantity,
-              pricePerUnit: part.pricePerUnit || 0,
-              gstPercentage: part.taxAmount || 0,
-              carName: part.carName || '',
-              model: part.model || ''
+              pricePerPiece: part.pricePerUnit || 0,
+              totalPrice: (part.pricePerUnit || 0) * selectedQuantity
             });
           }
 
@@ -878,7 +834,6 @@ const AssignEngineer = () => {
       });
 
       // Update inventory for all used parts
-      console.log('Updating inventory for used parts...');
       for (const partUpdate of partUpdates) {
         const currentPart = inventoryParts.find(p => p._id === partUpdate.partId);
         if (currentPart) {
@@ -887,17 +842,16 @@ const AssignEngineer = () => {
             throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
           }
 
-          console.log(`Updating ${partUpdate.partName}: ${currentPart.quantity} -> ${newQuantity}`);
-          await updatePartQuantity(partUpdate.partId, newQuantity);
+           await updatePartQuantity(partUpdate.partId, newQuantity);
         }
       }
 
-      // Update job card with job details and parts used
+      // Update job card with parts used using the workprogress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
 
       const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
         if (jobCardId) {
-          return updateJobCard(jobCardId, jobDetailsString, allPartsUsed);
+          return updateJobCard(jobCardId, null, allPartsUsed);
         }
       }).filter(Boolean);
 
@@ -916,8 +870,7 @@ const AssignEngineer = () => {
           notes: assignment.notes
         };
 
-        console.log(`Assigning to engineer ${assignment.engineer._id}:`, payload);
-
+   
         return axios.put(
           `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
           payload,
@@ -931,20 +884,12 @@ const AssignEngineer = () => {
 
       // Execute job card updates first
       if (jobCardUpdatePromises.length > 0) {
-        console.log('Updating job cards with job details and parts used...');
         await Promise.all(jobCardUpdatePromises);
-        console.log('Job cards updated successfully');
       }
 
       // Execute all assignments
-      console.log('Assigning to engineers...');
       const results = await Promise.all(assignmentPromises);
 
-      console.log('All assignments completed:', results.map(r => r.data));
-      console.log('Job details updated with combined data:', jobDetailsString);
-      console.log('Total job details cost:', totalJobDetailsCost);
-      console.log('Parts used in job cards:', allPartsUsed);
-      console.log('Inventory updated for parts:', partUpdates);
 
       // Show success message with totals
       setSnackbar({
@@ -1189,7 +1134,7 @@ const AssignEngineer = () => {
         </Alert>
       </Snackbar>
 
-    
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -1208,13 +1153,13 @@ const AssignEngineer = () => {
 
       {/* Main Content */}
       <Box
-         sx={{
-         flexGrow: 1,
-    mb: 4,
-    ml: { xs: 0, sm: 35 },
-    overflow: "auto",
-    px: { xs: 1, sm: 3 },
-      }}
+        sx={{
+          flexGrow: 1,
+          mb: 4,
+          ml: { xs: 0, sm: 35 },
+          overflow: "auto",
+          px: { xs: 1, sm: 3 },
+        }}
       >
         <CssBaseline />
         <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3 } }}>

@@ -169,7 +169,6 @@ const AddEngineer = () => {
         }));
         
         setEngineers(engineersWithId);
-        console.log('Engineers data:', engineersWithId); // Print engineers data
       } catch (err) {
         console.error('Failed to fetch engineers:', err);
         setError(err.response?.data?.message || 'Failed to load engineers');

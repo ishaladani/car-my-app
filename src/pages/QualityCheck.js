@@ -92,7 +92,7 @@ const QualityCheck = () => {
         
         const data = response.data;
         setJobCardData(data);
-        console.log(data)
+
         
         if (data.partsUsed && data.partsUsed.length > 0) {
           const existingParts = data.partsUsed.map((part, index) => ({

@@ -148,21 +148,21 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
 
     // --- Helper Function for Section Headers ---
     const addSectionHeader = (title) => {
-         // Check if enough space for header and some content, else new page
-        if (yPosition > pageHeight - 30) {
-            doc.addPage();
-            yPosition = 20;
-        }
-        doc.setFillColor(...lightGray);
-        doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, 'F'); // Slightly taller header
-        doc.setFontSize(14); // Increased section header font size
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...darkGray);
-        doc.text(title, margin + 3, yPosition + 7); // Adjusted Y for vertical centering
-        yPosition += 15; // Increased space after header
-        doc.setTextColor(...blackColor);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(12); // Set body font size
+      // Check if enough space for header and some content, else new page
+      if (yPosition > pageHeight - 30) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      doc.setFillColor(...lightGray);
+      doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, 'F'); // Slightly taller header
+      doc.setFontSize(14); // Increased section header font size
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...darkGray);
+      doc.text(title, margin + 3, yPosition + 7); // Adjusted Y for vertical centering
+      yPosition += 15; // Increased space after header
+      doc.setTextColor(...blackColor);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12); // Set body font size
     };
 
     // --- Customer Information Section ---
@@ -189,9 +189,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         0: { fontStyle: 'bold', cellWidth: 55 }, // Slightly wider label column
         1: { cellWidth: pageWidth - 2 * margin - 55 - 10 } // Adjust data column width
       },
-       bodyStyles: {
-           valign: 'top' // Align text to the top of cells
-       },
+      bodyStyles: {
+        valign: 'top' // Align text to the top of cells
+      },
       margin: { left: margin, right: margin },
       didDrawPage: function (data) {
         yPosition = data.cursor.y + sectionSpacing; // Update Y position after table
@@ -223,9 +223,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         0: { fontStyle: 'bold', cellWidth: 55 },
         1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
       },
-       bodyStyles: {
-           valign: 'top'
-       },
+      bodyStyles: {
+        valign: 'top'
+      },
       margin: { left: margin, right: margin },
       didDrawPage: function (data) {
         yPosition = data.cursor.y + sectionSpacing;
@@ -239,7 +239,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
       ['Policy Number', jobData.policyNumber || 'N/A'],
       ['Insurance Type', jobData.type || 'N/A'],
       ['Expiry Date', formatDate(jobData.expiryDate)],
-      ['Excess Amount', jobData.excessAmount ? `${jobData.excessAmount.toLocaleString()}` : 'N/A']
+      [
+        'Excess Amount', `${String(jobData.excessAmount)}` || 'N/A'
+      ]
     ];
     autoTable(doc, {
       startY: yPosition,
@@ -257,9 +259,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         0: { fontStyle: 'bold', cellWidth: 55 },
         1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
       },
-       bodyStyles: {
-           valign: 'top'
-       },
+      bodyStyles: {
+        valign: 'top'
+      },
       margin: { left: margin, right: margin },
       didDrawPage: function (data) {
         yPosition = data.cursor.y + sectionSpacing;
@@ -269,7 +271,8 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
     // --- Job Information Section ---
     addSectionHeader('JOB INFORMATION');
     const jobInfoData = [
-      ['Assigned Engineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
+      ['Job Card Number', jobData.jobCardNumber],
+      ['Assigned En gineer', jobData.engineerId && jobData.engineerId.length > 0 ? jobData.engineerId[0].name : 'Not Assigned'],
       ['Status', jobData.status || 'Pending'],
       ['Created Date', formatDate(jobData.createdAt)],
       ['Engineer Remarks', jobData.engineerRemarks || 'N/A']
@@ -290,9 +293,9 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
         0: { fontStyle: 'bold', cellWidth: 55 },
         1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
       },
-       bodyStyles: {
-           valign: 'top'
-       },
+      bodyStyles: {
+        valign: 'top'
+      },
       margin: { left: margin, right: margin },
       didDrawPage: function (data) {
         yPosition = data.cursor.y + sectionSpacing;
@@ -329,14 +332,14 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
           0: { cellWidth: 25, halign: 'center' }, // Slightly wider S.No.
           1: { cellWidth: pageWidth - 2 * margin - 25 - 15 } // Adjust description width
         },
-         bodyStyles: {
-             valign: 'top'
-         },
+        bodyStyles: {
+          valign: 'top'
+        },
         margin: { left: margin, right: margin },
         // Ensure table doesn't split awkwardly
         pageBreak: 'auto',
         didDrawPage: function (data) {
-            yPosition = data.cursor.y + sectionSpacing;
+          yPosition = data.cursor.y + sectionSpacing;
         }
       });
     }
@@ -372,7 +375,7 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
           }
         }}
       >
-        <DialogTitle sx={{ 
+        <DialogTitle sx={{
           pb: 1,
           display: 'flex',
           justifyContent: 'space-between',
@@ -494,7 +497,16 @@ const JobDetailsModal = ({ open, onClose, jobData }) => {
                     </Typography>
                     <Typography variant="body2" color="text.secondary">Excess Amount</Typography>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {jobData.excessAmount ? `${jobData.excessAmount.toLocaleString()}` : 'N/A'}
+                      {jobData.excessAmount
+                        ? new Intl.NumberFormat('en-IN', {
+                          style: 'currency',
+                          currency: 'INR',
+                          minimumFractionDigits: 2,
+                        }).format(Number(jobData.excessAmount))
+                        : 'N/A'}
+                      {
+                        // console.log(jobData.excessAmount)
+                      }
                     </Typography>
                   </Box>
                 </CardContent>

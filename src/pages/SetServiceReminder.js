@@ -154,7 +154,7 @@ const SetServiceReminder = () => {
         });
 
         setCustomers(uniqueCustomers);
-        console.log("Fetched customers:", uniqueCustomers);
+
       } else {
         setCustomers([]);
         setCustomersError("No customer data found");
@@ -441,7 +441,7 @@ const SetServiceReminder = () => {
         message: sanitizeInput(customerMessage) || "",
       };
 
-      console.log("Sending reminder data:", reminderData);
+      
 
       // API call with correct endpoint
       const response = await fetch(
@@ -456,7 +456,7 @@ const SetServiceReminder = () => {
       );
 
       const result = await response.json();
-      console.log("API Response:", result);
+      
 
       if (!response.ok) {
         const errorMsg =

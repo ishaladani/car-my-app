@@ -99,13 +99,10 @@ const LoginPage = () => {
 
   // Handle logout
   const handleLogout = async () => {
-    console.log("=== LOGOUT BUTTON CLICKED ===");
     setLogoutLoading(true);
     try {
       const storedUserId = localStorage.getItem("garageId");
       const token = localStorage.getItem("token");
-      console.log("Stored userId:", storedUserId);
-      console.log("Stored token:", token ? "Token exists" : "No token found");
       if (!storedUserId) {
         console.error("No userId found in localStorage");
         return;
@@ -114,7 +111,6 @@ const LoginPage = () => {
         console.error("No token found in localStorage");
         return;
       }
-      console.log("Making API call to logout...");
       const response = await axios.post(
         `${BASE_URL}/api/garage/logout/${storedUserId}`,
         {},
@@ -125,8 +121,6 @@ const LoginPage = () => {
           }
         }
       );
-      console.log("Logout API response:", response.data);
-      console.log("Logout API called successfully");
     } catch (error) {
       console.error("Error calling logout API:", error);
       console.error("Error details:", {
@@ -136,7 +130,7 @@ const LoginPage = () => {
         data: error.response?.data
       });
     } finally {
-      console.log("Clearing localStorage and resetting state...");
+      
       localStorage.clear();
       setIsLoggedIn(false);
       setCurrentUser(null);

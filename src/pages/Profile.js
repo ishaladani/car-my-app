@@ -318,7 +318,7 @@ const Profile = () => {
 
       updatePayload.logo = editData.image || "";
 
-      console.log("Update payload:", updatePayload);
+      
 
       const response = await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`, // Updated to match your curl command

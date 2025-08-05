@@ -253,7 +253,6 @@ const EnhancedSignUpPage = () => {
       if (response.ok) {
         // Handle different response structures
         const plansArray = data.data || data || [];
-        console.log("Fetched plans:", plansArray);
         setPlans(Array.isArray(plansArray) ? plansArray : []);
       } else {
         throw new Error(data.message || "Failed to fetch plans");
@@ -433,11 +432,7 @@ const EnhancedSignUpPage = () => {
         );
       }
     } else if (activeStep === 4) {
-      // Step 4: Complete Registration - Send OTP
-      console.log("=== Starting Registration Process ===");
-      console.log("Form data:", formData);
-      console.log("Selected plan:", formData.selectedPlan);
-      console.log("Current step:", activeStep);
+
 
       // Check if a plan is selected
       if (!formData.selectedPlan) {
@@ -466,7 +461,6 @@ const EnhancedSignUpPage = () => {
           bankDetails: formData.bankDetails,
         };
 
-        console.log("Sending registration data:", registrationData);
 
         // Call registration API with fallback
         let response;
@@ -479,7 +473,6 @@ const EnhancedSignUpPage = () => {
             body: JSON.stringify(registrationData),
           });
         } catch (error) {
-          console.log("Primary endpoint failed, trying fallback...");
           // Fallback to direct endpoint
           response = await fetch(`${BASE_URL}/api/garage/submit-registration`, {
             method: "POST",
@@ -490,12 +483,10 @@ const EnhancedSignUpPage = () => {
           });
         }
 
-        console.log("Registration response status:", response.status);
 
         let data;
         try {
           data = await response.json();
-          console.log("Registration response data:", data);
         } catch (parseError) {
           console.error("Failed to parse response as JSON:", parseError);
           throw new Error(
@@ -537,8 +528,6 @@ const EnhancedSignUpPage = () => {
 
       setLoading(true);
       try {
-        console.log("=== Verifying OTP ===");
-        console.log("OTP:", formData.otp);
 
         const response = await fetch(getGarageApiUrl("/verify-registration"), {
           method: "POST",
@@ -552,7 +541,6 @@ const EnhancedSignUpPage = () => {
         });
 
         const data = await response.json();
-        console.log("OTP verification response:", data);
 
         if (response.ok) {
           showSnackbar(
@@ -598,7 +586,6 @@ const EnhancedSignUpPage = () => {
   const handleResendOTP = async () => {
     setLoading(true);
     try {
-      console.log("=== Resending OTP ===");
 
       const response = await fetch(
         getGarageApiUrl("/resend-registration-otp"),
@@ -614,7 +601,6 @@ const EnhancedSignUpPage = () => {
       );
 
       const data = await response.json();
-      console.log("Resend OTP response:", data);
 
       if (response.ok) {
         showSnackbar(
@@ -913,8 +899,6 @@ const EnhancedSignUpPage = () => {
             size="small"
             variant="outlined"
             onClick={() => {
-              console.log("Current plans:", plans);
-              console.log("Current formData:", formData);
             }}
             sx={{ mt: 1 }}
           >
@@ -967,9 +951,6 @@ const EnhancedSignUpPage = () => {
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      console.log("=== Plan Selected ===");
-                      console.log("Selected plan:", plan);
-                      console.log("Current formData:", formData);
 
                       const isFree =
                         plan.price === "Free" ||
@@ -983,7 +964,6 @@ const EnhancedSignUpPage = () => {
                         selectedPlan: plan,
                       };
 
-                      console.log("Updated formData:", updatedFormData);
 
                       setFormData(updatedFormData);
 

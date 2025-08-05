@@ -128,7 +128,6 @@ const RenewPlanFlow = () => {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.onload = () => {
-          console.log("Razorpay SDK loaded");
           resolve();
         };
         script.onerror = () => {
@@ -329,10 +328,6 @@ const RenewPlanFlow = () => {
 
   const processPayment = async () => {
     try {
-      console.log("=== Starting Payment Process ===");
-      console.log("Garage ID:", garageData.garageId);
-      console.log("Selected Plan:", selectedPlan);
-      console.log("Current step:", activeStep);
 
       setLoading(true);
       setPaymentStatus("processing");
@@ -742,9 +737,6 @@ const RenewPlanFlow = () => {
                   <Button
                     variant="outlined"
                     onClick={() => {
-                      console.log("Current payment status:", paymentStatus);
-                      console.log("Current step:", activeStep);
-                      console.log("Selected plan:", selectedPlan);
                     }}
                   >
                     Debug Status

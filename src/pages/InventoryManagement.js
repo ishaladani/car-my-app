@@ -323,7 +323,7 @@ const InventoryManagement = () => {
         cgstSgst: parseFloat(formData.cgstSgst) || 0,
       };
 
-      console.log('Adding part:', requestData);
+      
       await axios.post(`${API_BASE_URL}/inventory/add`, requestData, {
         headers: {
           'Content-Type': 'application/json',
@@ -377,7 +377,7 @@ const InventoryManagement = () => {
         cgstSgst: parseFloat(editItemData.cgstSgst) || 0,
       };
 
-      console.log('Updating part:', requestData);
+      
       await axios.put(`${API_BASE_URL}/inventory/update/${editItemData.id}`, requestData, {
         headers: {
           'Content-Type': 'application/json',

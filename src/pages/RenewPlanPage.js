@@ -81,7 +81,7 @@ const RenewPlanPage = () => {
     const loadRazorpaySDK = () => {
       return new Promise((resolve, reject) => {
         if (window.Razorpay) {
-          console.log("Razorpay SDK already loaded");
+    
           resolve();
           return;
         }
@@ -107,9 +107,6 @@ const RenewPlanPage = () => {
           script.defer = true;
 
           script.onload = () => {
-            console.log(
-              `Razorpay SDK loaded successfully from: ${cdnSources[currentSourceIndex]}`
-            );
             resolve();
           };
 
@@ -235,12 +232,11 @@ const RenewPlanPage = () => {
   };
 
   const handleSelectPlan = (plan) => {
-    console.log("=== handleSelectPlan called ===");
-    console.log("Selected plan:", plan);
+    
 
     // Check if it's a free plan
     if (isPlanFree(plan)) {
-      console.log("Free plan selected");
+      
       showSnackbar(
         "Free plans are automatically activated. No payment required.",
         "info"
@@ -249,16 +245,14 @@ const RenewPlanPage = () => {
 
     setSelectedPlan(plan);
     setOpenPlanDialog(false);
-    console.log("Plan selected and dialog closed");
+    
   };
 
   const handleRenewPlan = async () => {
-    console.log("=== handleRenewPlan called ===");
-    console.log("Selected plan:", selectedPlan);
-    console.log("Garage data:", garageData);
+
 
     if (!selectedPlan) {
-      console.log("No plan selected");
+
       showSnackbar("Please select a plan to renew.", "warning");
       return;
     }
@@ -267,24 +261,24 @@ const RenewPlanPage = () => {
     const isFreePlan = isPlanFree(selectedPlan);
 
     if (isFreePlan) {
-      console.log("Free plan selected - activating without payment");
+
       await activateFreePlan();
       return;
     }
 
     if (!garageData.garageId) {
-      console.log("No garage ID found");
+
       showSnackbar("Garage ID not found. Please login again.", "error");
       navigate("/login");
       return;
     }
 
-    console.log("Starting payment process...");
+    
     await handleRazorpayPayment();
   };
 
   const activateFreePlan = async () => {
-    console.log("=== activateFreePlan called ===");
+
     try {
       setLoading(true);
 
@@ -319,7 +313,7 @@ const RenewPlanPage = () => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Free plan activated successfully:", data);
+
         showSnackbar(
           "Free plan activated successfully! Redirecting to dashboard...",
           "success"
@@ -330,9 +324,7 @@ const RenewPlanPage = () => {
           navigate("/dashboard");
         }, 2000);
       } else {
-        console.log(
-          "Free plan activation failed, redirecting to dashboard anyway"
-        );
+        
         showSnackbar("Free plan selected. Redirecting to dashboard...", "info");
         setTimeout(() => {
           navigate("/dashboard");
@@ -350,7 +342,6 @@ const RenewPlanPage = () => {
   };
 
   const handleRazorpayPayment = async () => {
-    console.log("=== handleRazorpayPayment called ===");
     try {
       setLoading(true);
 
@@ -362,7 +353,6 @@ const RenewPlanPage = () => {
         );
       }
 
-      console.log("Razorpay SDK is available:", !!window.Razorpay);
 
       // Validate Razorpay key
       if (
@@ -373,7 +363,6 @@ const RenewPlanPage = () => {
         throw new Error("Razorpay key not configured. Please contact support.");
       }
 
-      console.log("Using Razorpay Key:", RAZORPAY_KEY_ID);
 
       // 1. Create renewal order - try new endpoint first
       let orderResponse = await fetch(`${getBaseApiUrl()}/api/plans/renew`, {
@@ -410,8 +399,7 @@ const RenewPlanPage = () => {
         const errorData = await orderResponse.json().catch(() => ({}));
         console.error("Order creation failed:", errorData);
 
-        // If order creation fails, try to open Razorpay with a test order
-        console.log("Trying fallback Razorpay payment...");
+
         const fallbackOrderId = "fallback_order_" + Date.now();
         const fallbackAmount = selectedPlan.amount * 100;
 
@@ -423,7 +411,6 @@ const RenewPlanPage = () => {
           description: `${selectedPlan.name} Plan Renewal (Fallback)`,
           order_id: fallbackOrderId,
           handler: async (response) => {
-            console.log("Fallback payment successful:", response);
             await processRenewal({
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
@@ -452,7 +439,6 @@ const RenewPlanPage = () => {
       }
 
       const orderData = await orderResponse.json();
-      console.log("Order response from server:", orderData);
 
       // Show success message for order creation
       showSnackbar(
@@ -509,22 +495,14 @@ const RenewPlanPage = () => {
           "Full order response:",
           JSON.stringify(orderData, null, 2)
         );
-        console.log("Order ID not found, using fallback order ID");
         // Use a fallback order ID if the server doesn't provide one
         orderId =
           "order_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
         orderAmount = selectedPlan.amount * 100;
       }
 
-      console.log("Extracted Order ID:", orderId);
-      console.log("Order Amount:", orderAmount);
-      console.log("Razorpay SDK available:", !!window.Razorpay);
 
-      // 2. Open Razorpay payment dialog
-      console.log("Preparing Razorpay options...");
-      console.log("Razorpay Key:", RAZORPAY_KEY_ID);
-      console.log("Order ID:", orderId);
-      console.log("Amount:", orderAmount);
+      
 
       const options = {
         key: RAZORPAY_KEY_ID,
@@ -534,7 +512,6 @@ const RenewPlanPage = () => {
         description: `${selectedPlan.name} Plan Renewal`,
         order_id: orderId,
         handler: async (response) => {
-          console.log("Payment successful:", response);
           // 3. Process renewal with payment details
           await processRenewal({
             razorpayOrderId: response.razorpay_order_id,
@@ -551,21 +528,17 @@ const RenewPlanPage = () => {
         },
         modal: {
           ondismiss: () => {
-            console.log("Payment modal dismissed");
             setLoading(false);
             showSnackbar("Payment cancelled", "info");
           },
         },
       };
 
-      console.log("Razorpay options:", options);
 
       try {
         const rzp = new window.Razorpay(options);
-        console.log("Razorpay instance created successfully");
 
         rzp.on("payment.failed", (response) => {
-          console.log("Payment failed:", response);
           setLoading(false);
           showSnackbar(
             response.error?.description || "Payment failed. Please try again.",
@@ -573,37 +546,26 @@ const RenewPlanPage = () => {
           );
         });
 
-        console.log("Opening Razorpay popup...");
 
         // Try to open immediately first
         try {
-          console.log("Attempting to open Razorpay popup immediately...");
           rzp.open();
-          console.log("Razorpay popup opened successfully");
         } catch (immediateError) {
-          console.log(
-            "Immediate open failed, trying with delay:",
-            immediateError
-          );
+         
 
           // If immediate open fails, try with delay
           setTimeout(() => {
             try {
-              console.log("Attempting to open Razorpay popup with delay...");
               rzp.open();
-              console.log("Razorpay popup opened successfully with delay");
             } catch (openError) {
               console.error("Error opening Razorpay popup:", openError);
 
               // Try one more time with a different approach
               setTimeout(() => {
                 try {
-                  console.log("Final attempt to open Razorpay popup...");
                   const newRzp = new window.Razorpay(options);
                   newRzp.open();
-                  console.log(
-                    "Razorpay popup opened successfully on final attempt"
-                  );
+                 
                 } catch (finalError) {
                   console.error("Final attempt failed:", finalError);
                   throw new Error(
@@ -711,8 +673,6 @@ const RenewPlanPage = () => {
 
   // Test function to manually trigger Razorpay
   const testRazorpay = () => {
-    console.log("=== Testing Razorpay manually ===");
-    console.log("Razorpay available:", !!window.Razorpay);
 
     if (window.Razorpay) {
       const options = {
@@ -723,7 +683,6 @@ const RenewPlanPage = () => {
         description: "Test Payment",
         order_id: "test_order_" + Date.now(),
         handler: function (response) {
-          console.log("Test payment successful:", response);
           alert("Test payment successful!");
         },
         prefill: {
@@ -735,32 +694,25 @@ const RenewPlanPage = () => {
         },
         modal: {
           ondismiss: () => {
-            console.log("Test payment modal dismissed");
             alert("Test payment cancelled");
           },
         },
       };
 
       try {
-        console.log("Creating test Razorpay instance...");
         const rzp = new window.Razorpay(options);
-        console.log("Test Razorpay instance created successfully");
 
         // Try multiple approaches to open the popup
         try {
-          console.log("Attempting to open test Razorpay popup...");
           rzp.open();
-          console.log("Test Razorpay popup opened successfully");
         } catch (openError) {
           console.error("Failed to open test popup:", openError);
 
           // Try again with a new instance
           setTimeout(() => {
             try {
-              console.log("Retrying test Razorpay popup...");
               const newRzp = new window.Razorpay(options);
               newRzp.open();
-              console.log("Test Razorpay popup opened on retry");
             } catch (retryError) {
               console.error("Retry also failed:", retryError);
               alert("Failed to open Razorpay popup: " + retryError.message);
@@ -779,7 +731,6 @@ const RenewPlanPage = () => {
 
   // Retry loading Razorpay SDK
   const retryLoadRazorpay = () => {
-    console.log("=== Retrying Razorpay SDK load ===");
     setError(null);
 
     const script = document.createElement("script");
@@ -788,7 +739,6 @@ const RenewPlanPage = () => {
     script.defer = true;
 
     script.onload = () => {
-      console.log("Razorpay SDK loaded successfully on retry");
       showSnackbar("Payment gateway loaded successfully!", "success");
     };
 
@@ -804,7 +754,6 @@ const RenewPlanPage = () => {
 
   // Force Razorpay popup without API calls
   const forceRazorpayPopup = () => {
-    console.log("=== Force Razorpay Popup ===");
 
     if (!window.Razorpay) {
       alert("Razorpay SDK not loaded!");
@@ -819,7 +768,6 @@ const RenewPlanPage = () => {
       description: "Force Test Payment",
       order_id: "force_order_" + Date.now(),
       handler: function (response) {
-        console.log("Force payment successful:", response);
         alert(
           "Force payment successful! Order ID: " + response.razorpay_order_id
         );
@@ -833,21 +781,16 @@ const RenewPlanPage = () => {
       },
       modal: {
         ondismiss: () => {
-          console.log("Force payment modal dismissed");
           alert("Force payment cancelled");
         },
       },
     };
 
     try {
-      console.log("Creating force Razorpay instance...");
       const rzp = new window.Razorpay(options);
-      console.log("Force Razorpay instance created");
 
       // Force open the popup
-      console.log("Force opening Razorpay popup...");
       rzp.open();
-      console.log("Force Razorpay popup opened");
     } catch (error) {
       console.error("Force Razorpay error:", error);
       alert("Force Razorpay error: " + error.message);
@@ -1018,14 +961,7 @@ const RenewPlanPage = () => {
                 }
                 startIcon={<CreditCard />}
                 onClick={() => {
-                  console.log("=== PAYMENT BUTTON CLICKED ===");
-                  console.log(
-                    "Button disabled:",
-                    loading || !selectedPlan || fetchingPlans
-                  );
-                  console.log("Loading:", loading);
-                  console.log("Selected plan:", selectedPlan);
-                  console.log("Fetching plans:", fetchingPlans);
+                 
                   handleRenewPlan();
                 }}
                 sx={{

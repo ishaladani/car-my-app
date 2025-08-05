@@ -99,13 +99,10 @@ const AppLayout = () => {
       let logoutId;
       if (roll === "garage") {
         logoutId = garageId;
-        console.log("Logging out garage:", logoutId);
       } else if (roll === "user") {
         logoutId = userId;
-        console.log("Logging out user:", logoutId);
       } else {
         logoutId = userId;
-        console.log("Logging out (fallback to user):", logoutId);
       }
 
       if (!logoutId) {
@@ -121,7 +118,6 @@ const AppLayout = () => {
           timeout: 10000,
         }
       );
-      console.log("Logout API call successful");
     } catch (error) {
       console.error("Error during logout:", error);
     } finally {

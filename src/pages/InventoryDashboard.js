@@ -56,7 +56,7 @@ const InventoryDashboard = () => {
   // API call functions
   const fetchInventoryReport = async (threshold = lowStockThreshold) => {
     try {
-      console.log(`🔍 Fetching inventory report with threshold: ${threshold}`);
+
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/inventory/report/${garageId}?lowStockThreshold=${threshold}`,
         {
@@ -68,7 +68,7 @@ const InventoryDashboard = () => {
         }
       );
       
-      console.log('📊 Inventory report received:', response.data);
+      
       setInventoryReport(response.data.report);
       setApiErrors(prev => ({ ...prev, report: null }));
       
@@ -83,7 +83,7 @@ const InventoryDashboard = () => {
 
   const fetchLowStockItems = async (threshold = lowStockThreshold) => {
     try {
-      console.log(`🔍 Fetching low stock items with threshold: ${threshold}`);
+
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/inventory/low-stock/${garageId}?threshold=${threshold}`,
         {
@@ -95,7 +95,7 @@ const InventoryDashboard = () => {
         }
       );
       
-      console.log('⚠️ Low stock alert received:', response.data);
+      
       setLowStockAlert(response.data.alert);
       setApiErrors(prev => ({ ...prev, lowStock: null }));
       
@@ -110,7 +110,7 @@ const InventoryDashboard = () => {
 
   const fetchInventorySummary = async () => {
     try {
-      console.log('🔍 Fetching inventory summary');
+
       const response = await axios.get(
         `https://garage-management-zi5z.onrender.com/api/inventory/summary/${garageId}`,
         {
@@ -122,7 +122,7 @@ const InventoryDashboard = () => {
         }
       );
       
-      console.log('📈 Inventory summary received:', response.data);
+      
       setInventorySummary(response.data.summary);
       setApiErrors(prev => ({ ...prev, summary: null }));
       

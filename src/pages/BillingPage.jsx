@@ -171,7 +171,7 @@ const AutoServeBilling = () => {
       );
       
       if (response.status === 200) {
-        console.log('Bill status updated successfully');
+
         setBillGenerated(true);
       }
     } catch (error) {
@@ -231,14 +231,14 @@ setGarageDetails({
 
       try {
         setIsLoading(true);
-        console.log(`🔍 Fetching job card data for ID: ${jobCardIdFromUrl}`);
+
         
         const response = await axios.get(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${jobCardIdFromUrl}`
         );
         
         const data = response.data;
-        console.log('📊 Job card data received:', data);
+        
         setJobCardData(data);
         
         // NEW: Check if bill is already generated
@@ -286,7 +286,7 @@ setGarageDetails({
             total: parseFloat(part.totalPrice) || (parseInt(part.quantity) * parseFloat(part.pricePerPiece || part.sellingPrice)) || 0,
             hsnNumber: part.hsnNumber || part.hsn || "8708" // Default HSN for auto parts
           }));
-          console.log('🔧 Parts processed:', apiParts);
+
           setParts(apiParts);
         } else {
           // UPDATED: Add default service if no parts or services found
@@ -361,10 +361,10 @@ setGarageDetails({
             status: 'Completed',
             laborCost: 500 // Default service charge
           }];
-          console.log('⚙️ Added default service');
+
         }
 
-        console.log('⚙️ Services processed:', apiServices);
+        
         setServices(apiServices);
 
         // UPDATED: Set final inspection notes with better fallback
@@ -378,7 +378,7 @@ setGarageDetails({
         } else {
           // UPDATED: Provide default inspection notes
           inspectionNotes = `Vehicle inspected on ${today}. All work completed satisfactorily. Vehicle is ready for delivery.`;
-          console.log('📝 Added default inspection notes');
+
         }
         setFinalInspection(inspectionNotes);
 
@@ -387,7 +387,7 @@ setGarageDetails({
           setEmailRecipient(data.email || data.customer?.email);
         }
 
-        console.log('✅ Job card data processing completed');
+        
 
       } catch (error) {
         console.error('❌ Error fetching job card data:', error);
@@ -496,7 +496,7 @@ useEffect(() => {
       );
 
       if (response.status === 200) {
-        console.log('✅ Labor and tax updated successfully:', response.data);
+
       }
     } catch (error) {
       console.error('❌ Error updating labor and tax:', error);
@@ -547,8 +547,49 @@ useEffect(() => {
     setSummary(prev => ({ ...prev, discount }));
   };
 
-  const removePart = (id) => {
-    setParts(prev => prev.filter(part => part.id !== id));
+  const removePart = async (id) => {
+    // Remove from local state
+    const updatedParts = parts.filter(part => part.id !== id);
+    setParts(updatedParts);
+
+    // Update job card via API
+    try {
+              const partsForAPI = updatedParts.map(part => ({
+          _id: part.id, // Changed from partId to _id to match WorkInProgress.js expectations
+          partName: part.name,
+          quantity: part.quantity,
+          totalPrice: part.total,
+        }));
+
+      const updatePayload = {
+        partsUsed: partsForAPI
+      };
+
+      const response = await axios.put(
+        `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardIdFromUrl}`,
+        updatePayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+          }
+        }
+      );
+
+      
+      setSnackbar({
+        open: true,
+        message: "Part removed successfully and updated in job card!",
+        severity: "success",
+      });
+    } catch (error) {
+      console.error('Error updating job card after part removal:', error);
+      setSnackbar({
+        open: true,
+        message: "Part removed locally but failed to update job card. Please try again.",
+        severity: "warning",
+      });
+    }
   };
 
   const removeService = (id) => {
@@ -614,7 +655,7 @@ const updateBillAndJobStatus = async (jobCardId) => {
     );
 
     if (statusUpdateResponse.status === 200) {
-      console.log('✅ Job card status updated to Completed');
+      
       setJobCardData(prev => ({ ...prev, status: 'Completed' }));
     }
   } catch (error) {
@@ -634,7 +675,7 @@ const updateBillAndJobStatus = async (jobCardId) => {
       `https://garage-management-zi5z.onrender.com/api/bills/create/${jobCardIdFromUrl}`
     ];
 
-    console.log('🔍 Testing API endpoints...');
+    
     
     for (const endpoint of endpointsToTest) {
       try {
@@ -645,12 +686,12 @@ const updateBillAndJobStatus = async (jobCardId) => {
           },
           timeout: 5000
         });
-        console.log(`✅ ${endpoint} - Responded with status: ${response.status}`);
+
       } catch (error) {
         if (error.response) {
-          console.log(`❓ ${endpoint} - Status: ${error.response.status} (${error.response.status === 404 ? 'Not Found' : 'Other Error'})`);
+          
         } else {
-          console.log(`❌ ${endpoint} - Network error: ${error.message}`);
+          
         }
       }
     }
@@ -660,9 +701,9 @@ const updateBillAndJobStatus = async (jobCardId) => {
       const healthCheck = await axios.get('https://garage-management-zi5z.onrender.com/api/health', {
         timeout: 5000
       });
-      console.log('✅ API Server is reachable');
+
     } catch (error) {
-      console.log('❌ API Server connectivity issue');
+      
     }
   };
 
@@ -870,7 +911,7 @@ const generateBill = async () => {
 
     for (const endpoint of possibleEndpoints) {
       try {
-        console.log(`Trying endpoint: ${endpoint}`);
+
         
         const response = await axios.post(endpoint, apiData, {
           headers: {
@@ -1006,7 +1047,7 @@ const generateBill = async () => {
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying bill generation endpoint: ${endpoint}`);
+  
           
           billResponse = await axios.post(endpoint, apiData, {
             headers: {
@@ -1148,16 +1189,56 @@ const generateBill = async () => {
   };
 
   // Item management functions
-  const saveEditedPrice = () => {
+  const saveEditedPrice = async () => {
     const { id, type, field, value } = editItem;
     const newValue = parseFloat(value);
 
     if (type === "part") {
-      setParts(prev => prev.map(part => 
+      const updatedParts = parts.map(part => 
         part.id === id 
           ? { ...part, [field]: newValue, total: field === 'pricePerUnit' ? part.quantity * newValue : part.total } 
           : part
-      ));
+      );
+      setParts(updatedParts);
+
+      // Update job card via API for part price changes
+      try {
+        const partsForAPI = updatedParts.map(part => ({
+          _id: part.id, // Changed from partId to _id to match WorkInProgress.js expectations
+          partName: part.name,
+          quantity: part.quantity,
+          totalPrice: part.total,
+        }));
+
+        const updatePayload = {
+          partsUsed: partsForAPI
+        };
+
+        const response = await axios.put(
+          `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardIdFromUrl}`,
+          updatePayload,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem("token")}`,
+            }
+          }
+        );
+
+
+        setSnackbar({
+          open: true,
+          message: "Price updated successfully and saved to job card!",
+          severity: "success",
+        });
+      } catch (error) {
+        console.error('Error updating job card after price edit:', error);
+        setSnackbar({
+          open: true,
+          message: "Price updated locally but failed to save to job card. Please try again.",
+          severity: "warning",
+        });
+      }
     } else if (type === "service") {
       setServices(prev => prev.map(service => 
         service.id === id ? { ...service, [field]: newValue } : service
@@ -1168,7 +1249,7 @@ const generateBill = async () => {
   };
 
   // UPDATED: Add new part with HSN number
-  const addNewPart = () => {
+  const addNewPart = async () => {
     const { name, quantity, pricePerUnit, hsnNumber } = newPart;
     if (name && quantity > 0 && pricePerUnit > 0) {
       const newPartObj = {
@@ -1180,9 +1261,49 @@ const generateBill = async () => {
         hsnNumber: hsnNumber || "8708"
       };
 
+      // Add to local state
       setParts(prev => [...prev, newPartObj]);
       setNewPart({ name: "", quantity: 1, pricePerUnit: 0, hsnNumber: "" });
       setShowNewPartDialog(false);
+
+      // Update job card via API
+      try {
+        const updatedParts = [...parts, newPartObj].map(part => ({
+          _id: part.id, // Changed from partId to _id to match WorkInProgress.js expectations
+          partName: part.name,
+          quantity: part.quantity,
+          totalPrice: part.total,
+        }));
+
+        const updatePayload = {
+          partsUsed: updatedParts
+        };
+
+        const response = await axios.put(
+          `https://garage-management-zi5z.onrender.com/api/jobCards/${jobCardIdFromUrl}`,
+          updatePayload,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem("token")}`,
+            }
+          }
+        );
+
+
+        setSnackbar({
+          open: true,
+          message: "Part added successfully and saved to job card!",
+          severity: "success",
+        });
+      } catch (error) {
+        console.error('Error updating job card with new part:', error);
+        setSnackbar({
+          open: true,
+          message: "Part added locally but failed to save to job card. Please try again.",
+          severity: "warning",
+        });
+      }
     }
   };
 
@@ -1573,27 +1694,45 @@ const printInvoice = () => {
     const doc = generateProfessionalGSTInvoice();
     const pdfBlob = doc.output('blob');
     const url = URL.createObjectURL(pdfBlob);
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.src = url;
-    document.body.appendChild(iframe);
-
-    iframe.onload = () => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
+    
+    // Create a simple approach that works across browsers
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
+    
+    // Try to open in new tab first
+    const newWindow = window.open(url, '_blank');
+    
+    if (newWindow) {
+      // Show success message
+      setSnackbar({
+        open: true,
+        message: "PDF opened in new tab. Please use browser's print function (Ctrl+P) to print.",
+        severity: "success",
+      });
+      
+      // Clean up URL after a delay
       setTimeout(() => {
-        document.body.removeChild(iframe);
         URL.revokeObjectURL(url);
-      }, 1000);
-    };
+      }, 10000);
+    } else {
+      // If popup blocked, download the file
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      setSnackbar({
+        open: true,
+        message: "PDF downloaded. Please open the file and print manually.",
+        severity: "info",
+      });
+    }
+    
   } catch (error) {
     console.error("Error printing invoice:", error);
     setSnackbar({
       open: true,
-      message: "Failed to print invoice. Please try again.",
+      message: "Failed to generate PDF. Please try again.",
       severity: "error",
     });
   }

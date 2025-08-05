@@ -118,7 +118,7 @@ const InsuranceManagement = () => {
         garageId: insuranceForm.garageId || garageId
       };
 
-      console.log('Sending insurance data:', insuranceData);
+      
 
       const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/insurance/add', {
         method: 'POST',

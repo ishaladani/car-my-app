@@ -743,7 +743,7 @@ const JobCards = () => {
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("JOB CARD PREVIEW", margin, 19);
-    doc.setFontSize(10);
+    doc.setFontSize(12);
     doc.text(
       `Generated: ${new Date().toLocaleDateString("en-IN")}`,
       pageWidth - margin - 50,
@@ -776,8 +776,9 @@ const JobCards = () => {
 
     // --- Customer Info ---
     addSectionHeader("CUSTOMER INFORMATION");
+    console.log(formData);
+    
     const customerData = [
-      ["Job Card Number", jobCardNumber],
       ["Customer Name", formData.customerName || "N/A"],
       ["Contact Number", formData.contactNumber || "N/A"],
       ["Email", formData.email || "N/A"],
@@ -856,7 +857,7 @@ const JobCards = () => {
         ["Type", formData.type || "N/A"],
         [
           "Excess Amount",
-          formData.excessAmount ? `₹${formData.excessAmount}` : "N/A",
+          formData.excessAmount ? `${formData.excessAmount}` : "N/A",
         ],
       ];
       autoTable(doc, {
@@ -961,7 +962,6 @@ const JobCards = () => {
         const jobCardData = response.data;
 
         console.log("Fetched Job Card Data:", jobCardData);
-        console.log("Job Card Number:", jobCardData.jobCardNumber);
         console.log("Job Card ID:", jobCardData._id);
 
         // Store the complete job card data for PDF generation
@@ -1041,9 +1041,9 @@ const JobCards = () => {
         setFetchingData(false);
       }
     };
-
+    
     fetchJobCardData();
-  }, [id]);
+  }, [id]); 
 
   // Fields that should be converted to uppercase
   const uppercaseFields = [
@@ -1522,11 +1522,6 @@ const JobCards = () => {
         );
       }
 
-      setSnackbar({
-        open: true,
-        message: `Job card ${isEditMode ? "updated" : "created"} successfully!`,
-        severity: "success",
-      });
 
       setTimeout(
         () =>
@@ -1642,415 +1637,552 @@ const JobCards = () => {
 
   // Preview Component
   const PreviewModal = () => (
-  <PreviewDialog
-    open={showPreview}
-    onClose={() => setShowPreview(false)}
-    maxWidth="md"
-    fullWidth
-    // Make full screen on small devices
-    sx={{
-      "& .MuiDialog-paper": {
-        borderRadius: { xs: 0, sm: "16px" }, // Full screen on xs
-      },
-    }}
-    fullScreen={{ xs: true, sm: false }}
-  >
-    <DialogTitle
+    <PreviewDialog
+      open={showPreview}
+      onClose={() => setShowPreview(false)}
+      maxWidth="md"
+      fullWidth
       sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        py: 2,
-        px: { xs: 2, sm: 3 },
+        "& .MuiDialog-paper": {
+          margin: { xs: 2, sm: 4 },
+          width: { xs: "calc(100% - 32px)", sm: "auto" },
+          maxWidth: { xs: "100%", sm: "900px" }
+        }
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center" }}>
-        <VisibilityIcon sx={{ mr: 1, color: "primary.main" }} />
-        <Typography variant="h6" component="div">
-          Job Card Preview
-        </Typography>
-      </Box>
-      <IconButton onClick={() => setShowPreview(false)} size="small">
-        <CloseIcon />
-      </IconButton>
-    </DialogTitle>
-    <DialogContent sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
-      <Box sx={{ maxHeight: "70vh", overflowY: "auto" }}>
-        {/* Customer Details */}
-        <PreviewCard>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-              <Person sx={{ mr: 1, fontSize: "1.2rem" }} />
-              Customer Details
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText
-                  primary="Customer Name"
-                  secondary={formData.customerName || "N/A"}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText
-                  primary="Contact Number"
-                  secondary={formData.contactNumber || "N/A"}
-                />
-              </ListItem>
-              {formData.email && (
-                <ListItem>
-                  <ListItemText
-                    primary="Email"
-                    secondary={formData.email || "N/A"}
-                  />
-                </ListItem>
-              )}
-            </List>
-          </CardContent>
-        </PreviewCard>
+      <DialogTitle
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "flex-start", sm: "center" },
+          justifyContent: "space-between",
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          pb: 2,
+          gap: { xs: 1, sm: 0 }
+        }}
+      >
+        <Box sx={{ 
+          display: "flex", 
+          alignItems: "center",
+          flexWrap: "wrap"
+        }}>
+          <VisibilityIcon sx={{ mr: 1, color: "primary.main" }} />
+          <Typography 
+            variant="h5" 
+            component="div"
+            sx={{
+              fontSize: { xs: "1.25rem", sm: "1.5rem" },
+              wordBreak: "break-word"
+            }}
+          >
+            Job Card Preview
+          </Typography>
+        </Box>
+        <IconButton 
+          onClick={() => setShowPreview(false)}
+          sx={{ 
+            alignSelf: { xs: "flex-end", sm: "center" }
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
 
-        {/* Vehicle Details */}
-        <PreviewCard>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-              <DirectionsCar sx={{ mr: 1, fontSize: "1.2rem" }} />
-              Vehicle Details
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText
-                  primary="Car Number"
-                  secondary={formData.carNumber || "N/A"}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText
-                  primary="Model"
-                  secondary={formData.model || "N/A"}
-                />
-              </ListItem>
-              {formData.company && (
-                <ListItem>
-                  <ListItemText
-                    primary="Company"
-                    secondary={formData.company || "N/A"}
-                  />
-                </ListItem>
-              )}
-              <ListItem>
-                <ListItemText
-                  primary="Fuel Type"
-                  secondary={
-                    fuelTypeOptions.find(
-                      (o) => o.value === formData.fuelType
-                    )?.label || "N/A"
-                  }
-                />
-              </ListItem>
-              {formData.kilometer && (
-                <ListItem>
-                  <ListItemText
-                    primary="Kilometer"
-                    secondary={`${formData.kilometer} km`}
-                  />
-                </ListItem>
-              )}
-              {formData.chesiNumber && (
-                <ListItem>
-                  <ListItemText
-                    primary="Chassis Number"
-                    secondary={formData.chesiNumber || "N/A"}
-                  />
-                </ListItem>
-              )}
-            </List>
-          </CardContent>
-        </PreviewCard>
+      <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <Box sx={{ 
+          maxHeight: { xs: "60vh", sm: "70vh" }, 
+          overflowY: "auto" 
+        }}>
+          {/* Header Info */}
 
-        {/* Fuel Level */}
-        {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
+          {/* Customer Details */}
           <PreviewCard>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-                <LocalGasStation sx={{ mr: 1, fontSize: "1.2rem" }} />
-                Fuel Level
-              </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Rating
-                  value={fuelLevel}
-                  readOnly
-                  max={5}
-                  size="medium"
-                  icon={<LocalGasStation fontSize="inherit" />}
-                  emptyIcon={<LocalGasStation fontSize="inherit" />}
-                />
-                <Typography variant="body2">
-                  {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
-                </Typography>
-              </Box>
-            </CardContent>
-          </PreviewCard>
-        )}
-
-        {/* Insurance Details */}
-        {(formData.insuranceProvider ||
-          formData.policyNumber ||
-          formData.expiryDate ||
-          formData.type ||
-          formData.excessAmount) && (
-          <PreviewCard>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-                <Policy sx={{ mr: 1, fontSize: "1.2rem" }} />
-                Insurance Details
-              </Typography>
-              <List dense>
-                {formData.insuranceProvider && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Insurance Provider"
-                      secondary={formData.insuranceProvider || "N/A"}
-                    />
-                  </ListItem>
-                )}
-                {formData.policyNumber && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Policy Number"
-                      secondary={formData.policyNumber || "N/A"}
-                    />
-                  </ListItem>
-                )}
-                {formData.expiryDate && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Expiry Date"
-                      secondary={
-                        new Date(formData.expiryDate).toLocaleDateString() ||
-                        "N/A"
-                      }
-                    />
-                  </ListItem>
-                )}
-                {formData.type && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Type"
-                      secondary={formData.type || "N/A"}
-                    />
-                  </ListItem>
-                )}
-                {formData.excessAmount && (
-                  <ListItem>
-                    <ListItemText
-                      primary="Excess Amount"
-                      secondary={`₹${formData.excessAmount}`}
-                    />
-                  </ListItem>
-                )}
-              </List>
-            </CardContent>
-          </PreviewCard>
-        )}
-
-        {/* Job Details */}
-        {jobPoints.length > 0 && (
-          <PreviewCard>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-                <Description sx={{ mr: 1, fontSize: "1.2rem" }} />
-                Job Details & Pricing
-              </Typography>
-              <TableContainer
-                component={Paper}
-                variant="outlined"
-                sx={{ mt: 1, overflowX: "auto" }}
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ 
+                  display: "flex", 
+                  alignItems: "center",
+                  fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                }}
               >
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>#</TableCell>
-                      <TableCell>Description</TableCell>
-                      {/* <TableCell align="right">Price</TableCell> */}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {jobPoints.map((point, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell sx={{ maxWidth: 150 }}>
-                          <Typography variant="body2" noWrap={false}>
-                            {point.description}
-                          </Typography>
-                        </TableCell>
-                        {/* <TableCell align="right">
-                          ₹{parseFloat(point.price || 0).toLocaleString('en-IN')}
-                        </TableCell> */}
-                      </TableRow>
-                    ))}
-                    {/* <TableRow>
-                      <TableCell colSpan={2} align="right">
-                        <strong>Total:</strong>
-                      </TableCell>
-                      <TableCell align="right">
-                        <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
-                      </TableCell>
-                    </TableRow> */}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </PreviewCard>
-        )}
-
-        {/* Images */}
-        {(Object.values(carImages).some((img) => img) ||
-          Object.values(existingImages).some((img) => img)) && (
-          <PreviewCard>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-                <PhotoCamera sx={{ mr: 1, fontSize: "1.2rem" }} />
-                Car Images
+                <Person sx={{ mr: 1 }} />
+                Customer Details
               </Typography>
-              <Grid container spacing={1}>
-                {[
-                  { key: "frontView", label: "Front" },
-                  { key: "rearView", label: "Rear" },
-                  { key: "leftSide", label: "Left" },
-                  { key: "rightSide", label: "Right" },
-                ].map((imageType) => {
-                  const hasNew = carImages[imageType.key];
-                  const hasOld = existingImages[imageType.key];
-                  if (!hasNew && !hasOld) return null;
-                  return (
-                    <Grid item xs={6} key={imageType.key}>
-                      <Box sx={{ textAlign: "center" }}>
-                        <Typography variant="caption">
-                          {imageType.label}
-                        </Typography>
-                        <img
-                          src={hasNew ? URL.createObjectURL(hasNew) : hasOld}
-                          alt={imageType.label}
-                          style={{
-                            width: "100%",
-                            height: 100,
-                            objectFit: "cover",
-                            borderRadius: "8px",
-                            border: hasNew ? "2px solid #4caf50" : "1px solid #ddd",
-                          }}
-                        />
-                        {hasNew && (
-                          <Typography
-                            variant="caption"
-                            color="success.main"
-                            sx={{ display: "block" }}
-                          >
-                            New
-                          </Typography>
-                        )}
-                      </Box>
-                    </Grid>
-                  );
-                })}
+              <Grid container spacing={{ xs: 1, sm: 2 }}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Customer Name:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {formData.customerName}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Contact Number:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {formData.contactNumber}
+                  </Typography>
+                </Grid>
+                {formData.email && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Email:
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {formData.email}
+                    </Typography>
+                  </Grid>
+                )}
               </Grid>
             </CardContent>
           </PreviewCard>
-        )}
 
-        {/* Video */}
-        {(videoFile || existingVideo) && (
+          {/* Vehicle Details */}
           <PreviewCard>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom sx={{ fontSize: "1.1rem" }}>
-                <Videocam sx={{ mr: 1, fontSize: "1.2rem" }} />
-                Video
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography
+                variant="h6"
+                gutterBottom
+                sx={{ 
+                  display: "flex", 
+                  alignItems: "center",
+                  fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                }}
+              >
+                <DirectionsCar sx={{ mr: 1 }} />
+                Vehicle Details
               </Typography>
-              <Box sx={{ position: "relative", pt: "56.25%", height: 0 }}>
-                <video
-                  controls
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "8px",
-                    border: videoFile ? "2px solid #4caf50" : "1px solid #ddd",
-                  }}
-                >
-                  <source
-                    src={videoFile ? URL.createObjectURL(videoFile) : existingVideo}
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </Box>
-              {videoFile && (
-                <Typography
-                  variant="caption"
-                  color="success.main"
-                  sx={{ mt: 1, display: "block" }}
-                >
-                  New Video: {videoFile.name}
-                </Typography>
-              )}
+              <Grid container spacing={{ xs: 1, sm: 2 }}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Car Number:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {formData.carNumber}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Model:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {formData.model}
+                  </Typography>
+                </Grid>
+                {formData.company && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Company:
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {formData.company}
+                    </Typography>
+                  </Grid>
+                )}
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Fuel Type:
+                  </Typography>
+                  <Typography variant="body1" fontWeight={500}>
+                    {fuelTypeOptions.find(
+                      (option) => option.value === formData.fuelType
+                    )?.label || formData.fuelType}
+                  </Typography>
+                </Grid>
+                {formData.kilometer && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Kilometer:
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {formData.kilometer} km
+                    </Typography>
+                  </Grid>
+                )}
+                {formData.chesiNumber && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Chassis Number:
+                    </Typography>
+                    <Typography variant="body1" fontWeight={500}>
+                      {formData.chesiNumber}
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
             </CardContent>
           </PreviewCard>
-        )}
-      </Box>
-    </DialogContent>
 
-    <DialogActions
-      sx={{
-        flexDirection: { xs: "column", sm: "row" },
-        gap: 1,
-        p: 3,
-        borderTop: `1px solid ${theme.palette.divider}`,
-      }}
-    >
-      <Button
-        onClick={() => setShowPreview(false)}
-        startIcon={<ArrowBackIcon />}
-        fullWidth
-        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
-      >
-        Back to Edit
-      </Button>
-      <Button
-        onClick={generatePreviewPDF}
-        variant="outlined"
-        startIcon={<DownloadIcon />}
-        fullWidth
-        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
-      >
-        Download PDF
-      </Button>
-      <Button
-        onClick={handleActualSubmit}
-        variant="contained"
-        disabled={loading}
-        startIcon={
-          loading ? (
-            <CircularProgress size={16} color="inherit" />
-          ) : (
-            <CheckIcon />
-          )
-        }
-        fullWidth
-        sx={{ maxWidth: { xs: "100%", sm: "200px" } }}
-      >
-        {loading
-          ? isEditMode
-            ? "Updating..."
-            : "Saving..."
-          : isEditMode
-          ? "Confirm Update"
-          : "Confirm Save"}
-      </Button>
-    </DialogActions>
-  </PreviewDialog>
-);
+          {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
+          {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
+            <PreviewCard>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
+                  <LocalGasStation sx={{ mr: 1 }} />
+                  Fuel Level
+                </Typography>
+                <Box sx={{ 
+                  display: "flex", 
+                  flexDirection: { xs: "column", sm: "row" },
+                  alignItems: { xs: "flex-start", sm: "center" }, 
+                  gap: { xs: 1, sm: 2 } 
+                }}>
+                  <Rating
+                    name="fuel-level-preview"
+                    value={fuelLevel}
+                    readOnly
+                    max={5}
+                    size="large"
+                    icon={<LocalGasStation fontSize="inherit" />}
+                    emptyIcon={<LocalGasStation fontSize="inherit" />}
+                  />
+                  <Typography variant="body1" fontWeight={500}>
+                    {fuelLevel}/5 - {getFuelLevelText(fuelLevel)}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </PreviewCard>
+          )}
 
+          {/* Insurance Details */}
+          {(formData.insuranceProvider ||
+            formData.policyNumber ||
+            formData.expiryDate ||
+            formData.type ||
+            formData.excessAmount) && (
+            <PreviewCard>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
+                  <Policy sx={{ mr: 1 }} />
+                  Insurance Details
+                </Typography>
+                <Grid container spacing={{ xs: 1, sm: 2 }}>
+                  {formData.insuranceProvider && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Insurance Provider:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        {formData.insuranceProvider}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {formData.policyNumber && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Policy Number:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        {formData.policyNumber}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {formData.expiryDate && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Expiry Date:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        {new Date(formData.expiryDate).toLocaleDateString()}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {formData.type && (
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Type:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        {formData.type}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {formData.excessAmount && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        Excess Amount:
+                      </Typography>
+                      <Typography variant="body1" fontWeight={500}>
+                        ₹{formData.excessAmount}
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Job Details with pricing table */}
+          {jobPoints.length > 0 && (
+            <PreviewCard>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
+                  <Description sx={{ mr: 1 }} />
+                  Job Details & Pricing
+                </Typography>
+                <TableContainer 
+                  component={Paper} 
+                  variant="outlined"
+                  sx={{ overflowX: "auto" }}
+                >
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ minWidth: 60 }}>
+                          <strong>S.No.</strong>
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 200 }}>
+                          <strong>Description</strong>
+                        </TableCell>
+                        {/* <TableCell align="right"><strong>Price (₹)</strong></TableCell> */}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {jobPoints.map((point, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell sx={{ wordBreak: "break-word" }}>
+                            {point.description}
+                          </TableCell>
+                          {/* <TableCell align="right">
+                            {point.price ? `₹${parseFloat(point.price).toLocaleString('en-IN')}` : '₹0'}
+                          </TableCell> */}
+                        </TableRow>
+                      ))}
+                      {/* <TableRow>
+                        <TableCell colSpan={2} align="right"><strong>Total Cost:</strong></TableCell>
+                        <TableCell align="right">
+                          <strong>₹{calculateTotalJobCost().toLocaleString('en-IN')}</strong>
+                        </TableCell>
+                      </TableRow> */}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Images Preview */}
+          {(Object.values(carImages).some((img) => img) ||
+            Object.values(existingImages).some((img) => img)) && (
+            <PreviewCard>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
+                  <PhotoCamera sx={{ mr: 1 }} />
+                  Car Images
+                </Typography>
+                <Grid container spacing={{ xs: 1, sm: 2 }}>
+                  {[
+                    { key: "frontView", label: "Front View" },
+                    { key: "rearView", label: "Rear View" },
+                    { key: "leftSide", label: "Left Side" },
+                    { key: "rightSide", label: "Right Side" },
+                  ].map((imageType) => {
+                    const hasNewImage = carImages[imageType.key];
+                    const hasExistingImage = existingImages[imageType.key];
+
+                    if (hasNewImage || hasExistingImage) {
+                      return (
+                        <Grid item xs={12} sm={6} md={3} key={imageType.key}>
+                          <Box sx={{ textAlign: "center" }}>
+                            <Typography 
+                              variant="subtitle2" 
+                              gutterBottom
+                              sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}
+                            >
+                              {imageType.label}
+                            </Typography>
+                            <img
+                              src={
+                                hasNewImage
+                                  ? URL.createObjectURL(hasNewImage)
+                                  : hasExistingImage
+                              }
+                              alt={imageType.label}
+                              style={{
+                                width: "100%",
+                                height: "120px",
+                                objectFit: "cover",
+                                borderRadius: "8px",
+                                border: hasNewImage
+                                  ? "2px solid #4caf50"
+                                  : "1px solid #ddd",
+                              }}
+                            />
+                            {hasNewImage && (
+                              <Typography
+                                variant="caption"
+                                color="success.main"
+                                sx={{ display: "block", mt: 0.5 }}
+                              >
+                                {hasNewImage.name &&
+                                hasNewImage.name.includes("captured")
+                                  ? "Camera Captured"
+                                  : "New Image"}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Grid>
+                      );
+                    }
+                    return null;
+                  })}
+                </Grid>
+              </CardContent>
+            </PreviewCard>
+          )}
+
+          {/* Video Preview */}
+          {(videoFile || existingVideo) && (
+            <PreviewCard>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                <Typography
+                  variant="h6"
+                  gutterBottom
+                  sx={{ 
+                    display: "flex", 
+                    alignItems: "center",
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
+                  <Videocam sx={{ mr: 1 }} />
+                  Video
+                </Typography>
+                <Box sx={{ 
+                  maxWidth: { xs: "100%", sm: 400 }, 
+                  mx: "auto" 
+                }}>
+                  <video
+                    controls
+                    style={{
+                      width: "100%",
+                      height: "auto",
+                      borderRadius: "8px",
+                      border: videoFile
+                        ? "2px solid #4caf50"
+                        : "1px solid #ddd",
+                    }}
+                  >
+                    <source
+                      src={
+                        videoFile
+                          ? URL.createObjectURL(videoFile)
+                          : existingVideo
+                      }
+                      type="video/mp4"
+                    />
+                    Your browser does not support the video tag.
+                  </video>
+                  {videoFile && (
+                    <Typography
+                      variant="caption"
+                      color="success.main"
+                      sx={{ display: "block", mt: 1, textAlign: "center" }}
+                    >
+                      New Video: {videoFile.name}
+                    </Typography>
+                  )}
+                </Box>
+              </CardContent>
+            </PreviewCard>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions
+        sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          borderTop: `1px solid ${theme.palette.divider}`,
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1, sm: 0 }
+        }}
+      >
+        <Button
+          onClick={() => setShowPreview(false)}
+          startIcon={<ArrowBackIcon />}
+          sx={{ 
+            mr: { xs: 0, sm: 2 },
+            width: { xs: "100%", sm: "auto" }
+          }}
+        >
+          Back to Edit
+        </Button>
+
+        {/* New Download PDF Button */}
+        <Button
+          onClick={generatePreviewPDF}
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          sx={{ 
+            mr: { xs: 0, sm: 2 },
+            width: { xs: "100%", sm: "auto" }
+          }}
+        >
+          Download PDF
+        </Button>
+
+        <Button
+          onClick={handleActualSubmit}
+          variant="contained"
+          disabled={loading}
+          startIcon={
+            loading ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <CheckIcon />
+            )
+          }
+          sx={{ 
+            px: { xs: 2, sm: 4 },
+            width: { xs: "100%", sm: "auto" }
+          }}
+        >
+          {loading
+            ? isEditMode
+              ? "Updating..."
+              : "Saving..."
+            : isEditMode
+            ? "Confirm Update"
+            : "Confirm Save"}
+        </Button>
+      </DialogActions>
+    </PreviewDialog>
+  );
 
   if (fetchingData) {
     return (
@@ -2079,25 +2211,27 @@ const JobCards = () => {
   return (
     <Box
       sx={{
-         flexGrow: 1,
-    mb: 4,
-    ml: { xs: 0, sm: 35 },
-    overflow: "auto",
-    px: { xs: 1, sm: 3 },
+        flexGrow: 1,
+        mb: 4,
+        ml: { xs: 0, sm: 35 },
+        overflow: "auto",
+        px: { xs: 2, sm: 3, md: 4 },
       }}
     >
       <CssBaseline />
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ px: { xs: 0, sm: 2 } }}>
         <Card sx={{ mb: 4, borderRadius: 2, bgcolor: "background.paper" }}>
-          <CardContent>
+          <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
             {/* Header Section */}
             <Box
               display="flex"
+              flexDirection={{ xs: "column", sm: "row" }}
               justifyContent="space-between"
-              alignItems="center"
+              alignItems={{ xs: "flex-start", sm: "center" }}
               mb={2}
+              gap={2}
             >
-              <Box display="flex" alignItems="center">
+              <Box display="flex" alignItems="center" flexWrap="wrap">
                 {isEditMode ? (
                   <EditIcon fontSize="large" color="primary" sx={{ mr: 2 }} />
                 ) : (
@@ -2107,11 +2241,18 @@ const JobCards = () => {
                     sx={{ mr: 2 }}
                   />
                 )}
-                <Typography variant="h5" color="primary">
+                <Typography 
+                  variant="h5" 
+                  color="primary"
+                  sx={{ 
+                    fontSize: { xs: "1.5rem", sm: "2rem" },
+                    wordBreak: "break-word"
+                  }}
+                >
                   {isEditMode ? `Edit Job Card ` : "Create Job Card"}
                 </Typography>
               </Box>
-              <Box display="flex" alignItems="center" gap={2}>
+              <Box display="flex" alignItems="center" gap={1}>
                 {isEditMode && (
                   <Chip
                     label={`Status: ${formData.status
@@ -2119,6 +2260,10 @@ const JobCards = () => {
                       .toUpperCase()}`}
                     color={getStatusColor(formData.status)}
                     variant="outlined"
+                    sx={{ 
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                      height: { xs: 24, sm: 32 }
+                    }}
                   />
                 )}
               </Box>
@@ -2132,18 +2277,25 @@ const JobCards = () => {
               {/* Status Section - Only shown in edit mode */}
               {isEditMode && (
                 <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 600, 
+                      mb: 2,
+                      fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                    }}
+                  >
                     Job Status
                   </Typography>
                   <Paper
                     sx={{
-                      p: 3,
+                      p: { xs: 2, sm: 3 },
                       border: `1px solid ${theme.palette.divider}`,
                       borderRadius: 2,
                       bgcolor: "background.paper",
                     }}
                   >
-                    <Grid container spacing={3}>
+                    <Grid container spacing={{ xs: 2, sm: 3 }}>
                       <Grid item xs={12} md={6}>
                         <FormControl fullWidth>
                           <InputLabel id="status-label">Status</InputLabel>
@@ -2182,7 +2334,10 @@ const JobCards = () => {
                           onClick={() => updateJobCardStatus(formData.status)}
                           disabled={loading}
                           startIcon={<SaveIcon />}
-                          sx={{ mt: 1 }}
+                          sx={{ 
+                            mt: { xs: 0, md: 1 },
+                            width: { xs: "100%", md: "auto" }
+                          }}
                         >
                           Update Status Only
                         </Button>
@@ -2194,20 +2349,27 @@ const JobCards = () => {
 
               {/* Customer & Car Details */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    mb: 2,
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
                   Customer & Car Details
                 </Typography>
                 <Paper
                   sx={{
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
                     bgcolor: "background.paper",
                   }}
                 >
-                  <Grid container spacing={3}>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
                     {customerCarFields.map((field) => (
-                      <Grid item xs={12} md={4} key={field.name}>
+                      <Grid item xs={12} sm={6} md={4} key={field.name}>
                         <TextField
                           fullWidth
                           name={field.name}
@@ -2242,7 +2404,7 @@ const JobCards = () => {
                     ))}
 
                     {/* Fuel Type Dropdown */}
-                    <Grid item xs={12} md={4}>
+                    <Grid item xs={12} sm={6} md={4}>
                       <FormControl
                         fullWidth
                         required
@@ -2282,18 +2444,25 @@ const JobCards = () => {
               {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
               {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
                 <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 600, 
+                      mb: 2,
+                      fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                    }}
+                  >
                     Fuel Level
                   </Typography>
                   <Paper
                     sx={{
-                      p: 3,
+                      p: { xs: 2, sm: 3 },
                       border: `1px solid ${theme.palette.divider}`,
                       borderRadius: 2,
                       bgcolor: "background.paper",
                     }}
                   >
-                    <Grid container spacing={3}>
+                    <Grid container spacing={{ xs: 2, sm: 3 }}>
                       <Grid item xs={12}>
                         <Typography component="legend" sx={{ mb: 1 }}>
                           Current Fuel Level
@@ -2308,6 +2477,9 @@ const JobCards = () => {
                           size="large"
                           icon={<LocalGasStation fontSize="inherit" />}
                           emptyIcon={<LocalGasStation fontSize="inherit" />}
+                          sx={{ 
+                            fontSize: { xs: "2rem", sm: "2.5rem" }
+                          }}
                         />
                         <Typography
                           variant="body2"
@@ -2324,18 +2496,25 @@ const JobCards = () => {
 
               {/* Insurance Details */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    mb: 2,
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
                   Insurance Details
                 </Typography>
                 <Paper
                   sx={{
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
                     bgcolor: "background.paper",
                   }}
                 >
-                  <Grid container spacing={3}>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
                     {[
                       {
                         name: "insuranceProvider",
@@ -2419,20 +2598,32 @@ const JobCards = () => {
 
               {/* Job Details with Price */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    mb: 2,
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
                   Job Details & Pricing
                 </Typography>
                 <Paper
                   sx={{
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
                     bgcolor: "background.paper",
                   }}
                 >
-                  <Grid container spacing={3}>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
                     <Grid item xs={12}>
-                      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                      <Box sx={{ 
+                        display: "flex", 
+                        flexDirection: { xs: "column", sm: "row" },
+                        gap: { xs: 2, sm: 1 }, 
+                        mb: 2 
+                      }}>
                         <TextField
                           fullWidth
                           placeholder="Enter job description..."
@@ -2474,7 +2665,10 @@ const JobCards = () => {
                           onClick={addJobPoint}
                           disabled={!currentJobDescription.trim()}
                           startIcon={<AddIcon />}
-                          sx={{ minWidth: 120 }}
+                          sx={{ 
+                            minWidth: { xs: "100%", sm: 120 },
+                            height: { xs: 56, sm: "auto" }
+                          }}
                         >
                           Add Item
                         </Button>
@@ -2488,19 +2682,22 @@ const JobCards = () => {
                           <TableContainer
                             component={Paper}
                             variant="outlined"
-                            sx={{ mt: 2 }}
+                            sx={{ 
+                              mt: 2,
+                              overflowX: "auto"
+                            }}
                           >
                             <Table size="small">
                               <TableHead>
                                 <TableRow>
-                                  <TableCell>
+                                  <TableCell sx={{ minWidth: 60 }}>
                                     <strong>S.No.</strong>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell sx={{ minWidth: 200 }}>
                                     <strong>Description</strong>
                                   </TableCell>
                                   {/* <TableCell align="right"><strong>Price (₹)</strong></TableCell> */}
-                                  <TableCell align="center">
+                                  <TableCell align="center" sx={{ minWidth: 100 }}>
                                     <strong>Actions</strong>
                                   </TableCell>
                                 </TableRow>
@@ -2574,25 +2771,32 @@ const JobCards = () => {
 
               {/* UPDATED: Car Images Upload/Display with Camera Support */}
               <Box sx={{ mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    mb: 2,
+                    fontSize: { xs: "1.1rem", sm: "1.25rem" }
+                  }}
+                >
                   Car Images
                   <Chip
                     label="Camera Supported"
                     size="small"
                     color="success"
-                    sx={{ ml: 2 }}
+                    sx={{ ml: { xs: 1, sm: 2 } }}
                     icon={<CameraAlt fontSize="small" />}
                   />
                 </Typography>
                 <Paper
                   sx={{
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 2,
                     bgcolor: "background.paper",
                   }}
                 >
-                  <Grid container spacing={3}>
+                  <Grid container spacing={{ xs: 2, sm: 3 }}>
                     {[
                       { key: "frontView", label: "Front View" },
                       { key: "rearView", label: "Rear View" },
@@ -2627,7 +2831,13 @@ const JobCards = () => {
 
                   {/* Video Upload Section */}
                   <Box sx={{ mt: 4 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 2 }}>
+                    <Typography 
+                      variant="subtitle1" 
+                      sx={{ 
+                        mb: 2,
+                        fontSize: { xs: "1rem", sm: "1.125rem" }
+                      }}
+                    >
                       Video (Optional)
                     </Typography>
 
@@ -2753,7 +2963,12 @@ const JobCards = () => {
               </Box>
 
               {/* Submit Button - Changed to Preview */}
-              <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+              <Box sx={{ 
+                display: "flex", 
+                justifyContent: "center", 
+                mt: 4,
+                px: { xs: 2, sm: 0 }
+              }}>
                 <Button
                   type="submit"
                   variant="contained"
@@ -2761,12 +2976,14 @@ const JobCards = () => {
                   startIcon={<PreviewIcon />}
                   disabled={loading}
                   sx={{
-                    px: 6,
-                    py: 1.5,
+                    px: { xs: 4, sm: 6 },
+                    py: { xs: 1.5, sm: 1.5 },
                     borderRadius: 2,
                     fontWeight: 600,
-                    fontSize: "1rem",
+                    fontSize: { xs: "0.9rem", sm: "1rem" },
                     textTransform: "none",
+                    width: { xs: "100%", sm: "auto" },
+                    maxWidth: { xs: "300px", sm: "none" }
                   }}
                 >
                   Preview Job Card

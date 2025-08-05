@@ -293,7 +293,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
         ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
         ['Policy Number', jobData.policyNumber || 'N/A'],
         ['Expiry Date', formatDate(jobData.expiryDate)],
-        ['Excess Amount', jobData.excessAmount ? `${jobData.excessAmount}` : 'N/A'],
+        ['Excess Amount', String(jobData.excessAmount) ? `${String(jobData.excessAmount)}` : 'N/A'],
         ['Job Type', jobData.type || 'N/A'],
         ['Engineer', jobData.engineerId?.[0]?.name || 'Not Assigned'],
         ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
@@ -334,6 +334,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
   const generatePDFWithHTML2Canvas = async () => {
     try {
       setIsGenerating(true);
+      
       
       // Create a temporary div with the content
       const tempDiv = document.createElement('div');
@@ -384,7 +385,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
                     <tr style="background-color: ${index % 2 === 0 ? '#f5f5f5' : 'white'};">
                       <td style="border: 1px solid #ddd; padding: 12px;">${index + 1}</td>
                       <td style="border: 1px solid #ddd; padding: 12px;">${item.description || 'N/A'}</td>
-                      <td style="border: 1px solid #ddd; padding: 12px;">${item.price || 'N/A'}</td>
+                      <td style="border: 1px solid #ddd; padding: 12px;">₹${item.price || 'N/A'}</td>
                     </tr>
                   `;
                 });
@@ -393,7 +394,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
                 tableHTML += `
                     <tr style="background-color: #e3f2fd; font-weight: bold;">
                       <td colspan="2" style="border: 1px solid #ddd; padding: 12px;"><strong>Service Total:</strong></td>
-                      <td style="border: 1px solid #ddd; padding: 12px;"><strong>${total.toFixed(2)}</strong></td>
+                      <td style="border: 1px solid #ddd; padding: 12px;"><strong>₹${total.toFixed(2)}</strong></td>
                     </tr>
                   </tbody>
                 </table>

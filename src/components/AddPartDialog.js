@@ -128,7 +128,6 @@ const AddPartDialog = ({
         taxAmount: taxAmount
       };
 
-      console.log('Sending complete payload for new part:', requestData);
 
       const response = await axios.post(
         'https://garage-management-zi5z.onrender.com/api/garage/inventory/add',

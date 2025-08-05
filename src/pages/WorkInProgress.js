@@ -163,7 +163,7 @@ const WorkInProgress = () => {
     { value: "on_hold", label: "On Hold", color: "default" },
   ];
 
-  const handlePartSelection = (newParts, previousParts = []) => {
+  const handlePartSelection = async (newParts, previousParts = []) => {
     try {
       const partsMap = new Map();
       previousParts.forEach((part) => {
@@ -203,6 +203,12 @@ const WorkInProgress = () => {
 
       const updatedParts = Array.from(partsMap.values());
       setSelectedParts(updatedParts);
+      
+      // Update API with the new parts selection
+      if (updatedParts.length > 0) {
+        await updateJobCardWithParts(updatedParts);
+      }
+      
       if (error) setError(null);
     } catch (err) {
       console.error("Error handling part selection:", err);
@@ -210,17 +216,25 @@ const WorkInProgress = () => {
     }
   };
 
-  const handlePartRemoval = (partIndex) => {
+  const handlePartRemoval = async (partIndex) => {
     try {
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
       setSelectedParts(updatedParts);
+      
+      // Update API with the remaining parts
+      if (updatedParts.length > 0) {
+        await updateJobCardWithParts(updatedParts);
+      } else {
+        // If no parts remain, send empty array to clear parts
+        await updateJobCardWithParts([]);
+      }
     } catch (err) {
       console.error("Error removing part:", err);
       setError(`Failed to remove part`);
     }
   };
 
-  const handlePartQuantityChange = (partIndex, newQuantity, oldQuantity) => {
+  const handlePartQuantityChange = async (partIndex, newQuantity, oldQuantity) => {
     const part = selectedParts[partIndex];
     if (!part) return;
 
@@ -244,6 +258,10 @@ const WorkInProgress = () => {
         idx === partIndex ? { ...p, selectedQuantity: newQuantity } : p
       );
       setSelectedParts(updatedParts);
+      
+      // Update API with the updated parts
+      await updateJobCardWithParts(updatedParts);
+      
       if (error && error.includes(part.partName)) {
         setError(null);
       }
@@ -411,7 +429,60 @@ const WorkInProgress = () => {
     [apiCall, fetchInventoryParts]
   );
 
-  const addInventoryPartToList = (inventoryPart) => {
+  // Function to update job card with parts in API
+  const updateJobCardWithParts = async (partsToUpdate) => {
+    try {
+
+      
+      // Map parts to the simplified API structure based on successful response
+      const partsForAPI = partsToUpdate.map(part => {
+        const quantity = Number(part.selectedQuantity) || Number(part.quantity) || 1;
+        const sellingPrice = Number(part.sellingPrice) || 0;
+        const totalPrice = sellingPrice * quantity;
+        
+        return {
+          partName: part.partName || '',
+          quantity: quantity,
+          totalPrice: totalPrice,
+          _id: part._id || part.partId || Date.now().toString() // Generate _id if not present
+        };
+      });
+
+      const updatePayload = { partsUsed: partsForAPI };
+      
+
+
+      const response = await axios.put(
+        `${API_BASE_URL}/jobCards/${id}`,
+        updatePayload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${garageToken}`,
+          }
+        }
+      );
+
+
+      setSnackbar({
+        open: true,
+        message: "Parts updated successfully in job card!",
+        severity: "success",
+      });
+      
+      return response.data;
+    } catch (err) {
+      console.error('Failed to update job card with parts:', err);
+      setSnackbar({
+        open: true,
+        message: "Failed to update parts in job card. Please try again.",
+        severity: "error",
+      });
+      throw err;
+    }
+  };
+
+  const addInventoryPartToList = async (inventoryPart) => {
     const availableQuantity = getAvailableQuantity(inventoryPart._id);
     if (availableQuantity <= 0) {
       setSnackbar({
@@ -438,10 +509,39 @@ const WorkInProgress = () => {
     };
     setAllParts((prev) => [...prev, newPart]);
     setPartIdCounter((prev) => prev + 1);
+    
+    // Update API with the new part added to the list
+    try {
+      const currentSelectedParts = [...selectedParts];
+      const partForAPI = {
+        _id: inventoryPart._id,
+        partName: inventoryPart.partName,
+        selectedQuantity: 1,
+        sellingPrice: inventoryPart.sellingPrice || 0,
+      };
+      
+      const updatedParts = [...currentSelectedParts, partForAPI];
+      await updateJobCardWithParts(updatedParts);
+    } catch (err) {
+      console.error("Error updating API when adding inventory part:", err);
+    }
   };
 
-  const removePartFromList = (partId) => {
+  const removePartFromList = async (partId) => {
+    const partToRemove = allParts.find((part) => part.id === partId);
     setAllParts((prev) => prev.filter((part) => part.id !== partId));
+    
+    // Update API by removing the part from selected parts
+    if (partToRemove) {
+      try {
+        const updatedSelectedParts = selectedParts.filter(
+          (part) => part._id !== partToRemove.inventoryId && part._id !== partToRemove._id
+        );
+        await updateJobCardWithParts(updatedSelectedParts);
+      } catch (err) {
+        console.error("Error updating API when removing part from list:", err);
+      }
+    }
   };
 
   const updatePartInList = (partId, field, value) => {
@@ -450,7 +550,7 @@ const WorkInProgress = () => {
     );
   };
 
-  const handleInventoryPartQuantityChange = (partId, newQuantity) => {
+  const handleInventoryPartQuantityChange = async (partId, newQuantity) => {
     const part = allParts.find((p) => p.id === partId);
     if (!part) return;
     if (part.type === "existing") {
@@ -463,6 +563,16 @@ const WorkInProgress = () => {
         return;
       }
       updatePartInList(partId, "selectedQuantity", newQuantity);
+      
+      // Update API with the updated existing part
+      try {
+        const updatedSelectedParts = selectedParts.map(p => 
+          p._id === part._id ? { ...p, selectedQuantity: newQuantity } : p
+        );
+        await updateJobCardWithParts(updatedSelectedParts);
+      } catch (err) {
+        console.error("Error updating API when changing existing part quantity:", err);
+      }
       return;
     }
     if (part.type === "inventory") {
@@ -486,6 +596,16 @@ const WorkInProgress = () => {
         return;
       }
       updatePartInList(partId, "selectedQuantity", newQuantity);
+      
+      // Update API with the updated inventory part
+      try {
+        const updatedSelectedParts = selectedParts.map(p => 
+          p._id === part.inventoryId ? { ...p, selectedQuantity: newQuantity } : p
+        );
+        await updateJobCardWithParts(updatedSelectedParts);
+      } catch (err) {
+        console.error("Error updating API when changing inventory part quantity:", err);
+      }
     }
   };
 
@@ -655,6 +775,7 @@ const WorkInProgress = () => {
         }
 
         if (data.partsUsed && data.partsUsed.length > 0) {
+
           const existingParts = data.partsUsed.map((part, index) => ({
             id: index + 1,
             type: "existing",
@@ -671,6 +792,7 @@ const WorkInProgress = () => {
             quantity: part.quantity || 1,
             taxAmount: part.gstPercentage || 0,
           }));
+
           setAllParts(existingParts);
           setSelectedParts(existingParts);
           setPartIdCounter(existingParts.length + 1);
@@ -837,7 +959,7 @@ const WorkInProgress = () => {
         jobCardNumber: jobId,
       };
 
-      console.log("Submitting work progress:", requestData);
+
 
       const response = await axios.put(
         `${API_BASE_URL}/garage/jobcards/${id}/workprogress`,
@@ -1431,15 +1553,7 @@ const WorkInProgress = () => {
                                 const totalPrice = unitPrice * selectedQuantity;
                                 const finalPrice = totalPrice + totalTax;
     
-                                // Log the calculated values as requested
-                                console.log(`Part: ${part.partName}`, {
-                                  sellingPrice: unitPrice,
-                                  selectedQuantity: selectedQuantity,
-                                  taxAmount: taxAmount,
-                                  originalQuantity: quantity,
-                                  calculatedTax: totalTax,
-                                  finalPrice: finalPrice,
-                                });
+
     
                                 // Get available quantity considering all current selections
                                 const availableQuantity = getAvailableQuantity(
