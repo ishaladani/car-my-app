@@ -1,706 +1,712 @@
-import React, { useState, useEffect } from 'react';
-import { 
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import {
   Box,
   Typography,
+  Card,
+  CardContent,
   TextField,
   Button,
-  Link,
-  CssBaseline,
-  Paper,
-  useTheme,
+  Container,
   IconButton,
-  InputAdornment,
-  Alert,
-  CircularProgress,
-  Switch,
-  FormControlLabel,
-  Divider,
-  Chip,
+  Autocomplete,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stepper,
-  Step,
-  StepLabel,
-  AppBar,
-  Toolbar,
-  Container
+  Grid,
+  CssBaseline,
+  InputAdornment,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  Tooltip,
+  Chip,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Paper,
+  useTheme,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress as MuiCircularProgress
 } from '@mui/material';
-import { 
-  Visibility, 
-  VisibilityOff, 
-  Business, 
-  Person,
-  DirectionsCar,
-  AccountCircle,
-  Email,
-  Lock,
-  VerifiedUser,
-  Send,
-  ExitToApp
+import {
+  ArrowBack as ArrowBackIcon,
+  Person as PersonIcon,
+  Send as SendIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  ExpandMore as ExpandMoreIcon,
+  Description as DescriptionIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import { useThemeContext } from '../Layout/ThemeContext';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
-const LoginPage = () => {
+const API_BASE_URL = 'https://garage-management-zi5z.onrender.com/api';
+
+const AssignEngineer = () => {
+  const { darkMode } = useThemeContext();
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const [isGarageLogin, setIsGarageLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [logoutLoading, setLogoutLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { id } = useParams();
 
-  // Forgot Password State
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [forgotPasswordStep, setForgotPasswordStep] = useState(0);
-  const [forgotPasswordData, setForgotPasswordData] = useState({
-    email: '',
-    otp: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
-  const [forgotPasswordError, setForgotPasswordError] = useState('');
-  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  const garageId = localStorage.getItem('garageId');
+  const garageToken = localStorage.getItem('token');
 
-  // API Base URL
-  const BASE_URL = 'https://garage-management-zi5z.onrender.com';
-
-  // Check if user is already logged in on mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userType = localStorage.getItem('userType');
-    const garageId = localStorage.getItem('garageId');
-    if (token && userType && garageId) {
-      setIsLoggedIn(true);
-      setCurrentUser({ userType, garageId, token });
-      setIsGarageLogin(userType === 'garage');
+  // State
+  const [engineers, setEngineers] = useState([]);
+  const [inventoryParts, setInventoryParts] = useState([]);
+  const [jobCardIds, setJobCardIds] = useState([]);
+  const [assignments, setAssignments] = useState([
+    {
+      id: Date.now(),
+      engineer: null,
+      parts: [],
+      priority: 'medium',
+      notes: ''
     }
-  }, []);
+  ]);
+  const [jobPoints, setJobPoints] = useState([]);
+  const [currentJobPoint, setCurrentJobPoint] = useState({ description: '' });
+  const [parsedJobDetails, setParsedJobDetails] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [jobCardDataTemp, setJobCardDataTemp] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Handle logout
-  const handleLogout = async () => {
-    setLogoutLoading(true);
+  // Dialogs
+  const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
+  const [newPart, setNewPart] = useState({
+    garageId,
+    carName: "",
+    model: "",
+    partNumber: "",
+    partName: "",
+    quantity: 1,
+    purchasePrice: 0,
+    sellingPrice: 0,
+    hsnNumber: "",
+    igst: 0,
+    cgstSgst: 0,
+    taxType: 'igst'
+  });
+  const [addingPart, setAddingPart] = useState(false);
+  const [partAddError, setPartAddError] = useState(null);
+
+  const [openAddEngineerDialog, setOpenAddEngineerDialog] = useState(false);
+  const [newEngineer, setNewEngineer] = useState({
+    name: "", email: "", phone: "", specialty: "", garageId
+  });
+  const [addingEngineer, setAddingEngineer] = useState(false);
+  const [engineerAddError, setEngineerAddError] = useState(null);
+
+  // Utility API Call
+  const apiCall = useCallback(async (endpoint, options = {}) => {
     try {
-      const storedUserId = localStorage.getItem("garageId");
-      const token = localStorage.getItem("token");
+      const response = await axios({
+        url: `${API_BASE_URL}${endpoint}`,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+          ...options.headers
+        },
+        ...options
+      });
+      return response;
+    } catch (err) {
+      console.error(`API call failed for ${endpoint}:`, err);
+      throw err;
+    }
+  }, [garageToken]);
 
-      if (!storedUserId) {
-        console.error("No userId found in localStorage");
-      }
-      if (!token) {
-        console.error("No token found in localStorage");
-      }
+  // Fetch Engineers
+  const fetchEngineers = useCallback(async () => {
+    if (!garageId) return;
+    try {
+      setIsLoading(true);
+      const res = await apiCall(`/garage/engineers/${garageId}`, { method: 'GET' });
+      setEngineers(res.data?.engineers || []);
+    } catch (err) {
+      setError('Failed to load engineers');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [garageId, apiCall]);
 
-      await axios.post(
-        `${BASE_URL}/api/garage/logout/${storedUserId}`,
-        {},
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
+  // Fetch Inventory
+  const fetchInventoryParts = useCallback(async () => {
+    if (!garageId) return;
+    try {
+      setIsLoadingInventory(true);
+      const res = await apiCall(`/garage/inventory/${garageId}`, { method: 'GET' });
+      setInventoryParts(res.data?.parts || []);
+    } catch (err) {
+      setError('Failed to load inventory');
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  }, [garageId, apiCall]);
+
+  // Get available quantity considering all selected parts
+  const getAvailableQuantity = (partId) => {
+    const originalPart = inventoryParts.find(p => p._id === partId);
+    if (!originalPart) return 0;
+
+    let totalSelected = 0;
+    assignments.forEach(assignment => {
+      assignment.parts.forEach(part => {
+        if (part._id === partId) {
+          totalSelected += part.selectedQuantity || 1;
         }
+      });
+    });
+
+    return Math.max(0, originalPart.quantity - totalSelected);
+  };
+
+  // Update job card with parts used
+  const updateJobCardWithParts = async (partsUsed) => {
+    try {
+      const formattedParts = partsUsed.map(part => {
+        const sellingPrice = Number(part.sellingPrice) || 0;
+        const taxRate = Number(part.taxAmount || 0); // percentage
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+        const quantity = Number(part.selectedQuantity || 1);
+        const totalPrice = pricePerPiece * quantity;
+
+        return {
+          partName: part.partName,
+          quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2))
+        };
+      });
+
+      await axios.put(
+        `${API_BASE_URL}/garage/jobcards/${id}/workprogress`,
+        { partsUsed: formattedParts },
+        { headers: { Authorization: `Bearer ${garageToken}` } }
       );
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      localStorage.clear();
-      setIsLoggedIn(false);
-      setCurrentUser(null);
-      setFormData({ email: '', password: '' });
-      setError('');
-      setLogoutLoading(false);
+
+      setSnackbar({
+        open: true,
+        message: `✅ Job card updated with ${formattedParts.length} part(s)`,
+        severity: 'success'
+      });
+    } catch (err) {
+      console.error('Error updating job card:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update job card',
+        severity: 'error'
+      });
     }
   };
 
-  // Handle form input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (error) setError('');
+  // Handle part selection
+  const handlePartSelection = async (assignmentId, newParts) => {
+    const uniqueParts = newParts.map(part => ({
+      ...part,
+      selectedQuantity: part.selectedQuantity || 1
+    }));
+
+    updateAssignment(assignmentId, 'parts', uniqueParts);
+
+    if (id) {
+      await updateJobCardWithParts(uniqueParts);
+    }
   };
 
-  // Handle forgot password form changes
-  const handleForgotPasswordChange = (e) => {
-    const { name, value } = e.target;
-    setForgotPasswordData(prev => ({ ...prev, [name]: value }));
-    if (forgotPasswordError) setForgotPasswordError('');
-  };
+  // Handle quantity change
+  const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
 
-  // Main Login Handler
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+    const part = assignment.parts[partIndex];
+    const availableQuantity = getAvailableQuantity(part._id) + (part.selectedQuantity || 1);
 
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      setLoading(false);
+    if (newQuantity < 1 || newQuantity > availableQuantity) {
+      setError(`Quantity must be between 1 and ${availableQuantity}`);
       return;
     }
 
-    try {
-      const endpoint = isGarageLogin 
-        ? `${BASE_URL}/api/garage/login`
-        : `${BASE_URL}/api/garage/user/login`;
+    const updatedParts = assignment.parts.map((p, idx) =>
+      idx === partIndex ? { ...p, selectedQuantity: newQuantity } : p
+    );
 
-      const response = await fetch(endpoint, {
+    updateAssignment(assignmentId, 'parts', updatedParts);
+
+    if (id) {
+      await updateJobCardWithParts(updatedParts);
+    }
+  };
+
+  // Remove part
+  const handlePartRemoval = async (assignmentId, partIndex) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    const part = assignment.parts[partIndex];
+
+    const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
+    updateAssignment(assignmentId, 'parts', updatedParts);
+
+    if (id) {
+      await updateJobCardWithParts(updatedParts);
+    }
+
+    setSnackbar({
+      open: true,
+      message: `Part "${part.partName}" removed`,
+      severity: 'info'
+    });
+  };
+
+  // Add job point
+  const addJobPoint = () => {
+    if (currentJobPoint.description.trim()) {
+      setJobPoints(prev => [...prev, { id: Date.now(), description: currentJobPoint.description.trim() }]);
+      setCurrentJobPoint({ description: '' });
+    }
+  };
+
+  const removeJobPoint = (index) => {
+    setJobPoints(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle input
+  const handleJobPointInputChange = (field, value) => {
+    setCurrentJobPoint(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleJobPointKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addJobPoint();
+    }
+  };
+
+  // Get job details for API
+  const getJobDetailsForAPI = () => {
+    const combined = [...parsedJobDetails, ...jobPoints];
+    return JSON.stringify(combined);
+  };
+
+  // Priority color
+  const getPriorityColor = (priority) => {
+    return priority === 'high' ? 'error' : priority === 'medium' ? 'warning' : 'success';
+  };
+
+  // Update assignment
+  const updateAssignment = (assignmentId, field, value) => {
+    setAssignments(prev => prev.map(assignment =>
+      assignment.id === assignmentId ? { ...assignment, [field]: value } : assignment
+    ));
+  };
+
+  // Remove assignment
+  const removeAssignment = (assignmentId) => {
+    if (assignments.length > 1) {
+      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+    }
+  };
+
+  // Add Engineer
+  const handleAddEngineer = async () => {
+    if (!newEngineer.name?.trim() || !newEngineer.email?.trim() || !newEngineer.phone?.trim()) {
+      setEngineerAddError('All fields are required');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEngineer.email)) {
+      setEngineerAddError('Invalid email');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(newEngineer.phone)) {
+      setEngineerAddError('Phone must be 10 digits');
+      return;
+    }
+
+    setAddingEngineer(true);
+    try {
+      await apiCall('/garage/engineers/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        data: newEngineer
+      });
+      await fetchEngineers();
+      setSnackbar({ open: true, message: 'Engineer added!', severity: 'success' });
+      handleCloseAddEngineerDialog();
+    } catch (err) {
+      setEngineerAddError(err.response?.data?.message || 'Failed to add engineer');
+    } finally {
+      setAddingEngineer(false);
+    }
+  };
+
+  // Add Part
+  const handleAddPart = async () => {
+    if (!newPart.partName || !newPart.carName || !newPart.model || newPart.quantity <= 0) {
+      setPartAddError('Please fill all required fields');
+      return;
+    }
+
+    setAddingPart(true);
+    try {
+      const igst = newPart.taxType === 'igst' ? parseFloat(newPart.igst) || 0 : 0;
+      const cgstSgst = newPart.taxType === 'cgstSgst' ? parseFloat(newPart.cgstSgst) || 0 : 0;
+      const taxAmount = newPart.taxType === 'igst' ? igst : cgstSgst * 2;
+
+      await axios.post(`${API_BASE_URL}/garage/inventory/add`, {
+        name: "abc",
+        garageId,
+        carName: newPart.carName,
+        model: newPart.model,
+        partNumber: newPart.partNumber,
+        partName: newPart.partName,
+        quantity: parseInt(newPart.quantity),
+        purchasePrice: parseFloat(newPart.purchasePrice),
+        sellingPrice: parseFloat(newPart.sellingPrice),
+        hsnNumber: newPart.hsnNumber,
+        igst,
+        cgstSgst,
+        taxAmount
+      }, {
+        headers: { Authorization: `Bearer ${garageToken}` }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Login failed');
+      await fetchInventoryParts();
+      setSnackbar({ open: true, message: 'Part added!', severity: 'success' });
+      handleCloseAddPartDialog();
+    } catch (err) {
+      setPartAddError(err.response?.data?.message || 'Failed to add part');
+    } finally {
+      setAddingPart(false);
+    }
+  };
+
+  // Submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const allPartsUsed = [];
+      const partUpdates = [];
+
+      assignments.forEach(assignment => {
+        assignment.parts.forEach(part => {
+          const selectedQty = part.selectedQuantity || 1;
+          const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
+          const sellingPrice = Number(part.sellingPrice) || 0;
+          const taxRate = Number(part.taxAmount || 0);
+          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+          const totalPrice = pricePerPiece * selectedQty;
+
+          if (existingIndex !== -1) {
+            allPartsUsed[existingIndex].quantity += selectedQty;
+            allPartsUsed[existingIndex].totalPrice += totalPrice;
+          } else {
+            allPartsUsed.push({
+              partName: part.partName,
+              quantity: selectedQty,
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat(totalPrice.toFixed(2))
+            });
+          }
+
+          partUpdates.push({ partId: part._id, qty: selectedQty });
+        });
+      });
+
+      // Update inventory
+      for (const update of partUpdates) {
+        const part = inventoryParts.find(p => p._id === update.partId);
+        if (part && part.quantity >= update.qty) {
+          await apiCall(`/garage/inventory/update/${update.partId}`, {
+            method: 'PUT',
+            data: { quantity: part.quantity - update.qty }
+          });
+        }
       }
 
-      const data = await response.json();
+      // Update job card
+      if (id) {
+        await updateJobCardWithParts(allPartsUsed);
+      }
 
-      // 🔥 Redirect to renew-plan if subscription has expired
-      if (data.message && data.message.includes('subscription has expired')) {
-        if (isGarageLogin && data.garage?._id) {
-          localStorage.setItem('garageId', data.garage._id);
-          localStorage.setItem('garageName', data.garage.name || 'Your Garage');
-          localStorage.setItem('garageEmail', data.garage.email || formData.email);
+      setSuccess(true);
+      setSnackbar({ open: true, message: '✅ Assignment completed!', severity: 'success' });
+      setTimeout(() => navigate(`/Work-In-Progress/${id}`), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to assign');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    assignments.forEach((a, i) => {
+      if (!a.engineer) errors[`assignment_${a.id}_engineer`] = 'Required';
+    });
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+  const handleCloseAddPartDialog = () => {
+    setOpenAddPartDialog(false);
+    setPartAddError(null);
+    setNewPart({
+      garageId, carName: "", model: "", partNumber: "", partName: "",
+      quantity: 1, purchasePrice: 0, sellingPrice: 0, hsnNumber: "", igst: 0, cgstSgst: 0, taxType: 'igst'
+    });
+  };
+
+  const handleCloseAddEngineerDialog = () => {
+    setOpenAddEngineerDialog(false);
+    setEngineerAddError(null);
+    setNewEngineer({ name: "", email: "", phone: "", specialty: "", garageId });
+  };
+
+  const handleEngineerInputChange = (field, value) => {
+    setNewEngineer(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePartInputChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setNewPart(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  // Initialize
+  useEffect(() => {
+    fetchEngineers();
+    fetchInventoryParts();
+  }, [fetchEngineers, fetchInventoryParts]);
+
+  // Fetch job card data
+  useEffect(() => {
+    const fetchJobCardData = async () => {
+      if (!id) return;
+      setIsEditMode(true);
+      try {
+        const res = await axios.get(`${API_BASE_URL}/garage/jobCards/${id}`, {
+          headers: { Authorization: `Bearer ${garageToken}` }
+        });
+        const data = res.data;
+
+        if (data.jobDetails) {
+          try {
+            const parsed = JSON.parse(data.jobDetails);
+            if (Array.isArray(parsed)) setParsedJobDetails(parsed);
+          } catch (e) {
+            const lines = data.jobDetails.split('\n').filter(l => l.trim());
+            setParsedJobDetails(lines.map(l => ({ description: l.trim() })));
+          }
         }
 
-        navigate('/renew-plan', {
-          state: {
-            garageId: data.garage?._id,
-            garageName: data.garage?.name || 'Your Garage',
-            garageEmail: data.garage?.email || formData.email,
-            message: data.message
-          }
+        setJobCardDataTemp(data);
+      } catch (err) {
+        setError('Failed to load job card');
+      }
+    };
+    if (id) fetchJobCardData();
+  }, [id, garageToken]);
+
+  // Set assignments after data loads
+  useEffect(() => {
+    if (jobCardDataTemp && engineers.length && inventoryParts.length && !isLoading && !isLoadingInventory) {
+      const assignedEngineer = jobCardDataTemp.engineerId?.[0];
+      const fullEngineer = engineers.find(e => e._id === assignedEngineer?._id) || assignedEngineer;
+
+      let formattedParts = [];
+      if (jobCardDataTemp.partsUsed?.length) {
+        formattedParts = jobCardDataTemp.partsUsed.map(used => {
+          const invPart = inventoryParts.find(p => p.partName === used.partName);
+          return invPart ? { ...invPart, selectedQuantity: used.quantity || 1 } : {
+            partName: used.partName,
+            selectedQuantity: used.quantity || 1,
+            sellingPrice: (used.totalPrice / used.quantity) || 0,
+            taxAmount: 0
+          };
         });
-        return;
       }
 
-      // Save login data and redirect
-      localStorage.setItem('token', data.token);
-      const userType = isGarageLogin ? 'garage' : 'user';
-      localStorage.setItem('userType', userType);
-      localStorage.setItem('name', isGarageLogin ? data.garage.name : data.user.name);
-
-      const garageId = isGarageLogin 
-        ? data.garage?._id 
-        : data.user?.garageId;
-
-      localStorage.setItem('garageId', garageId);
-
-      setIsLoggedIn(true);
-      setCurrentUser({ userType, garageId, token: data.token });
-
-      navigate(isGarageLogin ? '/' : '/');
-    } catch (err) {
-      setError(err.message || 'An error occurred during login.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Forgot Password: Send OTP
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    setForgotPasswordError('');
-    setForgotPasswordSuccess('');
-    setForgotPasswordLoading(true);
-
-    if (!forgotPasswordData.email) {
-      setForgotPasswordError('Please enter your email address');
-      setForgotPasswordLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${BASE_URL}/api/verify/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotPasswordData.email })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to send OTP');
+      if (fullEngineer) {
+        setAssignments([{
+          id: Date.now(),
+          engineer: fullEngineer,
+          parts: formattedParts,
+          priority: 'medium',
+          notes: jobCardDataTemp.engineerRemarks || ''
+        }]);
       }
 
-      setForgotPasswordSuccess('OTP sent successfully! Please check your email.');
-      setOtpSent(true);
-      setForgotPasswordStep(1);
-      setResendTimer(60);
-
-      const timer = setInterval(() => {
-        setResendTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      setForgotPasswordError(err.message);
-    } finally {
-      setForgotPasswordLoading(false);
+      setJobCardDataTemp(null);
     }
-  };
-
-  // Forgot Password: Verify OTP
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setForgotPasswordError('');
-    setForgotPasswordSuccess('');
-    setForgotPasswordLoading(true);
-
-    if (!forgotPasswordData.otp) {
-      setForgotPasswordError('Please enter the OTP');
-      setForgotPasswordLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${BASE_URL}/api/verify/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: forgotPasswordData.email,
-          otp: forgotPasswordData.otp
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Invalid OTP');
-      }
-
-      setForgotPasswordSuccess('OTP verified successfully!');
-      setOtpVerified(true);
-      setForgotPasswordStep(2);
-    } catch (err) {
-      setForgotPasswordError(err.message);
-    } finally {
-      setForgotPasswordLoading(false);
-    }
-  };
-
-  // Forgot Password: Reset Password
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    setForgotPasswordError('');
-    setForgotPasswordSuccess('');
-    setForgotPasswordLoading(true);
-
-    const { newPassword, confirmPassword } = forgotPasswordData;
-    if (!newPassword || !confirmPassword) {
-      setForgotPasswordError('Please fill in all password fields');
-      setForgotPasswordLoading(false);
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setForgotPasswordError('Passwords do not match');
-      setForgotPasswordLoading(false);
-      return;
-    }
-    if (newPassword.length < 6) {
-      setForgotPasswordError('Password must be at least 6 characters long');
-      setForgotPasswordLoading(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${BASE_URL}/api/verify/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: forgotPasswordData.email,
-          newPassword
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Password reset failed');
-      }
-
-      setForgotPasswordSuccess('Password reset successfully! You can now log in.');
-      setTimeout(() => {
-        closeForgotPasswordDialog();
-      }, 3000);
-    } catch (err) {
-      setForgotPasswordError(err.message);
-    } finally {
-      setForgotPasswordLoading(false);
-    }
-  };
-
-  // Toggle password visibility
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
-  // Switch between garage and user login
-  const handleLoginTypeChange = (e) => {
-    setIsGarageLogin(e.target.checked);
-    setFormData({ email: '', password: '' });
-    setError('');
-  };
-
-  // Open forgot password dialog
-  const openForgotPasswordDialog = () => {
-    setForgotPasswordOpen(true);
-    setForgotPasswordStep(0);
-    setForgotPasswordData({ email: '', otp: '', newPassword: '', confirmPassword: '' });
-    setForgotPasswordError('');
-    setForgotPasswordSuccess('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setResendTimer(0);
-  };
-
-  // Close forgot password dialog
-  const closeForgotPasswordDialog = () => {
-    setForgotPasswordOpen(false);
-    setForgotPasswordStep(0);
-    setForgotPasswordData({ email: '', otp: '', newPassword: '', confirmPassword: '' });
-    setForgotPasswordError('');
-    setForgotPasswordSuccess('');
-    setOtpSent(false);
-    setOtpVerified(false);
-    setResendTimer(0);
-  };
-
-  // Resend OTP
-  const handleResendOtp = () => {
-    if (resendTimer === 0) {
-      handleSendOtp({ preventDefault: () => {} });
-    }
-  };
-
-  // Theme color based on login type
-  const getThemeColors = () => {
-    return isGarageLogin 
-      ? { primary: '#08197B', secondary: '#364ab8', accent: '#2196F3' }
-      : { primary: '#2E7D32', secondary: '#4CAF50', accent: '#66BB6A' };
-  };
-  const colors = getThemeColors();
-
-  // Dynamic TextField styles
-  const getTextFieldStyles = () => ({
-    '& .MuiOutlinedInput-root': {
-      backgroundColor: theme.palette.mode === 'dark' 
-        ? theme.palette.background.paper 
-        : theme.palette.background.default,
-      borderRadius: 2,
-      '& fieldset': {
-        borderColor: theme.palette.mode === 'dark' ? theme.palette.divider : '#ddd'
-      },
-      '&:hover fieldset': { borderColor: colors.secondary },
-      '&.Mui-focused fieldset': { borderColor: colors.primary }
-    },
-    '& .MuiInputLabel-root': {
-      color: theme.palette.text.secondary,
-      '&.Mui-focused': { color: colors.primary }
-    }
-  });
-
-  const steps = ['Verify Email', 'Enter OTP', 'New Password'];
+  }, [jobCardDataTemp, engineers, inventoryParts, isLoading, isLoadingInventory]);
 
   return (
     <>
-      <CssBaseline />
-      
-      {/* Top Bar (Visible when logged in) */}
-      {isLoggedIn && (
-        <AppBar position="fixed" elevation={0} sx={{ backgroundColor: 'transparent', backdropFilter: 'blur(10px)', borderBottom: `1px solid ${theme.palette.divider}` }}>
-          <Toolbar sx={{ justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="h6" sx={{ color: colors.primary, fontWeight: 600 }}>Garage Management</Typography>
-              <Chip
-                icon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
-                label={`Logged in as ${currentUser?.userType}`}
-                size="small"
-                sx={{ backgroundColor: colors.primary, color: 'white' }}
+      {/* Snackbars */}
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
+        <Alert severity="error">{error}</Alert>
+      </Snackbar>
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+      </Snackbar>
+
+      <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, px: { xs: 1, sm: 3 } }}>
+        <CssBaseline />
+        <Container maxWidth="xl">
+          {/* Header */}
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton onClick={() => navigate(`/jobs/${id}`)}><ArrowBackIcon /></IconButton>
+            <Typography variant="h5" fontWeight={600}>Assign Engineer & Job Details</Typography>
+          </Box>
+
+          {/* Summary */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Assignment Summary</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6} sm={3}><Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" color="primary">{assignments.length}</Typography>
+                  <Typography variant="body2">Assignments</Typography>
+                </Box></Grid>
+                <Grid item xs={6} sm={3}><Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" color="primary">{jobPoints.length + parsedJobDetails.length}</Typography>
+                  <Typography variant="body2">Job Points</Typography>
+                </Box></Grid>
+                <Grid item xs={6} sm={3}><Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" color="primary">{assignments.reduce((a, b) => a + b.parts.length, 0)}</Typography>
+                  <Typography variant="body2">Parts Used</Typography>
+                </Box></Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Job Details */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2 }}>Job Details</Typography>
+              <TextField
+                fullWidth
+                placeholder="Add job detail"
+                value={currentJobPoint.description}
+                onChange={(e) => handleJobPointInputChange('description', e.target.value)}
+                onKeyPress={handleJobPointKeyPress}
+                InputProps={{ startAdornment: <InputAdornment position="start"><DescriptionIcon /></InputAdornment> }}
+                sx={{ mb: 2 }}
               />
-            </Box>
-            <Button
-              variant="outlined"
-              onClick={handleLogout}
-              disabled={logoutLoading}
-              startIcon={logoutLoading ? <CircularProgress size={16} /> : <ExitToApp />}
-              sx={{ borderColor: '#ff4444', color: '#ff4444' }}
-            >
-              {logoutLoading ? 'Logging out...' : 'Logout'}
-            </Button>
-          </Toolbar>
-        </AppBar>
-      )}
+              <List>
+                {jobPoints.map((p, i) => (
+                  <ListItem key={i}>
+                    <ListItemText primary={p.description} />
+                    <IconButton onClick={() => removeJobPoint(i)} color="error"><DeleteIcon /></IconButton>
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
 
-      {/* Main Login Page */}
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          p: 2,
-          pt: isLoggedIn ? 10 : 2,
-          background: theme.palette.mode === 'dark'
-            ? `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.accent}15 100%)`
-            : `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.accent}10 100%)`
-        }}
-      >
-        <Container maxWidth="sm">
-          <Paper sx={{ p: 4, borderRadius: 3, backgroundColor: theme.palette.background.paper }}>
-            {isLoggedIn ? (
-              <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>✅ You are logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Customer'}</Alert>
-            ) : null}
+          {/* Assignments */}
+          <Card>
+            <CardContent>
+              <form onSubmit={handleSubmit}>
+                {assignments.map((a) => (
+                  <Accordion key={a.id} defaultExpanded>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography>Assignment #{assignments.indexOf(a) + 1}</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} md={6}>
+                          <Autocomplete
+                            options={engineers}
+                            getOptionLabel={(o) => o.name || o.email || ''}
+                            value={a.engineer}
+                            onChange={(e, v) => updateAssignment(a.id, 'engineer', v)}
+                            renderInput={(params) => <TextField {...params} label="Engineer" />}
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <FormControl fullWidth>
+                            <Select value={a.priority} onChange={(e) => updateAssignment(a.id, 'priority', e.target.value)}>
+                              <MenuItem value="low">Low</MenuItem>
+                              <MenuItem value="medium">Medium</MenuItem>
+                              <MenuItem value="high">High</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Autocomplete
+                            multiple
+                            options={inventoryParts.filter(p => getAvailableQuantity(p._id) > 0)}
+                            getOptionLabel={(o) => `${o.partName} (${o.partNumber})`}
+                            value={a.parts}
+                            onChange={(e, v) => handlePartSelection(a.id, v)}
+                            renderInput={(params) => <TextField {...params} label="Select Parts" />}
+                          />
+                          {a.parts.length > 0 && (
+                            <List>
+                              {a.parts.map((part, idx) => (
+                                <ListItem key={part._id}>
+                                  <ListItemText
+                                    primary={part.partName}
+                                    secondary={`Qty: ${part.selectedQuantity || 1} | ₹${part.sellingPrice} + ${part.taxAmount}% tax`}
+                                  />
+                                  <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button size="small" onClick={() => handlePartQuantityChange(a.id, idx, (part.selectedQuantity || 1) - 1)}>-</Button>
+                                    <TextField size="small" value={part.selectedQuantity || 1} sx={{ width: 60 }} />
+                                    <Button size="small" onClick={() => handlePartQuantityChange(a.id, idx, (part.selectedQuantity || 1) + 1)}>+</Button>
+                                    <IconButton onClick={() => handlePartRemoval(a.id, idx)} color="error"><DeleteIcon /></IconButton>
+                                  </Box>
+                                </ListItem>
+                              ))}
+                            </List>
+                          )}
+                        </Grid>
+                      </Grid>
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
 
-            <Chip
-              icon={isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
-              label={`${isGarageLogin ? 'Garage' : 'User'} Login`}
-              sx={{ backgroundColor: colors.primary, color: 'white', fontWeight: 600, mb: 3 }}
-            />
-
-            <Typography variant="h3" sx={{ mb: 2, fontWeight: 700, color: colors.primary }}>Welcome Back</Typography>
-            <Typography variant="body1" sx={{ mb: 4, color: theme.palette.text.secondary }}>
-              {isGarageLogin ? 'Access your garage management system' : 'Sign in to your customer account'}
-            </Typography>
-
-            {!isLoggedIn && (
-              <Box component="form" onSubmit={handleLogin}>
-                {error && <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>}
-
-                <TextField
-                  fullWidth
-                  name="email"
-                  label="Email Address"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  sx={{ mb: 3, ...getTextFieldStyles() }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        {isGarageLogin ? <Business /> : <Person />}
-                      </InputAdornment>
-                    )
-                  }}
-                />
-
-                <TextField
-                  fullWidth
-                  name="password"
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  sx={{ mb: 2, ...getTextFieldStyles() }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={togglePasswordVisibility} edge="end" sx={{ color: colors.primary }}>
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
-                  <Link
-                    component="button"
-                    onClick={openForgotPasswordDialog}
-                    sx={{ color: colors.primary, textDecoration: 'none', fontWeight: 500 }}
+                <Box sx={{ textAlign: 'center', mt: 4 }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={isSubmitting}
+                    startIcon={isSubmitting ? <MuiCircularProgress size={20} /> : <SendIcon />}
+                    size="large"
                   >
-                    Forgot Password?
-                  </Link>
+                    {isSubmitting ? 'Saving...' : 'Submit'}
+                  </Button>
                 </Box>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={loading}
-                  fullWidth
-                  sx={{
-                    height: 48,
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    backgroundColor: colors.primary,
-                    background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`
-                  }}
-                >
-                  {loading ? <CircularProgress size={24} color="inherit" /> : `Sign In as ${isGarageLogin ? 'Garage' : 'User'}`}
-                </Button>
-
-                <Divider sx={{ my: 3 }}>
-                  <Typography variant="body2" color="text.secondary">Switch Login Type</Typography>
-                </Divider>
-
-                <FormControlLabel
-                  control={<Switch checked={isGarageLogin} onChange={handleLoginTypeChange} />}
-                  label={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
-                      <Typography fontWeight={500}>{isGarageLogin ? 'Garage Owner' : 'Customer'}</Typography>
-                    </Box>
-                  }
-                />
-
-                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
-                  Don't have an account?{' '}
-                  <Link 
-                    component="button"
-                    onClick={() => navigate('/signup')}
-                    sx={{ fontWeight: 600, color: colors.primary }}
-                  >
-                    Create Account
-                  </Link>
-                </Typography>
-              </Box>
-            )}
-
-            {isLoggedIn && (
-              <Button
-                variant="contained"
-                onClick={() => navigate('/')}
-                startIcon={currentUser?.userType === 'garage' ? <DirectionsCar /> : <AccountCircle />}
-                sx={{
-                  mt: 4,
-                  height: 48,
-                  fontWeight: 600,
-                  backgroundColor: colors.primary,
-                  background: `linear-gradient(45deg, ${colors.primary} 30%, ${colors.secondary} 90%)`
-                }}
-              >
-                Go to Dashboard
-              </Button>
-            )}
-          </Paper>
+              </form>
+            </CardContent>
+          </Card>
         </Container>
       </Box>
-
-      {/* Forgot Password Dialog */}
-      <Dialog open={forgotPasswordOpen} onClose={closeForgotPasswordDialog} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ textAlign: 'center', color: colors.primary, fontWeight: 700 }}>
-          <Lock /> Reset Password
-        </DialogTitle>
-        <DialogContent>
-          <Stepper activeStep={forgotPasswordStep}>{steps.map(label => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}</Stepper>
-
-          {forgotPasswordError && <Alert severity="error" sx={{ mb: 2 }}>{forgotPasswordError}</Alert>}
-          {forgotPasswordSuccess && <Alert severity="success" sx={{ mb: 2 }}>{forgotPasswordSuccess}</Alert>}
-
-          {forgotPasswordStep === 0 && (
-            <TextField
-              fullWidth
-              name="email"
-              label="Email Address"
-              type="email"
-              value={forgotPasswordData.email}
-              onChange={handleForgotPasswordChange}
-              required
-              sx={{ mt: 2, ...getTextFieldStyles() }}
-              InputProps={{ startAdornment: <InputAdornment position="start"><Email /></InputAdornment> }}
-            />
-          )}
-
-          {forgotPasswordStep === 1 && (
-            <>
-              <TextField
-                fullWidth
-                name="otp"
-                label="Enter OTP"
-                type="text"
-                value={forgotPasswordData.otp}
-                onChange={handleForgotPasswordChange}
-                required
-                inputProps={{ maxLength: 6, style: { textAlign: 'center', fontSize: '1.5rem', letterSpacing: '0.5rem' } }}
-                sx={{ mb: 2, ...getTextFieldStyles() }}
-                InputProps={{ startAdornment: <InputAdornment position="start"><VerifiedUser /></InputAdornment> }}
-              />
-              <Button disabled={resendTimer > 0} onClick={handleResendOtp} sx={{ color: colors.primary }}>
-                {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
-              </Button>
-            </>
-          )}
-
-          {forgotPasswordStep === 2 && (
-            <>
-              <TextField
-                fullWidth
-                name="newPassword"
-                label="New Password"
-                type={showNewPassword ? 'text' : 'password'}
-                value={forgotPasswordData.newPassword}
-                onChange={handleForgotPasswordChange}
-                required
-                sx={{ mb: 2, ...getTextFieldStyles() }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end" sx={{ color: colors.primary }}>
-                        {showNewPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-              <TextField
-                fullWidth
-                name="confirmPassword"
-                label="Confirm New Password"
-                type={showConfirmPassword ? 'text' : 'password'}
-                value={forgotPasswordData.confirmPassword}
-                onChange={handleForgotPasswordChange}
-                required
-                sx={{ mb: 3, ...getTextFieldStyles() }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" sx={{ color: colors.primary }}>
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={closeForgotPasswordDialog} variant="outlined" sx={{ borderColor: colors.primary, color: colors.primary }}>
-            Cancel
-          </Button>
-          {forgotPasswordStep === 0 && (
-            <Button onClick={handleSendOtp} variant="contained" disabled={forgotPasswordLoading} startIcon={<Send />}>
-              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Send OTP'}
-            </Button>
-          )}
-          {forgotPasswordStep === 1 && (
-            <Button onClick={handleVerifyOtp} variant="contained" disabled={forgotPasswordLoading} startIcon={<VerifiedUser />}>
-              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Verify OTP'}
-            </Button>
-          )}
-          {forgotPasswordStep === 2 && (
-            <Button onClick={handleResetPassword} variant="contained" disabled={forgotPasswordLoading} startIcon={<Lock />}>
-              {forgotPasswordLoading ? <CircularProgress size={20} color="inherit" /> : 'Reset Password'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
     </>
   );
 };
 
-export default LoginPage;
+export default AssignEngineer;

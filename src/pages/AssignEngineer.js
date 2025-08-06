@@ -135,27 +135,40 @@ const AssignEngineer = () => {
   const [isEditMode, setIsEditMode] = useState(false);
 
 
-  const updateJobCardWithParts = async (selectedParts) => {
+  const updateJobCardWithParts = async (partsUsed) => {
     try {
-      const formattedParts = selectedParts.map(part => ({
-        partName: part.partName || '',
-        quantity: Number(part.selectedQuantity) || 1,
-        pricePerPiece: Number(part.pricePerUnit || part.sellingPrice) || 0,
-        totalPrice: Number(part.pricePerUnit || part.sellingPrice || 0) * Number(part.selectedQuantity || 1)
-      }));
+      const formattedParts = partsUsed.map(part => {
+        // Get the selling price from the part (could be from inventory or job card)
+        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+        const quantity = Number(part.selectedQuantity || part.quantity || 1);
+        const totalPrice = pricePerPiece * quantity;
 
-      await updateJobCard(id, null, formattedParts);
+        return {
+          partName: part.partName,
+          quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2))
+        };
+      });
+
+      await axios.put(
+        `${API_BASE_URL}/garage/jobcards/${id}/workprogress`,
+        { partsUsed: formattedParts },
+        { headers: { Authorization: `Bearer ${garageToken}` } }
+      );
 
       setSnackbar({
         open: true,
         message: `✅ Job card updated with ${formattedParts.length} part(s)`,
         severity: 'success'
       });
-    } catch (error) {
-      console.error('Error updating job card with parts:', error);
+    } catch (err) {
+      console.error('Error updating job card:', err);
       setSnackbar({
         open: true,
-        message: 'Failed to update job card with selected parts',
+        message: 'Failed to update job card',
         severity: 'error'
       });
     }
@@ -248,7 +261,10 @@ const AssignEngineer = () => {
       assignment.parts.forEach(part => {
         const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
         const qty = part.selectedQuantity || 1;
-        const pricePerPiece = part.sellingPrice || part.pricePerUnit || 0;
+        // Get the selling price from the part (could be from inventory or job card)
+        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
 
         if (existingIndex !== -1) {
           allPartsUsed[existingIndex].quantity += qty;
@@ -257,8 +273,8 @@ const AssignEngineer = () => {
           allPartsUsed.push({
             partName: part.partName,
             quantity: qty,
-            pricePerPiece: pricePerPiece,
-            totalPrice: pricePerPiece * qty
+            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+            totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
           });
         }
       });
@@ -748,12 +764,21 @@ const AssignEngineer = () => {
   const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
     try {
       // Format parts data according to the workprogress API structure
-      const formattedParts = partsUsed.map(part => ({
-        partName: part.partName || '',
-        quantity: Number(part.quantity) || 1,
-        pricePerPiece: Number(part.pricePerUnit) || 0,
-        totalPrice: Number(part.pricePerUnit || 0) * Number(part.quantity || 1)
-      }));
+      const formattedParts = partsUsed.map(part => {
+        // Get the selling price from the part (could be from inventory or job card)
+        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
+        const quantity = Number(part.quantity || part.selectedQuantity || 1);
+        const totalPrice = pricePerPiece * quantity;
+
+        return {
+          partName: part.partName || '',
+          quantity: quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2))
+        };
+      });
 
       const updatePayload = {
         partsUsed: formattedParts
@@ -809,12 +834,24 @@ const AssignEngineer = () => {
 
           if (existingPartIndex !== -1) {
             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+            // Recalculate total price with updated quantity
+            const sellingPrice = Number(allPartsUsed[existingPartIndex].pricePerPiece) / (1 + (Number(part.taxAmount || part.gstPercentage || 0) / 100));
+            const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+            allPartsUsed[existingPartIndex].pricePerPiece = parseFloat(pricePerPiece.toFixed(2));
+            allPartsUsed[existingPartIndex].totalPrice = parseFloat((pricePerPiece * allPartsUsed[existingPartIndex].quantity).toFixed(2));
           } else {
+            // Get the selling price from the part (could be from inventory or job card)
+            const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+            const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
+            const totalPrice = pricePerPiece * selectedQuantity;
+            
             allPartsUsed.push({
               partName: part.partName,
               quantity: selectedQuantity,
-              pricePerPiece: part.pricePerUnit || 0,
-              totalPrice: (part.pricePerUnit || 0) * selectedQuantity
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat(totalPrice.toFixed(2))
             });
           }
 

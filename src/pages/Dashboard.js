@@ -215,9 +215,8 @@ const Dashboard = () => {
   if (!garageId) {
     garageId = localStorage.getItem("garage_id");
   }
+
   const token = localStorage.getItem("token"); // ✅ Get JWT token
-  const userId = localStorage.getItem("userId"); // ✅ Get user ID for filtering
-  const userType = localStorage.getItem("userType"); // ✅ Get user type
   const theme = useTheme();
   const { darkMode } = useThemeContext();
   const [modalOpen, setModalOpen] = useState(false);
@@ -316,6 +315,7 @@ const Dashboard = () => {
       );
       const jobCard = response.data;
       const { engineerId, laborHours, qualityCheck } = jobCard;
+
       // Add safety checks for engineerId
       if (
         !engineerId ||
@@ -374,7 +374,6 @@ const Dashboard = () => {
 
   const applyFilters = (searchTerm, status, start, end) => {
     let filtered = [...currentJobs];
-
     if (searchTerm.trim() !== "") {
       filtered = filtered.filter(
         (job) =>
@@ -388,11 +387,9 @@ const Dashboard = () => {
           (job.type && job.type.toLowerCase().includes(searchTerm))
       );
     }
-
     if (status && status !== "All") {
       filtered = filtered.filter((job) => job.status === status);
     }
-
     if (start && end) {
       filtered = filtered.filter((job) => {
         const jobDate = new Date(job.createdAt);
@@ -401,7 +398,6 @@ const Dashboard = () => {
         return jobDate >= startDate && jobDate <= endDate;
       });
     }
-
     setFilteredJobs(filtered);
     setJobsPage(0);
   };
@@ -444,39 +440,44 @@ const Dashboard = () => {
 
   // Fetch job data from API
   useEffect(() => {
+    // if (!garageId) {
+    //   navigate("/login");
+    //   return;
+    // }
+
     const fetchJobs = async () => {
       if (!token) {
         setError("Authentication token not found. Please log in again.");
         setLoading(false);
         return;
       }
+
       try {
         setLoading(true);
         setError(null);
 
-        // Build URL with user filtering
-        let url = `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`;
-        if (userType === "user" && userId) {
-          url += `?createdBy=${userId}`;
-        }
-
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // ✅ Added token
-          },
-        });
+        const response = await fetch(
+          `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`, // ✅ Added token
+            },
+          }
+        );
 
         if (!response.ok) {
           if (response.status === 401) {
             setError("Session expired. Please log in again.");
+            // setTimeout(() => navigate("/login"), 2000);
             return;
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+
         const jobsData = Array.isArray(data)
           ? data
           : data.jobCards
@@ -485,29 +486,19 @@ const Dashboard = () => {
           ? data.data
           : [];
 
-        // Filter active jobs
         const activeJobs = jobsData.filter(
           (job) => job.status === "Pending" || job.status === "In Progress"
         );
 
-        // ✅ Sort by createdAt (newest first)
-        const sortedJobs = activeJobs.sort((a, b) => {
-          const dateA = new Date(a.createdAt);
-          const dateB = new Date(b.createdAt);
-          return dateB - dateA; // Descending order
-        });
-
-        setCurrentJobs(sortedJobs);
-        setFilteredJobs(sortedJobs);
+        setCurrentJobs(activeJobs);
+        setFilteredJobs(activeJobs);
         setJobsPage(0);
 
-        // Update dashboard stats
         const updatedStats = [...dashboardStats];
-        updatedStats[0].value = sortedJobs.length;
+        updatedStats[0].value = activeJobs.length;
         setDashboardStats(updatedStats);
 
-        // Extract pending devices
-        const pendingDevicesFromJobs = sortedJobs.map((job) => ({
+        const pendingDevicesFromJobs = activeJobs.map((job) => ({
           id: job._id,
           deviceName:
             job.carNumber || job.registrationNumber || "Unknown Device",
@@ -537,9 +528,11 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchInventory = async () => {
       if (!garageId || !token) return;
+
       try {
         setInventoryLoading(true);
         setInventoryError(null);
+
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/inventory/${garageId}`,
           {
@@ -550,10 +543,12 @@ const Dashboard = () => {
             },
           }
         );
+
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
+
         const inventoryData = Array.isArray(data)
           ? data
           : data.inventory || data.data || [];
@@ -706,6 +701,7 @@ const Dashboard = () => {
         <Container maxWidth="xl">
           <Card sx={{ mb: 4, overflow: "visible", borderRadius: 2 }}>
             <CardContent>
+              {/* Rest of your UI remains unchanged */}
               <Box
                 display="flex"
                 justifyContent="space-between"
@@ -808,7 +804,8 @@ const Dashboard = () => {
               {/* Search and Filter Section */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Active Jobs ({filteredJobs.length} of {currentJobs.length} total)
+                  Active Jobs ({filteredJobs.length} of {currentJobs.length}{" "}
+                  total)
                 </Typography>
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid item xs={12} md={4}>
@@ -831,7 +828,12 @@ const Dashboard = () => {
                               size="small"
                               onClick={() => {
                                 setSearch("");
-                                applyFilters("", statusFilter, startDate, endDate);
+                                applyFilters(
+                                  "",
+                                  statusFilter,
+                                  startDate,
+                                  endDate
+                                );
                               }}
                             >
                               <ClearIcon />
@@ -948,7 +950,7 @@ const Dashboard = () => {
                             <TableCell>Created By</TableCell>
                             <TableCell>Vehicle No.</TableCell>
                             <TableCell>Customer</TableCell>
-                            {/* <TableCell>Service</TableCell> */}
+                            <TableCell>Service</TableCell>
                             <TableCell>Progress</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Status Page</TableCell>
@@ -981,14 +983,14 @@ const Dashboard = () => {
                                 <TableCell>
                                   {job.customerName || "N/A"}
                                 </TableCell>
-                                {/* <TableCell>
+                                <TableCell>
                                   <JobDetailsComponent
                                     jobDetails={job.jobDetails}
                                     maxItems={2}
                                     showPrices={true}
                                     compact={true}
                                   />
-                                </TableCell> */}
+                                </TableCell>
                                 <TableCell>
                                   <Box
                                     sx={{
@@ -1083,7 +1085,6 @@ const Dashboard = () => {
                         </TableBody>
                       </Table>
                     </TableContainer>
-
                     {/* Pagination */}
                     <Box
                       sx={{
