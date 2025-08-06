@@ -209,9 +209,9 @@ const AssignEngineer = () => {
       updateAssignment(assignmentId, 'parts', updatedParts);
 
       // **NEW: Update job card API with updated quantities**
-      if (id) {
-        await updateJobCardWithParts(updatedParts);
-      }
+      // if (id) {
+      //   await updateJobCardWithParts(updatedParts);
+      // }
 
       // Clear any previous errors
       if (error && error.includes(part.partName)) {
@@ -238,9 +238,9 @@ const AssignEngineer = () => {
       updateAssignment(assignmentId, 'parts', updatedParts);
 
       // **NEW: Update job card API with remaining parts**
-      if (id) {
-        await updateJobCardWithParts(updatedParts);
-      }
+      // if (id) {
+      //   await updateJobCardWithParts(updatedParts);
+      // }
 
       setSnackbar({
         open: true,
@@ -270,12 +270,39 @@ const AssignEngineer = () => {
           allPartsUsed[existingIndex].quantity += qty;
           allPartsUsed[existingIndex].totalPrice = allPartsUsed[existingIndex].pricePerPiece * allPartsUsed[existingIndex].quantity;
         } else {
-          allPartsUsed.push({
-            partName: part.partName,
-            quantity: qty,
-            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-            totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
-          });
+          // If sellingPrice is 0, try to find the part in inventory to get correct pricing
+          if (pricePerPiece === 0) {
+            const inventoryPart = inventoryParts.find(invPart => 
+              invPart.partName === part.partName || 
+              invPart._id === part._id
+            );
+            if (inventoryPart) {
+              const sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
+              const taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
+              const newPricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+              
+              allPartsUsed.push({
+                partName: part.partName,
+                quantity: qty,
+                pricePerPiece: parseFloat(newPricePerPiece.toFixed(2)),
+                totalPrice: parseFloat((newPricePerPiece * qty).toFixed(2))
+              });
+            } else {
+              allPartsUsed.push({
+                partName: part.partName,
+                quantity: qty,
+                pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+                totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+              });
+            }
+          } else {
+            allPartsUsed.push({
+              partName: part.partName,
+              quantity: qty,
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+            });
+          }
         }
       });
     });
@@ -554,18 +581,28 @@ const AssignEngineer = () => {
                 return {
                   ...inventoryPart,
                   selectedQuantity: usedPart.quantity || 1,
-                  availableQuantity: inventoryPart.quantity
+                  availableQuantity: inventoryPart.quantity,
+                  // Ensure sellingPrice and taxAmount are properly set
+                  sellingPrice: inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0,
+                  taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0
                 };
               } else {
-                // If part not found in inventory, create a mock part object
+                // If part not found in inventory, create a mock part object with default pricing
+                // Use the pricePerPiece from the job card data if available
+                const pricePerPiece = usedPart.pricePerPiece || 0;
+                const sellingPrice = pricePerPiece > 0 ? pricePerPiece : 100; // Default to 100 if no price
+                const taxRate = 0; // Default tax rate
+                
                 return {
                   _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName}`,
                   partName: usedPart.partName || 'Unknown Part',
                   partNumber: usedPart.partNumber || '',
                   quantity: 0, // No stock available
                   selectedQuantity: usedPart.quantity || 1,
-                  pricePerUnit: usedPart.totalPrice ? (usedPart.totalPrice / (usedPart.quantity || 1)) : 0,
-                  gstPercentage: usedPart.gstPercentage || 0,
+                  sellingPrice: sellingPrice,
+                  pricePerUnit: sellingPrice,
+                  taxAmount: taxRate,
+                  gstPercentage: taxRate,
                   carName: usedPart.carName || '',
                   model: usedPart.model || '',
                   availableQuantity: 0
@@ -835,15 +872,42 @@ const AssignEngineer = () => {
           if (existingPartIndex !== -1) {
             allPartsUsed[existingPartIndex].quantity += selectedQuantity;
             // Recalculate total price with updated quantity
-            const sellingPrice = Number(allPartsUsed[existingPartIndex].pricePerPiece) / (1 + (Number(part.taxAmount || part.gstPercentage || 0) / 100));
-            const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+            let sellingPrice = Number(allPartsUsed[existingPartIndex].pricePerPiece) / (1 + (Number(part.taxAmount || part.gstPercentage || 0) / 100));
+            let taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+            
+            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
+            if (sellingPrice === 0) {
+              const inventoryPart = inventoryParts.find(invPart => 
+                invPart.partName === part.partName || 
+                invPart._id === part._id
+              );
+              if (inventoryPart) {
+                sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
+                taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
+              }
+            }
+            
             const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
             allPartsUsed[existingPartIndex].pricePerPiece = parseFloat(pricePerPiece.toFixed(2));
             allPartsUsed[existingPartIndex].totalPrice = parseFloat((pricePerPiece * allPartsUsed[existingPartIndex].quantity).toFixed(2));
           } else {
             // Get the selling price from the part (could be from inventory or job card)
-            const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-            const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+            // If part doesn't have sellingPrice, try to get it from inventory
+            let sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+            let taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+            
+            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
+            if (sellingPrice === 0) {
+              const inventoryPart = inventoryParts.find(invPart => 
+                invPart.partName === part.partName || 
+                invPart._id === part._id
+              );
+              if (inventoryPart) {
+                sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
+                taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
+              }
+            }
+            
             const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
             const totalPrice = pricePerPiece * selectedQuantity;
             
@@ -886,11 +950,12 @@ const AssignEngineer = () => {
       // Update job card with parts used using the workprogress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
 
-      const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
-        if (jobCardId) {
-          return updateJobCard(jobCardId, null, allPartsUsed);
-        }
-      }).filter(Boolean);
+      // Commented out: API call only happens when parts are selected, not on submit
+      // const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
+      //   if (jobCardId) {
+      //     return updateJobCard(jobCardId, null, allPartsUsed);
+      //   }
+      // }).filter(Boolean);
 
       // Process each assignment
       const assignmentPromises = assignments.map(async (assignment) => {
@@ -920,9 +985,10 @@ const AssignEngineer = () => {
       });
 
       // Execute job card updates first
-      if (jobCardUpdatePromises.length > 0) {
-        await Promise.all(jobCardUpdatePromises);
-      }
+      // Commented out: API call only happens when parts are selected, not on submit
+      // if (jobCardUpdatePromises.length > 0) {
+      //   await Promise.all(jobCardUpdatePromises);
+      // }
 
       // Execute all assignments
       const results = await Promise.all(assignmentPromises);
@@ -2005,9 +2071,9 @@ const AssignEngineer = () => {
                     disabled={isSubmitting || isLoading}
                     sx={{ px: 6, py: 1.5, textTransform: 'uppercase' }}
                   >
-                    {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}
+                  
                   </Button>
-                </Box>
+    {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}              </Box>
               </form>
             </CardContent>
           </Card>

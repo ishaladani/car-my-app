@@ -776,22 +776,37 @@ const WorkInProgress = () => {
 
         if (data.partsUsed && data.partsUsed.length > 0) {
 
-          const existingParts = data.partsUsed.map((part, index) => ({
-            id: index + 1,
-            type: "existing",
-            partName: part.partName || "",
-            partNumber: part.partNumber || "",
-            selectedQuantity: part.quantity || 1,
-            sellingPrice: part.sellingPrice || 0,
-            totalPrice: part.totalPrice || 0,
-            gstPercentage: part.gstPercentage || 0, // Use as %
-            carName: part.carName || "",
-            model: part.model || "",
-            isExisting: true,
-            _id: part._id,
-            quantity: part.quantity || 1,
-            taxAmount: part.gstPercentage || 0,
-          }));
+          const existingParts = data.partsUsed.map((part, index) => {
+            // For parts from job card, pricePerPiece is the final price including tax
+            // We need to extract the base selling price and tax amount
+            let sellingPrice = part.sellingPrice || 0;
+            let taxAmount = part.gstPercentage || 0;
+            
+            // If we have pricePerPiece from job card, treat it as the final price
+            if (part.pricePerPiece && !sellingPrice) {
+              // For job card parts, pricePerPiece is already the final price
+              // We'll set sellingPrice to pricePerPiece and taxAmount to 0 for display
+              sellingPrice = part.pricePerPiece;
+              taxAmount = 0; // Since pricePerPiece already includes tax
+            }
+            
+            return {
+              id: index + 1,
+              type: "existing",
+              partName: part.partName || "",
+              partNumber: part.partNumber || "",
+              selectedQuantity: part.quantity || 1,
+              sellingPrice: sellingPrice,
+              totalPrice: part.totalPrice || 0,
+              gstPercentage: taxAmount, // Use as %
+              carName: part.carName || "",
+              model: part.model || "",
+              isExisting: true,
+              _id: part._id,
+              quantity: part.quantity || 1,
+              taxAmount: taxAmount,
+            };
+          });
 
           setAllParts(existingParts);
           setSelectedParts(existingParts);
@@ -1547,11 +1562,13 @@ const WorkInProgress = () => {
                               {selectedParts.map((part, partIndex) => {
                                 const selectedQuantity = part.selectedQuantity || 1;
                                 const quantity = part.quantity;
-                                const unitPrice = part.sellingPrice || 0;
-                                const taxAmount = part.taxAmount || 0;
-                                const totalTax = part.taxAmount;
-                                const totalPrice = unitPrice * selectedQuantity;
-                                const finalPrice = totalPrice + totalTax;
+                                const sellingPrice = part.sellingPrice || 0;
+                                const taxRate = part.taxAmount || 0; // percentage
+                                
+                                // For existing parts from job card, sellingPrice is already the final price
+                                const pricePerPiece = part.isExisting ? sellingPrice : (sellingPrice + (sellingPrice * taxRate / 100));
+                                const totalPrice = pricePerPiece * selectedQuantity;
+                                const taxAmount = part.isExisting ? 0 : ((sellingPrice * taxRate / 100) * selectedQuantity);
     
 
     
@@ -1787,24 +1804,24 @@ const WorkInProgress = () => {
                                             variant="caption"
                                             color="text.secondary"
                                           >
-                                            Price/Unit: ₹{unitPrice.toFixed(2)}
+                                            Price/Unit: ₹{pricePerPiece.toFixed(2)}
                                           </Typography>
                                         </Grid>
-                                        <Grid item xs={3}>
+                                        {/* <Grid item xs={3}>
                                           <Typography
                                             variant="caption"
                                             color="text.secondary"
                                           >
-                                            GST: ₹{totalTax.toFixed(2)}
+                                            GST: ₹{taxAmount.toFixed(2)}
                                           </Typography>
-                                        </Grid>
+                                        </Grid> */}
                                         <Grid item xs={5}>
                                           <Typography
                                             variant="caption"
                                             fontWeight={600}
                                             color="primary"
                                           >
-                                            Total: ₹{finalPrice.toFixed(2)}
+                                            Total: ₹{totalPrice.toFixed(2)}
                                           </Typography>
                                         </Grid>
                                       </Grid>
