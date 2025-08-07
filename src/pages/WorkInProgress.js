@@ -796,14 +796,14 @@ const WorkInProgress = () => {
               partName: part.partName || "",
               partNumber: part.partNumber || "",
               selectedQuantity: part.quantity || 1,
-              sellingPrice: sellingPrice,
-              totalPrice: part.totalPrice || 0,
+              sellingPrice: part.pricePerPiece || sellingPrice, // Use original pricePerPiece
+              totalPrice: part.totalPrice || 0, // Use original totalPrice
               gstPercentage: taxAmount, // Use as %
               carName: part.carName || "",
               model: part.model || "",
               isExisting: true,
               _id: part._id,
-              quantity: part.quantity || 1,
+              quantity: part.quantity || 1, // Original quantity
               taxAmount: taxAmount,
             };
           });
@@ -887,13 +887,14 @@ const WorkInProgress = () => {
       );
 
       existingParts.forEach((part) => {
+        // For existing parts, use the original values as-is from the job card
         allPartsUsed.push({
           _id: part._id,
           partName: part.partName,
           partNumber: part.partNumber || "",
-          quantity: parseInt(part.selectedQuantity) || 1,
-          sellingPrice: parseFloat(part.sellingPrice) || 0,
-          totalPrice: calculatePartFinalPrice(part),
+          quantity: parseInt(part.quantity) || 1, // Use original quantity, not selectedQuantity
+          pricePerPiece: parseFloat(part.sellingPrice) || 0, // Use original pricePerPiece
+          totalPrice: parseFloat(part.totalPrice) || 0, // Use original totalPrice
           gstPercentage: part.gstPercentage || 0,
           originalQuantity: parseInt(part.quantity) || 1,
           carName: part.carName || "",
@@ -1565,9 +1566,9 @@ const WorkInProgress = () => {
                                 const sellingPrice = part.sellingPrice || 0;
                                 const taxRate = part.taxAmount || 0; // percentage
                                 
-                                // For existing parts from job card, sellingPrice is already the final price
-                                const pricePerPiece = part.isExisting ? sellingPrice : (sellingPrice + (sellingPrice * taxRate / 100));
-                                const totalPrice = pricePerPiece * selectedQuantity;
+                                // For existing parts from job card, use the original values as-is
+                                const pricePerPiece = part.isExisting ? part.sellingPrice : (sellingPrice + (sellingPrice * taxRate / 100));
+                                const totalPrice = part.isExisting ? part.totalPrice : (pricePerPiece * selectedQuantity);
                                 const taxAmount = part.isExisting ? 0 : ((sellingPrice * taxRate / 100) * selectedQuantity);
     
 
@@ -1605,12 +1606,23 @@ const WorkInProgress = () => {
                                       }}
                                     >
                                       <Box sx={{ flex: 1 }}>
-                                        <Typography
-                                          variant="body2"
-                                          fontWeight={500}
-                                        >
-                                          {part.partName}
-                                        </Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight={500}
+                                          >
+                                            {part.partName}
+                                          </Typography>
+                                          {part.isExisting && (
+                                            <Chip
+                                              label="Read-only"
+                                              size="small"
+                                              color="info"
+                                              variant="outlined"
+                                              sx={{ fontSize: '0.7rem', height: '20px' }}
+                                            />
+                                          )}
+                                        </Box>
                                         <Typography
                                           variant="caption"
                                           color="text.secondary"
@@ -1624,8 +1636,11 @@ const WorkInProgress = () => {
                                           color="info.main"
                                           sx={{ display: "block" }}
                                         >
-                                          Max Selectable: {maxSelectableQuantity} |
-                                          Selected: {selectedQuantity}
+                                          {part.isExisting ? (
+                                            `Quantity: ${selectedQuantity} (Fixed)`
+                                          ) : (
+                                            `Max Selectable: ${maxSelectableQuantity} | Selected: ${selectedQuantity}`
+                                          )}
                                         </Typography>
                                       </Box>
                                       <Box
@@ -1655,7 +1670,7 @@ const WorkInProgress = () => {
                                                 );
                                               }
                                             }}
-                                            disabled={selectedQuantity <= 1}
+                                            disabled={selectedQuantity <= 1 || part.isExisting}
                                             sx={{
                                               minWidth: "24px",
                                               width: "24px",
@@ -1676,6 +1691,9 @@ const WorkInProgress = () => {
                                             label="Qty"
                                             value={selectedQuantity}
                                             onChange={(e) => {
+                                              // Don't allow changes for existing parts
+                                              if (part.isExisting) return;
+                                              
                                               const newQuantity =
                                                 parseInt(e.target.value) || 1;
                                               const oldQuantity = selectedQuantity;
@@ -1708,9 +1726,9 @@ const WorkInProgress = () => {
                                                 textAlign: "center",
                                               },
                                               readOnly:
-                                                isMaxQuantityReached &&
+                                                (isMaxQuantityReached &&
                                                 selectedQuantity ===
-                                                  maxSelectableQuantity,
+                                                  maxSelectableQuantity) || part.isExisting,
                                             }}
                                             sx={{
                                               width: "70px",
@@ -1720,7 +1738,7 @@ const WorkInProgress = () => {
                                               },
                                             }}
                                             error={availableQuantity === 0}
-                                            disabled={maxSelectableQuantity === 0}
+                                            disabled={maxSelectableQuantity === 0 || part.isExisting}
                                           />
                                           <IconButton
                                             size="small"
@@ -1744,7 +1762,8 @@ const WorkInProgress = () => {
                                             disabled={
                                               selectedQuantity >=
                                                 maxSelectableQuantity ||
-                                              availableQuantity === 0
+                                              availableQuantity === 0 ||
+                                              part.isExisting
                                             }
                                             sx={{
                                               minWidth: "24px",
@@ -1777,6 +1796,7 @@ const WorkInProgress = () => {
                                           onClick={() =>
                                             handlePartRemoval(partIndex)
                                           }
+                                          disabled={part.isExisting}
                                         >
                                           <DeleteIcon fontSize="small" />
                                         </IconButton>
@@ -1803,8 +1823,13 @@ const WorkInProgress = () => {
                                           <Typography
                                             variant="caption"
                                             color="text.secondary"
+                                            sx={{ 
+                                              fontStyle: part.isExisting ? 'italic' : 'normal',
+                                              color: part.isExisting ? 'text.disabled' : 'text.secondary'
+                                            }}
                                           >
                                             Price/Unit: ₹{pricePerPiece.toFixed(2)}
+                                            {part.isExisting && ' (Fixed)'}
                                           </Typography>
                                         </Grid>
                                         {/* <Grid item xs={3}>
@@ -1820,8 +1845,13 @@ const WorkInProgress = () => {
                                             variant="caption"
                                             fontWeight={600}
                                             color="primary"
+                                            sx={{ 
+                                              fontStyle: part.isExisting ? 'italic' : 'normal',
+                                              color: part.isExisting ? 'text.disabled' : 'primary'
+                                            }}
                                           >
                                             Total: ₹{totalPrice.toFixed(2)}
+                                            {part.isExisting && ' (Fixed)'}
                                           </Typography>
                                         </Grid>
                                       </Grid>

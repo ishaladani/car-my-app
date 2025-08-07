@@ -70,6 +70,7 @@ const AppLayout = () => {
     { text: "Dashboard", icon: <DashboardIcon />, path: "/" },
     { text: "Create Job Cards", icon: <CarIcon />, path: "/jobs" },
     { text: "Manage Inventory", icon: <InventoryIcon />, path: "/inventory" },
+    { text: "History", icon: <InventoryIcon />, path: "/history" },
     { text: "Reports & Records", icon: <AssignmentIcon />, path: "/reports" },
     { text: "Service Reminders", icon: <NotificationsIcon />, path: "/reminders" },
     { text: "Insurance", icon: <BuildIcon />, path: "/insurance" },

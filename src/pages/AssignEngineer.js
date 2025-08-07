@@ -137,21 +137,53 @@ const AssignEngineer = () => {
 
   const updateJobCardWithParts = async (partsUsed) => {
     try {
-      const formattedParts = partsUsed.map(part => {
-        // Get the selling price from the part (could be from inventory or job card)
-        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
-        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-        const quantity = Number(part.selectedQuantity || part.quantity || 1);
-        const totalPrice = pricePerPiece * quantity;
-
-        return {
+      // Get existing parts from job card data if available
+      let existingParts = [];
+      if (jobCardDataTemp && jobCardDataTemp.partsUsed) {
+        existingParts = jobCardDataTemp.partsUsed.map(part => ({
           partName: part.partName,
-          quantity,
-          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-          totalPrice: parseFloat(totalPrice.toFixed(2))
-        };
+          quantity: part.quantity,
+          pricePerPiece: part.pricePerPiece,
+          totalPrice: part.totalPrice,
+          _id: part._id
+        }));
+      }
+
+      // Combine existing parts with new parts
+      const allParts = [...existingParts];
+
+      // Add new parts, avoiding duplicates by partName
+      partsUsed.forEach(newPart => {
+        const existingIndex = allParts.findIndex(p => p.partName === newPart.partName);
+        if (existingIndex !== -1) {
+          // Update existing part with new data
+          allParts[existingIndex] = {
+            ...allParts[existingIndex],
+            quantity: newPart.selectedQuantity || newPart.quantity || 1,
+            pricePerPiece: newPart.sellingPrice || newPart.pricePerUnit || 0,
+            totalPrice: (newPart.sellingPrice || newPart.pricePerUnit || 0) * (newPart.selectedQuantity || newPart.quantity || 1)
+          };
+        } else {
+          // Add new part
+          const quantity = newPart.selectedQuantity || newPart.quantity || 1;
+          const pricePerPiece = newPart.sellingPrice || newPart.pricePerUnit || 0;
+          const totalPrice = pricePerPiece * quantity;
+
+          allParts.push({
+            partName: newPart.partName,
+            quantity: quantity,
+            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+            totalPrice: parseFloat(totalPrice.toFixed(2))
+          });
+        }
       });
+
+      const formattedParts = allParts.map(part => ({
+        partName: part.partName,
+        quantity: Number(part.quantity || 1),
+        pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
+        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+      }));
 
       await axios.put(
         `${API_BASE_URL}/garage/jobcards/${id}/workprogress`,
@@ -208,12 +240,10 @@ const AssignEngineer = () => {
 
       updateAssignment(assignmentId, 'parts', updatedParts);
 
-      // **NEW: Update job card API with updated quantities**
-      // if (id) {
-      //   await updateJobCardWithParts(updatedParts);
-      // }
+      if (id && updatedParts.length > 0) {
+        await updateJobCardWithParts(updatedParts);
+      }
 
-      // Clear any previous errors
       if (error && error.includes(part.partName)) {
         setError(null);
       }
@@ -237,14 +267,13 @@ const AssignEngineer = () => {
       const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
       updateAssignment(assignmentId, 'parts', updatedParts);
 
-      // **NEW: Update job card API with remaining parts**
-      // if (id) {
-      //   await updateJobCardWithParts(updatedParts);
-      // }
+      if (id && updatedParts.length > 0) {
+        await updateJobCardWithParts(updatedParts);
+      }
 
       setSnackbar({
         open: true,
-        message: `Part "${part.partName}" removed and job card updated`,
+        message: `Part "${part.partName}" removed`,
         severity: 'info'
       });
 
@@ -257,36 +286,90 @@ const AssignEngineer = () => {
   // **ENHANCED: Collect all parts from all assignments for job card update**
   const getAllSelectedParts = () => {
     const allPartsUsed = [];
+
+    // First, add existing parts from job card data
+    if (jobCardDataTemp && jobCardDataTemp.partsUsed) {
+      jobCardDataTemp.partsUsed.forEach(existingPart => {
+        allPartsUsed.push({
+          partName: existingPart.partName,
+          quantity: existingPart.quantity,
+          pricePerPiece: existingPart.pricePerPiece,
+          totalPrice: existingPart.totalPrice,
+          _id: existingPart._id,
+          isExisting: true
+        });
+      });
+    }
+
+    // Then add parts from assignments
     assignments.forEach(assignment => {
       assignment.parts.forEach(part => {
         const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
-        const qty = part.selectedQuantity || 1;
-        // Get the selling price from the part (could be from inventory or job card)
-        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
-        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
 
-        if (existingIndex !== -1) {
-          allPartsUsed[existingIndex].quantity += qty;
-          allPartsUsed[existingIndex].totalPrice = allPartsUsed[existingIndex].pricePerPiece * allPartsUsed[existingIndex].quantity;
+        // For pre-loaded parts, use original values from job card
+        if (part.isPreLoaded) {
+          const qty = part.originalQuantity || part.selectedQuantity || 1;
+          const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
+          const totalPrice = part.originalTotalPrice || (pricePerPiece * qty);
+
+          if (existingIndex !== -1) {
+            // Update existing part with new data
+            allPartsUsed[existingIndex] = {
+              ...allPartsUsed[existingIndex],
+              quantity: qty,
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat(totalPrice.toFixed(2))
+            };
+          } else {
+            allPartsUsed.push({
+              partName: part.partName,
+              quantity: qty,
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat(totalPrice.toFixed(2))
+            });
+          }
         } else {
-          // If sellingPrice is 0, try to find the part in inventory to get correct pricing
-          if (pricePerPiece === 0) {
-            const inventoryPart = inventoryParts.find(invPart => 
-              invPart.partName === part.partName || 
-              invPart._id === part._id
-            );
-            if (inventoryPart) {
-              const sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
-              const taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
-              const newPricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-              
-              allPartsUsed.push({
-                partName: part.partName,
-                quantity: qty,
-                pricePerPiece: parseFloat(newPricePerPiece.toFixed(2)),
-                totalPrice: parseFloat((newPricePerPiece * qty).toFixed(2))
-              });
+          // For newly added parts, calculate normally
+          const qty = part.selectedQuantity || 1;
+          // Get the selling price from the part (could be from inventory or job card)
+          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+          const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
+
+          if (existingIndex !== -1) {
+            // Update existing part with new data
+            allPartsUsed[existingIndex] = {
+              ...allPartsUsed[existingIndex],
+              quantity: qty,
+              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+              totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+            };
+          } else {
+            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
+            if (pricePerPiece === 0) {
+              const inventoryPart = inventoryParts.find(invPart =>
+                invPart.partName === part.partName ||
+                invPart._id === part._id
+              );
+              if (inventoryPart) {
+                const sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
+                const taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
+                const newPricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+
+                allPartsUsed.push({
+                  partName: part.partName,
+                  quantity: qty,
+                  pricePerPiece: parseFloat(newPricePerPiece.toFixed(2)),
+                  totalPrice: parseFloat((newPricePerPiece * qty).toFixed(2))
+                });
+              } else {
+                allPartsUsed.push({
+                  partName: part.partName,
+                  quantity: qty,
+                  pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+                  totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+                });
+              }
             } else {
               allPartsUsed.push({
                 partName: part.partName,
@@ -295,13 +378,6 @@ const AssignEngineer = () => {
                 totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
               });
             }
-          } else {
-            allPartsUsed.push({
-              partName: part.partName,
-              quantity: qty,
-              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-              totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
-            });
           }
         }
       });
@@ -426,6 +502,26 @@ const AssignEngineer = () => {
     );
   };
 
+  // Debug function to check inventory status (only call when needed)
+  const debugInventoryStatus = () => {
+    console.log('🔍 Inventory Debug Info:', {
+      totalInventoryParts: inventoryParts.length,
+      partsWithLowStock: inventoryParts.filter(part => part.quantity < 5).map(part => ({
+        name: part.partName,
+        quantity: part.quantity,
+        available: getAvailableQuantity(part._id)
+      })),
+      assignments: assignments.map(assignment => ({
+        assignmentId: assignment.id,
+        partsCount: assignment.parts.length,
+        preLoadedCount: assignment.parts.filter(p => p.isPreLoaded).length,
+        userSelectedCount: assignment.parts.filter(p => !p.isPreLoaded).length,
+        allParts: assignment.parts.map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
+      })),
+      allPartsForAPI: getAllPartsForAPI().map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
+    });
+  };
+
   // Utility API Call with Authorization
   const apiCall = useCallback(async (endpoint, options = {}) => {
     try {
@@ -470,19 +566,22 @@ const AssignEngineer = () => {
   // Helper function to get available quantity considering all current selections
   const getAvailableQuantity = (partId) => {
     const originalPart = inventoryParts.find(p => p._id === partId);
-    if (!originalPart) return 0;
+    if (!originalPart) {
+      return 0;
+    }
 
-    // Calculate total selected quantity across all assignments
     let totalSelected = 0;
     assignments.forEach(assignment => {
       assignment.parts.forEach(part => {
-        if (part._id === partId) {
+        // Only count user-selected parts, not pre-loaded parts
+        if (part._id === partId && !part.isPreLoaded) {
           totalSelected += part.selectedQuantity || 1;
         }
       });
     });
 
-    return Math.max(0, originalPart.quantity - totalSelected);
+    const available = Math.max(0, originalPart.quantity - totalSelected);
+    return available;
   };
 
   // Update Part Quantity using PUT API, DELETE only when qty = 0
@@ -553,7 +652,7 @@ const AssignEngineer = () => {
   // Set assignments after engineers and inventory are loaded
   useEffect(() => {
     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
-     
+
 
       // Set engineer and parts in assignments if they exist
       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
@@ -567,9 +666,12 @@ const AssignEngineer = () => {
           // Convert partsUsed from job card to format expected by the form
           let formattedParts = [];
           if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
-          
+            console.log('Processing partsUsed from job card:', jobCardDataTemp.partsUsed);
 
-            formattedParts = jobCardDataTemp.partsUsed.map(usedPart => {
+            const validParts = jobCardDataTemp.partsUsed.filter(usedPart => usedPart && (usedPart.partName || usedPart._id));
+            console.log('Valid parts after filtering:', validParts);
+
+            formattedParts = validParts.map(usedPart => {
               // Find the part in inventory to get full details
               const inventoryPart = inventoryParts.find(invPart =>
                 invPart.partName === usedPart.partName ||
@@ -584,7 +686,13 @@ const AssignEngineer = () => {
                   availableQuantity: inventoryPart.quantity,
                   // Ensure sellingPrice and taxAmount are properly set
                   sellingPrice: inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0,
-                  taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0
+                  taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0,
+                  // Mark as pre-loaded from job card
+                  isPreLoaded: true,
+                  // Preserve original values from job card
+                  originalQuantity: usedPart.quantity || 1,
+                  originalPricePerPiece: usedPart.pricePerPiece || 0,
+                  originalTotalPrice: usedPart.totalPrice || 0
                 };
               } else {
                 // If part not found in inventory, create a mock part object with default pricing
@@ -592,9 +700,9 @@ const AssignEngineer = () => {
                 const pricePerPiece = usedPart.pricePerPiece || 0;
                 const sellingPrice = pricePerPiece > 0 ? pricePerPiece : 100; // Default to 100 if no price
                 const taxRate = 0; // Default tax rate
-                
+
                 return {
-                  _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName}`,
+                  _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName || 'unknown'}`,
                   partName: usedPart.partName || 'Unknown Part',
                   partNumber: usedPart.partNumber || '',
                   quantity: 0, // No stock available
@@ -605,7 +713,13 @@ const AssignEngineer = () => {
                   gstPercentage: taxRate,
                   carName: usedPart.carName || '',
                   model: usedPart.model || '',
-                  availableQuantity: 0
+                  availableQuantity: 0,
+                  // Mark as pre-loaded from job card
+                  isPreLoaded: true,
+                  // Preserve original values from job card
+                  originalQuantity: usedPart.quantity || 1,
+                  originalPricePerPiece: usedPart.pricePerPiece || 0,
+                  originalTotalPrice: usedPart.totalPrice || 0
                 };
               }
             });
@@ -623,7 +737,7 @@ const AssignEngineer = () => {
 
           setAssignments([newAssignment]);
 
-      
+
 
           // Clear temp data
           setJobCardDataTemp(null);
@@ -740,31 +854,50 @@ const AssignEngineer = () => {
 
   const handlePartSelection = async (assignmentId, newParts, previousParts = []) => {
     try {
-      // Prevent selecting duplicate parts
-      const uniqueParts = [];
-      const seenIds = new Set();
+      console.log('🔄 Part selection triggered:', {
+        assignmentId,
+        newParts: newParts,
+        previousParts: previousParts,
+        newPartsLength: newParts.length,
+        previousPartsLength: previousParts.length
+      });
 
-      for (const part of newParts) {
-        if (!seenIds.has(part._id)) {
-          seenIds.add(part._id);
-          uniqueParts.push({
-            ...part,
-            selectedQuantity: part.selectedQuantity || 1,
-            availableQuantity: part.quantity
-          });
-        }
+      const currentAssignment = assignments.find(a => a.id === assignmentId);
+      if (!currentAssignment) {
+        console.error('❌ Assignment not found:', assignmentId);
+        return;
       }
 
-      // Update the assignment with filtered parts (no duplicates)
-      updateAssignment(assignmentId, 'parts', uniqueParts);
+      // Keep existing pre-loaded parts
+      const existingPreLoadedParts = currentAssignment.parts.filter(part => part.isPreLoaded);
 
-      // **NEW: Immediately update job card API with selected parts**
-      if (id && uniqueParts.length > 0) {
-        await updateJobCardWithParts(uniqueParts);
+      // Process new parts (user-selected parts)
+      const processedNewParts = newParts
+        .filter(part => !part.isPreLoaded) // Only process non-pre-loaded parts
+        .map(part => ({
+          ...part,
+          selectedQuantity: part.selectedQuantity || 1,
+          isPreLoaded: false
+        }));
+
+      const allParts = [...existingPreLoadedParts, ...processedNewParts];
+
+      console.log('📦 Processed parts:', {
+        assignmentId,
+        existingPreLoadedParts: existingPreLoadedParts.length,
+        processedNewParts: processedNewParts.length,
+        totalParts: allParts.length,
+        allParts: allParts.map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
+      });
+
+      updateAssignment(assignmentId, 'parts', allParts);
+
+      if (id && allParts.length > 0) {
+        await updateJobCardWithParts(allParts);
       }
 
     } catch (err) {
-      console.error('Error handling part selection:', err);
+      console.error('❌ Error handling part selection:', err);
       setError('Failed to update part selection and job card');
     }
   };
@@ -797,29 +930,69 @@ const AssignEngineer = () => {
     return true;
   };
 
-  // Updated updateJobCard function to handle job details with prices
+  // Enhanced function to collect all parts (pre-loaded + user-selected) for API
+  const getAllPartsForAPI = () => {
+    const allParts = [];
+
+    assignments.forEach(assignment => {
+      assignment.parts.forEach(part => {
+        const selectedQuantity = part.selectedQuantity || 1;
+
+        // For pre-loaded parts, use original values from job card
+        if (part.isPreLoaded) {
+          const quantity = part.originalQuantity || selectedQuantity;
+          const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
+          const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
+
+          allParts.push({
+            partName: part.partName,
+            quantity: quantity,
+            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+            totalPrice: parseFloat(totalPrice.toFixed(2)),
+            isPreLoaded: true
+          });
+        } else {
+          // For user-selected parts, calculate normally
+          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+          const totalPrice = pricePerPiece * selectedQuantity;
+
+          allParts.push({
+            partName: part.partName,
+            quantity: selectedQuantity,
+            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+            totalPrice: parseFloat(totalPrice.toFixed(2)),
+            isPreLoaded: false
+          });
+        }
+      });
+    });
+
+    return allParts;
+  };
+
+  // Enhanced updateJobCard function to handle both pre-loaded and user-selected parts
   const updateJobCard = async (jobCardId, jobDetails, partsUsed) => {
     try {
-      // Format parts data according to the workprogress API structure
-      const formattedParts = partsUsed.map(part => {
-        // Get the selling price from the part (could be from inventory or job card)
-        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
-        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
-        const quantity = Number(part.quantity || part.selectedQuantity || 1);
-        const totalPrice = pricePerPiece * quantity;
+      // Get all parts (pre-loaded + user-selected)
+      const allParts = getAllPartsForAPI();
 
-        return {
-          partName: part.partName || '',
-          quantity: quantity,
-          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-          totalPrice: parseFloat(totalPrice.toFixed(2))
-        };
-      });
+      // Format parts data according to the workprogress API structure
+      const formattedParts = allParts.map(part => ({
+        partName: part.partName || '',
+        quantity: Number(part.quantity || 1),
+        pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
+        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+      }));
 
       const updatePayload = {
         partsUsed: formattedParts
       };
+
+      console.log('Updating job card with all parts:', formattedParts);
+      console.log('Pre-loaded parts:', allParts.filter(p => p.isPreLoaded));
+      console.log('User-selected parts:', allParts.filter(p => !p.isPreLoaded));
 
       const response = await axios.put(
         `${API_BASE_URL}/garage/jobcards/${jobCardId}/workprogress`,
@@ -861,75 +1034,25 @@ const AssignEngineer = () => {
       })();
 
       // Collect all parts used across all assignments with enhanced data
-      const allPartsUsed = [];
+      const allPartsUsed = getAllPartsForAPI();
       const partUpdates = []; // Track inventory updates needed
 
+      // Track inventory updates needed (only for user-selected parts)
       assignments.forEach(assignment => {
         assignment.parts.forEach(part => {
-          const existingPartIndex = allPartsUsed.findIndex(p => p.partId === part._id);
-          const selectedQuantity = part.selectedQuantity || 1;
-
-          if (existingPartIndex !== -1) {
-            allPartsUsed[existingPartIndex].quantity += selectedQuantity;
-            // Recalculate total price with updated quantity
-            let sellingPrice = Number(allPartsUsed[existingPartIndex].pricePerPiece) / (1 + (Number(part.taxAmount || part.gstPercentage || 0) / 100));
-            let taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-            
-            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
-            if (sellingPrice === 0) {
-              const inventoryPart = inventoryParts.find(invPart => 
-                invPart.partName === part.partName || 
-                invPart._id === part._id
-              );
-              if (inventoryPart) {
-                sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
-                taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
-              }
+          if (!part.isPreLoaded) {
+            const selectedQuantity = part.selectedQuantity || 1;
+            const existingUpdateIndex = partUpdates.findIndex(p => p.partId === part._id);
+            if (existingUpdateIndex !== -1) {
+              partUpdates[existingUpdateIndex].totalUsed += selectedQuantity;
+            } else {
+              partUpdates.push({
+                partId: part._id,
+                partName: part.partName,
+                totalUsed: selectedQuantity,
+                originalQuantity: part.quantity
+              });
             }
-            
-            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-            allPartsUsed[existingPartIndex].pricePerPiece = parseFloat(pricePerPiece.toFixed(2));
-            allPartsUsed[existingPartIndex].totalPrice = parseFloat((pricePerPiece * allPartsUsed[existingPartIndex].quantity).toFixed(2));
-          } else {
-            // Get the selling price from the part (could be from inventory or job card)
-            // If part doesn't have sellingPrice, try to get it from inventory
-            let sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-            let taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-            
-            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
-            if (sellingPrice === 0) {
-              const inventoryPart = inventoryParts.find(invPart => 
-                invPart.partName === part.partName || 
-                invPart._id === part._id
-              );
-              if (inventoryPart) {
-                sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
-                taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
-              }
-            }
-            
-            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
-            const totalPrice = pricePerPiece * selectedQuantity;
-            
-            allPartsUsed.push({
-              partName: part.partName,
-              quantity: selectedQuantity,
-              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-              totalPrice: parseFloat(totalPrice.toFixed(2))
-            });
-          }
-
-          // Track inventory updates needed
-          const existingUpdateIndex = partUpdates.findIndex(p => p.partId === part._id);
-          if (existingUpdateIndex !== -1) {
-            partUpdates[existingUpdateIndex].totalUsed += selectedQuantity;
-          } else {
-            partUpdates.push({
-              partId: part._id,
-              partName: part.partName,
-              totalUsed: selectedQuantity,
-              originalQuantity: part.quantity
-            });
           }
         });
       });
@@ -943,19 +1066,25 @@ const AssignEngineer = () => {
             throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
           }
 
-           await updatePartQuantity(partUpdate.partId, newQuantity);
+          await updatePartQuantity(partUpdate.partId, newQuantity);
         }
       }
 
       // Update job card with parts used using the workprogress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
 
-      // Commented out: API call only happens when parts are selected, not on submit
-      // const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
-      //   if (jobCardId) {
-      //     return updateJobCard(jobCardId, null, allPartsUsed);
-      //   }
-      // }).filter(Boolean);
+      console.log('🚀 Starting job card updates with parts:', {
+        targetJobCardIds,
+        allPartsUsed,
+        preLoadedParts: allPartsUsed.filter(p => p.isPreLoaded),
+        userSelectedParts: allPartsUsed.filter(p => !p.isPreLoaded)
+      });
+
+      const jobCardUpdatePromises = targetJobCardIds.map(jobCardId => {
+        if (jobCardId) {
+          return updateJobCard(jobCardId, null, allPartsUsed);
+        }
+      }).filter(Boolean);
 
       // Process each assignment
       const assignmentPromises = assignments.map(async (assignment) => {
@@ -972,7 +1101,7 @@ const AssignEngineer = () => {
           notes: assignment.notes
         };
 
-   
+
         return axios.put(
           `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
           payload,
@@ -985,19 +1114,34 @@ const AssignEngineer = () => {
       });
 
       // Execute job card updates first
-      // Commented out: API call only happens when parts are selected, not on submit
-      // if (jobCardUpdatePromises.length > 0) {
-      //   await Promise.all(jobCardUpdatePromises);
-      // }
+      if (jobCardUpdatePromises.length > 0) {
+        await Promise.all(jobCardUpdatePromises);
+      }
 
       // Execute all assignments
       const results = await Promise.all(assignmentPromises);
 
 
-      // Show success message with totals
+      // Calculate total cost for success message
+      const totalCost = (() => {
+        const jobDetailsCost = totalJobDetailsCost;
+        const partsCost = allPartsUsed.reduce((total, part) => total + (part.totalPrice || 0), 0);
+        return jobDetailsCost + partsCost;
+      })();
+
+      // Calculate pre-loaded vs user-selected parts
+      const preLoadedParts = allPartsUsed.filter(part => part.isPreLoaded);
+      const userSelectedParts = allPartsUsed.filter(part => !part.isPreLoaded);
+
+      // Show success message with detailed breakdown
+      const successMessage = `✅ Assignment completed! 
+        Total Cost: ₹${totalCost.toFixed(2)} 
+        (Job Details: ₹${totalJobDetailsCost.toFixed(2)} + Parts: ₹${(totalCost - totalJobDetailsCost).toFixed(2)}) 
+        Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedParts.length} user-selected = ${allPartsUsed.length} total`;
+
       setSnackbar({
         open: true,
-        message: `✅ Assignment completed! Job Details Cost: ₹${totalJobDetailsCost.toFixed(2)}, Parts: ${allPartsUsed.length} items`,
+        message: successMessage,
         severity: 'success'
       });
 
@@ -1225,7 +1369,6 @@ const AssignEngineer = () => {
 
   return (
     <>
-      {/* Error & Success Alerts */}
       <Snackbar
         open={!!error}
         autoHideDuration={6000}
@@ -1236,7 +1379,6 @@ const AssignEngineer = () => {
           {error}
         </Alert>
       </Snackbar>
-
 
       <Snackbar
         open={snackbar.open}
@@ -1261,11 +1403,11 @@ const AssignEngineer = () => {
           mb: 4,
           ml: { xs: 0, sm: 35 },
           overflow: "auto",
-          px: { xs: 1, sm: 3 },
+          px: { xs: 1, sm: 2, md: 3 },
         }}
       >
         <CssBaseline />
-        <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3 } }}>
+        <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
           {/* Header */}
           <Box sx={{
             mb: 3,
@@ -1283,85 +1425,149 @@ const AssignEngineer = () => {
               >
                 <ArrowBackIcon />
               </IconButton>
-              <Typography variant="h5" fontWeight={600}>
+              <Typography
+                variant="h5"
+                fontWeight={600}
+                sx={{
+                  fontSize: { xs: '1.25rem', sm: '1.5rem' }
+                }}
+              >
                 Assign Engineer & Job Details
               </Typography>
-
             </Box>
-
           </Box>
 
           {/* Updated Assignment Summary Card with Job Details Cost */}
           <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  mb: 2,
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' }
+                }}
+              >
                 Assignment Summary
                 {isEditMode && (
                   <Chip
                     label="Editing Existing Job Card"
                     color="info"
                     size="small"
-                    sx={{ ml: 2 }}
+                    sx={{ ml: { xs: 0, sm: 2 }, mt: { xs: 1, sm: 0 }, display: { xs: 'block', sm: 'inline-block' } }}
                   />
                 )}
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="primary">
+              <Grid container spacing={{ xs: 1, sm: 2 }}>
+                <Grid item xs={6} sm={2.4}>
+                  <Box sx={{ textAlign: 'center', p: 1 }}>
+                    <Typography
+                      variant="h4"
+                      color="primary"
+                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+                    >
                       {assignments.length}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    >
                       Total Assignments
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="primary">
+                <Grid item xs={6} sm={2.4}>
+                  <Box sx={{ textAlign: 'center', p: 1 }}>
+                    <Typography
+                      variant="h4"
+                      color="primary"
+                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+                    >
                       {(() => {
-                        // Count existing + new job points
                         const existingCount = parsedJobDetails.length;
                         const newCount = jobPoints.length;
                         return existingCount + newCount;
                       })()}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    >
                       Job Details Points
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} sm={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="success.main">
+                  <Box sx={{ textAlign: 'center', p: 1 }}>
+                    <Typography
+                      variant="h4"
+                      color="success.main"
+                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+                    >
                       ₹{(() => {
-                        // Calculate total cost from existing + new job points
+                        // Calculate job details cost
                         const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
                         const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-                        return (existingCost + newCost).toFixed(0);
+                        const jobDetailsCost = existingCost + newCost;
+
+                        // Calculate parts cost
+                        const partsCost = assignments.reduce((total, assignment) => {
+                          return total + assignment.parts.reduce((partTotal, part) => {
+                            const selectedQuantity = part.selectedQuantity || 1;
+                            const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                            const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                            const partTotalPrice = pricePerPiece * selectedQuantity;
+                            return partTotal + partTotalPrice;
+                          }, 0);
+                        }, 0);
+
+                        // Return total cost (job details + parts)
+                        return (jobDetailsCost + partsCost).toFixed(0);
                       })()}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Job Details Cost
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    >
+                      Total Job Cost
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="primary">
+                <Grid item xs={6} sm={2.4}>
+                  <Box sx={{ textAlign: 'center', p: 1 }}>
+                    <Typography
+                      variant="h4"
+                      color="primary"
+                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+                    >
                       {new Set(assignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    >
                       Engineers Assigned
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={2.4}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" color="primary">
+                <Grid item xs={6} sm={2.4}>
+                  <Box sx={{ textAlign: 'center', p: 1 }}>
+                    <Typography
+                      variant="h4"
+                      color="primary"
+                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
+                    >
                       {assignments.reduce((total, assignment) => total + assignment.parts.length, 0)}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                    >
                       Parts Selected
                     </Typography>
                   </Box>
@@ -1372,10 +1578,27 @@ const AssignEngineer = () => {
               {isEditMode && assignments[0]?.engineer && (
                 <>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600, color: 'info.main' }}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      mb: 1,
+                      fontWeight: 600,
+                      color: 'info.main',
+                      fontSize: { xs: '1rem', sm: '1.1rem' }
+                    }}
+                  >
                     📋 Pre-loaded from Job Card:
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Alert
+                    severity="info"
+                    sx={{ mb: 2 }}
+                    icon={<InventoryIcon />}
+                  >
+                    <Typography variant="body2">
+                      The following data was automatically loaded from the job card and will be included in the work progress update.
+                    </Typography>
+                  </Alert>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                     <Typography variant="body2" color="text.secondary">
                       👤 Engineer:
                     </Typography>
@@ -1386,18 +1609,24 @@ const AssignEngineer = () => {
                     />
                   </Box>
                   {assignments[0].notes && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2" color="text.secondary">
                         💬 Engineer Remarks:
                       </Typography>
-                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontStyle: 'italic',
+                          wordBreak: 'break-word',
+                          maxWidth: { xs: '100%', sm: '60%' }
+                        }}
+                      >
                         "{assignments[0].notes}"
                       </Typography>
                     </Box>
                   )}
-                  {/* Show existing job details cost */}
                   {parsedJobDetails.length > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2" color="text.secondary">
                         💰 Existing Job Details Cost:
                       </Typography>
@@ -1408,84 +1637,306 @@ const AssignEngineer = () => {
                       />
                     </Box>
                   )}
+                  {(() => {
+                    // Calculate pre-loaded parts cost
+                    const preLoadedPartsCost = assignments.reduce((total, assignment) => {
+                      return total + assignment.parts.filter(part => part.isPreLoaded).reduce((partTotal, part) => {
+                        const selectedQuantity = part.selectedQuantity || 1;
+                        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                        const partTotalPrice = pricePerPiece * selectedQuantity;
+                        return partTotal + partTotalPrice;
+                      }, 0);
+                    }, 0);
+
+                    // Calculate user-selected parts cost
+                    const userSelectedPartsCost = assignments.reduce((total, assignment) => {
+                      return total + assignment.parts.filter(part => !part.isPreLoaded).reduce((partTotal, part) => {
+                        const selectedQuantity = part.selectedQuantity || 1;
+                        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                        const partTotalPrice = pricePerPiece * selectedQuantity;
+                        return partTotal + partTotalPrice;
+                      }, 0);
+                    }, 0);
+
+                    const totalPartsCost = preLoadedPartsCost + userSelectedPartsCost;
+
+                    if (totalPartsCost > 0) {
+                      return (
+                        <>
+                          {preLoadedPartsCost > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                📋 Pre-loaded Parts Cost:
+                              </Typography>
+                              <Chip
+                                label={`₹${preLoadedPartsCost.toFixed(2)}`}
+                                color="info"
+                                size="small"
+                              />
+                            </Box>
+                          )}
+                          {userSelectedPartsCost > 0 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="body2" color="text.secondary">
+                                🔧 User Selected Parts Cost:
+                              </Typography>
+                              <Chip
+                                label={`₹${userSelectedPartsCost.toFixed(2)}`}
+                                color="primary"
+                                size="small"
+                              />
+                            </Box>
+                          )}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="body2" color="text.secondary">
+                              🔧 Total Parts Cost:
+                            </Typography>
+                            <Chip
+                              label={`₹${totalPartsCost.toFixed(2)}`}
+                              color="warning"
+                              size="small"
+                            />
+                          </Box>
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               )}
 
-              {/* Job Details Cost Breakdown */}
-              {(parsedJobDetails.length > 0 || jobPoints.length > 0) && (
+              {/* Total Cost Breakdown */}
+              {(parsedJobDetails.length > 0 || jobPoints.length > 0 || assignments.some(a => a.parts.length > 0)) && (
                 <>
                   <Divider sx={{ my: 2 }} />
-                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                    💰 Job Details Cost Breakdown:
+                  <Typography
+                    variant="subtitle1"
+                    sx={{
+                      mb: 1,
+                      fontWeight: 600,
+                      fontSize: { xs: '1rem', sm: '1.1rem' }
+                    }}
+                  >
+                    💰 Total Cost Breakdown:
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-                    {parsedJobDetails.length > 0 && (
-                      <Chip
-                        label={`Existing: ₹${parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0).toFixed(2)}`}
-                        color="secondary"
-                        variant="outlined"
-                        size="small"
-                      />
-                    )}
-                    {jobPoints.length > 0 && (
-                      <Chip
-                        label={`New: ₹${jobPoints.reduce((total, item) => total + (item.price || 0), 0).toFixed(2)}`}
-                        color="primary"
-                        variant="outlined"
-                        size="small"
-                      />
-                    )}
-                    <Chip
-                      label={`Total: ₹${(() => {
-                        const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
-                        const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-                        return (existingCost + newCost).toFixed(2);
-                      })()}`}
-                      color="success"
-                      size="small"
-                    />
+                    {/* Job Details Cost */}
+                    {(() => {
+                      const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
+                      const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
+                      const jobDetailsCost = existingCost + newCost;
+
+                      if (jobDetailsCost > 0) {
+                        return (
+                          <>
+                            {parsedJobDetails.length > 0 && (
+                              <Chip
+                                label={`Job Details (Existing): ₹${existingCost.toFixed(2)}`}
+                                color="secondary"
+                                variant="outlined"
+                                size="small"
+                              />
+                            )}
+                            {jobPoints.length > 0 && (
+                              <Chip
+                                label={`Job Details (New): ₹${newCost.toFixed(2)}`}
+                                color="primary"
+                                variant="outlined"
+                                size="small"
+                              />
+                            )}
+                            <Chip
+                              label={`Job Details Total: ₹${jobDetailsCost.toFixed(2)}`}
+                              color="info"
+                              size="small"
+                            />
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Parts Cost */}
+                    {(() => {
+                      const partsCost = assignments.reduce((total, assignment) => {
+                        return total + assignment.parts.reduce((partTotal, part) => {
+                          const selectedQuantity = part.selectedQuantity || 1;
+                          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                          const partTotalPrice = pricePerPiece * selectedQuantity;
+                          return partTotal + partTotalPrice;
+                        }, 0);
+                      }, 0);
+
+                      if (partsCost > 0) {
+                        return (
+                          <Chip
+                            label={`Parts Cost: ₹${partsCost.toFixed(2)}`}
+                            color="warning"
+                            size="small"
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Total Cost */}
+                    {(() => {
+                      const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
+                      const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
+                      const jobDetailsCost = existingCost + newCost;
+
+                      const partsCost = assignments.reduce((total, assignment) => {
+                        return total + assignment.parts.reduce((partTotal, part) => {
+                          const selectedQuantity = part.selectedQuantity || 1;
+                          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                          const partTotalPrice = pricePerPiece * selectedQuantity;
+                          return partTotal + partTotalPrice;
+                        }, 0);
+                      }, 0);
+
+                      const totalCost = jobDetailsCost + partsCost;
+
+                      if (totalCost > 0) {
+                        return (
+                          <Chip
+                            label={`Grand Total: ₹${totalCost.toFixed(2)}`}
+                            color="success"
+                            size="small"
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
                   </Box>
                 </>
               )}
 
               {/* Parts Summary */}
               {(() => {
-                const allPartsUsed = [];
+                const preLoadedParts = [];
+                const userSelectedParts = [];
+
                 assignments.forEach(assignment => {
                   assignment.parts.forEach(part => {
-                    const existingPartIndex = allPartsUsed.findIndex(p => p._id === part._id);
                     const selectedQuantity = part.selectedQuantity || 1;
 
-                    if (existingPartIndex !== -1) {
-                      allPartsUsed[existingPartIndex].quantity += selectedQuantity;
+                    if (part.isPreLoaded) {
+                      const existingIndex = preLoadedParts.findIndex(p => p._id === part._id);
+                      if (existingIndex !== -1) {
+                        preLoadedParts[existingIndex].quantity += selectedQuantity;
+                      } else {
+                        preLoadedParts.push({ ...part, quantity: selectedQuantity });
+                      }
                     } else {
-                      allPartsUsed.push({ ...part, quantity: selectedQuantity });
+                      const existingIndex = userSelectedParts.findIndex(p => p._id === part._id);
+                      if (existingIndex !== -1) {
+                        userSelectedParts[existingIndex].quantity += selectedQuantity;
+                      } else {
+                        userSelectedParts.push({ ...part, quantity: selectedQuantity });
+                      }
                     }
                   });
                 });
 
-                if (allPartsUsed.length > 0) {
+                if (preLoadedParts.length > 0 || userSelectedParts.length > 0) {
                   return (
                     <>
                       <Divider sx={{ my: 2 }} />
-                      <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>
-                        {isEditMode ? '🔧 Parts from Job Card:' : '🔧 Parts to be Updated in Job Card:'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {allPartsUsed.map((part, index) => (
-                          <Chip
-                            key={index}
-                            label={`${part.partName} (Qty: ${part.quantity})`}
-                            color={isEditMode ? "secondary" : "info"}
-                            variant="outlined"
-                            size="small"
-                          />
-                        ))}
-                      </Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+
+                      {/* User Selected Parts Summary - Display First */}
+                      {userSelectedParts.length > 0 && (
+                        <>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{
+                              mb: 1,
+                              fontWeight: 600,
+                              fontSize: { xs: '1rem', sm: '1.1rem' },
+                              color: 'primary.main'
+                            }}
+                          >
+                            🔧 User Selected Parts:
+                          </Typography>
+                          <Alert
+                            severity="success"
+                            sx={{ mb: 2 }}
+                            icon={<AddIcon />}
+                          >
+                            <Typography variant="body2">
+                              These are newly selected parts that will be added to the job card along with the pre-loaded parts.
+                            </Typography>
+                          </Alert>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                            {userSelectedParts.map((part, index) => (
+                              <Chip
+                                key={index}
+                                label={`${part.partName} (Qty: ${part.quantity})`}
+                                color="primary"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))}
+                          </Box>
+                        </>
+                      )}
+
+                      {/* Pre-loaded Parts Summary - Display Second */}
+                      {preLoadedParts.length > 0 && (
+                        <>
+                          <Typography
+                            variant="subtitle1"
+                            sx={{
+                              mb: 1,
+                              fontWeight: 600,
+                              fontSize: { xs: '1rem', sm: '1.1rem' },
+                              color: 'info.main'
+                            }}
+                          >
+                            📋 Pre-loaded Parts from Job Card:
+                          </Typography>
+                          <Alert
+                            severity="info"
+                            sx={{ mb: 2 }}
+                            icon={<InventoryIcon />}
+                          >
+                            <Typography variant="body2">
+                              These parts were automatically loaded from the job card and will be included in the work progress update.
+                            </Typography>
+                          </Alert>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                            {preLoadedParts.map((part, index) => (
+                              <Chip
+                                key={index}
+                                label={`${part.partName} (Qty: ${part.quantity})`}
+                                color="info"
+                                variant="outlined"
+                                size="small"
+                              />
+                            ))}
+                          </Box>
+                        </>
+                      )}
+
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          mt: 1,
+                          display: 'block',
+                          fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                        }}
+                      >
                         {isEditMode
-                          ? `These parts were previously used in job card: ${id}`
-                          : `These parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
+                          ? `All parts (pre-loaded + user-selected) will be updated in job card: ${id}`
+                          : `All parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
                         }
                       </Typography>
                     </>
@@ -1498,15 +1949,21 @@ const AssignEngineer = () => {
 
           {/* Enhanced Job Details Section with Price */}
           <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  mb: 2,
+                  fontSize: { xs: '1.1rem', sm: '1.25rem' }
+                }}
+              >
                 Job Details (Point-wise)
               </Typography>
-              <Paper sx={{ p: 3, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
-                <Grid container spacing={3}>
+              <Paper sx={{ p: { xs: 2, sm: 3 }, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
+                <Grid container spacing={{ xs: 2, sm: 3 }}>
                   <Grid item xs={12}>
-
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                       <TextField
                         fullWidth
                         placeholder="Enter job detail description..."
@@ -1520,19 +1977,21 @@ const AssignEngineer = () => {
                             </InputAdornment>
                           ),
                         }}
-                        sx={{ flex: 2, minWidth: '200px' }}
+                        sx={{ flex: 2, minWidth: { xs: '100%', sm: '200px' } }}
                       />
                       <Button
                         variant="contained"
                         onClick={addJobPoint}
                         disabled={!currentJobPoint.description.trim()}
                         startIcon={<AddIcon />}
-                        sx={{ minWidth: 120 }}
+                        sx={{
+                          minWidth: { xs: '100%', sm: '120px' },
+                          mt: { xs: 1, sm: 0 }
+                        }}
                       >
                         Add Point
                       </Button>
                     </Box>
-
 
                     {jobPoints.length > 0 && (
                       <Box sx={{ mt: 2 }}>
@@ -1547,12 +2006,15 @@ const AssignEngineer = () => {
                           mb: 2
                         }}>
                           {jobPoints.map((point, index) => (
-                            <ListItem key={index} divider>
+                            <ListItem key={index} divider sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' } }}>
                               <ListItemText
                                 primary={point.description}
-                                sx={{ wordBreak: 'break-word' }}
+                                sx={{
+                                  wordBreak: 'break-word',
+                                  mb: { xs: 1, sm: 0 }
+                                }}
                               />
-                              <ListItemSecondaryAction>
+                              <ListItemSecondaryAction sx={{ position: { xs: 'static', sm: 'absolute' } }}>
                                 <IconButton
                                   edge="end"
                                   onClick={() => removeJobPoint(index)}
@@ -1567,10 +2029,16 @@ const AssignEngineer = () => {
                       </Box>
                     )}
 
-
                     {parsedJobDetails.length > 0 && (
                       <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom sx={{ color: 'info.main' }}>
+                        <Typography
+                          variant="subtitle2"
+                          gutterBottom
+                          sx={{
+                            color: 'info.main',
+                            fontSize: { xs: '0.9rem', sm: '1rem' }
+                          }}
+                        >
                           📋 Existing Job Details from Job Card:
                         </Typography>
                         <List sx={{
@@ -1580,11 +2048,15 @@ const AssignEngineer = () => {
                           borderRadius: 1
                         }}>
                           {parsedJobDetails.map((item, index) => (
-                            <ListItem key={index} divider>
+                            <ListItem key={index} divider sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' } }}>
                               <ListItemText
                                 primary={`Description: ${item.description}`}
+                                sx={{
+                                  wordBreak: 'break-word',
+                                  mb: { xs: 1, sm: 0 }
+                                }}
                               />
-                              <ListItemSecondaryAction>
+                              <ListItemSecondaryAction sx={{ position: { xs: 'static', sm: 'absolute' } }}>
                                 <IconButton
                                   edge="end"
                                   onClick={() => removeExistingJobPoint(index)}
@@ -1606,20 +2078,32 @@ const AssignEngineer = () => {
 
           {/* Main Form Card */}
           <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
               <form onSubmit={handleSubmit}>
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="h6" fontWeight={600}>
+                <Box sx={{
+                  mb: 3,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 2
+                }}>
+                  <Typography
+                    variant="h6"
+                    fontWeight={600}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
                     Engineer Assignments
                   </Typography>
 
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: { xs: 'stretch', sm: 'flex-end' } }}>
                     <Button
                       variant="contained"
                       color="primary"
                       startIcon={<AddIcon />}
                       onClick={() => setOpenAddEngineerDialog(true)}
                       size="small"
+                      sx={{ flex: { xs: 1, sm: 'none' } }}
                     >
                       Add Engineer
                     </Button>
@@ -1638,33 +2122,45 @@ const AssignEngineer = () => {
                     }}
                   >
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 2 }}>
+                      <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        width: '100%',
+                        pr: 2,
+                        flexWrap: 'wrap',
+                        gap: 1
+                      }}>
                         <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            flexGrow: 1,
+                            fontSize: { xs: '1rem', sm: '1.1rem' }
+                          }}
+                        >
                           Assignment #{index + 1}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {assignment.engineer && (
                             <Chip
                               label={assignment.engineer.name || assignment.engineer.email || 'Unknown Engineer'}
                               size="small"
-                              sx={{ ml: 1 }}
                               color="primary"
                             />
                           )}
                           <Chip
                             label={assignment.priority}
                             size="small"
-                            sx={{ ml: 1 }}
                             color={getPriorityColor(assignment.priority)}
                           />
                           {assignment.parts.length > 0 && (
                             <Chip
                               label={`${assignment.parts.length} parts`}
                               size="small"
-                              sx={{ ml: 1 }}
                               color="info"
                             />
                           )}
-                        </Typography>
+                        </Box>
                         {assignments.length > 1 && (
                           <IconButton
                             onClick={(e) => {
@@ -1679,11 +2175,18 @@ const AssignEngineer = () => {
                         )}
                       </Box>
                     </AccordionSummary>
-                    <AccordionDetails>
-                      <Grid container spacing={3}>
+                    <AccordionDetails sx={{ p: { xs: 2, sm: 3 } }}>
+                      <Grid container spacing={{ xs: 2, sm: 3 }}>
                         {/* Engineer Selection */}
                         <Grid item xs={12} md={6}>
-                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              mb: 1,
+                              fontWeight: 600,
+                              fontSize: { xs: '0.9rem', sm: '1rem' }
+                            }}
+                          >
                             Select Engineer *
                           </Typography>
                           {isLoading ? (
@@ -1733,7 +2236,15 @@ const AssignEngineer = () => {
                             />
                           )}
                           {assignment.engineer && isEditMode && (
-                            <Typography variant="caption" color="success.main" sx={{ mt: 1, display: 'block' }}>
+                            <Typography
+                              variant="caption"
+                              color="success.main"
+                              sx={{
+                                mt: 1,
+                                display: 'block',
+                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                              }}
+                            >
                               ✅ This engineer was pre-selected from the job card
                             </Typography>
                           )}
@@ -1741,7 +2252,14 @@ const AssignEngineer = () => {
 
                         {/* Priority Selection */}
                         <Grid item xs={12} md={3}>
-                          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          <Typography
+                            variant="subtitle2"
+                            sx={{
+                              mb: 1,
+                              fontWeight: 600,
+                              fontSize: { xs: '0.9rem', sm: '1rem' }
+                            }}
+                          >
                             Priority
                           </Typography>
                           <FormControl fullWidth>
@@ -1761,26 +2279,92 @@ const AssignEngineer = () => {
                           <Box sx={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', sm: 'center' },
                             mb: 1,
-                            flexWrap: 'wrap',
+                            flexDirection: { xs: 'column', sm: 'row' },
                             gap: 1
                           }}>
-                            <Typography variant="subtitle2" fontWeight={600}>
-                              Select Parts (Optional)
-                            </Typography>
-                            <Tooltip title="Add New Part">
-                              <Button
-                                variant="outlined"
-                                color="primary"
-                                size="small"
-                                startIcon={<AddIcon />}
-                                onClick={() => setOpenAddPartDialog(true)}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography
+                                variant="subtitle2"
+                                fontWeight={600}
+                                sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
                               >
-                                Add Part
-                              </Button>
-                            </Tooltip>
+                                Select Parts (Optional)
+                              </Typography>
+                              <Tooltip title="You can select multiple parts at once. Use Ctrl/Cmd + Click to select multiple parts.">
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ cursor: 'help' }}
+                                >
+                                  ℹ️
+                                </Typography>
+                              </Tooltip>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Tooltip title="Add New Part">
+                                <Button
+                                  variant="outlined"
+                                  color="primary"
+                                  size="small"
+                                  startIcon={<AddIcon />}
+                                  onClick={() => setOpenAddPartDialog(true)}
+                                  sx={{ flex: { xs: 1, sm: 'none' } }}
+                                >
+                                  Add Part
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title="Debug Inventory Status (Check Console)">
+                                <Button
+                                  variant="outlined"
+                                  color="secondary"
+                                  size="small"
+                                  onClick={debugInventoryStatus}
+                                  sx={{ flex: { xs: 1, sm: 'none' } }}
+                                >
+                                  Debug
+                                </Button>
+                              </Tooltip>
+                            </Box>
                           </Box>
+
+                          {/* Pre-loaded Parts Notice */}
+                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
+                            <Alert
+                              severity="info"
+                              sx={{ mb: 2 }}
+                              icon={<InventoryIcon />}
+                            >
+                              <Typography variant="body2">
+                                <strong>Pre-loaded parts detected:</strong> {assignment.parts.filter(part => part.isPreLoaded).length} parts from the job card are already included and will be sent to the work progress API.
+                              </Typography>
+                            </Alert>
+                          )}
+
+                          {/* No Parts Available Notice */}
+                          {(() => {
+                            const availableParts = inventoryParts.filter(part => {
+                              const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === part._id);
+                              const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
+                              return isAlreadySelected || hasAvailableQuantity;
+                            });
+
+                            if (availableParts.length === 0 && !isLoadingInventory) {
+                              return (
+                                <Alert
+                                  severity="warning"
+                                  sx={{ mb: 2 }}
+                                  icon={<InventoryIcon />}
+                                >
+                                  <Typography variant="body2">
+                                    <strong>No parts available:</strong> All parts in inventory are either out of stock or already selected. You can add new parts using the "Add Part" button.
+                                  </Typography>
+                                </Alert>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           {isLoadingInventory ? (
                             <Box sx={{
@@ -1798,40 +2382,61 @@ const AssignEngineer = () => {
                             <Autocomplete
                               multiple
                               fullWidth
-                              options={inventoryParts.filter(
-                                part => getAvailableQuantity(part._id) > 0 && !assignment.parts.some(p => p._id === part._id)
-                              )}
-                              getOptionLabel={(option) =>
-                                `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${getAvailableQuantity(option._id)}`
-                              }
+                              options={inventoryParts.filter(part => {
+                                // Allow parts that are already selected or have available quantity
+                                const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === part._id);
+                                const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
+                                return isAlreadySelected || hasAvailableQuantity;
+                              })}
+                              getOptionLabel={(option) => {
+                                const available = getAvailableQuantity(option._id);
+                                const stockStatus = available <= 2 ? '⚠️ LOW STOCK' : available <= 5 ? '⚠️' : '';
+                                return `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${available} ${stockStatus}`;
+                              }}
                               isOptionEqualToValue={(option, value) => {
                                 if (!option || !value) return false;
                                 return option._id === value._id || option.id === value.id;
                               }}
-                              value={assignment.parts}
+                              value={assignment.parts.filter(part => !part.isPreLoaded)} // Only show user-selected parts in the dropdown
                               onChange={(event, newValue) => {
+                                console.log('🔄 Autocomplete onChange:', {
+                                  newValue: newValue,
+                                  newValueLength: newValue.length,
+                                  assignmentId: assignment.id
+                                });
                                 handlePartSelection(assignment.id, newValue, assignment.parts);
                               }}
                               renderTags={(value, getTagProps) =>
                                 value.map((option, index) => (
                                   <Chip
                                     variant="outlined"
+                                    color={option.isPreLoaded ? "info" : "primary"}
                                     label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
                                     {...getTagProps({ index })}
                                     key={option._id}
+                                    sx={{
+                                      fontSize: '0.75rem',
+                                      '& .MuiChip-label': {
+                                        fontSize: '0.75rem'
+                                      }
+                                    }}
                                   />
                                 ))
                               }
-                              renderOption={(props, option) => (
-                                <Box component="li" {...props} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                  <Typography variant="body2" noWrap sx={{ width: '100%', textOverflow: 'ellipsis' }}>
-                                    {option.partName}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
-                                    #{option.partNumber} | ₹{option.pricePerUnit} | GST: {option.taxAmount}% | Avail: {getAvailableQuantity(option._id)}
-                                  </Typography>
-                                </Box>
-                              )}
+                              renderOption={(props, option) => {
+                                const available = getAvailableQuantity(option._id);
+                                const stockStatus = available <= 2 ? '⚠️ LOW STOCK' : available <= 5 ? '⚠️' : '';
+                                return (
+                                  <Box component="li" {...props} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                    <Typography variant="body2" noWrap sx={{ width: '100%', textOverflow: 'ellipsis' }}>
+                                      {option.partName}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
+                                      #{option.partNumber} | ₹{option.pricePerUnit} | GST: {option.taxAmount}% | Avail: {available} {stockStatus}
+                                    </Typography>
+                                  </Box>
+                                );
+                              }}
                               renderInput={(params) => (
                                 <TextField
                                   {...params}
@@ -1842,225 +2447,859 @@ const AssignEngineer = () => {
                                 />
                               )}
                               sx={{ '& .MuiAutocomplete-popper': { maxHeight: 300 } }}
-                              noOptionsText="No parts available in stock"
+                              noOptionsText="No parts available in stock or all parts already selected"
                               filterOptions={(options, { inputValue }) => {
-                                return options.filter(option =>
-                                  getAvailableQuantity(option._id) > 0 && (
+                                return options.filter(option => {
+                                  // Allow parts that are already selected or have available quantity
+                                  const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === option._id);
+                                  const hasAvailableQuantity = getAvailableQuantity(option._id) > 0;
+                                  const isAvailable = isAlreadySelected || hasAvailableQuantity;
+
+                                  return isAvailable && (
                                     option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
                                     option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
                                     option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
                                     option.model?.toLowerCase().includes(inputValue.toLowerCase())
-                                  )
-                                );
+                                  );
+                                });
                               }}
                             />
                           )}
 
-                          {/* Selected Parts with Enhanced Quantity Management */}
-                          {assignment.parts.length > 0 && (
+                          {/* User Selected Parts - Display First */}
+                          {assignment.parts.filter(part => part && part.partName && !part.isPreLoaded).length > 0 && (
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                                Selected Parts with Details:
-                                {isEditMode && (
-                                  <Chip
-                                    label="Pre-loaded from Job Card"
-                                    size="small"
-                                    color="secondary"
-                                    sx={{ ml: 1 }}
-                                  />
-                                )}
+                              <Typography
+                                variant="subtitle2"
+                                sx={{
+                                  mb: 1,
+                                  fontWeight: 600,
+                                  fontSize: { xs: '0.9rem', sm: '1rem' },
+                                  color: 'primary.main'
+                                }}
+                              >
+                                🔧 User Selected Parts:
                               </Typography>
+                              <Alert
+                                severity="success"
+                                sx={{ mb: 2 }}
+                                icon={<AddIcon />}
+                              >
+                                <Typography variant="body2">
+                                  These are newly selected parts that will be added to the job card along with the pre-loaded parts.
+                                </Typography>
+                              </Alert>
                               <List dense>
-                                {assignment.parts.map((part, partIndex) => {
-                                  const selectedQuantity = part.selectedQuantity || 1;
-                                  const quantity = part.quantity;
-                                  const unitPrice = part.sellingPrice || 0;
-                                  const gstPercentage = part.taxAmount;
-                                  const gst = (part.taxAmount * selectedQuantity) / quantity;
-                                  const totalTax = (gstPercentage * selectedQuantity) / quantity;
-                                  const totalPrice = unitPrice * selectedQuantity;
-                                  const gstAmount = (totalPrice * gstPercentage) / 100;
-                                  const finalPrice = totalPrice + totalTax;
+                                {assignment.parts
+                                  .filter(part => part && part.partName && !part.isPreLoaded)
+                                  .map((part, partIndex) => {
+                                    const selectedQuantity = part.selectedQuantity || 1;
+                                    const quantity = part.quantity || 0;
+                                    const unitPrice = part.sellingPrice || 0;
+                                    const gstPercentage = part.taxAmount || 0;
+                                    const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
+                                    const totalTax = (gstPercentage * selectedQuantity) / 100;
+                                    const totalPrice = unitPrice * selectedQuantity;
+                                    const gstAmount = (totalPrice * gstPercentage) / 100;
+                                    const finalPrice = totalPrice + totalTax;
 
-                                  // Get available quantity considering all current selections
-                                  const availableQuantity = getAvailableQuantity(part._id);
+                                    const availableQuantity = getAvailableQuantity(part._id);
+                                    const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                    const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
 
-                                  // Calculate the maximum quantity user can select
-                                  // This is the current available quantity + already selected quantity for this specific part
-                                  const maxSelectableQuantity = availableQuantity + selectedQuantity;
-                                  const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
-
-                                  return (
-                                    <ListItem
-                                      key={part._id}
-                                      sx={{
-                                        border: `1px solid ${theme.palette.divider}`,
-                                        borderRadius: 1,
-                                        mb: 1,
-                                        py: 1,
-                                        flexDirection: 'column',
-                                        alignItems: 'stretch',
-                                        bgcolor: 'background.paper'
-                                      }}
-                                    >
-                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                                        <Box sx={{ flex: 1 }}>
-                                          <Typography variant="body2" fontWeight={500}>
-                                            {part.partName}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                            Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
-                                          </Typography>
-
-                                          <Typography variant="caption" color="info.main" sx={{ display: 'block' }}>
-                                            Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
-                                          </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => {
-                                                const newQuantity = selectedQuantity - 1;
-                                                if (newQuantity >= 1) {
-                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
-                                                }
-                                              }}
-                                              disabled={selectedQuantity <= 1}
+                                    return (
+                                      <ListItem
+                                        key={part._id}
+                                        sx={{
+                                          border: `1px solid ${theme.palette.divider}`,
+                                          borderRadius: 1,
+                                          mb: 1,
+                                          py: 1,
+                                          flexDirection: 'column',
+                                          alignItems: 'stretch',
+                                          bgcolor: 'background.paper'
+                                        }}
+                                      >
+                                        <Box sx={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'flex-start',
+                                          width: '100%',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          gap: { xs: 1, sm: 0 }
+                                        }}>
+                                          <Box sx={{ flex: 1 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                              <Typography
+                                                variant="body2"
+                                                fontWeight={500}
+                                                sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                              >
+                                                {part.partName}
+                                              </Typography>
+                                              <Chip
+                                                label="User Selected"
+                                                size="small"
+                                                color="primary"
+                                                variant="outlined"
+                                                sx={{ fontSize: '0.7rem', height: '20px' }}
+                                              />
+                                            </Box>
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
                                               sx={{
-                                                minWidth: '24px',
-                                                width: '24px',
-                                                height: '24px',
-                                                border: `1px solid ${theme.palette.divider}`
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                               }}
                                             >
-                                              <Typography variant="caption" fontWeight="bold">-</Typography>
-                                            </IconButton>
-                                            <TextField
-                                              size="small"
-                                              type="number"
-                                              label="Qty"
-                                              value={selectedQuantity}
-                                              onChange={(e) => {
-                                                const newQuantity = parseInt(e.target.value) || 1;
-                                                const oldQuantity = selectedQuantity;
+                                              Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                            </Typography>
 
-                                                // Validate quantity limits
-                                                if (newQuantity < 1) {
-                                                  return;
-                                                }
-
-                                                if (newQuantity > maxSelectableQuantity) {
-                                                  setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                                  return;
-                                                }
-
-                                                handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
-                                              }}
-                                              inputProps={{
-                                                min: 1,
-                                                max: maxSelectableQuantity,
-                                                style: { width: '50px', textAlign: 'center' },
-                                                readOnly: isMaxQuantityReached && selectedQuantity === maxSelectableQuantity
-                                              }}
+                                            <Typography
+                                              variant="caption"
+                                              color="primary.main"
                                               sx={{
-                                                width: '70px',
-                                                '& .MuiInputBase-input': {
-                                                  textAlign: 'center',
-                                                  fontSize: '0.875rem'
-                                                }
-                                              }}
-                                              error={availableQuantity === 0}
-                                              disabled={maxSelectableQuantity === 0}
-                                            />
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => {
-                                                const newQuantity = selectedQuantity + 1;
-                                                if (newQuantity <= maxSelectableQuantity) {
-                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
-                                                } else {
-                                                  setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                                }
-                                              }}
-                                              disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
-                                              sx={{
-                                                minWidth: '24px',
-                                                width: '24px',
-                                                height: '24px',
-                                                border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
-                                                color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                               }}
                                             >
-                                              <Typography variant="caption" fontWeight="bold">+</Typography>
+                                              Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                                            </Typography>
+                                          </Box>
+                                          <Box sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                            width: { xs: '100%', sm: 'auto' },
+                                            justifyContent: { xs: 'space-between', sm: 'flex-end' }
+                                          }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  const newQuantity = selectedQuantity - 1;
+                                                  if (newQuantity >= 1) {
+                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                  }
+                                                }}
+                                                disabled={selectedQuantity <= 1}
+                                                sx={{
+                                                  minWidth: '24px',
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  border: `1px solid ${theme.palette.divider}`
+                                                }}
+                                              >
+                                                <Typography variant="caption" fontWeight="bold">-</Typography>
+                                              </IconButton>
+                                              <TextField
+                                                size="small"
+                                                type="number"
+                                                label="Qty"
+                                                value={selectedQuantity}
+                                                onChange={(e) => {
+                                                  const newQuantity = parseInt(e.target.value) || 1;
+                                                  const oldQuantity = selectedQuantity;
+
+                                                  if (newQuantity < 1) {
+                                                    return;
+                                                  }
+
+                                                  if (newQuantity > maxSelectableQuantity) {
+                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                    return;
+                                                  }
+
+                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
+                                                }}
+                                                inputProps={{
+                                                  min: 1,
+                                                  max: maxSelectableQuantity,
+                                                  style: { width: '50px', textAlign: 'center' },
+                                                  readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity)
+                                                }}
+                                                sx={{
+                                                  width: '70px',
+                                                  '& .MuiInputBase-input': {
+                                                    textAlign: 'center',
+                                                    fontSize: '0.875rem'
+                                                  }
+                                                }}
+                                                error={availableQuantity === 0}
+                                                disabled={maxSelectableQuantity === 0}
+                                              />
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  const newQuantity = selectedQuantity + 1;
+                                                  if (newQuantity <= maxSelectableQuantity) {
+                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                  } else {
+                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                  }
+                                                }}
+                                                disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
+                                                sx={{
+                                                  minWidth: '24px',
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                                                  color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                                }}
+                                              >
+                                                <Typography variant="caption" fontWeight="bold">+</Typography>
+                                              </IconButton>
+                                            </Box>
+                                            <IconButton
+                                              size="small"
+                                              color="error"
+                                              onClick={() => {
+                                                handlePartRemoval(assignment.id, partIndex);
+                                              }}
+                                            >
+                                              <DeleteIcon fontSize="small" />
                                             </IconButton>
                                           </Box>
-                                          <IconButton
-                                            size="small"
-                                            color="error"
-                                            onClick={() => handlePartRemoval(assignment.id, partIndex)}
-                                          >
-                                            <DeleteIcon fontSize="small" />
-                                          </IconButton>
                                         </Box>
-                                      </Box>
-                                      {/* Price Details */}
-                                      <Box sx={{
-                                        mt: 1,
-                                        p: 1,
-                                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
-                                        borderRadius: 1
-                                      }}>
-                                        <Grid container spacing={1} alignItems="center">
-                                          <Grid item xs={4}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              Price/Unit: ₹{unitPrice.toFixed(2)}
-                                            </Typography>
+                                        {/* Price Details */}
+                                        <Box sx={{
+                                          mt: 1,
+                                          p: 1,
+                                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                          borderRadius: 1
+                                        }}>
+                                          <Grid container spacing={1} alignItems="center">
+                                            <Grid item xs={12} sm={4}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{
+                                                  fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                                }}
+                                              >
+                                                Price/Unit: ₹{unitPrice.toFixed(2)}
+                                              </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={3}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                              >
+                                                GST: ₹{gst}
+                                              </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                              <Typography
+                                                variant="caption"
+                                                fontWeight={600}
+                                                color="primary"
+                                                sx={{
+                                                  fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                                }}
+                                              >
+                                                Total: ₹{finalPrice.toFixed(2)}
+                                              </Typography>
+                                            </Grid>
                                           </Grid>
-                                          <Grid item xs={3}>
-                                            <Typography variant="caption" color="text.secondary">
-                                              GST: ₹{gst}
-                                            </Typography>
-                                          </Grid>
-                                          <Grid item xs={5}>
-                                            <Typography variant="caption" fontWeight={600} color="primary">
-                                              Total: ₹{finalPrice.toFixed(2)}
-                                            </Typography>
-                                          </Grid>
-                                        </Grid>
-                                      </Box>
-                                    </ListItem>
-                                  );
-                                })}
+                                        </Box>
+                                      </ListItem>
+                                    );
+                                  })}
                               </List>
-                              {/* Total Summary */}
-                              {(() => {
-                                const grandTotal = assignment.parts.reduce((total, part) => {
-                                  const selectedQuantity = part.selectedQuantity || 1;
-                                  const unitPrice = part.pricePerUnit || 0;
-                                  const gstPercentage = part.gstPercentage || part.taxAmount || 0;
-                                  const totalPrice = unitPrice * selectedQuantity;
-                                  const gstAmount = (totalPrice * gstPercentage) / 100;
-                                  return total + totalPrice + gstAmount;
-                                }, 0);
-                                return (
-                                  // <Box sx={{ mt: 1, p: 1, backgroundColor: 'primary.main', borderRadius: 1 }}>
-                                  //   <Typography variant="subtitle2" fontWeight={600} color="primary.contrastText">
-                                  //     Assignment Parts Total: ₹{grandTotal.toFixed(2)}
-                                  //   </Typography>
-                                  // </Box>
-                                  <></>
-                                );
-                              })()}
                             </Box>
                           )}
+
+                          {/* Pre-loaded Parts from Job Card - Display Second */}
+                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
+                            <Box sx={{ mt: 2 }}>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{
+                                  mb: 1,
+                                  fontWeight: 600,
+                                  fontSize: { xs: '0.9rem', sm: '1rem' },
+                                  color: 'info.main'
+                                }}
+                              >
+                                📋 Pre-loaded Parts from Job Card:
+                              </Typography>
+                              <Alert
+                                severity="info"
+                                sx={{ mb: 2 }}
+                                icon={<InventoryIcon />}
+                              >
+                                <Typography variant="body2">
+                                  These parts were pre-loaded from the job card and will be automatically included in the work progress update.
+                                </Typography>
+                              </Alert>
+                              <List dense>
+                                {assignment.parts
+                                  .filter(part => part && part.partName && part.isPreLoaded)
+                                  .map((part, partIndex) => {
+                                    const selectedQuantity = part.selectedQuantity || 1;
+                                    const quantity = part.quantity || 0;
+                                    const unitPrice = part.sellingPrice || 0;
+                                    const gstPercentage = part.taxAmount || 0;
+                                    const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
+                                    const totalTax = (gstPercentage * selectedQuantity) / 100;
+                                    const totalPrice = unitPrice * selectedQuantity;
+                                    const gstAmount = (totalPrice * gstPercentage) / 100;
+                                    const finalPrice = totalPrice + totalTax;
+
+                                    const availableQuantity = getAvailableQuantity(part._id);
+                                    const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                    const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
+
+                                    return (
+                                      <ListItem
+                                        key={part._id}
+                                        sx={{
+                                          border: `1px solid ${theme.palette.divider}`,
+                                          borderRadius: 1,
+                                          mb: 1,
+                                          py: 1,
+                                          flexDirection: 'column',
+                                          alignItems: 'stretch',
+                                          bgcolor: 'background.paper'
+                                        }}
+                                      >
+                                        <Box sx={{
+                                          display: 'flex',
+                                          justifyContent: 'space-between',
+                                          alignItems: 'flex-start',
+                                          width: '100%',
+                                          flexDirection: { xs: 'column', sm: 'row' },
+                                          gap: { xs: 1, sm: 0 }
+                                        }}>
+                                          <Box sx={{ flex: 1 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                              <Typography
+                                                variant="body2"
+                                                fontWeight={500}
+                                                sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                              >
+                                                {part.partName}
+                                              </Typography>
+                                              {part.isPreLoaded && (
+                                                <Chip
+                                                  label="From Job Card"
+                                                  size="small"
+                                                  color="info"
+                                                  variant="outlined"
+                                                  sx={{ fontSize: '0.7rem', height: '20px' }}
+                                                />
+                                              )}
+                                            </Box>
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                              sx={{
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                              }}
+                                            >
+                                              Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                            </Typography>
+
+                                            <Typography
+                                              variant="caption"
+                                              color="info.main"
+                                              sx={{
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                              }}
+                                            >
+                                              {part.isPreLoaded ? (
+                                                `Quantity: ${selectedQuantity} (Fixed from Job Card)`
+                                              ) : (
+                                                `Max Selectable: ${maxSelectableQuantity} | Selected: ${selectedQuantity}`
+                                              )}
+                                            </Typography>
+                                          </Box>
+                                          <Box sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                            width: { xs: '100%', sm: 'auto' },
+                                            justifyContent: { xs: 'space-between', sm: 'flex-end' }
+                                          }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  if (part.isPreLoaded) return;
+                                                  const newQuantity = selectedQuantity - 1;
+                                                  if (newQuantity >= 1) {
+                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                  }
+                                                }}
+                                                disabled={selectedQuantity <= 1 || part.isPreLoaded}
+                                                sx={{
+                                                  minWidth: '24px',
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  border: `1px solid ${theme.palette.divider}`
+                                                }}
+                                              >
+                                                <Typography variant="caption" fontWeight="bold">-</Typography>
+                                              </IconButton>
+                                              <TextField
+                                                size="small"
+                                                type="number"
+                                                label="Qty"
+                                                value={selectedQuantity}
+                                                onChange={(e) => {
+                                                  if (part.isPreLoaded) return;
+                                                  const newQuantity = parseInt(e.target.value) || 1;
+                                                  const oldQuantity = selectedQuantity;
+
+                                                  if (newQuantity < 1) {
+                                                    return;
+                                                  }
+
+                                                  if (newQuantity > maxSelectableQuantity) {
+                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                    return;
+                                                  }
+
+                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
+                                                }}
+                                                inputProps={{
+                                                  min: 1,
+                                                  max: maxSelectableQuantity,
+                                                  style: { width: '50px', textAlign: 'center' },
+                                                  readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity) || part.isPreLoaded
+                                                }}
+                                                sx={{
+                                                  width: '70px',
+                                                  '& .MuiInputBase-input': {
+                                                    textAlign: 'center',
+                                                    fontSize: '0.875rem'
+                                                  }
+                                                }}
+                                                error={availableQuantity === 0}
+                                                disabled={maxSelectableQuantity === 0 || part.isPreLoaded}
+                                              />
+                                              <IconButton
+                                                size="small"
+                                                onClick={() => {
+                                                  if (part.isPreLoaded) return;
+                                                  const newQuantity = selectedQuantity + 1;
+                                                  if (newQuantity <= maxSelectableQuantity) {
+                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                  } else {
+                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                  }
+                                                }}
+                                                disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0 || part.isPreLoaded}
+                                                sx={{
+                                                  minWidth: '24px',
+                                                  width: '24px',
+                                                  height: '24px',
+                                                  border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                                                  color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                                }}
+                                              >
+                                                <Typography variant="caption" fontWeight="bold">+</Typography>
+                                              </IconButton>
+                                            </Box>
+                                            <IconButton
+                                              size="small"
+                                              color="error"
+                                              onClick={() => {
+                                                if (part.isPreLoaded) {
+                                                  setError("Pre-loaded parts from job card cannot be removed.");
+                                                  return;
+                                                }
+                                                handlePartRemoval(assignment.id, partIndex);
+                                              }}
+                                              disabled={part.isPreLoaded}
+                                            >
+                                              <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                          </Box>
+                                        </Box>
+                                        {/* Price Details */}
+                                        <Box sx={{
+                                          mt: 1,
+                                          p: 1,
+                                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                          borderRadius: 1
+                                        }}>
+                                          <Grid container spacing={1} alignItems="center">
+                                            <Grid item xs={12} sm={4}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{
+                                                  fontStyle: part.isPreLoaded ? 'italic' : 'normal',
+                                                  color: part.isPreLoaded ? 'text.disabled' : 'text.secondary',
+                                                  fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                                }}
+                                              >
+                                                Price/Unit: ₹{unitPrice.toFixed(2)}
+                                                {part.isPreLoaded && ' (Fixed)'}
+                                              </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={3}>
+                                              <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                              >
+                                                GST: ₹{gst}
+                                              </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={5}>
+                                              <Typography
+                                                variant="caption"
+                                                fontWeight={600}
+                                                color="primary"
+                                                sx={{
+                                                  fontStyle: part.isPreLoaded ? 'italic' : 'normal',
+                                                  color: part.isPreLoaded ? 'text.disabled' : 'primary',
+                                                  fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                                }}
+                                              >
+                                                Total: ₹{finalPrice.toFixed(2)}
+                                                {part.isPreLoaded && ' (Fixed)'}
+                                              </Typography>
+                                            </Grid>
+                                          </Grid>
+                                        </Box>
+                                      </ListItem>
+                                    );
+                                  })}
+                              </List>
+                            </Box>
+                          )}
+                          <List dense>
+                            {assignment.parts
+                              .filter(part => part && part.partName && !part.isPreLoaded)
+                              .map((part, partIndex) => {
+                                const selectedQuantity = part.selectedQuantity || 1;
+                                const quantity = part.quantity || 0;
+                                const unitPrice = part.sellingPrice || 0;
+                                const gstPercentage = part.taxAmount || 0;
+                                const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
+                                const totalTax = (gstPercentage * selectedQuantity) / 100;
+                                const totalPrice = unitPrice * selectedQuantity;
+                                const gstAmount = (totalPrice * gstPercentage) / 100;
+                                const finalPrice = totalPrice + totalTax;
+
+                                const availableQuantity = getAvailableQuantity(part._id);
+                                const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
+
+                                return (
+                                  <ListItem
+                                    key={part._id}
+                                    sx={{
+                                      border: `1px solid ${theme.palette.divider}`,
+                                      borderRadius: 1,
+                                      mb: 1,
+                                      py: 1,
+                                      flexDirection: 'column',
+                                      alignItems: 'stretch',
+                                      bgcolor: 'background.paper'
+                                    }}
+                                  >
+                                    <Box sx={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'flex-start',
+                                      width: '100%',
+                                      flexDirection: { xs: 'column', sm: 'row' },
+                                      gap: { xs: 1, sm: 0 }
+                                    }}>
+                                      <Box sx={{ flex: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight={500}
+                                            sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                          >
+                                            {part.partName}
+                                          </Typography>
+                                          <Chip
+                                            label="User Selected"
+                                            size="small"
+                                            color="primary"
+                                            variant="outlined"
+                                            sx={{ fontSize: '0.7rem', height: '20px' }}
+                                          />
+                                        </Box>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{
+                                            display: 'block',
+                                            fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                          }}
+                                        >
+                                          Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                        </Typography>
+
+                                        <Typography
+                                          variant="caption"
+                                          color="primary.main"
+                                          sx={{
+                                            display: 'block',
+                                            fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                          }}
+                                        >
+                                          Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                                        </Typography>
+                                      </Box>
+                                      <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        width: { xs: '100%', sm: 'auto' },
+                                        justifyContent: { xs: 'space-between', sm: 'flex-end' }
+                                      }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                              const newQuantity = selectedQuantity - 1;
+                                              if (newQuantity >= 1) {
+                                                handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                              }
+                                            }}
+                                            disabled={selectedQuantity <= 1}
+                                            sx={{
+                                              minWidth: '24px',
+                                              width: '24px',
+                                              height: '24px',
+                                              border: `1px solid ${theme.palette.divider}`
+                                            }}
+                                          >
+                                            <Typography variant="caption" fontWeight="bold">-</Typography>
+                                          </IconButton>
+                                          <TextField
+                                            size="small"
+                                            type="number"
+                                            label="Qty"
+                                            value={selectedQuantity}
+                                            onChange={(e) => {
+                                              const newQuantity = parseInt(e.target.value) || 1;
+                                              const oldQuantity = selectedQuantity;
+
+                                              if (newQuantity < 1) {
+                                                return;
+                                              }
+
+                                              if (newQuantity > maxSelectableQuantity) {
+                                                setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                return;
+                                              }
+
+                                              handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
+                                            }}
+                                            inputProps={{
+                                              min: 1,
+                                              max: maxSelectableQuantity,
+                                              style: { width: '50px', textAlign: 'center' },
+                                              readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity)
+                                            }}
+                                            sx={{
+                                              width: '70px',
+                                              '& .MuiInputBase-input': {
+                                                textAlign: 'center',
+                                                fontSize: '0.875rem'
+                                              }
+                                            }}
+                                            error={availableQuantity === 0}
+                                            disabled={maxSelectableQuantity === 0}
+                                          />
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                              const newQuantity = selectedQuantity + 1;
+                                              if (newQuantity <= maxSelectableQuantity) {
+                                                handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                              } else {
+                                                setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                              }
+                                            }}
+                                            disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
+                                            sx={{
+                                              minWidth: '24px',
+                                              width: '24px',
+                                              height: '24px',
+                                              border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                                              color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                            }}
+                                          >
+                                            <Typography variant="caption" fontWeight="bold">+</Typography>
+                                          </IconButton>
+                                        </Box>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() => {
+                                            handlePartRemoval(assignment.id, partIndex);
+                                          }}
+                                        >
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      </Box>
+                                    </Box>
+                                    {/* Price Details */}
+                                    <Box sx={{
+                                      mt: 1,
+                                      p: 1,
+                                      backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                      borderRadius: 1
+                                    }}>
+                                      <Grid container spacing={1} alignItems="center">
+                                        <Grid item xs={12} sm={4}>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{
+                                              fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                            }}
+                                          >
+                                            Price/Unit: ₹{unitPrice.toFixed(2)}
+                                          </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={3}>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                          >
+                                            GST: ₹{gst}
+                                          </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={5}>
+                                          <Typography
+                                            variant="caption"
+                                            fontWeight={600}
+                                            color="primary"
+                                            sx={{
+                                              fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                            }}
+                                          >
+                                            Total: ₹{finalPrice.toFixed(2)}
+                                          </Typography>
+                                        </Grid>
+                                      </Grid>
+                                    </Box>
+                                  </ListItem>
+                                );
+                              })}
+                          </List>
                         </Grid>
-                      </Grid>
+                      </Grid>  {/* ✅ Closing missing Grid container */} 
                     </AccordionDetails>
                   </Accordion>
                 ))}
 
-                {/* Submit Button */}
+                {/* Final Summary Before Submission */}
+                {(() => {
+                  const allParts = getAllPartsForAPI();
+                  const preLoadedParts = allParts.filter(part => part.isPreLoaded);
+                  const userSelectedParts = allParts.filter(part => !part.isPreLoaded);
+
+                  console.log('📊 Final Summary Debug:', {
+                    allParts: allParts.length,
+                    preLoadedParts: preLoadedParts.length,
+                    userSelectedParts: userSelectedParts.length,
+                    preLoadedDetails: preLoadedParts.map(p => p.partName),
+                    userSelectedDetails: userSelectedParts.map(p => p.partName)
+                  });
+
+                  // if (allParts.length > 0) {
+                  //   return (
+                  //     <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 2 }}>
+                  //       <Typography
+                  //         variant="h6"
+                  //         sx={{
+                  //           mb: 2,
+                  //           fontWeight: 600,
+                  //           fontSize: { xs: '1rem', sm: '1.1rem' }
+                  //         }}
+                  //       >
+                  //         📋 Final Parts Summary for Work Progress API:
+                  //       </Typography>
+
+                  //       {/* User Selected Parts Summary - Display First */}
+                  //       {userSelectedParts.length > 0 && (
+                  //         <Box sx={{ mb: 2 }}>
+                  //           <Typography
+                  //             variant="subtitle1"
+                  //             sx={{
+                  //               mb: 1,
+                  //               fontWeight: 600,
+                  //               fontSize: { xs: '0.9rem', sm: '1rem' },
+                  //               color: 'primary.main'
+                  //             }}
+                  //           >
+                  //             🔧 User Selected Parts ({userSelectedParts.length}):
+                  //           </Typography>
+                  //           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                  //             {userSelectedParts.map((part, index) => (
+                  //               <Chip
+                  //                 key={index}
+                  //                 label={`${part.partName} (Qty: ${part.quantity})`}
+                  //                 color="primary"
+                  //                 variant="outlined"
+                  //                 size="small"
+                  //               />
+                  //             ))}
+                  //           </Box>
+                  //         </Box>
+                  //       )}
+
+                  //       {/* Pre-loaded Parts Summary - Display Second */}
+                  //       {preLoadedParts.length > 0 && (
+                  //         <Box sx={{ mb: 2 }}>
+                  //           <Typography
+                  //             variant="subtitle1"
+                  //             sx={{
+                  //               mb: 1,
+                  //               fontWeight: 600,
+                  //               fontSize: { xs: '0.9rem', sm: '1rem' },
+                  //               color: 'info.main'
+                  //             }}
+                  //           >
+                  //             📋 Pre-loaded Parts from Job Card ({preLoadedParts.length}):
+                  //           </Typography>
+                  //           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                  //             {preLoadedParts.map((part, index) => (
+                  //               <Chip
+                  //                 key={index}
+                  //                 label={`${part.partName} (Qty: ${part.quantity})`}
+                  //                 color="info"
+                  //                 variant="outlined"
+                  //                 size="small"
+                  //               />
+                  //             ))}
+                  //           </Box>
+                  //         </Box>
+                  //       )}
+
+                  //       <Alert
+                  //         severity="info"
+                  //         sx={{ mt: 2 }}
+                  //         icon={<SendIcon />}
+                  //       >
+                  //         <Typography variant="body2">
+                  //           <strong>Total {allParts.length} parts</strong> will be sent to the <code>/workprogress</code> API endpoint, including both pre-loaded parts from the job card and newly selected parts.
+                  //         </Typography>
+                  //       </Alert>
+                  //     </Box>
+                  //   );
+                  // }
+                  return null;
+                })()}
+
+                {/* Submit Button - FIXED */}
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
                   <Button
                     type="submit"
@@ -2069,90 +3308,136 @@ const AssignEngineer = () => {
                     size="large"
                     startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                     disabled={isSubmitting || isLoading}
-                    sx={{ px: 6, py: 1.5, textTransform: 'uppercase' }}
+                    sx={{
+                      px: { xs: 4, sm: 6 },
+                      py: 1.5,
+                      textTransform: 'uppercase',
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                      width: { xs: '100%', sm: 'auto' }
+                    }}
                   >
-                  
+                    {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}
                   </Button>
-    {isSubmitting ? 'Assigning...' : 'Assign Engineer & Update Job Card'}              </Box>
+                </Box>
               </form>
             </CardContent>
           </Card>
         </Container>
 
         {/* Enhanced Add Part Dialog - Based on InventoryManagement */}
-        <Dialog open={openAddPartDialog} onClose={handleCloseAddPartDialog} maxWidth="sm" fullWidth fullScreen={{ xs: true, sm: false }}>
+        <Dialog
+          open={openAddPartDialog}
+          onClose={handleCloseAddPartDialog}
+          maxWidth="sm"
+          fullWidth
+          fullScreen={{ xs: true, sm: false }}
+        >
           <DialogTitle>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="h6">Add New Part</Typography>
               <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
             </Box>
           </DialogTitle>
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
             {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
             {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
 
-            <Grid container spacing={2}>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+            <Grid container spacing={{ xs: 1, sm: 2 }}>
+              <Grid item xs={12}>
                 <TextField
-                  label="Car Name *" name="carName"
-                  value={newPart.carName} onChange={handlePartInputChange}
-                  required fullWidth margin="normal"
+                  label="Car Name *"
+                  name="carName"
+                  value={newPart.carName}
+                  onChange={handlePartInputChange}
+                  required
+                  fullWidth
+                  margin="normal"
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12}>
                 <TextField
-                  label="Model *" name="model"
-                  value={newPart.model} onChange={handlePartInputChange}
-                  required fullWidth margin="normal"
+                  label="Model *"
+                  name="model"
+                  value={newPart.model}
+                  onChange={handlePartInputChange}
+                  required
+                  fullWidth
+                  margin="normal"
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12}>
                 <TextField
-                  label="Part Number *" name="partNumber"
-                  value={newPart.partNumber} onChange={handlePartInputChange}
-                  required fullWidth margin="normal"
+                  label="Part Number *"
+                  name="partNumber"
+                  value={newPart.partNumber}
+                  onChange={handlePartInputChange}
+                  required
+                  fullWidth
+                  margin="normal"
                   error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
                   helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12}>
                 <TextField
-                  label="Part Name *" name="partName"
-                  value={newPart.partName} onChange={handlePartInputChange}
-                  required fullWidth margin="normal"
+                  label="Part Name *"
+                  name="partName"
+                  value={newPart.partName}
+                  onChange={handlePartInputChange}
+                  required
+                  fullWidth
+                  margin="normal"
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Quantity *" name="quantity"
-                  type="number" value={newPart.quantity}
+                  label="Quantity *"
+                  name="quantity"
+                  type="number"
+                  value={newPart.quantity}
                   onChange={handlePartInputChange}
-                  required fullWidth margin="normal" inputProps={{ min: 1 }}
+                  required
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 1 }}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Purchase Price *" name="purchasePrice"
-                  type="number" value={newPart.purchasePrice}
+                  label="Purchase Price *"
+                  name="purchasePrice"
+                  type="number"
+                  value={newPart.purchasePrice}
                   onChange={handlePartInputChange}
-                  required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                  required
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 0, step: 0.01 }}
                   InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label="Selling Price *" name="sellingPrice"
-                  type="number" value={newPart.sellingPrice}
+                  label="Selling Price *"
+                  name="sellingPrice"
+                  type="number"
+                  value={newPart.sellingPrice}
                   onChange={handlePartInputChange}
-                  required fullWidth margin="normal" inputProps={{ min: 0, step: 0.01 }}
+                  required
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 0, step: 0.01 }}
                   InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label="HSN Number" name="hsnNumber"
-                  value={newPart.hsnNumber} onChange={handlePartInputChange}
-                  fullWidth margin="normal"
+                  label="HSN Number"
+                  name="hsnNumber"
+                  value={newPart.hsnNumber}
+                  onChange={handlePartInputChange}
+                  fullWidth
+                  margin="normal"
                 />
               </Grid>
             </Grid>
@@ -2174,18 +3459,26 @@ const AssignEngineer = () => {
 
               {newPart.taxType === 'igst' ? (
                 <TextField
-                  label="IGST (%)" name="igst"
-                  type="number" value={newPart.igst}
+                  label="IGST (%)"
+                  name="igst"
+                  type="number"
+                  value={newPart.igst}
                   onChange={handlePartInputChange}
-                  fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
                   InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
                 />
               ) : (
                 <TextField
-                  label="CGST/SGST (each %)" name="cgstSgst"
-                  type="number" value={newPart.cgstSgst}
+                  label="CGST/SGST (each %)"
+                  name="cgstSgst"
+                  type="number"
+                  value={newPart.cgstSgst}
                   onChange={handlePartInputChange}
-                  fullWidth margin="normal" inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  fullWidth
+                  margin="normal"
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
                   InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
                 />
               )}
@@ -2207,13 +3500,15 @@ const AssignEngineer = () => {
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Typography variant="h6">Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}</Typography>
+                    <Typography variant="h6">
+                      Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}
+                    </Typography>
                   </Grid>
                 </Grid>
               </Box>
             )}
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
             <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
             <Button
               onClick={handleAddPart}
@@ -2233,12 +3528,13 @@ const AssignEngineer = () => {
           onClose={handleCloseAddEngineerDialog}
           maxWidth="sm"
           fullWidth
+          fullScreen={{ xs: true, sm: false }}
           PaperProps={{
             sx: { bgcolor: 'background.paper' }
           }}
         >
           <DialogTitle>Add New Engineer</DialogTitle>
-          <DialogContent>
+          <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
             {engineerAddSuccess && (
               <Alert severity="success" sx={{ mb: 2 }}>
                 Engineer added successfully!
@@ -2250,7 +3546,7 @@ const AssignEngineer = () => {
               </Alert>
             )}
 
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid container spacing={{ xs: 1, sm: 2 }} sx={{ mt: 1 }}>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -2260,7 +3556,7 @@ const AssignEngineer = () => {
                   error={!newEngineer.name.trim() && !!engineerAddError}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Email *"
@@ -2270,7 +3566,7 @@ const AssignEngineer = () => {
                   error={!newEngineer.email.trim() && !!engineerAddError}
                 />
               </Grid>
-              <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Phone *"
@@ -2294,10 +3590,11 @@ const AssignEngineer = () => {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
             <Button
               onClick={handleCloseAddEngineerDialog}
               disabled={addingEngineer}
+              sx={{ flex: { xs: 1, sm: 'none' } }}
             >
               Cancel
             </Button>
@@ -2306,6 +3603,7 @@ const AssignEngineer = () => {
               disabled={addingEngineer}
               variant="contained"
               startIcon={addingEngineer ? <CircularProgress size={16} color="inherit" /> : null}
+              sx={{ flex: { xs: 1, sm: 'none' } }}
             >
               {addingEngineer ? 'Adding...' : 'Add Engineer'}
             </Button>

@@ -581,7 +581,7 @@ const LoginPage = () => {
                   }
                 }}
               >
-                ✅ You are successfully logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Customer'}. 
+                ✅ You are successfully logged in as {currentUser?.userType === 'garage' ? 'Garage Owner' : 'Sub Account '}. 
                 Use the logout button above to switch accounts.
               </Alert>
             )}
@@ -808,7 +808,7 @@ const LoginPage = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {isGarageLogin ? <DirectionsCar /> : <AccountCircle />}
                       <Typography variant="body1" fontWeight={500}>
-                        {isGarageLogin ? 'Garage Owner' : 'Customer'}
+                        {isGarageLogin ? 'Garage Owner' : 'Sub Account '}
                       </Typography>
                     </Box>
                   }

@@ -1141,13 +1141,13 @@ const JobCards = () => {
     }
 
     // Reset fuel level if fuelType is CNG or LPG
-    if (name === "fuelType") {
-      if (value === "cng" || value === "lpg") {
-        setFuelLevel(null); // Or keep it undefined
-      } else {
-        setFuelLevel(2); // Default to Low
-      }
-    }
+    // if (name === "fuelType") {
+    //   if (value === "cng" || value === "lpg") {
+    //     setFuelLevel(null); 
+    //   } else {
+    //     setFuelLevel(2); // Default to Low
+    //   }
+    // }
 
     // Update form data
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
@@ -1817,8 +1817,7 @@ const JobCards = () => {
             </CardContent>
           </PreviewCard>
 
-          {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
-          {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
+
             <PreviewCard>
               <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                 <Typography
@@ -1854,7 +1853,7 @@ const JobCards = () => {
                 </Box>
               </CardContent>
             </PreviewCard>
-          )}
+     
 
           {/* Insurance Details */}
           {(formData.insuranceProvider ||
@@ -2442,7 +2441,7 @@ const JobCards = () => {
               </Box>
 
               {/* Fuel Level - Only shown if fuelType is not CNG or LPG */}
-              {formData.fuelType !== "cng" && formData.fuelType !== "lpg" && (
+
                 <Box sx={{ mb: 4 }}>
                   <Typography 
                     variant="h6" 
@@ -2492,7 +2491,7 @@ const JobCards = () => {
                     </Grid>
                   </Paper>
                 </Box>
-              )}
+         
 
               {/* Insurance Details */}
               <Box sx={{ mb: 4 }}>

@@ -106,7 +106,9 @@ const UserManagement = () => {
     { value: 'Reports & Records', label: 'Reports & Records', color: '#9c27b0' },
     { value: 'Service Reminders', label: 'Service Reminders', color: '#00bcd4' },
     { value: 'Insurance', label: 'Insurance', color: '#795548' },
-    { value: 'Add Engineer', label: 'Add Engineer', color: '#e91e63' }
+    { value: 'Add Engineer', label: 'Add Engineer', color: '#e91e63' },
+    { value: 'History', label: 'History', color: '#3f51b5' },
+    { value: 'User List', label: 'User List', color: '#009688' }
   ];
 
   // Effects
