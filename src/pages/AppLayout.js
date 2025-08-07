@@ -70,11 +70,17 @@ const AppLayout = () => {
     { text: "Dashboard", icon: <DashboardIcon />, path: "/" },
     { text: "Create Job Cards", icon: <CarIcon />, path: "/jobs" },
     { text: "Manage Inventory", icon: <InventoryIcon />, path: "/inventory" },
+      {
+          text: "Add Engineer",
+          icon: <InventoryIcon />,
+          path: "/add-Engineer",
+          permission: "Add Engineer",
+        },
     { text: "History", icon: <InventoryIcon />, path: "/history" },
     { text: "Reports & Records", icon: <AssignmentIcon />, path: "/reports" },
     { text: "Service Reminders", icon: <NotificationsIcon />, path: "/reminders" },
     { text: "Insurance", icon: <BuildIcon />, path: "/insurance" },
-    { text: "User List", icon: <BuildIcon />, path: "/UserManagemt" },
+    { text: "User List", icon: <PersonIcon />, path: "/UserManagemt" },
   ];
 
   // Debug function to log navigation attempts
