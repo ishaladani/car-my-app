@@ -96,6 +96,36 @@ const RecordReport = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Calculate total amount for a job
+  const calculateJobTotal = (job) => {
+    let total = 0;
+    
+    // Add parts cost
+    if (job.partsUsed && Array.isArray(job.partsUsed)) {
+      total += job.partsUsed.reduce((sum, part) => {
+        return sum + (part.totalPrice || 0);
+      }, 0);
+    }
+    
+    // Add labor services
+    total += (job.laborServicesTotal || 0);
+    total += (job.laborServicesTax || 0);
+    total += (job.excessAmount || 0);
+    
+    return total;
+  };
+
+  // Enhanced job data processing
+  const processJobData = (rawJobs) => {
+    return rawJobs.map(job => ({
+      ...job,
+      totalAmount: calculateJobTotal(job),
+      completedAt: job.updatedAt, // Use updatedAt as completedAt
+      // Normalize status (handle both "completed" and "Completed")
+      normalizedStatus: job.status?.toLowerCase() === 'completed'
+    }));
+  };
+
   // Sort data by completed date (most recent first)
   const sortJobsByCompletedDate = (jobs) => {
     return jobs.sort((a, b) => {
@@ -125,73 +155,84 @@ const RecordReport = () => {
   };
 
   const formatCurrencyForPDF = (amount) => {
-  const number = amount || 0;
-  const formattedNumber = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  })
-    .format(number)
-    .replace("₹", "Rs "); // Replace ₹ with Rs
-  return formattedNumber;
-};
-
-  // Generate PDF for jobs
-  const generateJobsPDF = (jobs) => {
-  const doc = new jsPDF();
-
-  const formatCurrencyForPDF = (amount) => {
     const number = amount || 0;
-    return new Intl.NumberFormat("en-IN", {
+    const formattedNumber = new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
     })
       .format(number)
-      .replace("₹", "Rs ");
+      .replace("₹", "Rs "); // Replace ₹ with Rs
+    return formattedNumber;
   };
 
-  // Title
-  doc.setFontSize(20);
-  doc.text("Financial Report - Completed Jobs", 20, 20);
-  doc.setFontSize(12);
-  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+  // Generate PDF for jobs
+  const generateJobsPDF = (jobs) => {
+    const doc = new jsPDF();
 
-  // Summary
-  const totalJobs = jobs.length;
-  const totalAmount = jobs.reduce((sum, job) => sum + (job.totalAmount || 0), 0);
+    const formatCurrencyForPDF = (amount) => {
+      const number = amount || 0;
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+      })
+        .format(number)
+        .replace("₹", "Rs ");
+    };
 
-  doc.setFontSize(14);
-  doc.text("Summary:", 20, 45);
-  doc.setFontSize(12);
-  doc.text(`Total Jobs: ${totalJobs}`, 20, 55);
-  doc.text(`Total Revenue: ${formatCurrencyForPDF(totalAmount)}`, 20, 65);
+    // Title
+    doc.setFontSize(20);
+    doc.text("Financial Report - Completed Jobs", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
 
-  // Table
-  const tableData = jobs.map((job) => [
-    job.jobId || "N/A",
-    job.customerName || "N/A",
-    job.carNumber || "N/A",
-    formatCurrencyForPDF(job.totalAmount || 0),
-    new Date(job.completedAt || job.updatedAt).toLocaleDateString("en-IN"),
-  ]);
+    // Summary
+    const totalJobs = jobs.length;
+    const totalAmount = jobs.reduce((sum, job) => sum + (job.totalAmount || 0), 0);
 
-  autoTable(doc, {
-    head: [["Job ID", "Customer", "Vehicle", "Amount", "Completed Date"]],
-    body: tableData,
-    startY: 80,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [25, 118, 210] },
-  });
+    doc.setFontSize(14);
+    doc.text("Summary:", 20, 45);
+    doc.setFontSize(12);
+    doc.text(`Total Jobs: ${totalJobs}`, 20, 55);
+    doc.text(`Total Revenue: ${formatCurrencyForPDF(totalAmount)}`, 20, 65);
 
-  doc.save(`financial-report-${new Date().toISOString().split("T")[0]}.pdf`);
-};
+    // Table
+    const tableData = jobs.map((job) => [
+      job.jobId || "N/A",
+      job.customerName || "N/A",
+      job.carNumber || job.registrationNumber || "N/A",
+      formatCurrencyForPDF(job.totalAmount || 0),
+      new Date(job.completedAt || job.updatedAt).toLocaleDateString("en-IN"),
+    ]);
 
+    autoTable(doc, {
+      head: [["Job ID", "Customer", "Vehicle", "Amount", "Completed Date"]],
+      body: tableData,
+      startY: 80,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [25, 118, 210] },
+    });
+
+    doc.save(`financial-report-${new Date().toISOString().split("T")[0]}.pdf`);
+  };
 
 const generateInventoryPDF = (inventoryData) => {
   if (!inventoryData) return;
 
   const doc = new jsPDF();
+  
+  // Enhanced color scheme
+  const colors = {
+    primary: [41, 128, 185],      // Professional blue
+    secondary: [52, 73, 94],      // Dark gray
+    accent: [230, 126, 34],       // Orange
+    success: [39, 174, 96],       // Green
+    danger: [231, 76, 60],        // Red
+    light: [236, 240, 241],       // Light gray
+    white: [255, 255, 255]
+  };
+
   const formatCurrencyForPDF = (amount) => {
     const number = amount || 0;
     return new Intl.NumberFormat("en-IN", {
@@ -203,76 +244,264 @@ const generateInventoryPDF = (inventoryData) => {
       .replace("₹", "Rs ");
   };
 
-  // Title
-  doc.setFontSize(20);
-  doc.text("Inventory Report", 20, 20);
-  doc.setFontSize(12);
-  doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+  // Helper function to add header
+  const addHeader = () => {
+    // Background header
+    doc.setFillColor(...colors.primary);
+    doc.rect(0, 0, 210, 35, 'F');
+    
+    // Title
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont(undefined, 'bold');
+    doc.text("INVENTORY REPORT", 20, 20);
+    
+    // Date
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}`, 20, 28);
+    
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+  };
 
-  // Summary
+  // Helper function to add footer
+  const addFooter = (pageNum) => {
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Page ${pageNum}`, 20, pageHeight - 10);
+    doc.text(`Generated by Inventory Management System`, 105, pageHeight - 10, { align: 'center' });
+  };
+
+  // Start with header
+  addHeader();
+  
   const summary = inventoryData?.summary || {};
   let yPos = 45;
 
-  doc.setFontSize(14);
-  doc.text("Summary:", 20, yPos);
-  yPos += 12;
+  // Enhanced Summary Section with Cards Layout
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...colors.secondary);
+  doc.text("Executive Summary", 20, yPos);
+  yPos += 5;
 
-  doc.setFontSize(12);
-  doc.text(`Total Parts: ${summary.totalParts}`, 20, yPos);
-  yPos += 10;
+  // Add underline
+  doc.setDrawColor(...colors.primary);
+  doc.setLineWidth(0.5);
+  doc.line(20, yPos, 70, yPos);
+  yPos += 15;
 
-  doc.text(`Total Available: ${summary.totalPartsAvailable}`, 20, yPos);
-  yPos += 10;
+  // Helper function to create a summary card
+  const createSummaryCard = (x, y, width, height, title, value, bgColor) => {
+    // Card background
+    doc.setFillColor(...bgColor);
+    doc.roundedRect(x, y, width, height, 2, 2, 'F');
+    
+    // Card border
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(x, y, width, height, 2, 2, 'S');
+    
+    // Title
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(title, x + 4, y + 6);
+    
+    // Value
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(value.toString(), x + 4, y + height - 4);
+  };
 
-  doc.text(
-    `Purchase Value: ${formatCurrencyForPDF(summary.totalPurchaseValue)}`,
-    20,
-    yPos
-  );
-  yPos += 10;
+  // Card dimensions
+  const cardWidth = 54;
+  const cardHeight = 20;
+  const cardSpacing = 2;
+  const startX = 20;
 
-  doc.text(
-    `Selling Value: ${formatCurrencyForPDF(summary.totalSellingValue)}`,
-    20,
-    yPos
-  );
-  yPos += 10;
+  // Row 1 - Main metrics
+  createSummaryCard(startX, yPos, cardWidth, cardHeight, 
+    'Total Parts', summary.totalParts || 0, [240, 248, 255]);
+  
+  createSummaryCard(startX + cardWidth + cardSpacing, yPos, cardWidth, cardHeight, 
+    'Available Quantity', summary.totalPartsAvailable || 0, [240, 255, 240]);
+  
+  createSummaryCard(startX + (cardWidth + cardSpacing) * 2, yPos, cardWidth, cardHeight, 
+    'Low Stock Items', summary.lowStockCount || 0, [255, 240, 240]);
 
-  doc.text(
-    `Potential Profit: ${formatCurrencyForPDF(summary.potentialProfit)}`,
-    20,
-    yPos
-  );
-  yPos += 10;
+  yPos += cardHeight + 8;
 
-  doc.text(`Low Stock Items: ${summary.lowStockCount}`, 20, yPos);
-  yPos += 10;
+  // Row 2 - Financial metrics (wider cards)
+  const wideCardWidth = 82;
+  
+  createSummaryCard(startX, yPos, wideCardWidth, cardHeight, 
+    'Purchase Value', formatCurrencyForPDF(summary.totalPurchaseValue), [250, 250, 250]);
+  
+  createSummaryCard(startX + wideCardWidth + cardSpacing, yPos, wideCardWidth, cardHeight, 
+    'Selling Value', formatCurrencyForPDF(summary.totalSellingValue), [255, 248, 230]);
 
-  doc.text(`Out of Stock: ${summary.outOfStockCount}`, 20, yPos);
-  yPos += 20;
+  yPos += cardHeight + 8;
 
-  // Low Stock Table
+  // Row 3 - Profit and Out of Stock
+  createSummaryCard(startX, yPos, wideCardWidth, cardHeight, 
+    'Potential Profit', formatCurrencyForPDF(summary.potentialProfit), [240, 255, 240]);
+  
+  createSummaryCard(startX + wideCardWidth + cardSpacing, yPos, wideCardWidth, cardHeight, 
+    'Out of Stock', summary.outOfStockCount || 0, [255, 235, 235]);
+
+  yPos += cardHeight + 20;
+
+  // Enhanced Low Stock Section
   if (inventoryData.lowStockItems?.length > 0) {
+    // Check if we need a new page
+    if (yPos > 200) {
+      doc.addPage();
+      addHeader();
+      yPos = 45;
+    }
+
+    // Section header with warning styling
+    doc.setFillColor(...colors.danger);
+    doc.rect(20, yPos - 5, 170, 12, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("⚠ LOW STOCK ALERT", 25, yPos + 3);
+    
+    doc.setTextColor(0, 0, 0);
+    yPos += 15;
+
     autoTable(doc, {
-      head: [["Part Name", "Model", "Quantity", "Purchase Price", "Selling Price"]],
+      head: [["Part Name", "Part Number", "Car/Model", "Qty", "Purchase Price", "Selling Price"]],
       body: inventoryData.lowStockItems.map((part) => [
-        part.name,
-        part.model,
-        part.quantity,
-        formatCurrencyForPDF(part.price),
-        formatCurrencyForPDF(part.price),
+        part.partName || part.name,
+        part.partNumber || "N/A",
+        `${part.carName || ""} ${part.model || ""}`.trim() || "N/A",
+        part.quantity.toString(),
+        formatCurrencyForPDF(part.purchasePrice || part.price || 0),
+        formatCurrencyForPDF(part.sellingPrice || part.price || 0),
       ]),
       startY: yPos,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [255, 152, 0] },
+      theme: 'striped',
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+        alternateRowStyles: { fillColor: [255, 249, 249] }
+      },
+      headStyles: {
+        fillColor: colors.danger,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      columnStyles: {
+        3: { halign: 'center', textColor: colors.danger, fontStyle: 'bold' },
+        4: { halign: 'right' },
+        5: { halign: 'right' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 20;
+  }
+
+  // Enhanced All Items Section
+  if (inventoryData.allItems?.length > 0) {
+    // Add new page for all items
+    doc.addPage();
+    addHeader();
+    yPos = 45;
+
+    // Section header
+    doc.setFillColor(...colors.primary);
+    doc.rect(20, yPos - 5, 170, 12, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(" ALL INVENTORY ITEMS", 25, yPos + 3);
+    
+    doc.setTextColor(0, 0, 0);
+    yPos += 15;
+
+    // Calculate totals for the footer
+    const totalPurchaseValue = inventoryData.allItems.reduce((sum, item) => 
+      sum + (item.purchasePrice * item.quantity), 0);
+    const totalSellingValue = inventoryData.allItems.reduce((sum, item) => 
+      sum + (item.sellingPrice * item.quantity), 0);
+
+    autoTable(doc, {
+      head: [["Part Name", "Part No.", "Car/Model", "Qty", "Purchase ₹", "Selling ₹", "Total Value ₹"]],
+      body: inventoryData.allItems.map((part) => [
+        part.name,
+        part.partNumber || "N/A",
+        `${part.carName || ""} ${part.model || ""}`.trim() || "N/A",
+        part.quantity.toString(),
+        formatCurrencyForPDF(part.purchasePrice),
+        formatCurrencyForPDF(part.sellingPrice),
+        formatCurrencyForPDF(part.totalSellingValue || (part.sellingPrice * part.quantity)),
+      ]),
+      foot: [["", "", "", "TOTALS:", 
+        formatCurrencyForPDF(totalPurchaseValue),
+        formatCurrencyForPDF(totalSellingValue), 
+        formatCurrencyForPDF(totalSellingValue)]],
+      startY: yPos,
+      theme: 'striped',
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        alternateRowStyles: { fillColor: [249, 249, 249] }
+      },
+      headStyles: {
+        fillColor: colors.primary,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      footStyles: {
+        fillColor: colors.secondary,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      columnStyles: {
+        3: { halign: 'center' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 20, right: 20 },
+      showFoot: true
     });
   }
 
-  doc.save(`inventory-report-${new Date().toISOString().split("T")[0]}.pdf`);
+  // Add footers to all pages
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(i);
+  }
+
+  // Enhanced filename with timestamp
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+  doc.save(`inventory-report-${timestamp}.pdf`);
 };
 
-
-   // Fetch job data from API
+  // Auto-load inventory data when inventory tab is selected
+  useEffect(() => {
+    if (activeTab === 1 && !inventoryData && garageId && token) {
+      fetchInventoryData();
+    }
+  }, [activeTab, garageId, token, inventoryData]);
   useEffect(() => {
     if (!garageId) {
       navigate("/login");
@@ -303,9 +532,12 @@ const generateInventoryPDF = (inventoryData) => {
           ? data.data
           : [];
         
-        // Filter: Only jobs where status is "Completed" AND progress is exactly 100
-        const completedJobs = jobsData.filter(
-          (job) => job.status === "Completed" && job.progress === 100
+        // Process job data to calculate totals and normalize fields
+        const processedJobs = processJobData(jobsData);
+        
+        // Filter: Only jobs where status is "Completed" (case-insensitive) AND bill is approved
+        const completedJobs = processedJobs.filter(
+          (job) => job.normalizedStatus && job.qualityCheck?.billApproved === true
         );
 
         // Sort jobs by completed date (most recent first)
@@ -350,28 +582,23 @@ const generateInventoryPDF = (inventoryData) => {
           ),
           totalSellingValue: inventoryArray.reduce(
             (sum, item) =>
-              sum +
-              (item.quantity || 0) *
-                (item.sellingPrice || item.pricePerUnit || 0),
+              sum + (item.quantity || 0) * (item.sellingPrice || 0),
             0
           ),
           totalPurchaseValue: inventoryArray.reduce(
             (sum, item) =>
-              sum +
-              (item.quantity || 0) *
-                (item.purchasePrice || item.pricePerUnit || 0),
+              sum + (item.quantity || 0) * (item.purchasePrice || 0),
             0
           ),
           potentialProfit: inventoryArray.reduce(
             (sum, item) =>
               sum +
               (item.quantity || 0) *
-                ((item.sellingPrice || item.pricePerUnit || 0) -
-                  (item.purchasePrice || item.pricePerUnit || 0)),
+                ((item.sellingPrice || 0) - (item.purchasePrice || 0)),
             0
           ),
           lowStockCount: inventoryArray.filter(
-            (item) => (item.quantity || 0) < 3
+            (item) => (item.quantity || 0) <= 10
           ).length,
           outOfStockCount: inventoryArray.filter(
             (item) => (item.quantity || 0) === 0
@@ -380,22 +607,28 @@ const generateInventoryPDF = (inventoryData) => {
         totalItems: inventoryArray.length,
         totalValue: inventoryArray.reduce(
           (sum, item) =>
-            sum +
-            (item.quantity || 0) *
-              (item.sellingPrice || item.pricePerUnit || 0),
+            sum + (item.quantity || 0) * (item.sellingPrice || 0),
           0
         ),
         lowStockItems: inventoryArray.filter(
-          (item) => (item.quantity || 0) < 3
+          (item) => (item.quantity || 0) <= 10
         ),
         allItems: inventoryArray.map((item) => ({
           id: item._id,
-          name: item.partName || item.name,
+          name: item.partName,
+          partNumber: item.partNumber,
           quantity: item.quantity || 0,
-          price: item.sellingPrice || item.pricePerUnit || 0,
+          purchasePrice: item.purchasePrice || 0,
+          sellingPrice: item.sellingPrice || 0,
           carName: item.carName || "",
           model: item.model || "",
-          reorderPoint: Math.floor((item.quantity || 0) * 0.2) || 5,
+          hsnNumber: item.hsnNumber || "",
+          taxAmount: item.taxAmount || 0,
+          igst: item.igst || 0,
+          cgstSgst: item.cgstSgst || 0,
+          totalSellingValue: (item.quantity || 0) * (item.sellingPrice || 0),
+          totalPurchaseValue: (item.quantity || 0) * (item.purchasePrice || 0),
+          profit: (item.quantity || 0) * ((item.sellingPrice || 0) - (item.purchasePrice || 0))
         })),
       };
 
@@ -474,6 +707,7 @@ const generateInventoryPDF = (inventoryData) => {
         (job) =>
           job.customerName?.toLowerCase().includes(searchTerm) ||
           job.carNumber?.toLowerCase().includes(searchTerm) ||
+          job.registrationNumber?.toLowerCase().includes(searchTerm) ||
           job.jobId?.toLowerCase().includes(searchTerm) ||
           job.customerNumber?.toLowerCase().includes(searchTerm)
       );
@@ -626,7 +860,7 @@ const generateInventoryPDF = (inventoryData) => {
                 </IconButton>
                 <Box>
                   <Typography variant="h4" fontWeight="bold">
-                    📊 Reports And Report
+                    📊 Reports And Analytics
                   </Typography>
                   <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
                     Comprehensive reports for inventory and financial analysis
@@ -882,40 +1116,6 @@ const generateInventoryPDF = (inventoryData) => {
               </Grid>
             </Grid>
 
-            {/* Financial Data Actions */}
-            <Card
-              elevation={0}
-              sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                  <Button
-                    variant="contained"
-                    onClick={fetchFinancialData}
-                    disabled={financialLoading}
-                    startIcon={
-                      financialLoading ? (
-                        <CircularProgress size={20} />
-                      ) : (
-                        <RefreshIcon />
-                      )
-                    }
-                  >
-                    {financialLoading ? "Loading..." : "Load Financial Data"}
-                  </Button>
-                  {financialData && (
-                    <Button
-                      variant="outlined"
-                      onClick={() => generateJobsPDF(filteredJobsData)}
-                      startIcon={<FileDownloadIcon />}
-                    >
-                      Export PDF
-                    </Button>
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-
             {/* Search and Filters */}
             <Card
               elevation={0}
@@ -1059,7 +1259,7 @@ const generateInventoryPDF = (inventoryData) => {
                                     variant="caption"
                                     color="text.secondary"
                                   >
-                                    {job.customerNumber || "N/A"}
+                                    {job.contactNumber || "N/A"}
                                   </Typography>
                                 </Box>
                               </TableCell>
@@ -1295,30 +1495,35 @@ const generateInventoryPDF = (inventoryData) => {
               sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                  <Button
-                    variant="contained"
-                    onClick={fetchInventoryData}
-                    disabled={inventoryLoading}
-                    startIcon={
-                      inventoryLoading ? (
-                        <CircularProgress size={20} />
-                      ) : (
-                        <RefreshIcon />
-                      )
-                    }
-                  >
-                    {inventoryLoading ? "Loading..." : "Load Inventory Data"}
-                  </Button>
-                  {inventoryData && (
+                <Box sx={{ display: "flex", gap: 2, alignItems: "center", justifyContent: "space-between" }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Inventory Management
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => generateInventoryPDF(inventoryData)}
-                      startIcon={<FileDownloadIcon />}
+                      onClick={fetchInventoryData}
+                      disabled={inventoryLoading}
+                      startIcon={
+                        inventoryLoading ? (
+                          <CircularProgress size={20} />
+                        ) : (
+                          <RefreshIcon />
+                        )
+                      }
                     >
-                      Export PDF
+                      {inventoryLoading ? "Loading..." : "Refresh Data"}
                     </Button>
-                  )}
+                    {inventoryData && (
+                      <Button
+                        variant="contained"
+                        onClick={() => generateInventoryPDF(inventoryData)}
+                        startIcon={<FileDownloadIcon />}
+                      >
+                        Export PDF
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
@@ -1367,7 +1572,10 @@ const generateInventoryPDF = (inventoryData) => {
                                   Part Name
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 600 }}>
-                                  Model
+                                  Part Number
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>
+                                  Car/Model
                                 </TableCell>
                                 <TableCell sx={{ fontWeight: 600 }}>
                                   Quantity
@@ -1392,10 +1600,20 @@ const generateInventoryPDF = (inventoryData) => {
                                         variant="body2"
                                         fontWeight={500}
                                       >
-                                        {part.name}
+                                        {part.partName}
                                       </Typography>
                                     </TableCell>
-                                    <TableCell>{part.model}</TableCell>
+                                    <TableCell>{part.partNumber || "N/A"}</TableCell>
+                                    <TableCell>
+                                      <Box>
+                                        <Typography variant="body2" fontWeight={500}>
+                                          {part.carName || "N/A"}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                          {part.model || "N/A"}
+                                        </Typography>
+                                      </Box>
+                                    </TableCell>
                                     <TableCell>
                                       <Chip
                                         label={part.quantity}
@@ -1408,10 +1626,10 @@ const generateInventoryPDF = (inventoryData) => {
                                       />
                                     </TableCell>
                                     <TableCell>
-                                      {formatCurrency(part.price)}
+                                      {formatCurrency(part.purchasePrice)}
                                     </TableCell>
                                     <TableCell>
-                                      {formatCurrency(part.price)}
+                                      {formatCurrency(part.sellingPrice)}
                                     </TableCell>
                                     <TableCell>
                                       <Chip
@@ -1462,10 +1680,7 @@ const generateInventoryPDF = (inventoryData) => {
                               Quantity
                             </TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>
-                              Purchase Price
-                            </TableCell>
-                            <TableCell sx={{ fontWeight: 600 }}>
-                              Selling Price
+                              Unit Price
                             </TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>
                               Total Value
@@ -1501,10 +1716,7 @@ const generateInventoryPDF = (inventoryData) => {
                                 {formatCurrency(part.price)}
                               </TableCell>
                               <TableCell>
-                                {formatCurrency(part.price)}
-                              </TableCell>
-                              <TableCell>
-                                {formatCurrency(part.totalSellingValue)}
+                                {formatCurrency(part.quantity * part.price)}
                               </TableCell>
                               <TableCell>
                                 <Chip

@@ -1490,7 +1490,7 @@ const generateProfessionalGSTInvoice = () => {
     // ITEMS TABLE
     // -----------------------------
     const tableStartY = currentY;
-    const colWidths = { srNo: 40, productName: 180, hsnSac: 60, qty: 35, unit: 40, rate: 70, gstPercent: 50, amount: 70 };
+    const colWidths = { srNo: 40, productName: 240, qty: 35, unit: 40, rate: 70, gstPercent: 50, amount: 70 };
     const totalTableWidth = Object.values(colWidths).reduce((a, b) => a + b, 0);
     // Header
     const headerY = tableStartY;
@@ -1498,11 +1498,11 @@ const generateProfessionalGSTInvoice = () => {
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     let colX = margin;
-    ["Sr.No", "Product/Service Name", "HSN/SAC", "Qty", "Unit", "Rate", "GST%", "Amount"].forEach((text, i) => {
+    ["Sr.No", "Product/Service Name", "Qty", "Unit", "Rate", "GST%", "Amount"].forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
       doc.text(text, colX + (w - txtW) / 2, headerY + 20);
-      if (i < 7) doc.line(colX + w, headerY, colX + w, headerY + 30);
+              if (i < 6) doc.line(colX + w, headerY, colX + w, headerY + 30);
       colX += w;
     });
     currentY = headerY + 30;
@@ -1522,7 +1522,7 @@ const generateProfessionalGSTInvoice = () => {
         } else {
           doc.text(display, colX + 5, y + 17);
         }
-        if (i < 7) doc.line(colX + w, y, colX + w, y + rowHeight);
+        if (i < 6) doc.line(colX + w, y, colX + w, y + rowHeight);
         colX += w;
       });
       return rowHeight;
@@ -1533,7 +1533,6 @@ const generateProfessionalGSTInvoice = () => {
       const row = [
         rowIndex++,
         part.name,
-        part.hsnNumber || "8708",
         part.quantity,
         "Nos",
         part.pricePerUnit.toFixed(2),
@@ -1548,7 +1547,6 @@ const generateProfessionalGSTInvoice = () => {
       const row = [
         rowIndex++,
         "Labor & Services",
-        "9954",
         "1",
         "Nos",
         laborServicesTotal.toFixed(2),
@@ -1561,7 +1559,7 @@ const generateProfessionalGSTInvoice = () => {
     const minRows = 8;
     const filledRows = parts.length + (laborServicesTotal > 0 ? 1 : 0);
     for (let i = filledRows; i < minRows; i++) {
-      currentY += drawTableRow(["", "", "", "", "", "", "", ""], currentY);
+      currentY += drawTableRow(["", "", "", "", "", "", ""], currentY);
     }
     currentY += 10;
 

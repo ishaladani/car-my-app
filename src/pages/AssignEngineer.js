@@ -1574,376 +1574,6 @@ const AssignEngineer = () => {
                 </Grid>
               </Grid>
 
-              {/* Pre-loaded Engineer Info */}
-              {isEditMode && assignments[0]?.engineer && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      mb: 1,
-                      fontWeight: 600,
-                      color: 'info.main',
-                      fontSize: { xs: '1rem', sm: '1.1rem' }
-                    }}
-                  >
-                    📋 Pre-loaded from Job Card:
-                  </Typography>
-                  <Alert
-                    severity="info"
-                    sx={{ mb: 2 }}
-                    icon={<InventoryIcon />}
-                  >
-                    <Typography variant="body2">
-                      The following data was automatically loaded from the job card and will be included in the work progress update.
-                    </Typography>
-                  </Alert>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      👤 Engineer:
-                    </Typography>
-                    <Chip
-                      label={assignments[0].engineer.name || assignments[0].engineer.email || 'Unknown Engineer'}
-                      color="primary"
-                      size="small"
-                    />
-                  </Box>
-                  {assignments[0].notes && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        💬 Engineer Remarks:
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontStyle: 'italic',
-                          wordBreak: 'break-word',
-                          maxWidth: { xs: '100%', sm: '60%' }
-                        }}
-                      >
-                        "{assignments[0].notes}"
-                      </Typography>
-                    </Box>
-                  )}
-                  {parsedJobDetails.length > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        💰 Existing Job Details Cost:
-                      </Typography>
-                      <Chip
-                        label={`₹${parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0).toFixed(2)}`}
-                        color="success"
-                        size="small"
-                      />
-                    </Box>
-                  )}
-                  {(() => {
-                    // Calculate pre-loaded parts cost
-                    const preLoadedPartsCost = assignments.reduce((total, assignment) => {
-                      return total + assignment.parts.filter(part => part.isPreLoaded).reduce((partTotal, part) => {
-                        const selectedQuantity = part.selectedQuantity || 1;
-                        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-                        const partTotalPrice = pricePerPiece * selectedQuantity;
-                        return partTotal + partTotalPrice;
-                      }, 0);
-                    }, 0);
-
-                    // Calculate user-selected parts cost
-                    const userSelectedPartsCost = assignments.reduce((total, assignment) => {
-                      return total + assignment.parts.filter(part => !part.isPreLoaded).reduce((partTotal, part) => {
-                        const selectedQuantity = part.selectedQuantity || 1;
-                        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-                        const partTotalPrice = pricePerPiece * selectedQuantity;
-                        return partTotal + partTotalPrice;
-                      }, 0);
-                    }, 0);
-
-                    const totalPartsCost = preLoadedPartsCost + userSelectedPartsCost;
-
-                    if (totalPartsCost > 0) {
-                      return (
-                        <>
-                          {preLoadedPartsCost > 0 && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                📋 Pre-loaded Parts Cost:
-                              </Typography>
-                              <Chip
-                                label={`₹${preLoadedPartsCost.toFixed(2)}`}
-                                color="info"
-                                size="small"
-                              />
-                            </Box>
-                          )}
-                          {userSelectedPartsCost > 0 && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                              <Typography variant="body2" color="text.secondary">
-                                🔧 User Selected Parts Cost:
-                              </Typography>
-                              <Chip
-                                label={`₹${userSelectedPartsCost.toFixed(2)}`}
-                                color="primary"
-                                size="small"
-                              />
-                            </Box>
-                          )}
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              🔧 Total Parts Cost:
-                            </Typography>
-                            <Chip
-                              label={`₹${totalPartsCost.toFixed(2)}`}
-                              color="warning"
-                              size="small"
-                            />
-                          </Box>
-                        </>
-                      );
-                    }
-                    return null;
-                  })()}
-                </>
-              )}
-
-              {/* Total Cost Breakdown */}
-              {(parsedJobDetails.length > 0 || jobPoints.length > 0 || assignments.some(a => a.parts.length > 0)) && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      mb: 1,
-                      fontWeight: 600,
-                      fontSize: { xs: '1rem', sm: '1.1rem' }
-                    }}
-                  >
-                    💰 Total Cost Breakdown:
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-                    {/* Job Details Cost */}
-                    {(() => {
-                      const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
-                      const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-                      const jobDetailsCost = existingCost + newCost;
-
-                      if (jobDetailsCost > 0) {
-                        return (
-                          <>
-                            {parsedJobDetails.length > 0 && (
-                              <Chip
-                                label={`Job Details (Existing): ₹${existingCost.toFixed(2)}`}
-                                color="secondary"
-                                variant="outlined"
-                                size="small"
-                              />
-                            )}
-                            {jobPoints.length > 0 && (
-                              <Chip
-                                label={`Job Details (New): ₹${newCost.toFixed(2)}`}
-                                color="primary"
-                                variant="outlined"
-                                size="small"
-                              />
-                            )}
-                            <Chip
-                              label={`Job Details Total: ₹${jobDetailsCost.toFixed(2)}`}
-                              color="info"
-                              size="small"
-                            />
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Parts Cost */}
-                    {(() => {
-                      const partsCost = assignments.reduce((total, assignment) => {
-                        return total + assignment.parts.reduce((partTotal, part) => {
-                          const selectedQuantity = part.selectedQuantity || 1;
-                          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-                          const partTotalPrice = pricePerPiece * selectedQuantity;
-                          return partTotal + partTotalPrice;
-                        }, 0);
-                      }, 0);
-
-                      if (partsCost > 0) {
-                        return (
-                          <Chip
-                            label={`Parts Cost: ₹${partsCost.toFixed(2)}`}
-                            color="warning"
-                            size="small"
-                          />
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Total Cost */}
-                    {(() => {
-                      const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
-                      const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-                      const jobDetailsCost = existingCost + newCost;
-
-                      const partsCost = assignments.reduce((total, assignment) => {
-                        return total + assignment.parts.reduce((partTotal, part) => {
-                          const selectedQuantity = part.selectedQuantity || 1;
-                          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-                          const partTotalPrice = pricePerPiece * selectedQuantity;
-                          return partTotal + partTotalPrice;
-                        }, 0);
-                      }, 0);
-
-                      const totalCost = jobDetailsCost + partsCost;
-
-                      if (totalCost > 0) {
-                        return (
-                          <Chip
-                            label={`Grand Total: ₹${totalCost.toFixed(2)}`}
-                            color="success"
-                            size="small"
-                          />
-                        );
-                      }
-                      return null;
-                    })()}
-                  </Box>
-                </>
-              )}
-
-              {/* Parts Summary */}
-              {(() => {
-                const preLoadedParts = [];
-                const userSelectedParts = [];
-
-                assignments.forEach(assignment => {
-                  assignment.parts.forEach(part => {
-                    const selectedQuantity = part.selectedQuantity || 1;
-
-                    if (part.isPreLoaded) {
-                      const existingIndex = preLoadedParts.findIndex(p => p._id === part._id);
-                      if (existingIndex !== -1) {
-                        preLoadedParts[existingIndex].quantity += selectedQuantity;
-                      } else {
-                        preLoadedParts.push({ ...part, quantity: selectedQuantity });
-                      }
-                    } else {
-                      const existingIndex = userSelectedParts.findIndex(p => p._id === part._id);
-                      if (existingIndex !== -1) {
-                        userSelectedParts[existingIndex].quantity += selectedQuantity;
-                      } else {
-                        userSelectedParts.push({ ...part, quantity: selectedQuantity });
-                      }
-                    }
-                  });
-                });
-
-                if (preLoadedParts.length > 0 || userSelectedParts.length > 0) {
-                  return (
-                    <>
-                      <Divider sx={{ my: 2 }} />
-
-                      {/* User Selected Parts Summary - Display First */}
-                      {userSelectedParts.length > 0 && (
-                        <>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{
-                              mb: 1,
-                              fontWeight: 600,
-                              fontSize: { xs: '1rem', sm: '1.1rem' },
-                              color: 'primary.main'
-                            }}
-                          >
-                            🔧 User Selected Parts:
-                          </Typography>
-                          <Alert
-                            severity="success"
-                            sx={{ mb: 2 }}
-                            icon={<AddIcon />}
-                          >
-                            <Typography variant="body2">
-                              These are newly selected parts that will be added to the job card along with the pre-loaded parts.
-                            </Typography>
-                          </Alert>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                            {userSelectedParts.map((part, index) => (
-                              <Chip
-                                key={index}
-                                label={`${part.partName} (Qty: ${part.quantity})`}
-                                color="primary"
-                                variant="outlined"
-                                size="small"
-                              />
-                            ))}
-                          </Box>
-                        </>
-                      )}
-
-                      {/* Pre-loaded Parts Summary - Display Second */}
-                      {preLoadedParts.length > 0 && (
-                        <>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{
-                              mb: 1,
-                              fontWeight: 600,
-                              fontSize: { xs: '1rem', sm: '1.1rem' },
-                              color: 'info.main'
-                            }}
-                          >
-                            📋 Pre-loaded Parts from Job Card:
-                          </Typography>
-                          <Alert
-                            severity="info"
-                            sx={{ mb: 2 }}
-                            icon={<InventoryIcon />}
-                          >
-                            <Typography variant="body2">
-                              These parts were automatically loaded from the job card and will be included in the work progress update.
-                            </Typography>
-                          </Alert>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                            {preLoadedParts.map((part, index) => (
-                              <Chip
-                                key={index}
-                                label={`${part.partName} (Qty: ${part.quantity})`}
-                                color="info"
-                                variant="outlined"
-                                size="small"
-                              />
-                            ))}
-                          </Box>
-                        </>
-                      )}
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          mt: 1,
-                          display: 'block',
-                          fontSize: { xs: '0.7rem', sm: '0.75rem' }
-                        }}
-                      >
-                        {isEditMode
-                          ? `All parts (pre-loaded + user-selected) will be updated in job card: ${id}`
-                          : `All parts will be added to the partsUsed field in job card${jobCardIds.length > 1 ? 's' : ''}: ${(jobCardIds.length > 0 ? jobCardIds : [id]).join(', ')}`
-                        }
-                      </Typography>
-                    </>
-                  );
-                }
-                return null;
-              })()}
             </CardContent>
           </Card>
 
@@ -2330,7 +1960,7 @@ const AssignEngineer = () => {
                           </Box>
 
                           {/* Pre-loaded Parts Notice */}
-                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
+                          {/* {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
                             <Alert
                               severity="info"
                               sx={{ mb: 2 }}
@@ -2340,7 +1970,7 @@ const AssignEngineer = () => {
                                 <strong>Pre-loaded parts detected:</strong> {assignment.parts.filter(part => part.isPreLoaded).length} parts from the job card are already included and will be sent to the work progress API.
                               </Typography>
                             </Alert>
-                          )}
+                          )} */}
 
                           {/* No Parts Available Notice */}
                           {(() => {
@@ -2725,7 +2355,7 @@ const AssignEngineer = () => {
                               >
                                 📋 Pre-loaded Parts from Job Card:
                               </Typography>
-                              <Alert
+                              {/* <Alert
                                 severity="info"
                                 sx={{ mb: 2 }}
                                 icon={<InventoryIcon />}
@@ -2733,7 +2363,7 @@ const AssignEngineer = () => {
                                 <Typography variant="body2">
                                   These parts were pre-loaded from the job card and will be automatically included in the work progress update.
                                 </Typography>
-                              </Alert>
+                              </Alert> */}
                               <List dense>
                                 {assignment.parts
                                   .filter(part => part && part.partName && part.isPreLoaded)
@@ -3214,6 +2844,51 @@ const AssignEngineer = () => {
                     userSelectedDetails: userSelectedParts.map(p => p.partName)
                   });
 
+                  // Handle Select All Parts button click
+                  const handleSelectAllParts = async () => {
+                    try {
+                      // Get jobCardId from URL params or use the one from jobCardDataTemp
+                      const currentJobCardId = jobCardId || jobCardDataTemp?._id || id;
+                      
+                      if (!currentJobCardId) {
+                        setError('Job Card ID is missing. Please refresh the page and try again.');
+                        return;
+                      }
+
+                      console.log('🚀 Calling /workprogress API with all parts:', {
+                        jobCardId: currentJobCardId,
+                        allParts: allParts,
+                        partsCount: allParts.length
+                      });
+                      
+                      // Call the workprogress API with all parts
+                      const response = await axios.post(
+                        `https://garage-management-zi5z.onrender.com/api/garage/jobcards/${currentJobCardId}/workprogress`,
+                        {
+                          partsUsed: allParts.map(part => ({
+                            partName: part.partName || '',
+                            quantity: Number(part.quantity || 1),
+                            pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
+                            totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+                          }))
+                        },
+                        {
+                          headers: {
+                            Authorization: garageToken ? `Bearer ${garageToken}` : '',
+                            'Content-Type': 'application/json'
+                          }
+                        }
+                      );
+
+                      console.log('✅ /workprogress API response:', response.data);
+                      setSuccess('All parts successfully sent to work progress API!');
+                      
+                    } catch (error) {
+                      console.error('❌ Error calling /workprogress API:', error);
+                      setError(`Failed to send parts to work progress API: ${error.response?.data?.message || error.message}`);
+                    }
+                  };
+
                   // if (allParts.length > 0) {
                   //   return (
                   //     <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: 2 }}>
@@ -3224,9 +2899,9 @@ const AssignEngineer = () => {
                   //           fontWeight: 600,
                   //           fontSize: { xs: '1rem', sm: '1.1rem' }
                   //         }}
-                  //       >
-                  //         📋 Final Parts Summary for Work Progress API:
-                  //       </Typography>
+                  //                                >
+                  //          📋 Final Parts Summary for Work Progress API:
+                  //        </Typography>
 
                   //       {/* User Selected Parts Summary - Display First */}
                   //       {userSelectedParts.length > 0 && (
@@ -3283,6 +2958,26 @@ const AssignEngineer = () => {
                   //           </Box>
                   //         </Box>
                   //       )}
+
+                  //       {/* Select All Parts Button */}
+                  //       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                  //         <Button
+                  //           variant="contained"
+                  //           color="success"
+                  //           size="large"
+                  //           onClick={handleSelectAllParts}
+                  //           startIcon={<SendIcon />}
+                  //           sx={{
+                  //             px: { xs: 3, sm: 4 },
+                  //             py: 1.5,
+                  //             textTransform: 'uppercase',
+                  //             fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                  //             fontWeight: 600
+                  //           }}
+                  //         >
+                  //           Select All Parts ({allParts.length})
+                  //         </Button>
+                  //       </Box>
 
                   //       <Alert
                   //         severity="info"
