@@ -55,7 +55,7 @@ const QualityCheck = () => {
   }
 
   const [parts, setParts] = useState([]);
-  const [finalInspection, setFinalInspection] = useState('Done');
+  const [finalInspection, setFinalInspection] = useState('');
   const [jobCardData, setJobCardData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

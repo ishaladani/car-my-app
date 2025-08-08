@@ -41,6 +41,7 @@ import {
   Work as WorkIcon,
   Receipt as ReceiptIcon,
   Close as CloseIcon,
+  FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -63,17 +64,63 @@ const RecordReport = () => {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [billTypeFilter, setBillTypeFilter] = useState('All'); // GST/Non-GST filter
+  const [billTypeFilter, setBillTypeFilter] = useState('All');
+  const [createdByFilter, setCreatedByFilter] = useState('All'); // New filter
 
   // Data States
   const [jobsData, setJobsData] = useState([]);
+  const [allJobsData, setAllJobsData] = useState([]); // Store all data before user filtering
   const [filteredData, setFilteredData] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [availableCreators, setAvailableCreators] = useState([]); // For filter dropdown
 
   // Pagination States
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Cookie Helper Functions
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  };
+
+  const getUserFromCookies = () => {
+    const userType = getCookie('userType');
+    const name = getCookie('name');
+    return { userType, name };
+  };
+
+  // Helper function to safely get created by name
+  const getCreatedByName = (createdBy) => {
+    if (!createdBy) return null;
+    if (typeof createdBy === 'string') return createdBy;
+    if (typeof createdBy === 'object' && createdBy.name) return createdBy.name;
+    return 'Unknown';
+  };
+
+  // Helper function to safely get engineer name
+  const getEngineerName = (engineerId) => {
+    if (!engineerId) return null;
+    if (typeof engineerId === 'string') return engineerId;
+    if (Array.isArray(engineerId) && engineerId.length > 0) {
+      const engineer = engineerId[0];
+      if (typeof engineer === 'object' && engineer.name) return engineer.name;
+      if (typeof engineer === 'string') return engineer;
+    }
+    if (typeof engineerId === 'object' && engineerId.name) return engineerId.name;
+    return null;
+  };
+
+  // Helper function to safely get subaccount name
+  const getSubaccountName = (subaccountId) => {
+    if (!subaccountId) return null;
+    if (typeof subaccountId === 'string') return subaccountId;
+    if (typeof subaccountId === 'object' && subaccountId.name) return subaccountId.name;
+    return null;
+  };
 
   // ✅ Sort by updatedAt (most recent first)
   const sortJobsByUpdatedAt = (jobs) => {
@@ -116,10 +163,11 @@ const RecordReport = () => {
         ['Expiry Date', formatDate(jobData.expiryDate)],
         ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount}` : 'N/A'],
         ['Job Type', jobData.type || 'N/A'],
-        ['Engineer', jobData.engineerId?.[0]?.name || 'Not Assigned'],
+        ['Engineer', getEngineerName(jobData.engineerId) || 'Not Assigned'],
         ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
         ['Status', jobData.status || 'N/A'],
         ['Created Date', formatDate(jobData.createdAt)],
+        ['Created By', getCreatedByName(jobData.createdBy) || 'N/A'],
       ];
 
       autoTable(doc, {
@@ -196,6 +244,10 @@ const RecordReport = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Get user data from cookies
+        const { userType, name } = getUserFromCookies();
+        
         const response = await fetch(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/garage/${garageId}`,
           {
@@ -207,16 +259,53 @@ const RecordReport = () => {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
 
-        const jobsData = Array.isArray(data)
+        const allJobsArray = Array.isArray(data)
           ? data
           : data.jobCards || data.data || [];
 
-        const completedJobs = jobsData.filter(job => job.status === "Completed");
+        // Filter only completed jobs first
+        const completedJobs = allJobsArray.filter(job => 
+          job.status && (job.status.toLowerCase() === "completed" || job.status.toLowerCase() === "complete")
+        );
+
+        // Store all completed jobs for reference
+        setAllJobsData(completedJobs);
+
+        // Get unique creators for filter dropdown
+        const creators = [...new Set(completedJobs
+          .map(job => getCreatedByName(job.createdBy))
+          .filter(name => name && name !== 'Unknown')
+        )];
+        setAvailableCreators(creators);
+
+        let filteredJobs = completedJobs;
+
+        // ✅ Enhanced filtering by createdBy if userType is "user"
+        if (userType === "user" && name) {
+          filteredJobs = completedJobs.filter(job => {
+            const createdByName = getCreatedByName(job.createdBy);
+            const matches = createdByName === name;
+            
+            // Debug logging
+            console.log(`Job ${job._id}: createdBy = ${createdByName}, user = ${name}, matches = ${matches}`);
+            
+            return matches;
+          });
+          
+          console.log(`✅ User filtering applied:`);
+          console.log(`   - User type: ${userType}`);
+          console.log(`   - User name: ${name}`);
+          console.log(`   - Total completed jobs: ${completedJobs.length}`);
+          console.log(`   - Jobs matching user: ${filteredJobs.length}`);
+        } else {
+          console.log(`ℹ️ No user filtering applied (userType: ${userType}, name: ${name})`);
+        }
 
         // ✅ Sort by updatedAt (most recent first)
-        const sortedJobs = sortJobsByUpdatedAt(completedJobs);
+        const sortedJobs = sortJobsByUpdatedAt(filteredJobs);
         setJobsData(sortedJobs);
         setFilteredData(sortedJobs);
+
       } catch (error) {
         console.error("Error fetching jobs:", error);
         setError(`Failed to load jobs: ${error.message}`);
@@ -232,31 +321,38 @@ const RecordReport = () => {
   const handleSearch = (e) => {
     const searchTerm = e.target.value.toLowerCase();
     setSearch(searchTerm);
-    applyFilters(searchTerm, startDate, endDate, billTypeFilter);
+    applyFilters(searchTerm, startDate, endDate, billTypeFilter, createdByFilter);
   };
 
   // Handle date changes
   const handleStartDateChange = (e) => {
     const newStartDate = e.target.value;
     setStartDate(newStartDate);
-    applyFilters(search, newStartDate, endDate, billTypeFilter);
+    applyFilters(search, newStartDate, endDate, billTypeFilter, createdByFilter);
   };
 
   const handleEndDateChange = (e) => {
     const newEndDate = e.target.value;
     setEndDate(newEndDate);
-    applyFilters(search, startDate, newEndDate, billTypeFilter);
+    applyFilters(search, startDate, newEndDate, billTypeFilter, createdByFilter);
   };
 
   // Handle Bill Type filter
   const handleBillTypeFilterChange = (e) => {
     const newBillType = e.target.value;
     setBillTypeFilter(newBillType);
-    applyFilters(search, startDate, endDate, newBillType);
+    applyFilters(search, startDate, endDate, newBillType, createdByFilter);
+  };
+
+  // Handle Created By filter
+  const handleCreatedByFilterChange = (e) => {
+    const newCreatedBy = e.target.value;
+    setCreatedByFilter(newCreatedBy);
+    applyFilters(search, startDate, endDate, billTypeFilter, newCreatedBy);
   };
 
   // Apply all filters and sort
-  const applyFilters = (searchTerm, start, end, billType) => {
+  const applyFilters = (searchTerm, start, end, billType, createdBy) => {
     let filtered = [...jobsData];
 
     // Search
@@ -267,7 +363,8 @@ const RecordReport = () => {
           (job.registrationNumber && job.registrationNumber.toLowerCase().includes(searchTerm)) || 
           (job.customerName && job.customerName.toLowerCase().includes(searchTerm)) || 
           (job.jobDetails && job.jobDetails.toLowerCase().includes(searchTerm)) ||
-          (job.type && job.type.toLowerCase().includes(searchTerm))
+          (job.type && job.type.toLowerCase().includes(searchTerm)) ||
+          (getCreatedByName(job.createdBy) && getCreatedByName(job.createdBy).toLowerCase().includes(searchTerm))
       );
     }
 
@@ -288,6 +385,12 @@ const RecordReport = () => {
       } else if (billType === 'Non-GST') {
         filtered = filtered.filter(job => job.gstApplicable === false);
       }
+    }
+
+    // Created By filter (only for non-user types)
+    const { userType } = getUserFromCookies();
+    if (userType !== 'user' && createdBy && createdBy !== 'All') {
+      filtered = filtered.filter(job => getCreatedByName(job.createdBy) === createdBy);
     }
 
     // ✅ Re-sort filtered results by updatedAt
@@ -429,6 +532,7 @@ const RecordReport = () => {
     setStartDate('');
     setEndDate('');
     setBillTypeFilter('All');
+    setCreatedByFilter('All');
     const sortedJobs = sortJobsByUpdatedAt([...jobsData]);
     setFilteredData(sortedJobs);
     setPage(0);
@@ -446,6 +550,10 @@ const RecordReport = () => {
     return filteredData.slice(startIndex, endIndex);
   };
 
+  // Get current user info for display
+  const { userType, name } = getUserFromCookies();
+  const isUserTypeUser = userType === "user";
+
   return (
     <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: 'auto' }}>
       <CssBaseline />
@@ -461,19 +569,39 @@ const RecordReport = () => {
                 >
                   <ArrowBackIcon />
                 </IconButton>
-                <Typography variant="h5" color="primary">
-                  Completed Job Records & Reports
-                </Typography>
+                <Box>
+                  <Typography variant="h5" color="primary">
+                    Completed Job Records & Reports
+                  </Typography>
+                  {isUserTypeUser && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Showing records created by: {name || 'Unknown User'}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
               <Chip 
                 icon={<WorkIcon />} 
-                label={`${filteredData.length} Completed Jobs`}
+                label={`${filteredData.length} Completed Jobs${isUserTypeUser ? ' (Your Records)' : ''}`}
                 color="success" 
                 variant="outlined"
                 sx={{ fontWeight: 500 }}
               />
             </Box>
             <Divider sx={{ my: 3 }} />
+
+            {/* User Type Alert */}
+            {isUserTypeUser && (
+              <Alert severity="info" sx={{ mb: 3 }} icon={<FilterListIcon />}>
+                <Typography variant="body2">
+                  <strong>Filtered View:</strong> You are viewing only the job records that you created ({filteredData.length} records). 
+                  {allJobsData.length > filteredData.length && (
+                    <span> There are {allJobsData.length - filteredData.length} additional records created by other users.</span>
+                  )}
+                  Contact your administrator to view all records.
+                </Typography>
+              </Alert>
+            )}
 
             {/* Filters */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
@@ -524,7 +652,27 @@ const RecordReport = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={3}>
+              {/* Show Created By filter only for non-user types */}
+              {!isUserTypeUser && (
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Created By</InputLabel>
+                    <Select
+                      value={createdByFilter}
+                      onChange={handleCreatedByFilterChange}
+                      label="Created By"
+                    >
+                      <MenuItem value="All">All Creators</MenuItem>
+                      {availableCreators.map((creator) => (
+                        <MenuItem key={creator} value={creator}>
+                          {creator}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              <Grid item xs={12} md={isUserTypeUser ? 3 : 1}>
                 <Button
                   fullWidth
                   variant="outlined"
@@ -544,6 +692,7 @@ const RecordReport = () => {
             <Box sx={{ mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Completed Job Cards (Last Updated First)
+                {isUserTypeUser && ` - Created by ${name}`}
               </Typography>
 
               {loading ? (
@@ -562,6 +711,7 @@ const RecordReport = () => {
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Customer Name</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Subaccount</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Job Details</TableCell>
+                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Created By</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Status</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Last Updated</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} align="center">Actions</TableCell>
@@ -571,25 +721,49 @@ const RecordReport = () => {
                         {getCurrentPageData().length > 0 ? (
                           getCurrentPageData().map((job, index) => (
                             <TableRow key={job._id || index}>
-                              <TableCell>{job._id?.slice(-6) || 'N/A'}</TableCell>
-                              <TableCell>{job.carNumber || job.registrationNumber || 'N/A'}</TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={job._id?.slice(-6) || 'N/A'} 
+                                  size="small" 
+                                  variant="outlined" 
+                                  color="primary"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  {job.carNumber || job.registrationNumber || 'N/A'}
+                                </Typography>
+                              </TableCell>
                               <TableCell>{job.customerName || 'N/A'}</TableCell>
                               <TableCell>
-                                {job.subaccountId && job.subaccountId.name ? (
-                                  <Chip label={job.subaccountId.name} size="small" variant="outlined" />
+                                {getSubaccountName(job.subaccountId) ? (
+                                  <Chip label={getSubaccountName(job.subaccountId)} size="small" variant="outlined" />
                                 ) : 'N/A'}
                               </TableCell>
                               <TableCell sx={{ maxWidth: '300px', whiteSpace: 'pre-line' }}>
-                                <JobDetailsComponent jobDetails={job.jobDetails} />
+                                <JobDetailsComponent jobDetails={job.jobDetails} compact={true} />
+                              </TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={getCreatedByName(job.createdBy) || 'Unknown'} 
+                                  size="small" 
+                                  variant="outlined"
+                                  color={getCreatedByName(job.createdBy) === name ? 'primary' : 'default'}
+                                  sx={{ fontWeight: getCreatedByName(job.createdBy) === name ? 600 : 400 }}
+                                />
                               </TableCell>
                               <TableCell>
                                 <Chip 
                                   label={job.status || 'Unknown'} 
-                                  color={job.status === 'Completed' ? 'success' : job.status === 'In Progress' ? 'warning' : 'info'} 
+                                  color={job.status?.toLowerCase() === 'completed' ? 'success' : job.status?.toLowerCase() === 'in progress' ? 'warning' : 'info'} 
                                   size="small" 
                                 />
                               </TableCell>
-                              <TableCell>{formatDate(job.updatedAt || job.createdAt)}</TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {formatDate(job.updatedAt || job.createdAt)}
+                                </Typography>
+                              </TableCell>
                               <TableCell align="center">
                                 <Stack direction="row" spacing={1} justifyContent="center">
                                   <Button
@@ -613,10 +787,12 @@ const RecordReport = () => {
                           ))
                         ) : (
                           <TableRow>
-                            <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                            <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                               {filteredData.length === 0 && jobsData.length > 0 
                                 ? "No jobs match your search criteria" 
-                                : "No completed job records found"}
+                                : isUserTypeUser 
+                                  ? `No completed job records found created by ${name}`
+                                  : "No completed job records found"}
                             </TableCell>
                           </TableRow>
                         )}
@@ -641,7 +817,7 @@ const RecordReport = () => {
         </Card>
       </Container>
 
-      {/* Job Details Dialog */}
+      {/* Job Details Dialog - Same as before */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', p: 3 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -671,7 +847,7 @@ const RecordReport = () => {
                       <Box sx={{ mt: 1 }}>
                         <Chip 
                           label={selectedJob.status || 'Unknown'} 
-                          color={selectedJob.status === 'Completed' ? 'success' : selectedJob.status === 'In Progress' ? 'warning' : 'info'} 
+                          color={selectedJob.status?.toLowerCase() === 'completed' ? 'success' : selectedJob.status?.toLowerCase() === 'in progress' ? 'warning' : 'info'} 
                           sx={{ fontWeight: 600 }} 
                         />
                       </Box>
@@ -712,7 +888,7 @@ const RecordReport = () => {
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Subaccount</Typography>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.subaccountId?.name || 'N/A'}
+                        {getSubaccountName(selectedJob.subaccountId) || 'N/A'}
                       </Typography>
                     </Box>
                     <Box sx={{ mb: 3 }}>
@@ -742,6 +918,12 @@ const RecordReport = () => {
                       </Typography>
                     </Box>
                     <Box sx={{ mb: 3 }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Created By</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {getCreatedByName(selectedJob.createdBy) || 'N/A'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Labor Hours</Typography>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>
                         {selectedJob.laborHours || 'N/A'} hours
@@ -750,7 +932,7 @@ const RecordReport = () => {
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Engineer</Typography>
                       <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.engineerId?.[0]?.name || 'Not Assigned'}
+                        {getEngineerName(selectedJob.engineerId) || 'Not Assigned'}
                       </Typography>
                     </Box>
                   </Grid>

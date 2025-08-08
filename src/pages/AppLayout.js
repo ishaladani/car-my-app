@@ -321,23 +321,7 @@ const AppLayout = () => {
           ))}
         </List>
 
-        {/* Debug Info - Remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="caption" display="block">
-              Debug Info:
-            </Typography>
-            <Typography variant="caption" display="block">
-              Role: {roll}
-            </Typography>
-            <Typography variant="caption" display="block">
-              Nav Items: {filteredNavItems.length}
-            </Typography>
-            <Typography variant="caption" display="block">
-              Current: {location.pathname}
-            </Typography>
-          </Box>
-        )}
+      
       </Box>
 
       {/* Bottom Actions - Logout */}

@@ -39,6 +39,25 @@ const AutoServeBilling = () => {
   let garageId = localStorage.getItem("garageId") || localStorage.getItem("garage_id");
   
   const today = new Date().toISOString().split("T")[0];
+  
+  // Invoice number helpers: generate sequential numbers starting at INV-001
+  const getNextInvoiceNumber = () => {
+    const storageKey = 'invoiceSerial';
+    let serial = parseInt(localStorage.getItem(storageKey) || '1', 10);
+    if (!Number.isFinite(serial) || serial < 1) serial = 1;
+    const invoiceNo = `INV-${String(serial).padStart(3, '0')}`;
+    localStorage.setItem(storageKey, String(serial + 1));
+    return invoiceNo;
+  };
+  
+  const normalizeInvoiceNo = (raw) => {
+    if (!raw) return getNextInvoiceNumber();
+    const value = String(raw).trim();
+    if (/^INV-\d{3,}$/.test(value)) return value;
+    const digits = value.replace(/\D/g, '');
+    if (digits) return `INV-${digits.padStart(3, '0')}`;
+    return 'INV-001';
+  };
   const [laborServicesTotal, setLaborServicesTotal] = useState(0);
 
   // UPDATED: State declarations with complete bank details
@@ -254,7 +273,7 @@ setGarageDetails({
           });
         }
         
-        const invoiceNo = data.invoiceNumber || `INV-${Date.now()}`;
+        const invoiceNo = normalizeInvoiceNo(data.invoiceNumber);
 
         setCarDetails({
           carNumber: data.carNumber || data.registrationNumber || "",
@@ -1479,7 +1498,7 @@ const generateProfessionalGSTInvoice = () => {
     doc.setFont("helvetica", "bold");
     doc.text("Ship To / Insurance:", margin + sectionWidth + 20, billShipY + 20);
     doc.setFont("helvetica", "normal");
-    doc.text(`Insurance: ${gstSettings.shiftToParty}`, margin + sectionWidth + 20, billShipY + 40);
+    doc.text(`Insurance: ${gstSettings.insuranceProvider}`, margin + sectionWidth + 20, billShipY + 40);
     doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + sectionWidth + 20, billShipY + 55);
     doc.text(`Reg No: ${carDetails.carNumber}`, margin + sectionWidth + 20, billShipY + 70);
     doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + sectionWidth + 20, billShipY + 100);
@@ -1568,12 +1587,18 @@ const generateProfessionalGSTInvoice = () => {
     // -----------------------------
     const summaryWidth = 200;
     const summaryX = pageWidth - margin - summaryWidth;
-    // Sub Total
+    // Sub Total (Parts only)
     drawBorderedRect(summaryX, currentY, summaryWidth, 25);
     doc.setFont("helvetica", "bold");
     doc.text("Sub Total", summaryX + 10, currentY + 17);
-    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    doc.text(summary.laborServicesTax.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
     currentY += 25;
+    // Labour/Service
+    // drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    // doc.setFont("helvetica", "bold");
+    // doc.text("Labour/Service", summaryX + 10, currentY + 17);
+    // doc.text(summary.totalLaborCost.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    // currentY += 25;
     // Taxable Amount
     drawBorderedRect(summaryX, currentY, summaryWidth, 25);
     doc.text("Taxable Amount", summaryX + 10, currentY + 17);

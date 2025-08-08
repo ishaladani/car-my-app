@@ -503,24 +503,7 @@ const AssignEngineer = () => {
   };
 
   // Debug function to check inventory status (only call when needed)
-  const debugInventoryStatus = () => {
-    console.log('🔍 Inventory Debug Info:', {
-      totalInventoryParts: inventoryParts.length,
-      partsWithLowStock: inventoryParts.filter(part => part.quantity < 5).map(part => ({
-        name: part.partName,
-        quantity: part.quantity,
-        available: getAvailableQuantity(part._id)
-      })),
-      assignments: assignments.map(assignment => ({
-        assignmentId: assignment.id,
-        partsCount: assignment.parts.length,
-        preLoadedCount: assignment.parts.filter(p => p.isPreLoaded).length,
-        userSelectedCount: assignment.parts.filter(p => !p.isPreLoaded).length,
-        allParts: assignment.parts.map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
-      })),
-      allPartsForAPI: getAllPartsForAPI().map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
-    });
-  };
+ 
 
   // Utility API Call with Authorization
   const apiCall = useCallback(async (endpoint, options = {}) => {
@@ -1945,17 +1928,7 @@ const AssignEngineer = () => {
                                   Add Part
                                 </Button>
                               </Tooltip>
-                              <Tooltip title="Debug Inventory Status (Check Console)">
-                                <Button
-                                  variant="outlined"
-                                  color="secondary"
-                                  size="small"
-                                  onClick={debugInventoryStatus}
-                                  sx={{ flex: { xs: 1, sm: 'none' } }}
-                                >
-                                  Debug
-                                </Button>
-                              </Tooltip>
+                              
                             </Box>
                           </Box>
 

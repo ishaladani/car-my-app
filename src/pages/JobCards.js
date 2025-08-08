@@ -704,237 +704,298 @@ const JobCards = () => {
   const [jobCardData, setJobCardData] = useState(null);
 
   const generatePreviewPDF = () => {
-    console.log("Generating PDF with jobCardData:", jobCardData);
-    console.log("Job Card Number from data:", jobCardData?.jobCardNumber);
-    console.log("Job Card ID:", id);
+  console.log("Generating PDF with jobCardData:", jobCardData);
+  console.log("Job Card Number from data:", jobCardData?.jobCardNumber);
+  console.log("Job Card ID:", id);
 
-    // Generate a meaningful job card number for existing job cards
-    const getJobCardNumber = () => {
-      if (jobCardData?.jobCardNumber) {
-        return jobCardData.jobCardNumber;
-      }
-      // For existing job cards without jobCardNumber, use the last 6 characters of the ID
-      if (id && id.length > 6) {
-        return parseInt(id.slice(-6), 16) || id.slice(-6);
-      }
-      return id || "N/A";
-    };
-
-    const jobCardNumber = getJobCardNumber();
-    console.log("Final Job Card Number:", jobCardNumber);
-
-    const doc = new jsPDF();
-    const primaryColor = [63, 81, 181];
-    const lightGray = [245, 245, 245];
-    const darkGray = [66, 66, 66];
-    const blackColor = [0, 0, 0];
-
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 14;
-    const sectionSpacing = 12;
-    const headerHeight = 30;
-
-    let yPosition = 20;
-
-    // --- Header ---
-    doc.setFillColor(...primaryColor);
-    doc.rect(0, 0, pageWidth, headerHeight, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("JOB CARD PREVIEW", margin, 19);
-    doc.setFontSize(12);
-    doc.text(
-      `Generated: ${new Date().toLocaleDateString("en-IN")}`,
-      pageWidth - margin - 50,
-      19
-    );
-    // Add Job Card Number
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Job Card #${jobCardNumber}`, pageWidth - margin - 80, 12);
-    doc.setTextColor(...blackColor);
-    yPosition = headerHeight + 10;
-
-    // --- Helper: Section Header ---
-    const addSectionHeader = (title) => {
-      if (yPosition > doc.internal.pageSize.height - 30) {
-        doc.addPage();
-        yPosition = 20;
-      }
-      doc.setFillColor(...lightGray);
-      doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, "F");
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...darkGray);
-      doc.text(title, margin + 3, yPosition + 7);
-      yPosition += 15;
-      doc.setTextColor(...blackColor);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
-    };
-
-    // --- Customer Info ---
-    addSectionHeader("CUSTOMER INFORMATION");
-    console.log(formData);
-    
-    const customerData = [
-      ["Customer Name", formData.customerName || "N/A"],
-      ["Contact Number", formData.contactNumber || "N/A"],
-      ["Email", formData.email || "N/A"],
-      ["Company", formData.company || "N/A"],
-    ];
-    autoTable(doc, {
-      startY: yPosition,
-      body: customerData,
-      theme: "plain",
-      styles: {
-        fontSize: 12,
-        cellPadding: 4,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.5,
-      },
-      columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 55 },
-        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 },
-      },
-      margin: { left: margin, right: margin },
-      didDrawPage: (data) => {
-        yPosition = data.cursor.y + sectionSpacing;
-      },
-    });
-
-    // --- Vehicle Info ---
-    addSectionHeader("VEHICLE INFORMATION");
-    const vehicleData = [
-      ["Car Number", formData.carNumber || "N/A"],
-      ["Model", formData.model || "N/A"],
-      ["Kilometer", formData.kilometer ? `${formData.kilometer} km` : "N/A"],
-      [
-        "Fuel Type",
-        fuelTypeOptions.find((o) => o.value === formData.fuelType)?.label ||
-          "N/A",
-      ],
-      ["Fuel Level", getFuelLevelText(fuelLevel)],
-      ["Chassis Number", formData.chesiNumber || "N/A"],
-    ];
-    autoTable(doc, {
-      startY: yPosition,
-      body: vehicleData,
-      theme: "plain",
-      styles: {
-        fontSize: 12,
-        cellPadding: 4,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.5,
-      },
-      columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 55 },
-        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 },
-      },
-      margin: { left: margin, right: margin },
-      didDrawPage: (data) => {
-        yPosition = data.cursor.y + sectionSpacing;
-      },
-    });
-
-    // --- Insurance Info ---
-    if (
-      formData.insuranceProvider ||
-      formData.policyNumber ||
-      formData.expiryDate
-    ) {
-      addSectionHeader("INSURANCE INFORMATION");
-      const insuranceData = [
-        ["Provider", formData.insuranceProvider || "N/A"],
-        ["Policy Number", formData.policyNumber || "N/A"],
-        [
-          "Expiry Date",
-          formData.expiryDate
-            ? new Date(formData.expiryDate).toLocaleDateString()
-            : "N/A",
-        ],
-        ["Type", formData.type || "N/A"],
-        [
-          "Excess Amount",
-          formData.excessAmount ? `${formData.excessAmount}` : "N/A",
-        ],
-      ];
-      autoTable(doc, {
-        startY: yPosition,
-        body: insuranceData,
-        theme: "plain",
-        styles: {
-          fontSize: 12,
-          cellPadding: 4,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.5,
-        },
-        columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 55 },
-          1: { cellWidth: pageWidth - 2 * margin - 55 - 10 },
-        },
-        margin: { left: margin, right: margin },
-        didDrawPage: (data) => {
-          yPosition = data.cursor.y + sectionSpacing;
-        },
-      });
+  // Generate a meaningful job card number for existing job cards
+  const getJobCardNumber = () => {
+    if (jobCardData?.jobCardNumber) {
+      return jobCardData.jobCardNumber;
     }
-
-    // --- Job Details ---
-    if (jobPoints.length > 0) {
-      addSectionHeader("JOB DETAILS & SERVICES");
-      const jobDetailsData = jobPoints.map((item, index) => [
-        index + 1,
-        item.description || "N/A",
-      ]);
-      autoTable(doc, {
-        startY: yPosition,
-        head: [["S.No.", "Description"]],
-        body: jobDetailsData,
-        theme: "striped",
-        styles: { fontSize: 12, cellPadding: 5 },
-        headStyles: {
-          fillColor: primaryColor,
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-        },
-        columnStyles: {
-          0: { cellWidth: 25, halign: "center" },
-          1: { cellWidth: pageWidth - 2 * margin - 25 - 15 },
-        },
-        margin: { left: margin, right: margin },
-        didDrawPage: (data) => {
-          yPosition = data.cursor.y + sectionSpacing;
-        },
-      });
+    // For existing job cards without jobCardNumber, use the last 6 characters of the ID
+    if (id && id.length > 6) {
+      return parseInt(id.slice(-6), 16) || id.slice(-6);
     }
-
-    // --- Footer ---
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(9);
-      doc.setTextColor(128, 128, 128);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        pageWidth - margin,
-        doc.internal.pageSize.height - 10,
-        { align: "right" }
-      );
-      doc.text(
-        "Generated by Job Management System",
-        margin,
-        doc.internal.pageSize.height - 10
-      );
-    }
-
-    // --- Save PDF ---
-    const fileName = `JobCardPreview_${formData.carNumber || "N/A"}_${
-      new Date().toISOString().split("T")[0]
-    }.pdf`;
-    doc.save(fileName);
+    return id || "N/A";
   };
+
+  const jobCardNumber = getJobCardNumber();
+  console.log("Final Job Card Number:", jobCardNumber);
+
+  const doc = new jsPDF();
+
+  // Set up colors
+  const primaryColor = [63, 81, 181]; // Theme primary color
+  const lightGray = [245, 245, 245];   // Light background for headers
+  const darkGray = [66, 66, 66];       // Dark text for headers
+  const blackColor = [0, 0, 0];        // Standard black text
+
+  // --- Page Setup ---
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+  const margin = 14;
+  const sectionSpacing = 12; // Space after a section
+  const headerHeight = 30;   // Height for main header
+
+  // --- Header with company branding ---
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22); // Increased header font size
+  doc.setFont('helvetica', 'bold');
+  doc.text('JOB CARD DETAILS', margin, 19); // Adjusted Y position
+
+  // Job Card Number and Date (aligned to the right)
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Job Card #${jobCardNumber}`, pageWidth - margin - 80, 12);
+  
+  doc.setFontSize(12); // Date font size
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, pageWidth - margin - 50, 19); // Adjusted position
+
+  // Reset text color for content
+  doc.setTextColor(...blackColor);
+  let yPosition = headerHeight + 10; // Start content below header
+
+  // --- Helper Function for Section Headers ---
+  const addSectionHeader = (title) => {
+    // Check if enough space for header and some content, else new page
+    if (yPosition > pageHeight - 30) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    doc.setFillColor(...lightGray);
+    doc.rect(margin, yPosition, pageWidth - 2 * margin, 10, 'F'); // Slightly taller header
+    doc.setFontSize(14); // Increased section header font size
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkGray);
+    doc.text(title, margin + 3, yPosition + 7); // Adjusted Y for vertical centering
+    yPosition += 15; // Increased space after header
+    doc.setTextColor(...blackColor);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12); // Set body font size
+  };
+
+  // --- Customer Information Section ---
+  addSectionHeader('CUSTOMER INFORMATION');
+  const customerData = [
+    ['Customer Name', formData.customerName || 'N/A'],
+    ['Contact Number', formData.contactNumber || 'N/A'],
+    ['Email', formData.email || 'N/A'],
+    ['Company', formData.company || 'N/A']
+  ];
+  autoTable(doc, {
+    startY: yPosition,
+    body: customerData,
+    theme: 'plain',
+    styles: {
+      fontSize: 12, // Increased font size
+      cellPadding: 4, // Increased padding
+      lineColor: [200, 200, 200],
+      lineWidth: 0.5,
+      overflow: 'linebreak', // Handle text overflow
+      cellWidth: 'wrap'
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 }, // Slightly wider label column
+      1: { cellWidth: pageWidth - 2 * margin - 55 - 10 } // Adjust data column width
+    },
+    bodyStyles: {
+      valign: 'top' // Align text to the top of cells
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: function (data) {
+      yPosition = data.cursor.y + sectionSpacing; // Update Y position after table
+    }
+  });
+
+  // --- Vehicle Information Section ---
+  addSectionHeader('VEHICLE INFORMATION');
+  const vehicleData = [
+    ['Car Number', formData.carNumber || 'N/A'],
+    ['Model', formData.model || 'N/A'],
+    ['Kilometer', formData.kilometer ? `${formData.kilometer} km` : 'N/A'],
+    [
+      'Fuel Type',
+      fuelTypeOptions.find((o) => o.value === formData.fuelType)?.label || 'N/A'
+    ],
+  ];
+  autoTable(doc, {
+    startY: yPosition,
+    body: vehicleData,
+    theme: 'plain',
+    styles: {
+      fontSize: 12,
+      cellPadding: 4,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.5,
+      overflow: 'linebreak',
+      cellWidth: 'wrap'
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 },
+      1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+    },
+    bodyStyles: {
+      valign: 'top'
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: function (data) {
+      yPosition = data.cursor.y + sectionSpacing;
+    }
+  });
+
+  // --- Insurance Information Section ---
+  if (
+    formData.insuranceProvider ||
+    formData.policyNumber ||
+    formData.expiryDate
+  ) {
+    addSectionHeader('INSURANCE INFORMATION');
+    const insuranceData = [
+      ['Insurance Provider', formData.insuranceProvider || 'N/A'],
+      ['Policy Number', formData.policyNumber || 'N/A'],
+      ['Insurance Type', formData.type || 'N/A'],
+      [
+        'Expiry Date',
+        formData.expiryDate
+          ? new Date(formData.expiryDate).toLocaleDateString('en-IN', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })
+          : 'N/A'
+      ],
+      [
+        'Excess Amount',
+        formData.excessAmount ? `${String(formData.excessAmount)}` : 'N/A'
+      ]
+    ];
+    autoTable(doc, {
+      startY: yPosition,
+      body: insuranceData,
+      theme: 'plain',
+      styles: {
+        fontSize: 12,
+        cellPadding: 4,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.5,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 55 },
+        1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+      },
+      bodyStyles: {
+        valign: 'top'
+      },
+      margin: { left: margin, right: margin },
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing;
+      }
+    });
+  }
+
+  // --- Job Information Section ---
+  addSectionHeader('JOB INFORMATION');
+  const jobInfoData = [
+    ['Job Card Number', jobCardNumber],
+    ['Status', 'Preview'], // Since this is a preview
+    ['Created Date', new Date().toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })],
+    ['Assigned Engineer', 'To be assigned'],
+    ['Engineer Remarks', 'N/A']
+  ];
+  autoTable(doc, {
+    startY: yPosition,
+    body: jobInfoData,
+    theme: 'plain',
+    styles: {
+      fontSize: 12,
+      cellPadding: 4,
+      lineColor: [200, 200, 200],
+      lineWidth: 0.5,
+      overflow: 'linebreak',
+      cellWidth: 'wrap'
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55 },
+      1: { cellWidth: pageWidth - 2 * margin - 55 - 10 }
+    },
+    bodyStyles: {
+      valign: 'top'
+    },
+    margin: { left: margin, right: margin },
+    didDrawPage: function (data) {
+      yPosition = data.cursor.y + sectionSpacing;
+    }
+  });
+
+  // --- Job Details Section (if exists) ---
+  if (jobPoints.length > 0) {
+    addSectionHeader('JOB DETAILS & SERVICES');
+    // Prepare job details data
+    const jobDetailsData = jobPoints.map((item, index) => {
+      const description = item.description || 'N/A';
+      return [index + 1, description];
+    });
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['S.No.', 'Description']],
+      body: jobDetailsData,
+      theme: 'striped',
+      styles: {
+        fontSize: 12,
+        cellPadding: 5, // Increased padding
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 12
+      },
+      columnStyles: {
+        0: { cellWidth: 25, halign: 'center' }, // Slightly wider S.No.
+        1: { cellWidth: pageWidth - 2 * margin - 25 - 15 } // Adjust description width
+      },
+      bodyStyles: {
+        valign: 'top'
+      },
+      margin: { left: margin, right: margin },
+      // Ensure table doesn't split awkwardly
+      pageBreak: 'auto',
+      didDrawPage: function (data) {
+        yPosition = data.cursor.y + sectionSpacing;
+      }
+    });
+  }
+
+  // --- Footer ---
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9); // Slightly larger footer font
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    doc.text('Generated by Job Management System', margin, pageHeight - 10);
+  }
+
+  // --- Save the PDF ---
+  const fileName = `JobCardPreview_${formData.carNumber || 'N/A'}_${
+    new Date().toISOString().split('T')[0]
+  }.pdf`;
+  doc.save(fileName);
+};
 
   useEffect(() => {
     if (!garageId) {
