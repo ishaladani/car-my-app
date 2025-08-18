@@ -96,6 +96,24 @@ const AssignEngineer = () => {
   const [success, setSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [parsedJobDetails, setParsedJobDetails] = useState([]);
+  const [selectedPartIds, setSelectedPartIds] = useState(new Set());
+  const [selectedPartQuantities, setSelectedPartQuantities] = useState({});
+
+  // Clear error when quantities become valid
+  useEffect(() => {
+    if (error && error.includes('Cannot select more than')) {
+      // Check if all selected quantities are now valid
+      const hasInvalidQuantities = Array.from(selectedPartIds).some(partId => {
+        const quantity = selectedPartQuantities[partId] || 1;
+        const availableQuantity = getAvailableQuantity(partId);
+        return quantity > availableQuantity;
+      });
+      
+      if (!hasInvalidQuantities) {
+        setError(null);
+      }
+    }
+  }, [selectedPartQuantities, selectedPartIds, error]);
 
   // Enhanced Add Part Dialog States - Based on InventoryManagement
   const [openAddPartDialog, setOpenAddPartDialog] = useState(false);
@@ -231,7 +249,7 @@ const AssignEngineer = () => {
         return;
       }
 
-      // Update the part quantity in the assignment (local state)
+      // Update the part quantity in the assignment (local state only - no inventory update until form submission)
       const updatedParts = assignment.parts.map((p, idx) =>
         idx === partIndex
           ? { ...p, selectedQuantity: newQuantity }
@@ -240,10 +258,7 @@ const AssignEngineer = () => {
 
       updateAssignment(assignmentId, 'parts', updatedParts);
 
-      if (id && updatedParts.length > 0) {
-        await updateJobCardWithParts(updatedParts);
-      }
-
+      // Don't update job card or inventory here - only during form submission
       if (error && error.includes(part.partName)) {
         setError(null);
       }
@@ -263,17 +278,14 @@ const AssignEngineer = () => {
     if (!part) return;
 
     try {
-      // Remove part from assignment (local state)
+      // Remove part from assignment (local state only - no inventory update until form submission)
       const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
       updateAssignment(assignmentId, 'parts', updatedParts);
 
-      if (id && updatedParts.length > 0) {
-        await updateJobCardWithParts(updatedParts);
-      }
-
+      // Don't update job card or inventory here - only during form submission
       setSnackbar({
         open: true,
-        message: `Part "${part.partName}" removed`,
+        message: `Part "${part.partName}" removed from selection`,
         severity: 'info'
       });
 
@@ -593,6 +605,96 @@ const AssignEngineer = () => {
     }
   }, [apiCall, fetchInventoryParts]);
 
+  // Function to update work progress API when parts are checked/unchecked
+  const updateWorkProgressAPI = async (assignmentId, partId, quantity) => {
+    try {
+      const garageToken = localStorage.getItem('token');
+      if (!garageToken) {
+        throw new Error('No authentication token found');
+      }
+
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment) {
+        throw new Error('Assignment not found');
+      }
+
+      const part = inventoryParts.find(p => p._id === partId);
+      if (!part) {
+        throw new Error('Part not found');
+      }
+
+      // Get current parts from the assignment
+      const currentParts = assignment.parts || [];
+      
+      // If quantity is 0, remove the part from the list
+      let updatedParts;
+      if (quantity === 0) {
+        updatedParts = currentParts.filter(p => p._id !== partId);
+      } else {
+        // Check if part already exists in the assignment
+        const existingPartIndex = currentParts.findIndex(p => p._id === partId);
+        
+        if (existingPartIndex >= 0) {
+          // Update existing part quantity
+          updatedParts = [...currentParts];
+          updatedParts[existingPartIndex] = {
+            ...updatedParts[existingPartIndex],
+            selectedQuantity: quantity
+          };
+        } else {
+          // Add new part
+          const newPart = {
+            ...part,
+            selectedQuantity: quantity,
+            isPreLoaded: false
+          };
+          updatedParts = [...currentParts, newPart];
+        }
+      }
+
+      // Format parts for API
+      const formattedParts = updatedParts.map(part => ({
+        partName: part.partName || '',
+        quantity: Number(part.selectedQuantity || 1),
+        pricePerPiece: parseFloat((part.sellingPrice || part.pricePerUnit || 0).toFixed(2)),
+        totalPrice: parseFloat(((part.sellingPrice || part.pricePerUnit || 0) * (part.selectedQuantity || 1)).toFixed(2))
+      }));
+
+      // Update the assignment locally first
+      updateAssignment(assignmentId, 'parts', updatedParts);
+
+      // Update work progress API
+      const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
+      
+      for (const jobCardId of targetJobCardIds) {
+        if (jobCardId) {
+          const updatePayload = {
+            partsUsed: formattedParts
+          };
+
+          console.log(`🔄 Updating work progress API for job card ${jobCardId} with parts:`, formattedParts);
+
+          await axios.put(
+            `${API_BASE_URL}/garage/jobcards/${jobCardId}/workprogress`,
+            updatePayload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${garageToken}`,
+              }
+            }
+          );
+        }
+      }
+
+      console.log(`✅ Successfully updated work progress API for assignment ${assignmentId}`);
+
+    } catch (err) {
+      console.error(`Failed to update work progress API for assignment ${assignmentId}:`, err);
+      throw new Error(`Failed to update work progress: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
   // Initialize job card IDs
   useEffect(() => {
     const initialJobCardIds = [];
@@ -636,102 +738,98 @@ const AssignEngineer = () => {
   useEffect(() => {
     if (jobCardDataTemp && engineers.length > 0 && inventoryParts.length > 0 && !isLoading && !isLoadingInventory) {
 
+      // Convert partsUsed from job card to format expected by the form
+      let formattedParts = [];
+      if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
+        console.log('Processing partsUsed from job card:', jobCardDataTemp.partsUsed);
 
-      // Set engineer and parts in assignments if they exist
+        const validParts = jobCardDataTemp.partsUsed.filter(usedPart => usedPart && (usedPart.partName || usedPart._id));
+        console.log('Valid parts after filtering:', validParts);
+
+        formattedParts = validParts.map(usedPart => {
+          // Find the part in inventory to get full details
+          const inventoryPart = inventoryParts.find(invPart =>
+            invPart.partName === usedPart.partName ||
+            invPart._id === usedPart.partId ||
+            invPart._id === usedPart._id
+          );
+
+          if (inventoryPart) {
+            return {
+              ...inventoryPart,
+              selectedQuantity: usedPart.quantity || 1,
+              availableQuantity: inventoryPart.quantity,
+              // Ensure sellingPrice and taxAmount are properly set
+              sellingPrice: inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0,
+              taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0,
+              // Mark as pre-loaded from job card
+              isPreLoaded: true,
+              // Preserve original values from job card
+              originalQuantity: usedPart.quantity || 1,
+              originalPricePerPiece: usedPart.pricePerPiece || 0,
+              originalTotalPrice: usedPart.totalPrice || 0
+            };
+          } else {
+            // If part not found in inventory, create a part object using job card data
+            const pricePerPiece = usedPart.pricePerPiece || 0;
+            const sellingPrice = pricePerPiece > 0 ? pricePerPiece : 100;
+            const taxRate = 0;
+
+            return {
+              _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName || 'unknown'}`,
+              partName: usedPart.partName || 'Unknown Part',
+              partNumber: usedPart.partNumber || '',
+              quantity: 0, // No stock available in inventory
+              selectedQuantity: usedPart.quantity || 1,
+              sellingPrice: sellingPrice,
+              pricePerUnit: sellingPrice,
+              taxAmount: taxRate,
+              gstPercentage: taxRate,
+              carName: usedPart.carName || '',
+              model: usedPart.model || '',
+              availableQuantity: 0,
+              // Mark as pre-loaded from job card
+              isPreLoaded: true,
+              // Preserve original values from job card
+              originalQuantity: usedPart.quantity || 1,
+              originalPricePerPiece: usedPart.pricePerPiece || 0,
+              originalTotalPrice: usedPart.totalPrice || 0
+            };
+          }
+        });
+      }
+
+      // Set engineer if exists, otherwise leave as null
+      let assignedEngineer = null;
       if (jobCardDataTemp.engineerId && jobCardDataTemp.engineerId.length > 0) {
-        const assignedEngineer = jobCardDataTemp.engineerId[0]; // Get first engineer
-
+        assignedEngineer = jobCardDataTemp.engineerId[0]; // Get first engineer
         // Find the full engineer object from the engineers list
         const fullEngineerData = engineers.find(eng => eng._id === assignedEngineer._id);
-
-
-        if (fullEngineerData || assignedEngineer) {
-          // Convert partsUsed from job card to format expected by the form
-          let formattedParts = [];
-          if (jobCardDataTemp.partsUsed && jobCardDataTemp.partsUsed.length > 0) {
-            console.log('Processing partsUsed from job card:', jobCardDataTemp.partsUsed);
-
-            const validParts = jobCardDataTemp.partsUsed.filter(usedPart => usedPart && (usedPart.partName || usedPart._id));
-            console.log('Valid parts after filtering:', validParts);
-
-            formattedParts = validParts.map(usedPart => {
-              // Find the part in inventory to get full details
-              const inventoryPart = inventoryParts.find(invPart =>
-                invPart.partName === usedPart.partName ||
-                invPart._id === usedPart.partId ||
-                invPart._id === usedPart._id
-              );
-
-              if (inventoryPart) {
-                return {
-                  ...inventoryPart,
-                  selectedQuantity: usedPart.quantity || 1,
-                  availableQuantity: inventoryPart.quantity,
-                  // Ensure sellingPrice and taxAmount are properly set
-                  sellingPrice: inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0,
-                  taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0,
-                  // Mark as pre-loaded from job card
-                  isPreLoaded: true,
-                  // Preserve original values from job card
-                  originalQuantity: usedPart.quantity || 1,
-                  originalPricePerPiece: usedPart.pricePerPiece || 0,
-                  originalTotalPrice: usedPart.totalPrice || 0
-                };
-              } else {
-                // If part not found in inventory, create a mock part object with default pricing
-                // Use the pricePerPiece from the job card data if available
-                const pricePerPiece = usedPart.pricePerPiece || 0;
-                const sellingPrice = pricePerPiece > 0 ? pricePerPiece : 100; // Default to 100 if no price
-                const taxRate = 0; // Default tax rate
-
-                return {
-                  _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName || 'unknown'}`,
-                  partName: usedPart.partName || 'Unknown Part',
-                  partNumber: usedPart.partNumber || '',
-                  quantity: 0, // No stock available
-                  selectedQuantity: usedPart.quantity || 1,
-                  sellingPrice: sellingPrice,
-                  pricePerUnit: sellingPrice,
-                  taxAmount: taxRate,
-                  gstPercentage: taxRate,
-                  carName: usedPart.carName || '',
-                  model: usedPart.model || '',
-                  availableQuantity: 0,
-                  // Mark as pre-loaded from job card
-                  isPreLoaded: true,
-                  // Preserve original values from job card
-                  originalQuantity: usedPart.quantity || 1,
-                  originalPricePerPiece: usedPart.pricePerPiece || 0,
-                  originalTotalPrice: usedPart.totalPrice || 0
-                };
-              }
-            });
-          }
-
-          // Update the first assignment with engineer and parts
-          const newAssignment = {
-            id: Date.now(),
-            engineer: fullEngineerData || assignedEngineer,
-            parts: formattedParts,
-            priority: 'medium',
-            estimatedDuration: jobCardDataTemp.laborHours ? `${jobCardDataTemp.laborHours} hours` : '',
-            notes: jobCardDataTemp.engineerRemarks || ''
-          };
-
-          setAssignments([newAssignment]);
-
-
-
-          // Clear temp data
-          setJobCardDataTemp(null);
-
-          setSnackbar({
-            open: true,
-            message: `✅ Job card data populated! Engineer: ${assignedEngineer.name || assignedEngineer.email || 'Unknown Engineer'}, Parts: ${formattedParts.length} items`,
-            severity: 'success'
-          });
+        if (fullEngineerData) {
+          assignedEngineer = fullEngineerData;
         }
       }
+
+      // Update the first assignment with engineer and parts
+      const newAssignment = {
+        id: Date.now(),
+        engineer: assignedEngineer,
+        parts: formattedParts,
+        priority: 'medium',
+        estimatedDuration: jobCardDataTemp.laborHours ? `${jobCardDataTemp.laborHours} hours` : '',
+        notes: jobCardDataTemp.engineerRemarks || ''
+      };
+
+      setAssignments([newAssignment]);
+
+      // Clear temp data
+      setJobCardDataTemp(null);
+
+      setSnackbar({
+        open: true,
+        message: `✅ Job card data populated! ${assignedEngineer ? `Engineer: ${assignedEngineer.name || assignedEngineer.email || 'Unknown Engineer'}, ` : ''}Parts: ${formattedParts.length} items`,
+        severity: 'success'
+      });
     }
   }, [jobCardDataTemp, engineers, inventoryParts, isLoading, isLoadingInventory]);
 
@@ -851,24 +949,56 @@ const AssignEngineer = () => {
         return;
       }
 
-      // Keep existing pre-loaded parts
+      // Keep existing pre-loaded parts (these should always remain)
       const existingPreLoadedParts = currentAssignment.parts.filter(part => part.isPreLoaded);
 
-      // Process new parts (user-selected parts)
-      const processedNewParts = newParts
-        .filter(part => !part.isPreLoaded) // Only process non-pre-loaded parts
-        .map(part => ({
-          ...part,
-          selectedQuantity: part.selectedQuantity || 1,
-          isPreLoaded: false
-        }));
+      // Get previously selected user parts (excluding pre-loaded)
+      const previousUserParts = currentAssignment.parts.filter(part => !part.isPreLoaded);
 
+      // Calculate inventory changes for removed parts
+      const partsToRemove = previousUserParts.filter(prevPart => 
+        !newParts.some(newPart => newPart._id === prevPart._id)
+      );
+      
+      // Calculate inventory changes for added parts
+      const partsToAdd = newParts.filter(newPart => 
+        !previousUserParts.some(prevPart => prevPart._id === newPart._id)
+      );
+
+      // Update inventory for removed parts (increase quantity)
+      for (const part of partsToRemove) {
+        const selectedQuantity = part.selectedQuantity || 1;
+        const currentPart = inventoryParts.find(p => p._id === part._id);
+        if (currentPart) {
+          const newQuantity = currentPart.quantity + selectedQuantity;
+          await updatePartQuantity(part._id, newQuantity);
+        }
+      }
+
+      // Update inventory for added parts (decrease quantity)
+      for (const part of partsToAdd) {
+        const currentPart = inventoryParts.find(p => p._id === part._id);
+        if (currentPart) {
+          const newQuantity = Math.max(0, currentPart.quantity - 1);
+          await updatePartQuantity(part._id, newQuantity);
+        }
+      }
+
+      // Process new parts (these are the current selection from Autocomplete)
+      const processedNewParts = newParts.map(part => ({
+        ...part,
+        selectedQuantity: part.selectedQuantity || 1,
+        isPreLoaded: false // Always mark as user-selected
+      }));
+
+      // Combine pre-loaded parts with new user-selected parts
       const allParts = [...existingPreLoadedParts, ...processedNewParts];
 
       console.log('📦 Processed parts:', {
         assignmentId,
         existingPreLoadedParts: existingPreLoadedParts.length,
-        processedNewParts: processedNewParts.length,
+        previousUserParts: previousUserParts.length,
+        newParts: processedNewParts.length,
         totalParts: allParts.length,
         allParts: allParts.map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
       });
@@ -879,13 +1009,278 @@ const AssignEngineer = () => {
         await updateJobCardWithParts(allParts);
       }
 
+      // Show success message for part selection
+      if (newParts.length > 1) {
+        setSuccess(`Successfully selected ${newParts.length} parts!`);
+      } else if (newParts.length === 0) {
+        setSuccess('All user-selected parts cleared!');
+      } else {
+        setSuccess(`Successfully selected ${newParts.length} part!`);
+      }
+
     } catch (err) {
       console.error('❌ Error handling part selection:', err);
       setError('Failed to update part selection and job card');
     }
   };
 
+  // Function to add a single part to the selection
+  const handleAddPartToSelection = async (assignmentId, partToAdd) => {
+    try {
+      const currentAssignment = assignments.find(a => a.id === assignmentId);
+      if (!currentAssignment) {
+        console.error('❌ Assignment not found:', assignmentId);
+        return;
+      }
 
+      // Check if part is already selected
+      const isAlreadySelected = currentAssignment.parts.some(part => 
+        part._id === partToAdd._id && !part.isPreLoaded
+      );
+
+      if (isAlreadySelected) {
+        setError(`Part "${partToAdd.partName}" is already selected`);
+        return;
+      }
+
+      // Check available quantity
+      const availableQuantity = getAvailableQuantity(partToAdd._id);
+      if (availableQuantity <= 0) {
+        setError(`No stock available for "${partToAdd.partName}"`);
+        return;
+      }
+
+      // Add the new part to the selection
+      const newPart = {
+        ...partToAdd,
+        selectedQuantity: 1,
+        isPreLoaded: false
+      };
+
+      // Update inventory (decrease by 1)
+      const currentPart = inventoryParts.find(p => p._id === partToAdd._id);
+      if (currentPart) {
+        const newQuantity = Math.max(0, currentPart.quantity - 1);
+        await updatePartQuantity(partToAdd._id, newQuantity);
+      }
+
+      // Add to assignment
+      const updatedParts = [...currentAssignment.parts, newPart];
+      updateAssignment(assignmentId, 'parts', updatedParts);
+
+      setSuccess(`Successfully added "${partToAdd.partName}" to selection!`);
+
+    } catch (err) {
+      console.error('❌ Error adding part to selection:', err);
+      setError('Failed to add part to selection');
+    }
+  };
+
+  // Function to handle checkbox selection with immediate inventory update and work progress API call
+  const handleCheckboxChange = async (partId, assignmentId) => {
+    const newSelectedPartIds = new Set(selectedPartIds);
+    const part = inventoryParts.find(p => p._id === partId);
+    
+    if (!part) {
+      setError('Part not found');
+      return;
+    }
+
+    if (newSelectedPartIds.has(partId)) {
+      // Unchecking - remove from selection
+      newSelectedPartIds.delete(partId);
+      const newQuantities = { ...selectedPartQuantities };
+      delete newQuantities[partId];
+      setSelectedPartQuantities(newQuantities);
+      
+      // Update inventory (increase quantity back)
+      try {
+        const currentPart = inventoryParts.find(p => p._id === partId);
+        if (currentPart) {
+          const quantityToReturn = selectedPartQuantities[partId] || 1;
+          const newQuantity = currentPart.quantity + quantityToReturn;
+          await updatePartQuantity(partId, newQuantity);
+          
+          // Update work progress API to remove the part
+          await updateWorkProgressAPI(assignmentId, partId, 0); // 0 quantity means remove
+          
+          setSuccess(`Removed "${part.partName}" from selection and restored ${quantityToReturn} to inventory`);
+        }
+      } catch (error) {
+        console.error('Error removing part from selection:', error);
+        setError('Failed to remove part from selection');
+      }
+    } else {
+      // Checking - add to selection
+      newSelectedPartIds.add(partId);
+      const defaultQuantity = 1;
+      setSelectedPartQuantities(prev => ({
+        ...prev,
+        [partId]: defaultQuantity
+      }));
+      
+      // Check available quantity
+      const availableQuantity = getAvailableQuantity(partId);
+      if (availableQuantity < defaultQuantity) {
+        setError(`Insufficient stock for "${part.partName}". Available: ${availableQuantity}`);
+        return;
+      }
+      
+      // Update inventory (decrease quantity)
+      try {
+        const currentPart = inventoryParts.find(p => p._id === partId);
+        if (currentPart) {
+          const newQuantity = Math.max(0, currentPart.quantity - defaultQuantity);
+          await updatePartQuantity(partId, newQuantity);
+          
+          // Update work progress API to add the part
+          await updateWorkProgressAPI(assignmentId, partId, defaultQuantity);
+          
+          setSuccess(`Added "${part.partName}" (Qty: ${defaultQuantity}) to selection and updated inventory`);
+        }
+      } catch (error) {
+        console.error('Error adding part to selection:', error);
+        setError('Failed to add part to selection');
+        // Revert the checkbox state
+        return;
+      }
+    }
+    
+    setSelectedPartIds(newSelectedPartIds);
+  };
+
+  // Function to handle quantity change for selected parts with work progress API update
+  const handleQuantityChange = async (partId, newQuantity, assignmentId) => {
+    if (newQuantity < 1) return;
+    
+    // Get the part to check available quantity
+    const part = inventoryParts.find(p => p._id === partId);
+    if (!part) return;
+    
+    const availableQuantity = getAvailableQuantity(partId);
+    
+    // Ensure quantity doesn't exceed available stock
+    if (newQuantity > availableQuantity) {
+      setError(`Cannot select more than ${availableQuantity} units for "${part.partName}". Available stock: ${availableQuantity}`);
+      return;
+    }
+    
+    // Update local state
+    setSelectedPartQuantities(prev => ({
+      ...prev,
+      [partId]: newQuantity
+    }));
+
+    // Update work progress API if assignmentId is provided
+    if (assignmentId) {
+      try {
+        await updateWorkProgressAPI(assignmentId, partId, newQuantity);
+        setSuccess(`Updated quantity for "${part.partName}" to ${newQuantity}`);
+      } catch (error) {
+        console.error('Error updating quantity in work progress API:', error);
+        setError('Failed to update quantity in work progress API');
+      }
+    }
+  };
+
+  // Function to add selected parts from checkboxes with quantities
+  const handleAddSelectedParts = async (assignmentId) => {
+    try {
+      const selectedParts = inventoryParts.filter(part => selectedPartIds.has(part._id));
+      
+      if (selectedParts.length === 0) {
+        setError('Please select at least one part');
+        return;
+      }
+
+      // Check for invalid quantities before adding
+      const invalidParts = selectedParts.filter(part => {
+        const quantity = selectedPartQuantities[part._id] || 1;
+        const availableQuantity = getAvailableQuantity(part._id);
+        return quantity > availableQuantity;
+      });
+
+      if (invalidParts.length > 0) {
+        const invalidPartNames = invalidParts.map(part => part.partName).join(', ');
+        setError(`Cannot add parts with invalid quantities: ${invalidPartNames}. Please adjust quantities to match available stock.`);
+        return;
+      }
+
+      let addedCount = 0;
+      for (const part of selectedParts) {
+        try {
+          const quantity = selectedPartQuantities[part._id] || 1;
+          await handleAddPartToSelectionWithQuantity(assignmentId, part, quantity);
+          addedCount++;
+        } catch (error) {
+          console.error(`Failed to add part ${part.partName}:`, error);
+        }
+      }
+
+      if (addedCount > 0) {
+        setSuccess(`Successfully added ${addedCount} parts to selection!`);
+        // Clear selected checkboxes and quantities
+        setSelectedPartIds(new Set());
+        setSelectedPartQuantities({});
+      }
+
+    } catch (err) {
+      console.error('❌ Error adding selected parts:', err);
+      setError('Failed to add selected parts');
+    }
+  };
+
+  // Function to add a single part with specific quantity
+  const handleAddPartToSelectionWithQuantity = async (assignmentId, partToAdd, quantity) => {
+    try {
+      const currentAssignment = assignments.find(a => a.id === assignmentId);
+      if (!currentAssignment) {
+        console.error('❌ Assignment not found:', assignmentId);
+        return;
+      }
+
+      // Check if part is already selected
+      const isAlreadySelected = currentAssignment.parts.some(part => 
+        part._id === partToAdd._id && !part.isPreLoaded
+      );
+
+      if (isAlreadySelected) {
+        setError(`Part "${partToAdd.partName}" is already selected`);
+        return;
+      }
+
+      // Check available quantity
+      const availableQuantity = getAvailableQuantity(partToAdd._id);
+      if (availableQuantity < quantity) {
+        setError(`Insufficient stock for "${partToAdd.partName}". Required: ${quantity}, Available: ${availableQuantity}`);
+        return;
+      }
+
+      // Add the new part to the selection
+      const newPart = {
+        ...partToAdd,
+        selectedQuantity: quantity,
+        isPreLoaded: false
+      };
+
+      // Update inventory (decrease by quantity)
+      const currentPart = inventoryParts.find(p => p._id === partToAdd._id);
+      if (currentPart) {
+        const newQuantity = Math.max(0, currentPart.quantity - quantity);
+        await updatePartQuantity(partToAdd._id, newQuantity);
+      }
+
+      // Add to assignment
+      const updatedParts = [...currentAssignment.parts, newPart];
+      updateAssignment(assignmentId, 'parts', updatedParts);
+
+      setSuccess(`Successfully added "${partToAdd.partName}" (Qty: ${quantity}) to selection!`);
+
+    } catch (err) {
+      console.error('❌ Error adding part to selection:', err);
+      setError('Failed to add part to selection');
+    }
+  };
 
   // Form Validation
   const validateForm = () => {
@@ -1018,40 +1413,8 @@ const AssignEngineer = () => {
 
       // Collect all parts used across all assignments with enhanced data
       const allPartsUsed = getAllPartsForAPI();
-      const partUpdates = []; // Track inventory updates needed
 
-      // Track inventory updates needed (only for user-selected parts)
-      assignments.forEach(assignment => {
-        assignment.parts.forEach(part => {
-          if (!part.isPreLoaded) {
-            const selectedQuantity = part.selectedQuantity || 1;
-            const existingUpdateIndex = partUpdates.findIndex(p => p.partId === part._id);
-            if (existingUpdateIndex !== -1) {
-              partUpdates[existingUpdateIndex].totalUsed += selectedQuantity;
-            } else {
-              partUpdates.push({
-                partId: part._id,
-                partName: part.partName,
-                totalUsed: selectedQuantity,
-                originalQuantity: part.quantity
-              });
-            }
-          }
-        });
-      });
-
-      // Update inventory for all used parts
-      for (const partUpdate of partUpdates) {
-        const currentPart = inventoryParts.find(p => p._id === partUpdate.partId);
-        if (currentPart) {
-          const newQuantity = currentPart.quantity - partUpdate.totalUsed;
-          if (newQuantity < 0) {
-            throw new Error(`Insufficient stock for "${partUpdate.partName}". Required: ${partUpdate.totalUsed}, Available: ${currentPart.quantity}`);
-          }
-
-          await updatePartQuantity(partUpdate.partId, newQuantity);
-        }
-      }
+      // Note: Inventory is already updated when parts are added/removed, so no need to update again here
 
       // Update job card with parts used using the workprogress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
@@ -1120,7 +1483,8 @@ const AssignEngineer = () => {
       const successMessage = `✅ Assignment completed! 
         Total Cost: ₹${totalCost.toFixed(2)} 
         (Job Details: ₹${totalJobDetailsCost.toFixed(2)} + Parts: ₹${(totalCost - totalJobDetailsCost).toFixed(2)}) 
-        Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedParts.length} user-selected = ${allPartsUsed.length} total`;
+        Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedParts.length} user-selected = ${allPartsUsed.length} total
+        (Inventory already updated when parts were added)`;
 
       setSnackbar({
         open: true,
@@ -1555,6 +1919,58 @@ const AssignEngineer = () => {
                     </Typography>
                   </Box>
                 </Grid>
+                <Grid item xs={12}>
+                  <Box sx={{ 
+                    mt: 2, 
+                    p: 2, 
+                    bgcolor: 'info.light', 
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'info.main'
+                  }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'info.dark', mb: 1 }}>
+                      📦 Inventory Impact Summary:
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Pre-loaded Parts:</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {assignments.reduce((total, assignment) => 
+                            total + assignment.parts.filter(part => part.isPreLoaded).length, 0
+                          )} (No inventory change)
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">User Selected Parts:</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {assignments.reduce((total, assignment) => 
+                            total + assignment.parts.filter(part => !part.isPreLoaded).length, 0
+                          )} (Will reduce inventory)
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Total Quantity:</Typography>
+                        <Typography variant="body2" fontWeight={600}>
+                          {assignments.reduce((total, assignment) => 
+                            total + assignment.parts.reduce((partTotal, part) => 
+                              partTotal + (part.selectedQuantity || 1), 0
+                            ), 0
+                          )} units
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" color="text.secondary">Status:</Typography>
+                        <Chip 
+                          label={isSubmitting ? "Processing..." : "Ready"} 
+                          size="small" 
+                          color={isSubmitting ? "warning" : "success"} 
+                          variant="filled"
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Grid>
               </Grid>
 
             </CardContent>
@@ -1887,70 +2303,85 @@ const AssignEngineer = () => {
                           </FormControl>
                         </Grid>
 
-                        {/* Parts Selection with Quantity Management */}
-                        <Grid item xs={12}>
-                          <Box sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: { xs: 'stretch', sm: 'center' },
-                            mb: 1,
-                            flexDirection: { xs: 'column', sm: 'row' },
-                            gap: 1
-                          }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography
-                                variant="subtitle2"
-                                fontWeight={600}
-                                sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
-                              >
-                                Select Parts (Optional)
-                              </Typography>
-                              <Tooltip title="You can select multiple parts at once. Use Ctrl/Cmd + Click to select multiple parts.">
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ cursor: 'help' }}
-                                >
-                                  ℹ️
-                                </Typography>
-                              </Tooltip>
+                                                  {/* Parts Selection with Quantity Management */}
+                          <Grid item xs={12}>
+                            <Box sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: { xs: 'stretch', sm: 'center' },
+                              mb: 1,
+                              flexDirection: { xs: 'column', sm: 'row' },
+                              gap: 1
+                            }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Tooltip title="Add New Part">
+                                  <Button
+                                    variant="outlined"
+                                    color="primary"
+                                    size="small"
+                                    startIcon={<AddIcon />}
+                                    onClick={() => setOpenAddPartDialog(true)}
+                                    sx={{ flex: { xs: 1, sm: 'none' } }}
+                                  >
+                                    Add Part
+                                  </Button>
+                                </Tooltip>
+                                
+                                <Tooltip title="Clear all selected parts">
+                                  <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    startIcon={<DeleteIcon />}
+                                    onClick={() => {
+                                      const currentAssignment = assignments.find(a => a.id === assignment.id);
+                                      if (currentAssignment) {
+                                        const existingPreLoadedParts = currentAssignment.parts.filter(part => part.isPreLoaded);
+                                        updateAssignment(assignment.id, 'parts', existingPreLoadedParts);
+                                        setSuccess('All user-selected parts cleared');
+                                      }
+                                    }}
+                                    sx={{ flex: { xs: 1, sm: 'none' } }}
+                                  >
+                                    Clear All
+                                  </Button>
+                                </Tooltip>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Tooltip title="Add New Part">
-                                <Button
-                                  variant="outlined"
-                                  color="primary"
-                                  size="small"
-                                  startIcon={<AddIcon />}
-                                  onClick={() => setOpenAddPartDialog(true)}
-                                  sx={{ flex: { xs: 1, sm: 'none' } }}
-                                >
-                                  Add Part
-                                </Button>
-                              </Tooltip>
-                              
-                            </Box>
-                          </Box>
+
+                          {/* Inventory Management Notice */}
+                          <Alert
+                            severity="info"
+                            sx={{ mb: 2 }}
+                            icon={<InventoryIcon />}
+                          >
+                            <Typography variant="body2">
+                              <strong>Inventory Management:</strong> When you add parts, inventory quantities are updated immediately. 
+                              Pre-loaded parts from the job card cannot be modified. Use the + and - buttons to adjust quantities before submission.
+                              <br />
+                              <strong>Part Selection:</strong> Check the boxes below to immediately add parts to your selection. Parts are automatically removed from inventory and added to the work progress when checked. Pre-loaded parts from the job card are already included and cannot be selected again.
+                            </Typography>
+                          </Alert>
 
                           {/* Pre-loaded Parts Notice */}
-                          {/* {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
+                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
                             <Alert
                               severity="info"
                               sx={{ mb: 2 }}
                               icon={<InventoryIcon />}
                             >
                               <Typography variant="body2">
-                                <strong>Pre-loaded parts detected:</strong> {assignment.parts.filter(part => part.isPreLoaded).length} parts from the job card are already included and will be sent to the work progress API.
+                                <strong>Pre-loaded parts detected:</strong> {assignment.parts.filter(part => part.isPreLoaded).length} parts from the job card are already included and will be sent to the work progress API. These parts are excluded from the selection list below.
                               </Typography>
                             </Alert>
-                          )} */}
+                          )}
 
                           {/* No Parts Available Notice */}
                           {(() => {
                             const availableParts = inventoryParts.filter(part => {
                               const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === part._id);
                               const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
-                              return isAlreadySelected || hasAvailableQuantity;
+                              return !isAlreadySelected && hasAvailableQuantity;
                             });
 
                             if (availableParts.length === 0 && !isLoadingInventory) {
@@ -1961,7 +2392,7 @@ const AssignEngineer = () => {
                                   icon={<InventoryIcon />}
                                 >
                                   <Typography variant="body2">
-                                    <strong>No parts available:</strong> All parts in inventory are either out of stock or already selected. You can add new parts using the "Add Part" button.
+                                    <strong>No parts available:</strong> All parts in inventory are either out of stock or already selected (including pre-loaded parts from job card). You can add new parts using the "Add Part" button.
                                   </Typography>
                                 </Alert>
                               );
@@ -1969,7 +2400,7 @@ const AssignEngineer = () => {
                             return null;
                           })()}
 
-                          {isLoadingInventory ? (
+                          {isLoadingInventory && (
                             <Box sx={{
                               display: 'flex',
                               justifyContent: 'center',
@@ -1981,92 +2412,289 @@ const AssignEngineer = () => {
                                 Loading parts...
                               </Typography>
                             </Box>
-                          ) : (
-                            <Autocomplete
-                              multiple
-                              fullWidth
-                              options={inventoryParts.filter(part => {
-                                // Allow parts that are already selected or have available quantity
-                                const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === part._id);
-                                const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
-                                return isAlreadySelected || hasAvailableQuantity;
-                              })}
-                              getOptionLabel={(option) => {
-                                const available = getAvailableQuantity(option._id);
-                                const stockStatus = available <= 2 ? '⚠️ LOW STOCK' : available <= 5 ? '⚠️' : '';
-                                return `${option.partName} (${option.partNumber || 'N/A'}) - ₹${option.pricePerUnit || 0} | GST: ${option.gstPercentage || option.taxAmount || 0}% | Available: ${available} ${stockStatus}`;
-                              }}
-                              isOptionEqualToValue={(option, value) => {
-                                if (!option || !value) return false;
-                                return option._id === value._id || option.id === value.id;
-                              }}
-                              value={assignment.parts.filter(part => !part.isPreLoaded)} // Only show user-selected parts in the dropdown
-                              onChange={(event, newValue) => {
-                                console.log('🔄 Autocomplete onChange:', {
-                                  newValue: newValue,
-                                  newValueLength: newValue.length,
-                                  assignmentId: assignment.id
-                                });
-                                handlePartSelection(assignment.id, newValue, assignment.parts);
-                              }}
-                              renderTags={(value, getTagProps) =>
-                                value.map((option, index) => (
-                                  <Chip
-                                    variant="outlined"
-                                    color={option.isPreLoaded ? "info" : "primary"}
-                                    label={`${option.partName} (${option.partNumber || 'N/A'}) - Qty: ${option.selectedQuantity || 1} @ ₹${option.pricePerUnit || 0}`}
-                                    {...getTagProps({ index })}
-                                    key={option._id}
-                                    sx={{
-                                      fontSize: '0.75rem',
-                                      '& .MuiChip-label': {
-                                        fontSize: '0.75rem'
+                          )}
+                          
+
+
+                          {/* Individual Part Selection with Checkboxes */}
+                          <Box sx={{ mt: 2 }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              mb: 1
+                            }}>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: { xs: '0.9rem', sm: '1rem' }
+                                }}
+                              >
+                                Available Parts (Select with checkboxes):
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={async () => {
+                                    const availableParts = inventoryParts.filter(part => {
+                                      const isAlreadySelected = assignment.parts.some(selectedPart => 
+                                        selectedPart._id === part._id
+                                      );
+                                      const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
+                                      return !isAlreadySelected && hasAvailableQuantity;
+                                    });
+                                    
+                                    if (availableParts.length === 0) {
+                                      setError('No available parts to select');
+                                      return;
+                                    }
+
+                                    try {
+                                      // Select all available parts and update inventory/work progress API
+                                      for (const part of availableParts) {
+                                        await handleCheckboxChange(part._id, assignment.id);
+                                      }
+                                      
+                                      setSuccess(`Successfully selected all ${availableParts.length} available parts`);
+                                    } catch (error) {
+                                      console.error('Error selecting all parts:', error);
+                                      setError('Failed to select all parts');
+                                    }
+                                  }}
+                                  sx={{ fontSize: '0.75rem' }}
+                                >
+                                  Select All
+                                </Button>
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={() => handleAddSelectedParts(assignment.id)}
+                                  disabled={selectedPartIds.size === 0 || (() => {
+                                    // Check if any selected parts have invalid quantities
+                                    const selectedParts = inventoryParts.filter(part => selectedPartIds.has(part._id));
+                                    return selectedParts.some(part => {
+                                      const quantity = selectedPartQuantities[part._id] || 1;
+                                      const availableQuantity = getAvailableQuantity(part._id);
+                                      return quantity > availableQuantity;
+                                    });
+                                  })()}
+                                  sx={{ fontSize: '0.75rem' }}
+                                >
+                                  Add Selected ({selectedPartIds.size})
+                                </Button>
+                                {selectedPartIds.size > 0 && (
+                                  <Button
+                                    variant="text"
+                                    size="small"
+                                    onClick={async () => {
+                                      try {
+                                        // Remove all selected parts from inventory and work progress API
+                                        const selectedParts = Array.from(selectedPartIds);
+                                        for (const partId of selectedParts) {
+                                          await handleCheckboxChange(partId, assignment.id);
+                                        }
+                                        
+                                        setSuccess('Cleared all selected parts');
+                                      } catch (error) {
+                                        console.error('Error clearing selected parts:', error);
+                                        setError('Failed to clear selected parts');
                                       }
                                     }}
-                                  />
-                                ))
-                              }
-                              renderOption={(props, option) => {
-                                const available = getAvailableQuantity(option._id);
-                                const stockStatus = available <= 2 ? '⚠️ LOW STOCK' : available <= 5 ? '⚠️' : '';
-                                return (
-                                  <Box component="li" {...props} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                    <Typography variant="body2" noWrap sx={{ width: '100%', textOverflow: 'ellipsis' }}>
-                                      {option.partName}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ width: '100%' }}>
-                                      #{option.partNumber} | ₹{option.pricePerUnit} | GST: {option.taxAmount}% | Avail: {available} {stockStatus}
-                                    </Typography>
-                                  </Box>
-                                );
-                              }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  InputProps={{
-                                    ...params.InputProps,
-                                    sx: { borderRadius: 1 }
-                                  }}
-                                />
-                              )}
-                              sx={{ '& .MuiAutocomplete-popper': { maxHeight: 300 } }}
-                              noOptionsText="No parts available in stock or all parts already selected"
-                              filterOptions={(options, { inputValue }) => {
-                                return options.filter(option => {
-                                  // Allow parts that are already selected or have available quantity
-                                  const isAlreadySelected = assignment.parts.some(selectedPart => selectedPart._id === option._id);
-                                  const hasAvailableQuantity = getAvailableQuantity(option._id) > 0;
-                                  const isAvailable = isAlreadySelected || hasAvailableQuantity;
-
-                                  return isAvailable && (
-                                    option.partName.toLowerCase().includes(inputValue.toLowerCase()) ||
-                                    option.partNumber?.toLowerCase().includes(inputValue.toLowerCase()) ||
-                                    option.carName?.toLowerCase().includes(inputValue.toLowerCase()) ||
-                                    option.model?.toLowerCase().includes(inputValue.toLowerCase())
+                                    sx={{ fontSize: '0.75rem' }}
+                                  >
+                                    Clear
+                                  </Button>
+                                )}
+                              </Box>
+                            </Box>
+                            <Box sx={{ 
+                              maxHeight: '300px',
+                              overflowY: 'auto',
+                              border: `1px solid ${theme.palette.divider}`,
+                              borderRadius: 1,
+                              p: 1
+                            }}>
+                              {inventoryParts
+                                .filter(part => {
+                                  const isAlreadySelected = assignment.parts.some(selectedPart => 
+                                    selectedPart._id === part._id
                                   );
-                                });
-                              }}
-                            />
+                                  const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
+                                  return !isAlreadySelected && hasAvailableQuantity;
+                                })
+                                .map((part) => {
+                                  const available = getAvailableQuantity(part._id);
+                                  return (
+                                    <Box
+                                      key={part._id}
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        p: 1,
+                                        borderBottom: `1px solid ${theme.palette.divider}`,
+                                        '&:last-child': { borderBottom: 'none' },
+                                        '&:hover': {
+                                          backgroundColor: 'action.hover'
+                                        }
+                                      }}
+                                    >
+                                                                                                                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 1 }}>
+                                         <FormControlLabel
+                                           control={
+                                             <Checkbox
+                                               checked={selectedPartIds.has(part._id)}
+                                               onChange={() => handleCheckboxChange(part._id, assignment.id)}
+                                               color="primary"
+                                               size="small"
+                                             />
+                                           }
+                                           label={
+                                             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                               <Typography variant="body2" fontWeight={500}>
+                                                 {part.partName}
+                                               </Typography>
+                                               <Typography variant="caption" color="text.secondary">
+                                                 Part #: {part.partNumber || 'N/A'} | Price: ₹{part.pricePerUnit || 0} | Available: {available}
+                                               </Typography>
+                                             </Box>
+                                           }
+                                           sx={{
+                                             flex: 1,
+                                             margin: 0,
+                                             '& .MuiFormControlLabel-label': {
+                                               width: '100%'
+                                             }
+                                           }}
+                                         />
+                                         {selectedPartIds.has(part._id) && (
+                                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             <Tooltip title={`Maximum quantity: ${available} (available stock)`}>
+                                               <Typography 
+                                                 variant="caption" 
+                                                 color={selectedPartQuantities[part._id] > available ? "error" : "text.secondary"}
+                                               >
+                                                 Qty:
+                                               </Typography>
+                                             </Tooltip>
+                                             <TextField
+                                               size="small"
+                                               type="number"
+                                               value={selectedPartQuantities[part._id] || 1}
+                                               onChange={(e) => {
+                                                 const newQuantity = parseInt(e.target.value) || 1;
+                                                 if (newQuantity >= 1) {
+                                                   handleQuantityChange(part._id, newQuantity, assignment.id);
+                                                 }
+                                               }}
+                                               onBlur={(e) => {
+                                                 // Ensure value is within bounds when user leaves the field
+                                                 const currentValue = parseInt(e.target.value) || 1;
+                                                 const availableQuantity = getAvailableQuantity(part._id);
+                                                 if (currentValue > availableQuantity) {
+                                                   setSelectedPartQuantities(prev => ({
+                                                     ...prev,
+                                                     [part._id]: availableQuantity
+                                                   }));
+                                                 } else if (currentValue < 1) {
+                                                   setSelectedPartQuantities(prev => ({
+                                                     ...prev,
+                                                     [part._id]: 1
+                                                   }));
+                                                 }
+                                               }}
+                                               inputProps={{
+                                                 min: 1,
+                                                 max: available,
+                                                 style: { width: '50px', textAlign: 'center' }
+                                               }}
+                                               error={selectedPartQuantities[part._id] > available}
+                                               helperText={selectedPartQuantities[part._id] > available ? `Max: ${available}` : ''}
+                                               sx={{
+                                                 width: '70px',
+                                                 '& .MuiInputBase-input': {
+                                                   textAlign: 'center',
+                                                   fontSize: '0.75rem'
+                                                 },
+                                                 '& .MuiFormHelperText-root': {
+                                                   fontSize: '0.6rem',
+                                                   margin: 0,
+                                                   textAlign: 'center'
+                                                 }
+                                               }}
+                                             />
+                                           </Box>
+                                         )}
+                                       </Box>
+                                    </Box>
+                                  );
+                                })}
+                              {inventoryParts.filter(part => {
+                                const isAlreadySelected = assignment.parts.some(selectedPart => 
+                                  selectedPart._id === part._id
+                                );
+                                const hasAvailableQuantity = getAvailableQuantity(part._id) > 0;
+                                return !isAlreadySelected && hasAvailableQuantity;
+                              }).length === 0 && (
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'center', 
+                                  alignItems: 'center',
+                                  py: 3
+                                }}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    No more parts available to add
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+
+                          {/* Current Selection Summary */}
+                          {assignment.parts.filter(part => !part.isPreLoaded).length > 0 && (
+                            <Box sx={{ 
+                              mt: 2, 
+                              p: 2, 
+                              bgcolor: 'primary.light', 
+                              borderRadius: 1,
+                              border: '1px solid',
+                              borderColor: 'primary.main'
+                            }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.dark', mb: 1 }}>
+                                📋 Current Selection Summary:
+                              </Typography>
+                              <Grid container spacing={2}>
+                                <Grid item xs={6} sm={3}>
+                                  <Typography variant="caption" color="text.secondary">User Selected Parts:</Typography>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {assignment.parts.filter(part => !part.isPreLoaded).length} parts
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                  <Typography variant="caption" color="text.secondary">Total Quantity:</Typography>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {assignment.parts.filter(part => !part.isPreLoaded).reduce((total, part) => total + (part.selectedQuantity || 1), 0)} units
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                  <Typography variant="caption" color="text.secondary">Pre-loaded Parts:</Typography>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {assignment.parts.filter(part => part.isPreLoaded).length} parts
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={6} sm={3}>
+                                  <Typography variant="caption" color="text.secondary">Status:</Typography>
+                                  <Chip 
+                                    label="Ready to Add More" 
+                                    size="small" 
+                                    color="success" 
+                                    variant="filled"
+                                    sx={{ fontSize: '0.7rem' }}
+                                  />
+                                </Grid>
+                              </Grid>
+                            </Box>
                           )}
 
                           {/* User Selected Parts - Display First */}
@@ -2081,7 +2709,7 @@ const AssignEngineer = () => {
                                   color: 'primary.main'
                                 }}
                               >
-                                🔧 User Selected Parts:
+                                🔧 User Selected Parts ({assignment.parts.filter(part => part && part.partName && !part.isPreLoaded).length}):
                               </Typography>
                               <Alert
                                 severity="success"
@@ -2089,7 +2717,10 @@ const AssignEngineer = () => {
                                 icon={<AddIcon />}
                               >
                                 <Typography variant="body2">
-                                  These are newly selected parts that will be added to the job card along with the pre-loaded parts.
+                                  {assignment.parts.filter(part => part && part.partName && !part.isPreLoaded).length === 1 
+                                    ? 'This is a newly selected part that will be added to the job card along with the pre-loaded parts.'
+                                    : `These are ${assignment.parts.filter(part => part && part.partName && !part.isPreLoaded).length} newly selected parts that will be added to the job card along with the pre-loaded parts.`
+                                  }
                                 </Typography>
                               </Alert>
                               <List dense>
@@ -2178,91 +2809,106 @@ const AssignEngineer = () => {
                                             justifyContent: { xs: 'space-between', sm: 'flex-end' }
                                           }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                              <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                  const newQuantity = selectedQuantity - 1;
-                                                  if (newQuantity >= 1) {
-                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
-                                                  }
-                                                }}
-                                                disabled={selectedQuantity <= 1}
-                                                sx={{
-                                                  minWidth: '24px',
-                                                  width: '24px',
-                                                  height: '24px',
-                                                  border: `1px solid ${theme.palette.divider}`
-                                                }}
-                                              >
-                                                <Typography variant="caption" fontWeight="bold">-</Typography>
-                                              </IconButton>
-                                              <TextField
-                                                size="small"
-                                                type="number"
-                                                label="Qty"
-                                                value={selectedQuantity}
-                                                onChange={(e) => {
-                                                  const newQuantity = parseInt(e.target.value) || 1;
-                                                  const oldQuantity = selectedQuantity;
+                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Decrease quantity (inventory will be updated on form submission)"}>
+                                                <span>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() => {
+                                                      const newQuantity = selectedQuantity - 1;
+                                                      if (newQuantity >= 1) {
+                                                        handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                      }
+                                                    }}
+                                                    disabled={selectedQuantity <= 1 || isSubmitting}
+                                                    sx={{
+                                                      minWidth: '24px',
+                                                      width: '24px',
+                                                      height: '24px',
+                                                      border: `1px solid ${theme.palette.divider}`
+                                                    }}
+                                                  >
+                                                    <Typography variant="caption" fontWeight="bold">-</Typography>
+                                                  </IconButton>
+                                                </span>
+                                              </Tooltip>
+                                              <Tooltip title={isSubmitting ? "Quantity input disabled during submission" : "Enter quantity (inventory will be updated on form submission)"}>
+                                                <TextField
+                                                  size="small"
+                                                  type="number"
+                                                  label="Qty"
+                                                  value={selectedQuantity}
+                                                  onChange={(e) => {
+                                                    const newQuantity = parseInt(e.target.value) || 1;
+                                                    const oldQuantity = selectedQuantity;
 
-                                                  if (newQuantity < 1) {
-                                                    return;
-                                                  }
+                                                    if (newQuantity < 1) {
+                                                      return;
+                                                    }
 
-                                                  if (newQuantity > maxSelectableQuantity) {
-                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                                    return;
-                                                  }
+                                                    if (newQuantity > maxSelectableQuantity) {
+                                                      setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                      return;
+                                                    }
 
-                                                  handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
-                                                }}
-                                                inputProps={{
-                                                  min: 1,
-                                                  max: maxSelectableQuantity,
-                                                  style: { width: '50px', textAlign: 'center' },
-                                                  readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity)
-                                                }}
-                                                sx={{
-                                                  width: '70px',
-                                                  '& .MuiInputBase-input': {
-                                                    textAlign: 'center',
-                                                    fontSize: '0.875rem'
-                                                  }
-                                                }}
-                                                error={availableQuantity === 0}
-                                                disabled={maxSelectableQuantity === 0}
-                                              />
-                                              <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                  const newQuantity = selectedQuantity + 1;
-                                                  if (newQuantity <= maxSelectableQuantity) {
-                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
-                                                  } else {
-                                                    setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
-                                                  }
-                                                }}
-                                                disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0}
-                                                sx={{
-                                                  minWidth: '24px',
-                                                  width: '24px',
-                                                  height: '24px',
-                                                  border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
-                                                  color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
-                                                }}
-                                              >
-                                                <Typography variant="caption" fontWeight="bold">+</Typography>
-                                              </IconButton>
+                                                    handlePartQuantityChange(assignment.id, partIndex, newQuantity, oldQuantity);
+                                                  }}
+                                                  inputProps={{
+                                                    min: 1,
+                                                    max: maxSelectableQuantity,
+                                                    style: { width: '50px', textAlign: 'center' },
+                                                    readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity)
+                                                  }}
+                                                  sx={{
+                                                    width: '70px',
+                                                    '& .MuiInputBase-input': {
+                                                      textAlign: 'center',
+                                                      fontSize: '0.875rem'
+                                                    }
+                                                  }}
+                                                  error={availableQuantity === 0}
+                                                  disabled={maxSelectableQuantity === 0 || isSubmitting}
+                                                />
+                                              </Tooltip>
+                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Increase quantity (inventory will be updated on form submission)"}>
+                                                <span>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() => {
+                                                      const newQuantity = selectedQuantity + 1;
+                                                      if (newQuantity <= maxSelectableQuantity) {
+                                                        handlePartQuantityChange(assignment.id, partIndex, newQuantity, selectedQuantity);
+                                                      } else {
+                                                        setError(`Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`);
+                                                      }
+                                                    }}
+                                                    disabled={selectedQuantity >= maxSelectableQuantity || availableQuantity === 0 || isSubmitting}
+                                                    sx={{
+                                                      minWidth: '24px',
+                                                      width: '24px',
+                                                      height: '24px',
+                                                      border: `1px solid ${selectedQuantity >= maxSelectableQuantity ? theme.palette.error.main : theme.palette.divider}`,
+                                                      color: selectedQuantity >= maxSelectableQuantity ? 'error.main' : 'inherit'
+                                                    }}
+                                                  >
+                                                    <Typography variant="caption" fontWeight="bold">+</Typography>
+                                                  </IconButton>
+                                                </span>
+                                              </Tooltip>
                                             </Box>
-                                            <IconButton
-                                              size="small"
-                                              color="error"
-                                              onClick={() => {
-                                                handlePartRemoval(assignment.id, partIndex);
-                                              }}
-                                            >
-                                              <DeleteIcon fontSize="small" />
-                                            </IconButton>
+                                            <Tooltip title={isSubmitting ? "Remove button disabled during submission" : "Remove part from selection"}>
+                                              <span>
+                                                <IconButton
+                                                  size="small"
+                                                  color="error"
+                                                  onClick={() => {
+                                                    handlePartRemoval(assignment.id, partIndex);
+                                                  }}
+                                                  disabled={isSubmitting}
+                                                >
+                                                  <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                              </span>
+                                            </Tooltip>
                                           </Box>
                                         </Box>
                                         {/* Price Details */}
@@ -2797,6 +3443,62 @@ const AssignEngineer = () => {
                                 );
                               })}
                           </List>
+                          
+                          {/* Summary Section for Multiple Parts */}
+                          {(() => {
+                            const userSelectedParts = assignment.parts.filter(part => part && part.partName && !part.isPreLoaded);
+                            if (userSelectedParts.length > 1) {
+                              const totalQuantity = userSelectedParts.reduce((sum, part) => sum + (part.selectedQuantity || 1), 0);
+                              const totalValue = userSelectedParts.reduce((sum, part) => {
+                                const unitPrice = part.sellingPrice || 0;
+                                const quantity = part.selectedQuantity || 1;
+                                const gstPercentage = part.taxAmount || 0;
+                                const basePrice = unitPrice * quantity;
+                                const gstAmount = (basePrice * gstPercentage) / 100;
+                                return sum + basePrice + gstAmount;
+                              }, 0);
+                              
+                              return (
+                                <Box sx={{ 
+                                  mt: 2, 
+                                  p: 2, 
+                                  bgcolor: 'success.light', 
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: 'success.main'
+                                }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'success.dark', mb: 1 }}>
+                                    📊 Multiple Parts Summary:
+                                  </Typography>
+                                  <Grid container spacing={2}>
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary">Total Parts:</Typography>
+                                      <Typography variant="body2" fontWeight={600}>{userSelectedParts.length}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary">Total Quantity:</Typography>
+                                      <Typography variant="body2" fontWeight={600}>{totalQuantity}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary">Total Value:</Typography>
+                                      <Typography variant="body2" fontWeight={600}>₹{totalValue.toFixed(2)}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6} sm={3}>
+                                      <Typography variant="caption" color="text.secondary">Status:</Typography>
+                                      <Chip 
+                                        label="Ready" 
+                                        size="small" 
+                                        color="success" 
+                                        variant="filled"
+                                        sx={{ fontSize: '0.7rem' }}
+                                      />
+                                    </Grid>
+                                  </Grid>
+                                </Box>
+                              );
+                            }
+                            return null;
+                          })()}
                         </Grid>
                       </Grid>  {/* ✅ Closing missing Grid container */} 
                     </AccordionDetails>
@@ -2968,7 +3670,14 @@ const AssignEngineer = () => {
                 })()}
 
                 {/* Submit Button - FIXED */}
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 4, gap: 2 }}>
+                  {isSubmitting && (
+                    <Alert severity="info" sx={{ width: '100%', maxWidth: 600 }}>
+                      <Typography variant="body2">
+                        <strong>Processing:</strong> Updating inventory quantities and assigning engineers. Please wait...
+                      </Typography>
+                    </Alert>
+                  )}
                   <Button
                     type="submit"
                     variant="contained"

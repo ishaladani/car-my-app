@@ -26,7 +26,9 @@ const BillSummarySection = ({
   paymentMethod,
   isMobile,
   formatAmount,
-  onLaborChange, // ✅ Correct prop name
+  onLaborChange,
+  laborServicesTotal,
+  disabled = false,
   jobDetails: jobDetailsString = '[]',
 }) => {
   const theme = useTheme();
@@ -46,8 +48,14 @@ const BillSummarySection = ({
   // Auto-calculated labor from jobDetails
   const autoLaborTotal = jobDetails.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
-  // Use summary.totalLaborCost (which may be manually set) or fallback to auto
-  const displayLaborCost = summary.totalLaborCost !== undefined ? summary.totalLaborCost : autoLaborTotal;
+  // Use laborServicesTotal (which may be manually set) or fallback to auto
+  const displayLaborCost = laborServicesTotal !== undefined ? laborServicesTotal : autoLaborTotal;
+
+  // Calculate subtotal as parts only
+  const partsSubtotal = summary.totalPartsCost || 0;
+  
+  // Calculate total before tax (parts + labor)
+  const totalBeforeTax = partsSubtotal + displayLaborCost;
 
   const toggleExpand = () => setExpanded(!expanded);
 
@@ -108,11 +116,11 @@ const BillSummarySection = ({
                   Parts & Materials Total:
                 </Typography>
                 <Typography variant="body1" fontWeight={500} color="text.primary">
-                  {formatAmount(summary.totalPartsCost)}
+                  {formatAmount(partsSubtotal)}
                 </Typography>
               </Box>
 
-              {/* Labor & Services (Editable) */}
+              {/* Service/Labour Cost (Editable) */}
               <Box
                 sx={{
                   py: 1.5,
@@ -138,39 +146,38 @@ const BillSummarySection = ({
                     }}
                   >
                     <span>⚙️</span>
-                    Labor & Services Total:
+                    Service/Labour Cost:
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" color="text.secondary">
                       ₹
                     </Typography>
                     <TextField
-  type="number"
-  value={displayLaborCost || ''}
-  onChange={(e) => {
-    const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-    if (onLaborChange) {
-  onLaborChange(value);
-}
-  }}
-  size="small"
-  placeholder="0.00"
-  sx={{
-    width: isMobile ? '100%' : '120px',
-    '& .MuiInputBase-input': {
-      textAlign: 'right',
-      fontWeight: 600,
-      color: 'primary.main',
-    },
-  }}
-  inputProps={{
-    min: 0,
-    step: 0.01,
-    style: { textAlign: 'right' },
-  }}
-  disabled={false} // This allows editing
-/>
-
+                      type="number"
+                      value={displayLaborCost || ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+                        if (onLaborChange) {
+                          onLaborChange(value);
+                        }
+                      }}
+                      size="small"
+                      placeholder="0.00"
+                      sx={{
+                        width: isMobile ? '100%' : '120px',
+                        '& .MuiInputBase-input': {
+                          textAlign: 'right',
+                          fontWeight: 600,
+                          color: 'primary.main',
+                        },
+                      }}
+                      inputProps={{
+                        min: 0,
+                        step: 0.01,
+                        style: { textAlign: 'right' },
+                      }}
+                      disabled={disabled}
+                    />
                   </Box>
                 </Box>
 
@@ -217,30 +224,7 @@ const BillSummarySection = ({
                 </Collapse>
               </Box>
 
-              {/* Labor Tax Info */}
-              {displayLaborCost > 0 && gstSettings.includeGst && (
-                <Box
-                  sx={{
-                    mt: 1,
-                    p: 1,
-                    backgroundColor:
-                      theme.palette.mode === 'dark'
-                        ? 'rgba(25, 118, 210, 0.15)'
-                        : 'rgba(25, 118, 210, 0.1)',
-                    borderRadius: 1,
-                    border: `1px solid ${theme.palette.primary.main}20`,
-                  }}
-                >
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Labor Tax Calculation:
-                  </Typography>
-                  <Typography variant="caption" color="primary.main" display="block">
-                    Base: ₹{displayLaborCost} | Tax: ₹{((displayLaborCost * (gstSettings.gstPercentage || 18)) / 100).toFixed(2)}
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Subtotal */}
+              {/* Subtotal (Parts Only) */}
               <Box
                 sx={{
                   display: 'flex',
@@ -249,6 +233,12 @@ const BillSummarySection = ({
                   py: 1.5,
                   borderBottom: `1px dashed ${theme.palette.divider}`,
                   mt: 1,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(255, 255, 255, 0.05)' 
+                    : 'rgba(0, 0, 0, 0.02)',
+                  borderRadius: 1,
+                  px: 2,
+                  mx: -1,
                 }}
               >
                 <Typography
@@ -261,10 +251,46 @@ const BillSummarySection = ({
                     color: 'text.primary',
                   }}
                 >
-                  Subtotal (Before Tax):
+                  <span>📦</span>
+                  Subtotal (Parts Only):
                 </Typography>
                 <Typography variant="body1" fontWeight={600} color="primary.main">
-                  {formatAmount(summary.subtotal)}
+                  {formatAmount(partsSubtotal)}
+                </Typography>
+              </Box>
+
+              {/* Total Before Tax (Parts + Labour) */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  py: 1.5,
+                  borderBottom: `1px dashed ${theme.palette.divider}`,
+                  mt: 1,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(25, 118, 210, 0.1)' 
+                    : 'rgba(25, 118, 210, 0.05)',
+                  borderRadius: 1,
+                  px: 2,
+                  mx: -1,
+                }}
+              >
+                <Typography
+                  variant="body1"
+                  fontWeight={600}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    color: 'primary.main',
+                  }}
+                >
+                  <span>💰</span>
+                  Total Before Tax (Parts + Labour):
+                </Typography>
+                <Typography variant="body1" fontWeight={600} color="primary.main">
+                  {formatAmount(totalBeforeTax)}
                 </Typography>
               </Box>
 
@@ -389,7 +415,7 @@ const BillSummarySection = ({
                     Subtotal (After Discount):
                   </Typography>
                   <Typography variant="body1" fontWeight={600} color="primary.main">
-                    {formatAmount(summary.subtotal - summary.discount)}
+                    {formatAmount(totalBeforeTax - summary.discount)}
                   </Typography>
                 </Box>
               )}
@@ -426,6 +452,46 @@ const BillSummarySection = ({
                 </Typography>
               </Box>
 
+              {/* Cost Breakdown Summary */}
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  backgroundColor:
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(255, 255, 255, 0.05)'
+                      : 'rgba(0, 0, 0, 0.04)',
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.divider}`,
+                }}
+              >
+                <Typography variant="subtitle2" color="primary.main" fontWeight={600} gutterBottom>
+                  💰 Cost Breakdown
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Parts: {formatAmount(partsSubtotal)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Labour: {formatAmount(displayLaborCost)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Subtotal: {formatAmount(totalBeforeTax)}
+                </Typography>
+                {gstSettings.includeGst && (
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    GST: {formatAmount(summary.gstAmount)}
+                  </Typography>
+                )}
+                {summary.discount > 0 && (
+                  <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
+                    Discount: -{formatAmount(summary.discount)}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="primary.main" display="block" fontWeight={600}>
+                  Total: {formatAmount(summary.totalAmount)}
+                </Typography>
+              </Box>
+
               {/* Discount Summary */}
               {summary.discount > 0 && (
                 <Box
@@ -444,7 +510,7 @@ const BillSummarySection = ({
                     💸 Discount Summary
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Original Amount: {formatAmount(summary.subtotal + (gstSettings.includeGst ? summary.gstAmount : 0))}
+                    Original Amount: {formatAmount(totalBeforeTax + (gstSettings.includeGst ? summary.gstAmount : 0))}
                   </Typography>
                   <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
                     Discount: -{formatAmount(summary.discount)}

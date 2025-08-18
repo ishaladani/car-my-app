@@ -39,25 +39,6 @@ const AutoServeBilling = () => {
   let garageId = localStorage.getItem("garageId") || localStorage.getItem("garage_id");
   
   const today = new Date().toISOString().split("T")[0];
-  
-  // Invoice number helpers: generate sequential numbers starting at INV-001
-  const getNextInvoiceNumber = () => {
-    const storageKey = 'invoiceSerial';
-    let serial = parseInt(localStorage.getItem(storageKey) || '1', 10);
-    if (!Number.isFinite(serial) || serial < 1) serial = 1;
-    const invoiceNo = `INV-${String(serial).padStart(3, '0')}`;
-    localStorage.setItem(storageKey, String(serial + 1));
-    return invoiceNo;
-  };
-  
-  const normalizeInvoiceNo = (raw) => {
-    if (!raw) return getNextInvoiceNumber();
-    const value = String(raw).trim();
-    if (/^INV-\d{3,}$/.test(value)) return value;
-    const digits = value.replace(/\D/g, '');
-    if (digits) return `INV-${digits.padStart(3, '0')}`;
-    return 'INV-001';
-  };
   const [laborServicesTotal, setLaborServicesTotal] = useState(0);
 
   // UPDATED: State declarations with complete bank details
@@ -247,7 +228,6 @@ setGarageDetails({
         setIsLoading(false);
         return;
       }
-
       try {
         setIsLoading(true);
 
@@ -273,7 +253,7 @@ setGarageDetails({
           });
         }
         
-        const invoiceNo = normalizeInvoiceNo(data.invoiceNumber);
+        const invoiceNo = data.invoiceNumber || `INV-${Date.now()}`;
 
         setCarDetails({
           carNumber: data.carNumber || data.registrationNumber || "",
@@ -1359,15 +1339,87 @@ const generateProfessionalGSTInvoice = () => {
     // Helper: Draw bordered rectangle
     const drawBorderedRect = (x, y, width, height, fillColor = null) => {
       if (fillColor) {
-        doc.setFillColor(fillColor);
-        doc.rect(x, y, width, height, 'F');
+        // Handle different color formats safely
+        try {
+          if (typeof fillColor === 'string' && fillColor.startsWith('#')) {
+            const hex = fillColor.substring(1);
+            if (hex.length === 6) {
+              const r = parseInt(hex.substring(0, 2), 16);
+              const g = parseInt(hex.substring(2, 4), 16);
+              const b = parseInt(hex.substring(4, 6), 16);
+              doc.setFillColor(r, g, b);
+            } else {
+              doc.setFillColor(240, 240, 240); // Default light gray
+            }
+          } else if (typeof fillColor === 'string') {
+            // Handle named colors
+            switch(fillColor) {
+              case 'lightgray':
+              case '#f8f9fa':
+                doc.setFillColor(248, 249, 250);
+                break;
+              case 'darkblue':
+              case '#34495e':
+                doc.setFillColor(52, 73, 94);
+                break;
+              case 'blue':
+              case '#3498db':
+                doc.setFillColor(52, 152, 219);
+                break;
+              case 'green':
+              case '#27ae60':
+                doc.setFillColor(39, 174, 96);
+                break;
+              case 'lightgreen':
+              case '#e8f5e8':
+                doc.setFillColor(232, 245, 232);
+                break;
+              default:
+                doc.setFillColor(240, 240, 240);
+            }
+          } else {
+            doc.setFillColor(240, 240, 240); // Default
+          }
+          doc.rect(x, y, width, height, 'F');
+        } catch (error) {
+          console.warn('Color setting error:', error);
+          // Draw without fill if color fails
+        }
       }
       doc.setLineWidth(0.5);
       doc.setDrawColor(0, 0, 0);
       doc.rect(x, y, width, height);
     };
 
-    // Number to Words (for amount in words)
+    // Helper: Check if new page is needed
+    const checkPageBreak = (requiredSpace) => {
+      if (currentY + requiredSpace > pageHeight - 100) {
+        doc.addPage();
+        currentY = 40;
+        return true;
+      }
+      return false;
+    };
+
+    // Calculate totals properly - only include valid parts
+    const validParts = parts.filter(part => part && part.total > 0);
+    const partsTotal = validParts.reduce((total, part) => total + part.total, 0);
+    const laborTotal = laborServicesTotal || 0;
+    const subtotalAmount = partsTotal + laborTotal;
+    
+    // Calculate GST amounts
+    let gstOnParts = 0;
+    let gstOnLabor = 0;
+    if (gstSettings.billType === 'gst') {
+      gstOnParts = (partsTotal * gstSettings.gstPercentage) / 100;
+      gstOnLabor = (laborTotal * gstSettings.gstPercentage) / 100;
+    }
+    
+    const totalGstAmount = gstOnParts + gstOnLabor;
+    const totalAfterGst = subtotalAmount + totalGstAmount;
+    const finalAmount = totalAfterGst - (summary.discount || 0);
+
+    // Number to Words function
     const numberToWords = (num) => {
       const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
       const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -1404,150 +1456,226 @@ const generateProfessionalGSTInvoice = () => {
     // -----------------------------
     // HEADER SECTION
     // -----------------------------
-    drawBorderedRect(margin, currentY, contentWidth, 100);
+    drawBorderedRect(margin, currentY, contentWidth, 120, 'lightgray');
 
-    // Logo - Round shape with increased size
+    // Logo - Simple approach without complex graphics
+    const logoSize = 50;
+    const logoX = margin + 15;
+    const logoY = currentY + 15;
+    
     if (garageDetails.logoUrl) {
-      const logoImg = new Image();
-      logoImg.src = garageDetails.logoUrl;
-      
-      // Create larger logo size
-      const logoSize = 40;  // Increased logo size
-      const logoRadius = logoSize / 2;
-      const logoX = margin + 10;
-      const logoY = currentY + 10;
-
-      // Save the current context
-      doc.saveGraphicsState();
-      
-      // Create circular clipping path
-      doc.setFillColor(255, 255, 255); // White background
-      doc.circle(logoX + logoRadius, logoY + logoRadius, logoRadius, 'F');
-      
-      // Add the logo image
-      doc.addImage(logoImg, 'PNG', logoX, logoY, logoSize, logoSize);
-      
-      // Restore the context
-      doc.restoreGraphicsState();
+      try {
+        // Draw white background circle
+        // doc.setFillColor(255, 255, 255);
+        // doc.setDrawColor(200, 200, 200);
+        // doc.setLineWidth(2);
+        // doc.circle(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 'FD');
+        
+        // Add logo image (square crop will be contained within circle)
+        doc.addImage(garageDetails.logoUrl, 'JPEG', logoX + 5, logoY + 5, logoSize - 10, logoSize - 10);
+        
+      } catch (error) {
+        console.warn('Logo load failed:', error);
+        // Draw placeholder
+        doc.setFillColor(240, 240, 240);
+        doc.setDrawColor(180, 180, 180);
+        doc.circle(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 'FD');
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("LOGO", logoX + logoSize/2 - 15, logoY + logoSize/2 + 5);
+      }
     }
 
-    // Company Name - Centered
-    doc.setFontSize(16);
+    // Company Name
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
     const companyName = garageDetails.name.toUpperCase();
     const companyNameWidth = doc.getTextWidth(companyName);
     const centerX = (pageWidth - companyNameWidth) / 2;
-    doc.text(companyName, centerX, currentY + 35);
+    doc.text(companyName, centerX, currentY + 40);
 
-    // Address
-    doc.setFontSize(9);
+    // Invoice Type Banner
+    const billTypeText = gstSettings.billType === 'gst' ? 'GST TAX INVOICE' : 'NON-GST INVOICE';
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    const bannerWidth = 150;
+    const bannerX = (pageWidth - bannerWidth) / 2;
+    doc.setFillColor(52, 152, 219);
+    doc.rect(bannerX, currentY + 50, bannerWidth, 20, 'F');
+    const billTypeWidth = doc.getTextWidth(billTypeText);
+    doc.text(billTypeText, bannerX + (bannerWidth - billTypeWidth) / 2, currentY + 63);
+
+    // Contact details
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const addressLine = `${garageDetails.address}`;
+    const addressLine = garageDetails.address;
     const addressWidth = doc.getTextWidth(addressLine);
-    doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 45);
+    doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 80);
 
-    // GST Number
     const gstLine = `GST No: ${garageDetails.gstNumber || 'N/A'}`;
     const gstWidth = doc.getTextWidth(gstLine);
-    doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 65);
+    doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 95);
 
-    // Phone & Email
-    if (garageDetails.phone) {
-      const phoneLine = `Phone: ${garageDetails.phone}`;
-      const phoneWidth = doc.getTextWidth(phoneLine);
-      doc.text(phoneLine, (pageWidth - phoneWidth) / 2, currentY + 80);
-    }
-    if (garageDetails.email) {
-      const emailLine = `Email: ${garageDetails.email}`;
-      const emailWidth = doc.getTextWidth(emailLine);
-      doc.text(emailLine, (pageWidth - emailWidth) / 2, currentY + 95);
+    if (garageDetails.phone || garageDetails.email) {
+      const contactLine = `${garageDetails.phone ? 'Ph: ' + garageDetails.phone : ''}${garageDetails.phone && garageDetails.email ? ' | ' : ''}${garageDetails.email ? 'Email: ' + garageDetails.email : ''}`;
+      const contactWidth = doc.getTextWidth(contactLine);
+      doc.text(contactLine, (pageWidth - contactWidth) / 2, currentY + 110);
     }
 
-    currentY += 100;
+    currentY += 140;
 
     // -----------------------------
-    // BILL TYPE & INVOICE LABEL
+    // CUSTOMER & INVOICE DETAILS
     // -----------------------------
-    // const billTypeText = gstSettings.billType === 'gst' ? 'GST Tax Invoice' : 'Non-GST Invoice';
-    // const docTypeY = currentY;
-    // drawBorderedRect(margin, docTypeY, 120, 25);
-    // doc.setFont("helvetica", "bold");
-    // doc.text(billTypeText, margin + 10, docTypeY + 17);
-    // drawBorderedRect(pageWidth - margin - 80, docTypeY, 80, 25);
-    // doc.text("Original", pageWidth - margin - 70, docTypeY + 17);
-    // currentY += 35;
-
-    // -----------------------------
-    // BILL TO & SHIP TO
-    // -----------------------------
-    const billShipY = currentY;
-    const sectionWidth = contentWidth / 2 - 5;
-    // Bill To
-    drawBorderedRect(margin, billShipY, sectionWidth, 120);
+    const detailsY = currentY;
+    const leftSectionWidth = (contentWidth * 0.6) - 5;
+    const rightSectionWidth = (contentWidth * 0.4) - 5;
+    
+    // Bill To Section
+    drawBorderedRect(margin, detailsY, leftSectionWidth, 130);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Bill to:", margin + 10, billShipY + 20);
+    doc.setTextColor(52, 152, 219);
+    doc.text("BILL TO", margin + 10, detailsY + 20);
+    
+    doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Name: ${gstSettings.billToParty || carDetails.customerName}`, margin + 10, billShipY + 40);
-    doc.text(`Contact: ${carDetails.contact}`, margin + 10, billShipY + 55);
-    if (carDetails.email) doc.text(`Email: ${carDetails.email}`, margin + 10, billShipY + 70);
+    doc.setFontSize(10);
+    doc.text(`Name: ${gstSettings.billToParty || carDetails.customerName}`, margin + 10, detailsY + 40);
+    doc.text(`Contact: ${carDetails.contact}`, margin + 10, detailsY + 55);
+    if (carDetails.email) doc.text(`Email: ${carDetails.email}`, margin + 10, detailsY + 70);
     if (gstSettings.customerGstNumber && gstSettings.billType === 'gst') {
-      doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, billShipY + 85);
+      doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, detailsY + 85);
     }
-    // Ship To
-    drawBorderedRect(margin + sectionWidth + 10, billShipY, sectionWidth, 120);
+    
+    // Vehicle Details
     doc.setFont("helvetica", "bold");
-    doc.text("Ship To / Insurance:", margin + sectionWidth + 20, billShipY + 20);
+    doc.setTextColor(52, 152, 219);
+    doc.text("VEHICLE DETAILS", margin + 10, detailsY + 105);
+    doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Insurance: ${gstSettings.insuranceProvider}`, margin + sectionWidth + 20, billShipY + 40);
-    doc.text(`Vehicle: ${carDetails.company} ${carDetails.model}`, margin + sectionWidth + 20, billShipY + 55);
-    doc.text(`Reg No: ${carDetails.carNumber}`, margin + sectionWidth + 20, billShipY + 70);
-    doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + sectionWidth + 20, billShipY + 100);
-    doc.text(`Date: ${carDetails.billingDate}`, margin + sectionWidth + 20, billShipY + 115);
-    currentY = billShipY + 140;
+    doc.text(`${carDetails.company} ${carDetails.model} | Reg: ${carDetails.carNumber}`, margin + 10, detailsY + 120);
+
+    // Invoice Details
+    drawBorderedRect(margin + leftSectionWidth + 10, detailsY, rightSectionWidth, 130, 'lightgray');
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(52, 152, 219);
+    doc.text("INVOICE DETAILS", margin + leftSectionWidth + 20, detailsY + 20);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + leftSectionWidth + 20, detailsY + 40);
+    doc.text(`Date: ${carDetails.billingDate}`, margin + leftSectionWidth + 20, detailsY + 55);
+    if (gstSettings.shiftToParty) {
+      doc.text(`Insurance: ${gstSettings.shiftToParty}`, margin + leftSectionWidth + 20, detailsY + 70);
+    }
+    
+    currentY = detailsY + 150;
 
     // -----------------------------
     // ITEMS TABLE
     // -----------------------------
     const tableStartY = currentY;
-    const colWidths = { srNo: 40, productName: 240, qty: 35, unit: 40, rate: 70, gstPercent: 50, amount: 70 };
+    const colWidths = { 
+      srNo: 35, 
+      productName: 200, 
+      qty: 40, 
+      unit: 40, 
+      rate: 70, 
+      gstPercent: 50, 
+      amount: 80 
+    };
     const totalTableWidth = Object.values(colWidths).reduce((a, b) => a + b, 0);
-    // Header
+    
+    // Table Header
     const headerY = tableStartY;
-    drawBorderedRect(margin, headerY, totalTableWidth, 30, '#f0f0f0');
-    doc.setFontSize(9);
+    drawBorderedRect(margin, headerY, totalTableWidth, 35, 'darkblue');
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    
     let colX = margin;
-    ["Sr.No", "Product/Service Name", "Qty", "Unit", "Rate", "GST%", "Amount"].forEach((text, i) => {
+    const headers = ["Sr.", "Product/Service Description", "Qty", "Unit", "Rate", "GST%", "Amount"];
+    headers.forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
-      doc.text(text, colX + (w - txtW) / 2, headerY + 20);
-              if (i < 6) doc.line(colX + w, headerY, colX + w, headerY + 30);
+      if (i === 1) {
+        doc.text(text, colX + 5, headerY + 22);
+      } else {
+        doc.text(text, colX + (w - txtW) / 2, headerY + 22);
+      }
+      if (i < 6) {
+        doc.setDrawColor(255, 255, 255);
+        doc.line(colX + w, headerY, colX + w, headerY + 35);
+      }
       colX += w;
     });
-    currentY = headerY + 30;
-    // Rows
+    
+    doc.setTextColor(0, 0, 0);
+    currentY = headerY + 35;
+
+    // Table row drawing function
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
     let rowIndex = 1;
-    const drawTableRow = (rowData, y) => {
-      const rowHeight = 25;
-      drawBorderedRect(margin, y, totalTableWidth, rowHeight);
+    
+    const drawTableRow = (rowData, y, isAlternate = false) => {
+      const rowHeight = 30;
+      const bgColor = isAlternate ? 'lightgray' : null;
+      drawBorderedRect(margin, y, totalTableWidth, rowHeight, bgColor);
+      
       colX = margin;
       rowData.forEach((cell, i) => {
         const w = colWidths[Object.keys(colWidths)[i]];
-        const display = cell.toString();
-        const txtW = doc.getTextWidth(display);
-        if (i === 0 || i >= 3) {
-          doc.text(display, colX + w - txtW - 5, y + 17);
-        } else {
-          doc.text(display, colX + 5, y + 17);
+        let display = cell.toString();
+        
+        // Format currency properly - use proper rupee symbol
+        if (i === 4 || i === 6) { // Rate and Amount columns
+          if (display !== '' && !isNaN(display)) {
+            display = ' ' + parseFloat(display).toFixed(2);
+          }
         }
-        if (i < 6) doc.line(colX + w, y, colX + w, y + rowHeight);
+        
+        // Handle long text in product name
+        if (i === 1 && display.length > 30) {
+          const lines = doc.splitTextToSize(display, w - 10);
+          doc.text(lines[0], colX + 5, y + 20);
+          if (lines.length > 1) {
+            doc.setFontSize(8);
+            doc.text(lines[1].substring(0, 25) + '...', colX + 5, y + 28);
+            doc.setFontSize(9);
+          }
+        } else {
+          const txtW = doc.getTextWidth(display);
+          // Right align for Sr.No, Qty, Rate, Amount columns
+          if (i === 0 || i === 2 || i === 4 || i === 6) {
+            doc.text(display, colX + w - txtW - 5, y + 20);
+          } 
+          // Center align for Unit and GST% columns  
+          else if (i === 3 || i === 5) {
+            doc.text(display, colX + (w - txtW) / 2, y + 20);
+          }
+          // Left align for Product Name
+          else {
+            doc.text(display, colX + 5, y + 20);
+          }
+        }
+        
+        if (i < 6) {
+          doc.setDrawColor(220, 220, 220);
+          doc.line(colX + w, y, colX + w, y + rowHeight);
+        }
         colX += w;
       });
       return rowHeight;
     };
-    // Parts
-    parts.forEach(part => {
+
+    // Add only valid parts rows
+    validParts.forEach((part, index) => {
+      checkPageBreak(35);
       const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
       const row = [
         rowIndex++,
@@ -1558,141 +1686,215 @@ const generateProfessionalGSTInvoice = () => {
         gstDisplay,
         part.total.toFixed(2)
       ];
-      currentY += drawTableRow(row, currentY);
+      currentY += drawTableRow(row, currentY, index % 2 === 1);
     });
-    // Labor & Services
-    if (laborServicesTotal > 0) {
+
+    // Add Labor & Services Row if exists
+    if (laborTotal > 0) {
+      checkPageBreak(35);
       const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
       const row = [
         rowIndex++,
         "Labor & Services",
         "1",
-        "Nos",
-        laborServicesTotal.toFixed(2),
+        "Job",
+        laborTotal.toFixed(2),
         gstDisplay,
-        laborServicesTotal.toFixed(2)
+        laborTotal.toFixed(2)
       ];
-      currentY += drawTableRow(row, currentY);
+      currentY += drawTableRow(row, currentY, validParts.length % 2 === 0);
     }
-    // Empty rows
-    const minRows = 8;
-    const filledRows = parts.length + (laborServicesTotal > 0 ? 1 : 0);
-    for (let i = filledRows; i < minRows; i++) {
-      currentY += drawTableRow(["", "", "", "", "", "", ""], currentY);
+
+    // Add empty rows only if needed (minimum 5 rows total)
+    const totalDataRows = validParts.length + (laborTotal > 0 ? 1 : 0);
+    const minRows = Math.max(5, totalDataRows);
+    for (let i = totalDataRows; i < minRows; i++) {
+      currentY += drawTableRow(["", "", "", "", "", "", ""], currentY, i % 2 === 1);
     }
-    currentY += 10;
+
+    currentY += 20;
 
     // -----------------------------
-    // SUMMARY
+    // BILLING SUMMARY
     // -----------------------------
-    const summaryWidth = 200;
+    checkPageBreak(300);
+    
+    const summaryWidth = 250;
     const summaryX = pageWidth - margin - summaryWidth;
-    // Sub Total (Parts only)
-    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    
+    // Summary Header
+    drawBorderedRect(summaryX, currentY, summaryWidth, 30, 'darkblue');
     doc.setFont("helvetica", "bold");
-    doc.text("Sub Total", summaryX + 10, currentY + 17);
-    doc.text(summary.laborServicesTax.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-    currentY += 25;
-    // Labour/Service
-    // drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-    // doc.setFont("helvetica", "bold");
-    // doc.text("Labour/Service", summaryX + 10, currentY + 17);
-    // doc.text(summary.totalLaborCost.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
-    // currentY += 25;
-    // Taxable Amount
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    doc.text("BILLING SUMMARY", summaryX + 10, currentY + 20);
+    currentY += 30;
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    
+    // Parts Total
+    if (partsTotal > 0) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
+      doc.setFont("helvetica", "normal");
+      doc.text("Parts Total", summaryX + 10, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.text(` ${partsTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      currentY += 25;
+    }
+    
+    // Labor/Services Total
+    if (laborTotal > 0) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
+      doc.setFont("helvetica", "normal");
+      doc.text("Labor & Services", summaryX + 10, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.text(` ${laborTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      currentY += 25;
+    }
+    
+    // Subtotal
     drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-    doc.text("Taxable Amount", summaryX + 10, currentY + 17);
-    doc.text(summary.subtotal.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+    doc.setFont("helvetica", "normal");
+    doc.text("Subtotal", summaryX + 10, currentY + 17);
+    doc.setFont("helvetica", "bold");
+    doc.text(` ${subtotalAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
     currentY += 25;
-    // GST
-    if (gstSettings.billType === 'gst' && summary.gstAmount > 0) {
+
+    // GST Calculation
+    if (gstSettings.billType === 'gst' && totalGstAmount > 0) {
       if (gstSettings.isInterState) {
         drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+        doc.setFont("helvetica", "normal");
         doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
-        doc.text(summary.gstAmount.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        doc.setFont("helvetica", "bold");
+        doc.text(` ${totalGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
         currentY += 25;
       } else {
+        const cgstAmount = totalGstAmount / 2;
+        const sgstAmount = totalGstAmount / 2;
+        
         drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.text(`CGST ${gstSettings.cgstPercentage}%`, summaryX + 10, currentY + 17);
-        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        doc.setFont("helvetica", "normal");
+        doc.text(`CGST ${gstSettings.cgstPercentage || gstSettings.gstPercentage/2}%`, summaryX + 10, currentY + 17);
+        doc.setFont("helvetica", "bold");
+        doc.text(` ${cgstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
         currentY += 25;
+        
         drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.text(`SGST ${gstSettings.sgstPercentage}%`, summaryX + 10, currentY + 17);
-        doc.text((summary.gstAmount / 2).toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+        doc.setFont("helvetica", "normal");
+        doc.text(`SGST ${gstSettings.sgstPercentage || gstSettings.gstPercentage/2}%`, summaryX + 10, currentY + 17);
+        doc.setFont("helvetica", "bold");
+        doc.text(` ${sgstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
         currentY += 25;
       }
     }
+
     // Discount
     if (summary.discount > 0) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.setFont("helvetica", "normal");
       doc.text("Discount", summaryX + 10, currentY + 17);
-      doc.text(`-${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 80, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(220, 53, 69);
+      doc.text(`- ${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      doc.setTextColor(0, 0, 0);
       currentY += 25;
     }
+
     // Round Off
-    const roundOff = Math.round(summary.totalAmount) - summary.totalAmount;
+    const roundOff = Math.round(finalAmount) - finalAmount;
     if (Math.abs(roundOff) > 0.01) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.setFont("helvetica", "normal");
       doc.text("Round Off", summaryX + 10, currentY + 17);
-      doc.text(roundOff.toFixed(2), summaryX + summaryWidth - 80, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.text(` ${roundOff.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       currentY += 25;
     }
+
     // Grand Total
-    drawBorderedRect(summaryX, currentY, summaryWidth, 30, '#f0f0f0');
-    doc.setFontSize(12);
-    doc.text("Grand Total", summaryX + 10, currentY + 20);
-    doc.text(Math.round(summary.totalAmount).toFixed(2), summaryX + summaryWidth - 80, currentY + 20);
-    currentY += 40;
-    // Amount in Words
-    const amountInWords = numberToWords(Math.round(summary.totalAmount)) + " Only";
-    drawBorderedRect(margin, currentY, contentWidth, 30);
-    doc.setFontSize(10);
+    drawBorderedRect(summaryX, currentY, summaryWidth, 35, 'green');
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Bill Amount:", margin + 10, currentY + 15);
+    doc.setTextColor(255, 255, 255);
+    doc.text("GRAND TOTAL", summaryX + 10, currentY + 23);
+    doc.text(` ${Math.round(finalAmount).toFixed(2)}`, summaryX + summaryWidth - 120, currentY + 23);
+    currentY += 50;
+
+    // Amount in Words
+    doc.setTextColor(0, 0, 0);
+    const amountInWords = numberToWords(Math.round(finalAmount)) + " Rupees Only";
+    drawBorderedRect(margin, currentY, contentWidth, 35, 'lightgreen');
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Amount in Words:", margin + 10, currentY + 15);
     doc.setFont("helvetica", "normal");
-    doc.text(amountInWords, margin + 80, currentY + 15);
-    currentY += 40;
+    doc.text(amountInWords, margin + 10, currentY + 28);
+    currentY += 50;
 
     // -----------------------------
-    // BANK DETAILS
+    // FOOTER SECTION
     // -----------------------------
+    checkPageBreak(150);
+    
     if (garageDetails.bankDetails.bankName) {
-      drawBorderedRect(margin, currentY, contentWidth / 2, 100);
+      const footerY = currentY;
+      
+      // Bank Details
+      drawBorderedRect(margin, footerY, contentWidth / 2, 120, 'lightgray');
       doc.setFont("helvetica", "bold");
-      doc.text("Bank Details:", margin + 10, currentY + 20);
+      doc.setTextColor(52, 152, 219);
+      doc.text("BANK DETAILS", margin + 10, footerY + 20);
+      doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "normal");
-      doc.text(`Bank: ${garageDetails.bankDetails.bankName}`, margin + 10, currentY + 35);
-      doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName}`, margin + 10, currentY + 50);
-      doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber}`, margin + 10, currentY + 65);
-      doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode}`, margin + 10, currentY + 80);
+      doc.setFontSize(9);
+      doc.text(`Bank: ${garageDetails.bankDetails.bankName}`, margin + 10, footerY + 35);
+      doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName}`, margin + 10, footerY + 50);
+      doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber}`, margin + 10, footerY + 65);
+      doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode}`, margin + 10, footerY + 80);
       if (garageDetails.bankDetails.upiId) {
-        doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, currentY + 95);
+        doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, footerY + 95);
       }
+
+      // Terms & Conditions
+      const termsX = margin + (contentWidth / 2) + 10;
+      drawBorderedRect(termsX, footerY, contentWidth / 2 - 10, 120, 'lightgray');
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(52, 152, 219);
+      doc.text("TERMS & CONDITIONS", termsX + 10, footerY + 20);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("1. Goods once sold will not be taken back.", termsX + 10, footerY + 35);
+      doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, footerY + 47);
+      doc.text("3. Subject to local jurisdiction only.", termsX + 10, footerY + 59);
+      doc.text("4. Payment terms: As agreed", termsX + 10, footerY + 71);
+      doc.text("5. E. & O.E.", termsX + 10, footerY + 83);
+      if (gstSettings.billType === 'gst') {
+        doc.text("6. GST as applicable.", termsX + 10, footerY + 95);
+      }
+      
+      currentY += 140;
     }
-    // Terms
-    const termsX = margin + (contentWidth / 2) + 10;
-    drawBorderedRect(termsX, currentY, contentWidth / 2 - 10, 100);
+
+    // Signature Section
+    checkPageBreak(80);
     doc.setFont("helvetica", "bold");
-    doc.text("Terms & Conditions:", termsX + 10, currentY + 20);
+    doc.text("For " + garageDetails.name.toUpperCase(), pageWidth - margin - 120, currentY + 60);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("1. Goods once sold will not be taken back.", termsX + 10, currentY + 35);
-    doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, currentY + 47);
-    doc.text("3. Subject to local jurisdiction only.", termsX + 10, currentY + 59);
-    doc.text("4. E. & O.E.", termsX + 10, currentY + 71);
-    if (gstSettings.billType === 'gst') {
-      doc.text("5. GST as applicable.", termsX + 10, currentY + 83);
-    }
-    currentY += 120;
+    doc.text("Authorized Signatory", pageWidth - margin - 120, currentY + 75);
 
     // Footer
     doc.setFontSize(8);
-    doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()}`, pageWidth - margin - 100, pageHeight - 20);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 30);
+    doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()} | Page 1`, pageWidth - margin - 100, pageHeight - 30);
 
     return doc;
   } catch (error) {
     console.error('PDF Generation Error:', error);
-    throw new Error('Failed to generate invoice');
+    throw new Error('Failed to generate invoice: ' + error.message);
   }
 };
 
