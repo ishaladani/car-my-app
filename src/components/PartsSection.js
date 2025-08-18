@@ -18,15 +18,11 @@ import {
 } from "@mui/material";
 import {
   Build as BuildIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
   LibraryAdd as LibraryAddIcon,
 } from "@mui/icons-material";
 
 const PartsSection = ({
   parts,
-  removePart,
-  openEditPrice,
   setShowNewPartDialog,
   isMobile,
   tableCellStyle,
@@ -118,9 +114,7 @@ const PartsSection = ({
                   <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
                     Total
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                    Actions
-                  </TableCell>
+
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -142,28 +136,9 @@ const PartsSection = ({
                       </Typography>
                     </TableCell>
                     <TableCell {...tableCellStyle}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          ₹{part.pricePerUnit?.toFixed(2) || "0.00"}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            openEditPrice(
-                              part.id,
-                              "part",
-                              "pricePerUnit",
-                              part.pricePerUnit
-                            )
-                          }
-                          disabled={disabled}
-                          sx={{ color: "primary.main", p: 0.5 }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        ₹{part.pricePerUnit?.toFixed(2) || "0.00"}
+                      </Typography>
                     </TableCell>
                     <TableCell {...tableCellStyle}>
                       <Typography
@@ -174,18 +149,7 @@ const PartsSection = ({
                         ₹{part.total?.toFixed(2) || "0.00"}
                       </Typography>
                     </TableCell>
-                    <TableCell {...tableCellStyle}>
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => removePart(part.id)}
-                          disabled={disabled}
-                          sx={{ color: "error.main" }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
+
                   </TableRow>
                 ))}
               </TableBody>

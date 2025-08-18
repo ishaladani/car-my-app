@@ -65,28 +65,19 @@ const AssignEngineer = () => {
   const location = useLocation();
   const { id } = useParams();
 
-  // Updated job details state to include pricing
-  const [jobPoints, setJobPoints] = useState([]);
-  const [currentJobPoint, setCurrentJobPoint] = useState({
-    description: '',
-  });
-
   const jobCardId = location.state?.jobCardId;
   const garageId = localStorage.getItem('garageId');
   const garageToken = localStorage.getItem('token');
 
   // Main State
   const [engineers, setEngineers] = useState([]);
-  const [assignments, setAssignments] = useState([
-    {
-      id: Date.now(),
-      engineer: null,
-      parts: [],
-      priority: 'medium',
-      estimatedDuration: '',
-      notes: ''
-    }
-  ]);
+  const [assignment, setAssignment] = useState({
+    engineer: null,
+    parts: [],
+    priority: 'medium',
+    estimatedDuration: '',
+    notes: ''
+  });
   const [inventoryParts, setInventoryParts] = useState([]);
   const [jobCardIds, setJobCardIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,7 +86,6 @@ const AssignEngineer = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
-  const [parsedJobDetails, setParsedJobDetails] = useState([]);
   const [selectedPartIds, setSelectedPartIds] = useState(new Set());
   const [selectedPartQuantities, setSelectedPartQuantities] = useState({});
 
@@ -225,10 +215,7 @@ const AssignEngineer = () => {
   };
 
   // **ALTERNATIVE: Update job card when part quantity changes**
-  const handlePartQuantityChange = async (assignmentId, partIndex, newQuantity, oldQuantity) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
-
+  const handlePartQuantityChange = async (partIndex, newQuantity, oldQuantity) => {
     const part = assignment.parts[partIndex];
     if (!part) return;
 
@@ -256,7 +243,7 @@ const AssignEngineer = () => {
           : p
       );
 
-      updateAssignment(assignmentId, 'parts', updatedParts);
+      setAssignment(prev => ({ ...prev, parts: updatedParts }));
 
       // Don't update job card or inventory here - only during form submission
       if (error && error.includes(part.partName)) {
@@ -270,17 +257,14 @@ const AssignEngineer = () => {
   };
 
   // **ENHANCED: Update job card when parts are removed**
-  const handlePartRemoval = async (assignmentId, partIndex) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
-
+  const handlePartRemoval = async (partIndex) => {
     const part = assignment.parts[partIndex];
     if (!part) return;
 
     try {
       // Remove part from assignment (local state only - no inventory update until form submission)
       const updatedParts = assignment.parts.filter((_, idx) => idx !== partIndex);
-      updateAssignment(assignmentId, 'parts', updatedParts);
+      setAssignment(prev => ({ ...prev, parts: updatedParts }));
 
       // Don't update job card or inventory here - only during form submission
       setSnackbar({
@@ -295,7 +279,7 @@ const AssignEngineer = () => {
     }
   };
 
-  // **ENHANCED: Collect all parts from all assignments for job card update**
+  // **ENHANCED: Collect all parts from assignment for job card update**
   const getAllSelectedParts = () => {
     const allPartsUsed = [];
 
@@ -313,91 +297,91 @@ const AssignEngineer = () => {
       });
     }
 
-    // Then add parts from assignments
-    assignments.forEach(assignment => {
-      assignment.parts.forEach(part => {
-        const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
+    // Then add parts from assignment
+    assignment.parts.forEach(part => {
+      const existingIndex = allPartsUsed.findIndex(p => p.partName === part.partName);
 
-        // For pre-loaded parts, use original values from job card
-        if (part.isPreLoaded) {
-          const qty = part.originalQuantity || part.selectedQuantity || 1;
-          const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
-          const totalPrice = part.originalTotalPrice || (pricePerPiece * qty);
+      // For pre-loaded parts, use original values from job card
+      if (part.isPreLoaded) {
+        const qty = part.originalQuantity || part.selectedQuantity || 1;
+        const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
+                 const totalPrice = part.originalTotalPrice || (pricePerPiece * qty);
 
-          if (existingIndex !== -1) {
-            // Update existing part with new data
-            allPartsUsed[existingIndex] = {
-              ...allPartsUsed[existingIndex],
-              quantity: qty,
-              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-              totalPrice: parseFloat(totalPrice.toFixed(2))
-            };
-          } else {
-            allPartsUsed.push({
-              partName: part.partName,
-              quantity: qty,
-              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-              totalPrice: parseFloat(totalPrice.toFixed(2))
-            });
-          }
-        } else {
-          // For newly added parts, calculate normally
-          const qty = part.selectedQuantity || 1;
-          // Get the selling price from the part (could be from inventory or job card)
-          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-          const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
-          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
+         if (existingIndex !== -1) {
+           // Update existing part with new data
+           allPartsUsed[existingIndex] = {
+             ...allPartsUsed[existingIndex],
+             quantity: qty,
+             pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+             totalPrice: parseFloat(totalPrice.toFixed(2))
+           };
+         } else {
+           allPartsUsed.push({
+             partName: part.partName,
+             quantity: qty,
+             pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+             totalPrice: parseFloat(totalPrice.toFixed(2)),
+             _id: part._id,
+             isExisting: true
+           });
+         }
+       } else {
+         // For newly added parts, calculate normally
+         const qty = part.selectedQuantity || 1;
+         // Get the selling price from the part (could be from inventory or job card)
+         const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+         const taxRate = Number(part.taxAmount || part.gstPercentage || 0); // percentage
+         const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100); // sellingPrice + taxAmount
 
-          if (existingIndex !== -1) {
-            // Update existing part with new data
-            allPartsUsed[existingIndex] = {
-              ...allPartsUsed[existingIndex],
-              quantity: qty,
-              pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-              totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
-            };
-          } else {
-            // If sellingPrice is 0, try to find the part in inventory to get correct pricing
-            if (pricePerPiece === 0) {
-              const inventoryPart = inventoryParts.find(invPart =>
-                invPart.partName === part.partName ||
-                invPart._id === part._id
-              );
-              if (inventoryPart) {
-                const sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
-                const taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
-                const newPricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+         if (existingIndex !== -1) {
+           // Update existing part with new data
+           allPartsUsed[existingIndex] = {
+             ...allPartsUsed[existingIndex],
+             quantity: qty,
+             pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+             totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+           };
+         } else {
+           // If sellingPrice is 0, try to find the part in inventory to get correct pricing
+           if (pricePerPiece === 0) {
+             const inventoryPart = inventoryParts.find(invPart =>
+               invPart.partName === part.partName ||
+               invPart._id === part._id
+             );
+             if (inventoryPart) {
+               const sellingPrice = Number(inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0);
+               const taxRate = Number(inventoryPart.taxAmount || inventoryPart.gstPercentage || 0);
+               const newPricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
 
-                allPartsUsed.push({
-                  partName: part.partName,
-                  quantity: qty,
-                  pricePerPiece: parseFloat(newPricePerPiece.toFixed(2)),
-                  totalPrice: parseFloat((newPricePerPiece * qty).toFixed(2))
-                });
-              } else {
-                allPartsUsed.push({
-                  partName: part.partName,
-                  quantity: qty,
-                  pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-                  totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
-                });
-              }
-            } else {
-              allPartsUsed.push({
-                partName: part.partName,
-                quantity: qty,
-                pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-                totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
-              });
-            }
-          }
-        }
-      });
-    });
-    return allPartsUsed;
+               allPartsUsed.push({
+                 partName: part.partName,
+                 quantity: qty,
+                 pricePerPiece: parseFloat(newPricePerPiece.toFixed(2)),
+                 totalPrice: parseFloat((newPricePerPiece * qty).toFixed(2))
+               });
+             } else {
+               allPartsUsed.push({
+                 partName: part.partName,
+                 quantity: qty,
+                 pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+                 totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+               });
+             }
+           } else {
+             allPartsUsed.push({
+               partName: part.partName,
+               quantity: qty,
+               pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+               totalPrice: parseFloat((pricePerPiece * qty).toFixed(2))
+             });
+           }
+         }
+       }
+     });
+     return allPartsUsed;
   };
 
-  // **ENHANCED: Update job card with all parts from all assignments**
+  // **ENHANCED: Update job card with all parts from assignment**
   const updateJobCardWithAllParts = async () => {
     try {
       const allParts = getAllSelectedParts();
@@ -412,59 +396,7 @@ const AssignEngineer = () => {
   };
 
 
-  // Updated job details functions with pricing
-  const addJobPoint = () => {
-    if (currentJobPoint.description.trim()) {
-      const newJobPoint = {
-        id: Date.now(), // Simple ID generation
-        description: currentJobPoint.description.trim()
-      };
 
-      setJobPoints(prev => [...prev, newJobPoint]);
-
-      // Clear the input fields
-      setCurrentJobPoint({ description: '' });
-    }
-  };
-
-  const removeJobPoint = (indexToRemove) => {
-    setJobPoints(prev => prev.filter((_, index) => index !== indexToRemove));
-  };
-
-  // Handle input changes
-  const handleJobPointInputChange = (field, value) => {
-    setCurrentJobPoint(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleJobPointKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addJobPoint();
-    }
-  };
-
-
-
-  // Updated function to get job details for API
-  const getJobDetailsForAPI = () => {
-    // Combine existing and new job details
-    let combinedJobDetails = [];
-
-    // Add existing job details from parsed data
-    if (parsedJobDetails.length > 0) {
-      combinedJobDetails = [...parsedJobDetails];
-    }
-
-    // Add new job details from current input
-    if (jobPoints.length > 0) {
-      combinedJobDetails = [...combinedJobDetails, ...jobPoints];
-    }
-
-    return JSON.stringify(combinedJobDetails);
-  };
 
   // Snackbar notification
   const [snackbar, setSnackbar] = useState({
@@ -554,11 +486,9 @@ const AssignEngineer = () => {
     }
   }, [garageId, apiCall]);
 
-  const removeExistingJobPoint = (indexToRemove) => {
-    setParsedJobDetails(prev => prev.filter((_, index) => index !== indexToRemove));
-  };
 
-  // Helper function to get available quantity considering all current selections
+
+  // Helper function to get available quantity considering current selection
   const getAvailableQuantity = (partId) => {
     const originalPart = inventoryParts.find(p => p._id === partId);
     if (!originalPart) {
@@ -566,13 +496,11 @@ const AssignEngineer = () => {
     }
 
     let totalSelected = 0;
-    assignments.forEach(assignment => {
-      assignment.parts.forEach(part => {
-        // Only count user-selected parts, not pre-loaded parts
-        if (part._id === partId && !part.isPreLoaded) {
-          totalSelected += part.selectedQuantity || 1;
-        }
-      });
+    assignment.parts.forEach(part => {
+      // Only count user-selected parts, not pre-loaded parts
+      if (part._id === partId && !part.isPreLoaded) {
+        totalSelected += part.selectedQuantity || 1;
+      }
     });
 
     const available = Math.max(0, originalPart.quantity - totalSelected);
@@ -606,16 +534,11 @@ const AssignEngineer = () => {
   }, [apiCall, fetchInventoryParts]);
 
   // Function to update work progress API when parts are checked/unchecked
-  const updateWorkProgressAPI = async (assignmentId, partId, quantity) => {
+  const updateWorkProgressAPI = async (partId, quantity) => {
     try {
       const garageToken = localStorage.getItem('token');
       if (!garageToken) {
         throw new Error('No authentication token found');
-      }
-
-      const assignment = assignments.find(a => a.id === assignmentId);
-      if (!assignment) {
-        throw new Error('Assignment not found');
       }
 
       const part = inventoryParts.find(p => p._id === partId);
@@ -661,7 +584,7 @@ const AssignEngineer = () => {
       }));
 
       // Update the assignment locally first
-      updateAssignment(assignmentId, 'parts', updatedParts);
+      setAssignment(prev => ({ ...prev, parts: updatedParts }));
 
       // Update work progress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
@@ -687,10 +610,10 @@ const AssignEngineer = () => {
         }
       }
 
-      console.log(`✅ Successfully updated work progress API for assignment ${assignmentId}`);
+      console.log(`✅ Successfully updated work progress API`);
 
     } catch (err) {
-      console.error(`Failed to update work progress API for assignment ${assignmentId}:`, err);
+      console.error(`Failed to update work progress API:`, err);
       throw new Error(`Failed to update work progress: ${err.response?.data?.message || err.message}`);
     }
   };
@@ -820,7 +743,7 @@ const AssignEngineer = () => {
         notes: jobCardDataTemp.engineerRemarks || ''
       };
 
-      setAssignments([newAssignment]);
+      setAssignment(newAssignment);
 
       // Clear temp data
       setJobCardDataTemp(null);
@@ -851,40 +774,7 @@ const AssignEngineer = () => {
 
         const jobCardData = response.data;
 
-        // Enhanced job details parsing
-        if (jobCardData.jobDetails) {
-          try {
-            // First try to parse as JSON (new format with price)
-            const parsed = JSON.parse(jobCardData.jobDetails);
-            if (Array.isArray(parsed)) {
-              // New format: array of objects with description and price
-              setParsedJobDetails(parsed);
-              // Don't set jobPoints here as we want to show existing data separately
-            } else {
-              // Handle other JSON formats
-              setParsedJobDetails([]);
-            }
-          } catch (e) {
-            // If JSON parsing fails, treat as old string format
-            const lines = jobCardData.jobDetails.split('\n');
-            const cleanLines = lines.map(line => line.replace(/^\d+\.\s*/, '').trim())
-              .filter(line => line.length > 0);
-
-            // Convert old format to new format with default price of 0
-            const convertedJobDetails = cleanLines.map(line => ({
-              description: line,
-              price: 0
-            }));
-
-            setParsedJobDetails(convertedJobDetails);
-
-            // Set jobPoints to empty array for new input
-            setJobPoints([]);
-          }
-        } else {
-          setParsedJobDetails([]);
-          setJobPoints([]);
-        }
+        // Job details parsing removed - no longer needed
 
         // Store job card data temporarily to be processed when engineers and parts are loaded
         setJobCardDataTemp(jobCardData);
@@ -909,175 +799,17 @@ const AssignEngineer = () => {
     fetchJobCardData();
   }, [id]);
 
-  // Remove assignment
-  const removeAssignment = (assignmentId) => {
-    if (assignments.length > 1) {
-      setAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
-    }
-  };
-
-  // Update assignment
-  const updateAssignment = (assignmentId, field, value) => {
-    setAssignments(prev => prev.map(assignment =>
-      assignment.id === assignmentId
-        ? { ...assignment, [field]: value }
-        : assignment
-    ));
-
-    if (formErrors[`assignment_${assignmentId}_${field}`]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [`assignment_${assignmentId}_${field}`]: null
-      }));
-    }
-  };
 
 
-  const handlePartSelection = async (assignmentId, newParts, previousParts = []) => {
-    try {
-      console.log('🔄 Part selection triggered:', {
-        assignmentId,
-        newParts: newParts,
-        previousParts: previousParts,
-        newPartsLength: newParts.length,
-        previousPartsLength: previousParts.length
-      });
 
-      const currentAssignment = assignments.find(a => a.id === assignmentId);
-      if (!currentAssignment) {
-        console.error('❌ Assignment not found:', assignmentId);
-        return;
-      }
 
-      // Keep existing pre-loaded parts (these should always remain)
-      const existingPreLoadedParts = currentAssignment.parts.filter(part => part.isPreLoaded);
 
-      // Get previously selected user parts (excluding pre-loaded)
-      const previousUserParts = currentAssignment.parts.filter(part => !part.isPreLoaded);
 
-      // Calculate inventory changes for removed parts
-      const partsToRemove = previousUserParts.filter(prevPart => 
-        !newParts.some(newPart => newPart._id === prevPart._id)
-      );
-      
-      // Calculate inventory changes for added parts
-      const partsToAdd = newParts.filter(newPart => 
-        !previousUserParts.some(prevPart => prevPart._id === newPart._id)
-      );
 
-      // Update inventory for removed parts (increase quantity)
-      for (const part of partsToRemove) {
-        const selectedQuantity = part.selectedQuantity || 1;
-        const currentPart = inventoryParts.find(p => p._id === part._id);
-        if (currentPart) {
-          const newQuantity = currentPart.quantity + selectedQuantity;
-          await updatePartQuantity(part._id, newQuantity);
-        }
-      }
 
-      // Update inventory for added parts (decrease quantity)
-      for (const part of partsToAdd) {
-        const currentPart = inventoryParts.find(p => p._id === part._id);
-        if (currentPart) {
-          const newQuantity = Math.max(0, currentPart.quantity - 1);
-          await updatePartQuantity(part._id, newQuantity);
-        }
-      }
-
-      // Process new parts (these are the current selection from Autocomplete)
-      const processedNewParts = newParts.map(part => ({
-        ...part,
-        selectedQuantity: part.selectedQuantity || 1,
-        isPreLoaded: false // Always mark as user-selected
-      }));
-
-      // Combine pre-loaded parts with new user-selected parts
-      const allParts = [...existingPreLoadedParts, ...processedNewParts];
-
-      console.log('📦 Processed parts:', {
-        assignmentId,
-        existingPreLoadedParts: existingPreLoadedParts.length,
-        previousUserParts: previousUserParts.length,
-        newParts: processedNewParts.length,
-        totalParts: allParts.length,
-        allParts: allParts.map(p => ({ name: p.partName, isPreLoaded: p.isPreLoaded }))
-      });
-
-      updateAssignment(assignmentId, 'parts', allParts);
-
-      if (id && allParts.length > 0) {
-        await updateJobCardWithParts(allParts);
-      }
-
-      // Show success message for part selection
-      if (newParts.length > 1) {
-        setSuccess(`Successfully selected ${newParts.length} parts!`);
-      } else if (newParts.length === 0) {
-        setSuccess('All user-selected parts cleared!');
-      } else {
-        setSuccess(`Successfully selected ${newParts.length} part!`);
-      }
-
-    } catch (err) {
-      console.error('❌ Error handling part selection:', err);
-      setError('Failed to update part selection and job card');
-    }
-  };
-
-  // Function to add a single part to the selection
-  const handleAddPartToSelection = async (assignmentId, partToAdd) => {
-    try {
-      const currentAssignment = assignments.find(a => a.id === assignmentId);
-      if (!currentAssignment) {
-        console.error('❌ Assignment not found:', assignmentId);
-        return;
-      }
-
-      // Check if part is already selected
-      const isAlreadySelected = currentAssignment.parts.some(part => 
-        part._id === partToAdd._id && !part.isPreLoaded
-      );
-
-      if (isAlreadySelected) {
-        setError(`Part "${partToAdd.partName}" is already selected`);
-        return;
-      }
-
-      // Check available quantity
-      const availableQuantity = getAvailableQuantity(partToAdd._id);
-      if (availableQuantity <= 0) {
-        setError(`No stock available for "${partToAdd.partName}"`);
-        return;
-      }
-
-      // Add the new part to the selection
-      const newPart = {
-        ...partToAdd,
-        selectedQuantity: 1,
-        isPreLoaded: false
-      };
-
-      // Update inventory (decrease by 1)
-      const currentPart = inventoryParts.find(p => p._id === partToAdd._id);
-      if (currentPart) {
-        const newQuantity = Math.max(0, currentPart.quantity - 1);
-        await updatePartQuantity(partToAdd._id, newQuantity);
-      }
-
-      // Add to assignment
-      const updatedParts = [...currentAssignment.parts, newPart];
-      updateAssignment(assignmentId, 'parts', updatedParts);
-
-      setSuccess(`Successfully added "${partToAdd.partName}" to selection!`);
-
-    } catch (err) {
-      console.error('❌ Error adding part to selection:', err);
-      setError('Failed to add part to selection');
-    }
-  };
 
   // Function to handle checkbox selection with immediate inventory update and work progress API call
-  const handleCheckboxChange = async (partId, assignmentId) => {
+  const handleCheckboxChange = async (partId) => {
     const newSelectedPartIds = new Set(selectedPartIds);
     const part = inventoryParts.find(p => p._id === partId);
     
@@ -1102,7 +834,7 @@ const AssignEngineer = () => {
           await updatePartQuantity(partId, newQuantity);
           
           // Update work progress API to remove the part
-          await updateWorkProgressAPI(assignmentId, partId, 0); // 0 quantity means remove
+          await updateWorkProgressAPI(partId, 0); // 0 quantity means remove
           
           setSuccess(`Removed "${part.partName}" from selection and restored ${quantityToReturn} to inventory`);
         }
@@ -1134,7 +866,7 @@ const AssignEngineer = () => {
           await updatePartQuantity(partId, newQuantity);
           
           // Update work progress API to add the part
-          await updateWorkProgressAPI(assignmentId, partId, defaultQuantity);
+          await updateWorkProgressAPI(partId, defaultQuantity);
           
           setSuccess(`Added "${part.partName}" (Qty: ${defaultQuantity}) to selection and updated inventory`);
         }
@@ -1150,7 +882,7 @@ const AssignEngineer = () => {
   };
 
   // Function to handle quantity change for selected parts with work progress API update
-  const handleQuantityChange = async (partId, newQuantity, assignmentId) => {
+  const handleQuantityChange = async (partId, newQuantity) => {
     if (newQuantity < 1) return;
     
     // Get the part to check available quantity
@@ -1171,15 +903,13 @@ const AssignEngineer = () => {
       [partId]: newQuantity
     }));
 
-    // Update work progress API if assignmentId is provided
-    if (assignmentId) {
-      try {
-        await updateWorkProgressAPI(assignmentId, partId, newQuantity);
-        setSuccess(`Updated quantity for "${part.partName}" to ${newQuantity}`);
-      } catch (error) {
-        console.error('Error updating quantity in work progress API:', error);
-        setError('Failed to update quantity in work progress API');
-      }
+    // Update work progress API
+    try {
+      await updateWorkProgressAPI(partId, newQuantity);
+      setSuccess(`Updated quantity for "${part.partName}" to ${newQuantity}`);
+    } catch (error) {
+      console.error('Error updating quantity in work progress API:', error);
+      setError('Failed to update quantity in work progress API');
     }
   };
 
@@ -1231,16 +961,10 @@ const AssignEngineer = () => {
   };
 
   // Function to add a single part with specific quantity
-  const handleAddPartToSelectionWithQuantity = async (assignmentId, partToAdd, quantity) => {
+  const handleAddPartToSelectionWithQuantity = async (partToAdd, quantity) => {
     try {
-      const currentAssignment = assignments.find(a => a.id === assignmentId);
-      if (!currentAssignment) {
-        console.error('❌ Assignment not found:', assignmentId);
-        return;
-      }
-
       // Check if part is already selected
-      const isAlreadySelected = currentAssignment.parts.some(part => 
+      const isAlreadySelected = assignment.parts.some(part => 
         part._id === partToAdd._id && !part.isPreLoaded
       );
 
@@ -1271,8 +995,11 @@ const AssignEngineer = () => {
       }
 
       // Add to assignment
-      const updatedParts = [...currentAssignment.parts, newPart];
-      updateAssignment(assignmentId, 'parts', updatedParts);
+      const updatedParts = [...assignment.parts, newPart];
+      setAssignment(prev => ({
+        ...prev,
+        parts: updatedParts
+      }));
 
       setSuccess(`Successfully added "${partToAdd.partName}" (Qty: ${quantity}) to selection!`);
 
@@ -1286,13 +1013,9 @@ const AssignEngineer = () => {
   const validateForm = () => {
     const errors = {};
 
-    assignments.forEach((assignment, index) => {
-      const assignmentKey = `assignment_${assignment.id}`;
-
-      if (!assignment.engineer) {
-        errors[`${assignmentKey}_engineer`] = 'Please select an engineer';
-      }
-    });
+    if (!assignment.engineer) {
+      errors.engineer = 'Please select an engineer';
+    }
 
     if (!id && (!jobCardIds || jobCardIds.length === 0)) {
       errors.jobCards = 'No job cards to assign';
@@ -1312,39 +1035,37 @@ const AssignEngineer = () => {
   const getAllPartsForAPI = () => {
     const allParts = [];
 
-    assignments.forEach(assignment => {
-      assignment.parts.forEach(part => {
-        const selectedQuantity = part.selectedQuantity || 1;
+    assignment.parts.forEach(part => {
+      const selectedQuantity = part.selectedQuantity || 1;
 
-        // For pre-loaded parts, use original values from job card
-        if (part.isPreLoaded) {
-          const quantity = part.originalQuantity || selectedQuantity;
-          const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
-          const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
+      // For pre-loaded parts, use original values from job card
+      if (part.isPreLoaded) {
+        const quantity = part.originalQuantity || selectedQuantity;
+        const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
+        const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
 
-          allParts.push({
-            partName: part.partName,
-            quantity: quantity,
-            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-            totalPrice: parseFloat(totalPrice.toFixed(2)),
-            isPreLoaded: true
-          });
-        } else {
-          // For user-selected parts, calculate normally
-          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-          const totalPrice = pricePerPiece * selectedQuantity;
+        allParts.push({
+          partName: part.partName,
+          quantity: quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2)),
+          isPreLoaded: true
+        });
+      } else {
+        // For user-selected parts, calculate normally
+        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+        const totalPrice = pricePerPiece * selectedQuantity;
 
-          allParts.push({
-            partName: part.partName,
-            quantity: selectedQuantity,
-            pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-            totalPrice: parseFloat(totalPrice.toFixed(2)),
-            isPreLoaded: false
-          });
-        }
-      });
+        allParts.push({
+          partName: part.partName,
+          quantity: selectedQuantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2)),
+          isPreLoaded: false
+        });
+      }
     });
 
     return allParts;
@@ -1401,20 +1122,8 @@ const AssignEngineer = () => {
     setFormErrors({});
 
     try {
-      // Get job details for API - combined existing and new
-      const jobDetailsString = getJobDetailsForAPI();
-
-      // Calculate total job details cost
-      const totalJobDetailsCost = (() => {
-        const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
-        const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-        return existingCost + newCost;
-      })();
-
-      // Collect all parts used across all assignments with enhanced data
+      // Collect all parts used with enhanced data
       const allPartsUsed = getAllPartsForAPI();
-
-      // Note: Inventory is already updated when parts are added/removed, so no need to update again here
 
       // Update job card with parts used using the workprogress API
       const targetJobCardIds = jobCardIds.length > 0 ? jobCardIds : [id];
@@ -1432,48 +1141,39 @@ const AssignEngineer = () => {
         }
       }).filter(Boolean);
 
-      // Process each assignment
-      const assignmentPromises = assignments.map(async (assignment) => {
-        const payload = {
-          jobCardIds: targetJobCardIds,
-          parts: assignment.parts.map(part => ({
-            partId: part._id,
-            partName: part.partName,
-            quantity: part.selectedQuantity || 1,
-            taxAmount: part.taxAmount || 0,
+      // Process assignment
+      const payload = {
+        jobCardIds: targetJobCardIds,
+        parts: assignment.parts.map(part => ({
+          partId: part._id,
+          partName: part.partName,
+          quantity: part.selectedQuantity || 1,
+          taxAmount: part.taxAmount || 0,
+        })),
+        priority: assignment.priority,
+        notes: assignment.notes
+      };
 
-          })),
-          priority: assignment.priority,
-          notes: assignment.notes
-        };
-
-
-        return axios.put(
-          `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
-          payload,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            }
+      const assignmentPromise = axios.put(
+        `https://garage-management-zi5z.onrender.com/api/jobcards/assign-jobcards/${assignment.engineer._id}`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
           }
-        );
-      });
+        }
+      );
 
       // Execute job card updates first
       if (jobCardUpdatePromises.length > 0) {
         await Promise.all(jobCardUpdatePromises);
       }
 
-      // Execute all assignments
-      const results = await Promise.all(assignmentPromises);
-
+      // Execute assignment
+      await assignmentPromise;
 
       // Calculate total cost for success message
-      const totalCost = (() => {
-        const jobDetailsCost = totalJobDetailsCost;
-        const partsCost = allPartsUsed.reduce((total, part) => total + (part.totalPrice || 0), 0);
-        return jobDetailsCost + partsCost;
-      })();
+      const totalCost = allPartsUsed.reduce((total, part) => total + (part.totalPrice || 0), 0);
 
       // Calculate pre-loaded vs user-selected parts
       const preLoadedParts = allPartsUsed.filter(part => part.isPreLoaded);
@@ -1481,8 +1181,7 @@ const AssignEngineer = () => {
 
       // Show success message with detailed breakdown
       const successMessage = `✅ Assignment completed! 
-        Total Cost: ₹${totalCost.toFixed(2)} 
-        (Job Details: ₹${totalJobDetailsCost.toFixed(2)} + Parts: ₹${(totalCost - totalJobDetailsCost).toFixed(2)}) 
+        Total Cost: ₹${totalCost.toFixed(2)}
         Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedParts.length} user-selected = ${allPartsUsed.length} total
         (Inventory already updated when parts were added)`;
 
@@ -1805,36 +1504,15 @@ const AssignEngineer = () => {
                 )}
               </Typography>
               <Grid container spacing={{ xs: 1, sm: 2 }}>
-                <Grid item xs={6} sm={2.4}>
+                
+                <Grid item xs={6} sm={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
                     <Typography
                       variant="h4"
                       color="primary"
                       sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                     >
-                      {assignments.length}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
-                    >
-                      Total Assignments
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={6} sm={2.4}>
-                  <Box sx={{ textAlign: 'center', p: 1 }}>
-                    <Typography
-                      variant="h4"
-                      color="primary"
-                      sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
-                    >
-                      {(() => {
-                        const existingCount = parsedJobDetails.length;
-                        const newCount = jobPoints.length;
-                        return existingCount + newCount;
-                      })()}
+                      0
                     </Typography>
                     <Typography
                       variant="body2"
@@ -1845,7 +1523,7 @@ const AssignEngineer = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={2.4}>
+                <Grid item xs={12} sm={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
                     <Typography
                       variant="h4"
@@ -1853,25 +1531,17 @@ const AssignEngineer = () => {
                       sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                     >
                       ₹{(() => {
-                        // Calculate job details cost
-                        const existingCost = parsedJobDetails.reduce((total, item) => total + (parseFloat(item.price) || 0), 0);
-                        const newCost = jobPoints.reduce((total, item) => total + (item.price || 0), 0);
-                        const jobDetailsCost = existingCost + newCost;
-
-                        // Calculate parts cost
-                        const partsCost = assignments.reduce((total, assignment) => {
-                          return total + assignment.parts.reduce((partTotal, part) => {
-                            const selectedQuantity = part.selectedQuantity || 1;
-                            const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                            const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                            const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-                            const partTotalPrice = pricePerPiece * selectedQuantity;
-                            return partTotal + partTotalPrice;
-                          }, 0);
+                        // Calculate parts cost only
+                        const partsCost = assignment.parts.reduce((partTotal, part) => {
+                          const selectedQuantity = part.selectedQuantity || 1;
+                          const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                          const partTotalPrice = pricePerPiece * selectedQuantity;
+                          return partTotal + partTotalPrice;
                         }, 0);
 
-                        // Return total cost (job details + parts)
-                        return (jobDetailsCost + partsCost).toFixed(0);
+                        return partsCost.toFixed(0);
                       })()}
                     </Typography>
                     <Typography
@@ -1879,18 +1549,18 @@ const AssignEngineer = () => {
                       color="text.secondary"
                       sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                     >
-                      Total Job Cost
+                      Total Parts Cost
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={6} sm={2.4}>
+                <Grid item xs={6} sm={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
                     <Typography
                       variant="h4"
                       color="primary"
                       sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                     >
-                      {new Set(assignments.filter(a => a.engineer).map(a => a.engineer._id)).size}
+                      {assignment.engineer ? 1 : 0}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -1901,14 +1571,14 @@ const AssignEngineer = () => {
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={6} sm={2.4}>
+                <Grid item xs={6} sm={3}>
                   <Box sx={{ textAlign: 'center', p: 1 }}>
                     <Typography
                       variant="h4"
                       color="primary"
                       sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                     >
-                      {assignments.reduce((total, assignment) => total + assignment.parts.length, 0)}
+                      {assignment.parts.length}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -1935,26 +1605,20 @@ const AssignEngineer = () => {
                       <Grid item xs={6} sm={3}>
                         <Typography variant="caption" color="text.secondary">Pre-loaded Parts:</Typography>
                         <Typography variant="body2" fontWeight={600}>
-                          {assignments.reduce((total, assignment) => 
-                            total + assignment.parts.filter(part => part.isPreLoaded).length, 0
-                          )} (No inventory change)
+                          {assignment.parts.filter(part => part.isPreLoaded).length} (No inventory change)
                         </Typography>
                       </Grid>
                       <Grid item xs={6} sm={3}>
                         <Typography variant="caption" color="text.secondary">User Selected Parts:</Typography>
                         <Typography variant="body2" fontWeight={600}>
-                          {assignments.reduce((total, assignment) => 
-                            total + assignment.parts.filter(part => !part.isPreLoaded).length, 0
-                          )} (Will reduce inventory)
+                          {assignment.parts.filter(part => !part.isPreLoaded).length} (Will reduce inventory)
                         </Typography>
                       </Grid>
                       <Grid item xs={6} sm={3}>
                         <Typography variant="caption" color="text.secondary">Total Quantity:</Typography>
                         <Typography variant="body2" fontWeight={600}>
-                          {assignments.reduce((total, assignment) => 
-                            total + assignment.parts.reduce((partTotal, part) => 
-                              partTotal + (part.selectedQuantity || 1), 0
-                            ), 0
+                          {assignment.parts.reduce((partTotal, part) => 
+                            partTotal + (part.selectedQuantity || 1), 0
                           )} units
                         </Typography>
                       </Grid>
@@ -1977,133 +1641,7 @@ const AssignEngineer = () => {
           </Card>
 
           {/* Enhanced Job Details Section with Price */}
-          <Card sx={{ mb: 3, borderRadius: 2, bgcolor: 'background.paper' }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 600,
-                  mb: 2,
-                  fontSize: { xs: '1.1rem', sm: '1.25rem' }
-                }}
-              >
-                Job Details (Point-wise)
-              </Typography>
-              <Paper sx={{ p: { xs: 2, sm: 3 }, border: `1px solid ${theme.palette.divider}`, borderRadius: 2, bgcolor: 'background.paper' }}>
-                <Grid container spacing={{ xs: 2, sm: 3 }}>
-                  <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                      <TextField
-                        fullWidth
-                        placeholder="Enter job detail description..."
-                        value={currentJobPoint.description}
-                        onChange={(e) => handleJobPointInputChange('description', e.target.value)}
-                        onKeyPress={handleJobPointKeyPress}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <DescriptionIcon />
-                            </InputAdornment>
-                          ),
-                        }}
-                        sx={{ flex: 2, minWidth: { xs: '100%', sm: '200px' } }}
-                      />
-                      <Button
-                        variant="contained"
-                        onClick={addJobPoint}
-                        disabled={!currentJobPoint.description.trim()}
-                        startIcon={<AddIcon />}
-                        sx={{
-                          minWidth: { xs: '100%', sm: '120px' },
-                          mt: { xs: 1, sm: 0 }
-                        }}
-                      >
-                        Add Point
-                      </Button>
-                    </Box>
 
-                    {jobPoints.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Current Job Details Points:
-                        </Typography>
-                        <List sx={{
-                          bgcolor: 'background.paper',
-                          border: 1,
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          mb: 2
-                        }}>
-                          {jobPoints.map((point, index) => (
-                            <ListItem key={index} divider sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' } }}>
-                              <ListItemText
-                                primary={point.description}
-                                sx={{
-                                  wordBreak: 'break-word',
-                                  mb: { xs: 1, sm: 0 }
-                                }}
-                              />
-                              <ListItemSecondaryAction sx={{ position: { xs: 'static', sm: 'absolute' } }}>
-                                <IconButton
-                                  edge="end"
-                                  onClick={() => removeJobPoint(index)}
-                                  color="error"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </ListItemSecondaryAction>
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-
-                    {parsedJobDetails.length > 0 && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography
-                          variant="subtitle2"
-                          gutterBottom
-                          sx={{
-                            color: 'info.main',
-                            fontSize: { xs: '0.9rem', sm: '1rem' }
-                          }}
-                        >
-                          📋 Existing Job Details from Job Card:
-                        </Typography>
-                        <List sx={{
-                          bgcolor: 'background.paper',
-                          border: 1,
-                          borderColor: 'info.main',
-                          borderRadius: 1
-                        }}>
-                          {parsedJobDetails.map((item, index) => (
-                            <ListItem key={index} divider sx={{ flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' } }}>
-                              <ListItemText
-                                primary={`Description: ${item.description}`}
-                                sx={{
-                                  wordBreak: 'break-word',
-                                  mb: { xs: 1, sm: 0 }
-                                }}
-                              />
-                              <ListItemSecondaryAction sx={{ position: { xs: 'static', sm: 'absolute' } }}>
-                                <IconButton
-                                  edge="end"
-                                  onClick={() => removeExistingJobPoint(index)}
-                                  color="error"
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </ListItemSecondaryAction>
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-                  </Grid>
-                </Grid>
-              </Paper>
-            </CardContent>
-          </Card>
 
           {/* Main Form Card */}
           <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
@@ -2139,72 +1677,58 @@ const AssignEngineer = () => {
                   </Box>
                 </Box>
 
-                {/* Assignments */}
-                {assignments.map((assignment, index) => (
-                  <Accordion
-                    key={assignment.id}
-                    defaultExpanded
-                    sx={{
-                      mb: 2,
-                      border: `1px solid ${theme.palette.divider}`,
-                      bgcolor: 'background.paper'
-                    }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: '100%',
-                        pr: 2,
-                        flexWrap: 'wrap',
-                        gap: 1
-                      }}>
-                        <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography
-                          variant="subtitle1"
-                          sx={{
-                            flexGrow: 1,
-                            fontSize: { xs: '1rem', sm: '1.1rem' }
-                          }}
-                        >
-                          Assignment #{index + 1}
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                          {assignment.engineer && (
-                            <Chip
-                              label={assignment.engineer.name || assignment.engineer.email || 'Unknown Engineer'}
-                              size="small"
-                              color="primary"
-                            />
-                          )}
+                {/* Assignment */}
+                <Accordion
+                  defaultExpanded
+                  sx={{
+                    mb: 2,
+                    border: `1px solid ${theme.palette.divider}`,
+                    bgcolor: 'background.paper'
+                  }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      width: '100%',
+                      pr: 2,
+                      flexWrap: 'wrap',
+                      gap: 1
+                    }}>
+                      <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          flexGrow: 1,
+                          fontSize: { xs: '1rem', sm: '1.1rem' }
+                        }}
+                      >
+                        Engineer Assignment
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {assignment.engineer && (
                           <Chip
-                            label={assignment.priority}
+                            label={assignment.engineer.name || assignment.engineer.email || 'Unknown Engineer'}
                             size="small"
-                            color={getPriorityColor(assignment.priority)}
+                            color="primary"
                           />
-                          {assignment.parts.length > 0 && (
-                            <Chip
-                              label={`${assignment.parts.length} parts`}
-                              size="small"
-                              color="info"
-                            />
-                          )}
-                        </Box>
-                        {assignments.length > 1 && (
-                          <IconButton
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeAssignment(assignment.id);
-                            }}
+                        )}
+                        <Chip
+                          label={assignment.priority}
+                          size="small"
+                          color={getPriorityColor(assignment.priority)}
+                        />
+                        {assignment.parts.length > 0 && (
+                          <Chip
+                            label={`${assignment.parts.length} parts`}
                             size="small"
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                            color="info"
+                          />
                         )}
                       </Box>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ p: { xs: 2, sm: 3 } }}>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ p: { xs: 2, sm: 3 } }}>
                       <Grid container spacing={{ xs: 2, sm: 3 }}>
                         {/* Engineer Selection */}
                         <Grid item xs={12} md={6}>
@@ -2238,7 +1762,10 @@ const AssignEngineer = () => {
                               }}
                               value={assignment.engineer}
                               onChange={(event, newValue) => {
-                                updateAssignment(assignment.id, 'engineer', newValue);
+                                setAssignment(prev => ({
+                                  ...prev,
+                                  engineer: newValue
+                                }));
                               }}
                               renderInput={(params) => (
                                 <TextField
@@ -2294,7 +1821,10 @@ const AssignEngineer = () => {
                           <FormControl fullWidth>
                             <Select
                               value={assignment.priority}
-                              onChange={(e) => updateAssignment(assignment.id, 'priority', e.target.value)}
+                              onChange={(e) => setAssignment(prev => ({
+                                ...prev,
+                                priority: e.target.value
+                              }))}
                             >
                               <MenuItem value="low">Low</MenuItem>
                               <MenuItem value="medium">Medium</MenuItem>
@@ -2334,12 +1864,12 @@ const AssignEngineer = () => {
                                     size="small"
                                     startIcon={<DeleteIcon />}
                                     onClick={() => {
-                                      const currentAssignment = assignments.find(a => a.id === assignment.id);
-                                      if (currentAssignment) {
-                                        const existingPreLoadedParts = currentAssignment.parts.filter(part => part.isPreLoaded);
-                                        updateAssignment(assignment.id, 'parts', existingPreLoadedParts);
-                                        setSuccess('All user-selected parts cleared');
-                                      }
+                                      const existingPreLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
+                                      setAssignment(prev => ({
+                                        ...prev,
+                                        parts: existingPreLoadedParts
+                                      }));
+                                      setSuccess('All user-selected parts cleared');
                                     }}
                                     sx={{ flex: { xs: 1, sm: 'none' } }}
                                   >
@@ -2349,32 +1879,8 @@ const AssignEngineer = () => {
                               </Box>
                             </Box>
 
-                          {/* Inventory Management Notice */}
-                          <Alert
-                            severity="info"
-                            sx={{ mb: 2 }}
-                            icon={<InventoryIcon />}
-                          >
-                            <Typography variant="body2">
-                              <strong>Inventory Management:</strong> When you add parts, inventory quantities are updated immediately. 
-                              Pre-loaded parts from the job card cannot be modified. Use the + and - buttons to adjust quantities before submission.
-                              <br />
-                              <strong>Part Selection:</strong> Check the boxes below to immediately add parts to your selection. Parts are automatically removed from inventory and added to the work progress when checked. Pre-loaded parts from the job card are already included and cannot be selected again.
-                            </Typography>
-                          </Alert>
 
-                          {/* Pre-loaded Parts Notice */}
-                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
-                            <Alert
-                              severity="info"
-                              sx={{ mb: 2 }}
-                              icon={<InventoryIcon />}
-                            >
-                              <Typography variant="body2">
-                                <strong>Pre-loaded parts detected:</strong> {assignment.parts.filter(part => part.isPreLoaded).length} parts from the job card are already included and will be sent to the work progress API. These parts are excluded from the selection list below.
-                              </Typography>
-                            </Alert>
-                          )}
+                    
 
                           {/* No Parts Available Notice */}
                           {(() => {
@@ -2454,7 +1960,7 @@ const AssignEngineer = () => {
                                     try {
                                       // Select all available parts and update inventory/work progress API
                                       for (const part of availableParts) {
-                                        await handleCheckboxChange(part._id, assignment.id);
+                                        await handleCheckboxChange(part._id);
                                       }
                                       
                                       setSuccess(`Successfully selected all ${availableParts.length} available parts`);
@@ -2493,7 +1999,7 @@ const AssignEngineer = () => {
                                         // Remove all selected parts from inventory and work progress API
                                         const selectedParts = Array.from(selectedPartIds);
                                         for (const partId of selectedParts) {
-                                          await handleCheckboxChange(partId, assignment.id);
+                                          await handleCheckboxChange(partId);
                                         }
                                         
                                         setSuccess('Cleared all selected parts');
@@ -2545,7 +2051,7 @@ const AssignEngineer = () => {
                                            control={
                                              <Checkbox
                                                checked={selectedPartIds.has(part._id)}
-                                               onChange={() => handleCheckboxChange(part._id, assignment.id)}
+                                               onChange={() => handleCheckboxChange(part._id)}
                                                color="primary"
                                                size="small"
                                              />
@@ -2585,7 +2091,7 @@ const AssignEngineer = () => {
                                                onChange={(e) => {
                                                  const newQuantity = parseInt(e.target.value) || 1;
                                                  if (newQuantity >= 1) {
-                                                   handleQuantityChange(part._id, newQuantity, assignment.id);
+                                                   handleQuantityChange(part._id, newQuantity);
                                                  }
                                                }}
                                                onBlur={(e) => {
@@ -3500,10 +3006,9 @@ const AssignEngineer = () => {
                             return null;
                           })()}
                         </Grid>
-                      </Grid>  {/* ✅ Closing missing Grid container */} 
+                      </Grid>
                     </AccordionDetails>
                   </Accordion>
-                ))}
 
                 {/* Final Summary Before Submission */}
                 {(() => {

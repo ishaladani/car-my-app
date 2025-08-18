@@ -18,7 +18,7 @@ import GarageDetailsSection from "../components/GarageDetailsSection";
 import CustomerVehicleSection from "../components/CustomerVehicleSection";
 import GSTSettingsSection from "../components/GSTSettingsSection";
 import PartsSection from "../components/PartsSection";  
-import ServicesSection from "../components/ServicesSection";
+
 import FinalInspectionSection from "../components/FinalInspectionSection";
 import BillSummarySection from "../components/BillSummarySection";
 import ThankYouSection from "../components/ThankYouSection";
@@ -27,7 +27,7 @@ import ProcessingPaymentDialog from "../components/ProcessingPaymentDialog";
 import EmailDialog from "../components/EmailDialog";    
 import EditPriceDialog from "../components/EditPriceDialog";
 import AddPartDialog from "../components/AddPartDialog";
-import AddServiceDialog from "../components/AddServiceDialog";
+
 import SnackbarAlert from "../components/SnackbarAlert";
 
 const AutoServeBilling = () => {
@@ -110,7 +110,7 @@ const AutoServeBilling = () => {
   });
 
   const [parts, setParts] = useState([]);
-  const [services, setServices] = useState([]);
+
 
   const [summary, setSummary] = useState({
     totalPartsCost: 0,
@@ -137,12 +137,7 @@ const AutoServeBilling = () => {
     hsnNumber: "" // NEW: Added HSN number for parts
   });
 
-  const [showNewServiceDialog, setShowNewServiceDialog] = useState(false);
-  const [newService, setNewService] = useState({
-    name: "",
-    engineer: "",
-    laborCost: 0,
-  });
+
 
   const [showEditPriceDialog, setShowEditPriceDialog] = useState(false);
   const [editItem, setEditItem] = useState({
@@ -292,79 +287,7 @@ setGarageDetails({
           setParts([]);
         }
 
-        // Enhanced services processing
-        let apiServices = [];
 
-        if (data.services?.length > 0) {
-          apiServices = data.services.map((service, index) => ({
-            id: index + 1,
-            name: service.serviceName || service.name || '',
-            engineer: service.engineer || service.engineerName || 
-                     (data.engineerId?.length > 0 ? data.engineerId[0].name : null) ||
-                     data.engineerId?.name || 'Assigned Engineer',
-            progress: service.progress || 100,
-            status: service.status || 'Completed',
-            laborCost: parseFloat(service.laborCost) || 0
-          }));
-        }
-
-        if (apiServices.length === 0 && data.jobDetails) {
-          try {
-            const jobDetailsArray = JSON.parse(data.jobDetails);
-            
-            if (Array.isArray(jobDetailsArray) && jobDetailsArray.length > 0) {
-              apiServices = jobDetailsArray.map((job, index) => ({
-                id: index + 1,
-                name: job.description || `Service ${index + 1}`,
-                engineer: (data.engineerId?.length > 0 ? data.engineerId[0].name : null) ||
-                         data.engineerId?.name || 'Assigned Engineer',
-                progress: 100,
-                status: 'Completed',
-                laborCost: parseFloat(job.price) || 0
-              }));
-            }
-          } catch (error) {
-            console.error('Error parsing jobDetails:', error);
-            apiServices = [{
-              id: 1,
-              name: 'Service Details (Parsing Error)',
-              engineer: (data.engineerId?.length > 0 ? data.engineerId[0].name : null) ||
-                       data.engineerId?.name || 'Assigned Engineer',
-              progress: 100,
-              status: 'Completed',
-              laborCost: parseFloat(data.laborHours) * 500 || 0
-            }];
-          }
-        }
-
-        if (apiServices.length === 0 && data.laborHours) {
-          apiServices = [{
-            id: 1,
-            name: 'General Service',
-            engineer: (data.engineerId?.length > 0 ? data.engineerId[0].name : null) ||
-                     data.engineerId?.name || 'Assigned Engineer',
-            progress: 100,
-            status: 'Completed',
-            laborCost: parseFloat(data.laborHours) * 500 || 0
-          }];
-        }
-
-        // UPDATED: Add default service if no parts or services found
-        if (apiServices.length === 0 && parts.length === 0) {
-          apiServices = [{
-            id: 1,
-            name: 'Vehicle Inspection & General Service',
-            engineer: (data.engineerId?.length > 0 ? data.engineerId[0].name : null) ||
-                     data.engineerId?.name || 'Service Engineer',
-            progress: 100,
-            status: 'Completed',
-            laborCost: 500 // Default service charge
-          }];
-
-        }
-
-        
-        setServices(apiServices);
 
         // UPDATED: Set final inspection notes with better fallback
         let inspectionNotes = '';
@@ -406,25 +329,29 @@ setGarageDetails({
   // Calculate totals
  const calculateTotals = () => {
   const totalPartsCost = parts.reduce((sum, part) => sum + (part.total || 0), 0);
-  const subtotal = totalPartsCost + laborServicesTotal;
+  
+  // Use actual API data for labor services (same as PDF calculation)
+  const laborTotal = jobCardData?.laborServicesTotal || laborServicesTotal || 0;
+  const actualLaborTax = jobCardData?.laborServicesTax || 0;
+  
+  const subtotal = totalPartsCost; // Subtotal is only parts (same as PDF)
   const discount = summary.discount || 0;
-  let gstAmount = 0;
-  let totalAmount = subtotal - discount;
-
-  if (gstSettings.includeGst && gstSettings.billType === 'gst') {
-    if (gstSettings.gstType === 'percentage') {
-      gstAmount = Math.round(subtotal * (gstSettings.gstPercentage / 100));
-    } else {
-      gstAmount = gstSettings.gstAmount || 0;
-    }
-    totalAmount = subtotal + gstAmount - discount;
+  
+  // Calculate GST amounts using actual API data (same as PDF)
+  let gstOnParts = 0;
+  if (gstSettings.billType === 'gst') {
+    gstOnParts = (totalPartsCost * gstSettings.gstPercentage) / 100;
   }
+  
+  const totalGstAmount = gstOnParts + actualLaborTax;
+  const totalAfterGst = subtotal + laborTotal + totalGstAmount;
+  const totalAmount = totalAfterGst - discount;
 
   setSummary({
     totalPartsCost,
-    totalLaborCost: laborServicesTotal, // Reflects manual input
+    totalLaborCost: laborTotal, // Use API data
     subtotal,
-    gstAmount,
+    gstAmount: totalGstAmount,
     discount,
     totalAmount,
   });
@@ -432,7 +359,7 @@ setGarageDetails({
 
 useEffect(() => {
   calculateTotals();
-}, [laborServicesTotal, parts, summary.discount, gstSettings]);
+}, [laborServicesTotal, parts, summary.discount, gstSettings, jobCardData]);
 
   // UPDATED: Handler functions with new GST settings
   const handleInputChange = (e) => {
@@ -591,9 +518,7 @@ useEffect(() => {
     }
   };
 
-  const removeService = (id) => {
-    setServices(prev => prev.filter(service => service.id !== id));
-  };
+
 
   const openEditPrice = (id, type, field, value) => {
     setEditItem({ id, type, field, value });
@@ -710,11 +635,11 @@ const updateBillAndJobStatus = async (jobCardId) => {
   const validateJobCompletion = () => {
     const issues = [];
     
-    // UPDATED: More flexible parts/services validation
-    const hasPartsOrServices = parts.length > 0 || services.length > 0;
+    // UPDATED: More flexible parts validation
+    const hasParts = parts.length > 0;
     const totalAmount = summary.totalAmount || 0;
     
-    if (!hasPartsOrServices && totalAmount === 0) {
+    if (!hasParts && totalAmount === 0) {
       issues.push("At least one part or service is required, or add a minimum service charge");
     }
     
@@ -844,19 +769,7 @@ const generateBill = async () => {
       updated = true;
     }
     
-    // Ensure at least one service exists
-    if (parts.length === 0 && services.length === 0) {
-      const defaultService = {
-        id: Date.now(),
-        name: 'Vehicle Inspection & General Service',
-        engineer: 'Service Engineer',
-        progress: 100,
-        status: 'Completed',
-        laborCost: 500
-      };
-      setServices([defaultService]);
-      updated = true;
-    }
+
     
     if (updated) {
       setSnackbar({
@@ -888,10 +801,7 @@ const generateBill = async () => {
         sellingPrice: part.pricePerUnit,
         hsnNumber: part.hsnNumber || "8708"
       })),
-      services: services.map(service => ({
-        serviceName: service.name,
-        laborCost: service.laborCost,
-      })),
+
       discount: summary.discount,
       gstPercentage: gstSettings.gstPercentage,
       billType: gstSettings.billType,
@@ -1025,10 +935,7 @@ const generateBill = async () => {
           sellingPrice: part.pricePerUnit,
           hsnNumber: part.hsnNumber || "8708"
         })),
-        services: services.map(service => ({
-          serviceName: service.name,
-          laborCost: service.laborCost,
-        })),
+
         discount: summary.discount,
         gstPercentage: gstSettings.gstPercentage,
         billType: gstSettings.billType,
@@ -1155,10 +1062,7 @@ const generateBill = async () => {
             sellingPrice: part.pricePerUnit,
             hsnNumber: part.hsnNumber || "8708"
           })),
-          services: services.map(service => ({
-            serviceName: service.name,
-            laborCost: service.laborCost,
-          })),
+
           discount: summary.discount,
           gstPercentage: gstSettings.gstPercentage,
           billType: gstSettings.billType,
@@ -1238,10 +1142,6 @@ const generateBill = async () => {
           severity: "warning",
         });
       }
-    } else if (type === "service") {
-      setServices(prev => prev.map(service => 
-        service.id === id ? { ...service, [field]: newValue } : service
-      ));
     }
 
     setShowEditPriceDialog(false);
@@ -1306,23 +1206,7 @@ const generateBill = async () => {
     }
   };
 
-  const addNewService = () => {
-    const { name, engineer, laborCost } = newService;
-    if (name && engineer && laborCost > 0) {
-      const newServiceObj = {
-        id: Date.now(),
-        name,
-        engineer,
-        progress: 100,
-        status: "Completed",
-        laborCost: parseFloat(laborCost),
-      };
 
-      setServices(prev => [...prev, newServiceObj]);
-      setNewService({ name: "", engineer: "", laborCost: 0 });
-      setShowNewServiceDialog(false);
-    }
-  };
 
   // ===================================================================
 // 1. PROFESSIONAL GST INVOICE GENERATION (PDF)
@@ -1404,19 +1288,21 @@ const generateProfessionalGSTInvoice = () => {
     // Calculate totals properly - only include valid parts
     const validParts = parts.filter(part => part && part.total > 0);
     const partsTotal = validParts.reduce((total, part) => total + part.total, 0);
-    const laborTotal = laborServicesTotal || 0;
-    const subtotalAmount = partsTotal + laborTotal;
     
-    // Calculate GST amounts
+    // Use actual API data for labor services
+    const laborTotal = jobCardData?.laborServicesTotal || laborServicesTotal || 0;
+    const actualLaborTax = jobCardData?.laborServicesTax || 0;
+    
+    const subtotalAmount = partsTotal; // Subtotal is only parts
+    
+    // Calculate GST amounts using actual API data
     let gstOnParts = 0;
-    let gstOnLabor = 0;
     if (gstSettings.billType === 'gst') {
       gstOnParts = (partsTotal * gstSettings.gstPercentage) / 100;
-      gstOnLabor = (laborTotal * gstSettings.gstPercentage) / 100;
     }
     
-    const totalGstAmount = gstOnParts + gstOnLabor;
-    const totalAfterGst = subtotalAmount + totalGstAmount;
+    const totalGstAmount = gstOnParts + actualLaborTax;
+    const totalAfterGst = subtotalAmount + laborTotal + totalGstAmount;
     const finalAmount = totalAfterGst - (summary.discount || 0);
 
     // Number to Words function
@@ -1568,9 +1454,10 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
     doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + leftSectionWidth + 20, detailsY + 40);
-    doc.text(`Date: ${carDetails.billingDate}`, margin + leftSectionWidth + 20, detailsY + 55);
-    if (gstSettings.shiftToParty) {
-      doc.text(`Insurance: ${gstSettings.shiftToParty}`, margin + leftSectionWidth + 20, detailsY + 70);
+    doc.text(`Job Card No: ${jobCardData?.jobCardNumber || 'N/A'}`, margin + leftSectionWidth + 20, detailsY + 55);
+    doc.text(`Date: ${carDetails.billingDate}`, margin + leftSectionWidth + 20, detailsY + 70);
+    if (jobCardData?.insuranceProvider) {
+      doc.text(`Insurance: ${jobCardData.insuranceProvider}`, margin + leftSectionWidth + 20, detailsY + 85);
     }
     
     currentY = detailsY + 150;
@@ -1581,9 +1468,8 @@ const generateProfessionalGSTInvoice = () => {
     const tableStartY = currentY;
     const colWidths = { 
       srNo: 35, 
-      productName: 200, 
+      productName: 240, 
       qty: 40, 
-      unit: 40, 
       rate: 70, 
       gstPercent: 50, 
       amount: 80 
@@ -1598,7 +1484,7 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(255, 255, 255);
     
     let colX = margin;
-    const headers = ["Sr.", "Product/Service Description", "Qty", "Unit", "Rate", "GST%", "Amount"];
+    const headers = ["Sr.", "Product/Service Description", "Qty", "Rate", "GST%", "Amount"];
     headers.forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
@@ -1633,7 +1519,7 @@ const generateProfessionalGSTInvoice = () => {
         let display = cell.toString();
         
         // Format currency properly - use proper rupee symbol
-        if (i === 4 || i === 6) { // Rate and Amount columns
+        if (i === 3 || i === 5) { // Rate and Amount columns
           if (display !== '' && !isNaN(display)) {
             display = ' ' + parseFloat(display).toFixed(2);
           }
@@ -1651,11 +1537,11 @@ const generateProfessionalGSTInvoice = () => {
         } else {
           const txtW = doc.getTextWidth(display);
           // Right align for Sr.No, Qty, Rate, Amount columns
-          if (i === 0 || i === 2 || i === 4 || i === 6) {
+          if (i === 0 || i === 2 || i === 3 || i === 5) {
             doc.text(display, colX + w - txtW - 5, y + 20);
           } 
-          // Center align for Unit and GST% columns  
-          else if (i === 3 || i === 5) {
+          // Center align for GST% column  
+          else if (i === 4) {
             doc.text(display, colX + (w - txtW) / 2, y + 20);
           }
           // Left align for Product Name
@@ -1681,7 +1567,6 @@ const generateProfessionalGSTInvoice = () => {
         rowIndex++,
         part.name,
         part.quantity,
-        "Nos",
         part.pricePerUnit.toFixed(2),
         gstDisplay,
         part.total.toFixed(2)
@@ -1697,7 +1582,6 @@ const generateProfessionalGSTInvoice = () => {
         rowIndex++,
         "Labor & Services",
         "1",
-        "Job",
         laborTotal.toFixed(2),
         gstDisplay,
         laborTotal.toFixed(2)
@@ -1709,7 +1593,7 @@ const generateProfessionalGSTInvoice = () => {
     const totalDataRows = validParts.length + (laborTotal > 0 ? 1 : 0);
     const minRows = Math.max(5, totalDataRows);
     for (let i = totalDataRows; i < minRows; i++) {
-      currentY += drawTableRow(["", "", "", "", "", "", ""], currentY, i % 2 === 1);
+      currentY += drawTableRow(["", "", "", "", "", ""], currentY, i % 2 === 1);
     }
 
     currentY += 20;
@@ -1733,62 +1617,37 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     
-    // Parts Total
+    // Parts Total (Subtotal)
     if (partsTotal > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
       doc.setFont("helvetica", "normal");
-      doc.text("Parts Total", summaryX + 10, currentY + 17);
+      doc.text("Subtotal", summaryX + 10, currentY + 17);
       doc.setFont("helvetica", "bold");
       doc.text(` ${partsTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       currentY += 25;
     }
     
-    // Labor/Services Total
+    // Service/Labor Cost
     if (laborTotal > 0) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
       doc.setFont("helvetica", "normal");
-      doc.text("Labor & Services", summaryX + 10, currentY + 17);
+      doc.text("Service/Labor Cost", summaryX + 10, currentY + 17);
       doc.setFont("helvetica", "bold");
       doc.text(` ${laborTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       currentY += 25;
     }
-    
-    // Subtotal
-    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-    doc.setFont("helvetica", "normal");
-    doc.text("Subtotal", summaryX + 10, currentY + 17);
-    doc.setFont("helvetica", "bold");
-    doc.text(` ${subtotalAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-    currentY += 25;
 
-    // GST Calculation
+    // GST Calculation - Show total tax only
     if (gstSettings.billType === 'gst' && totalGstAmount > 0) {
-      if (gstSettings.isInterState) {
-        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.setFont("helvetica", "normal");
-        doc.text(`IGST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
-        doc.setFont("helvetica", "bold");
-        doc.text(` ${totalGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-        currentY += 25;
-      } else {
-        const cgstAmount = totalGstAmount / 2;
-        const sgstAmount = totalGstAmount / 2;
-        
-        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.setFont("helvetica", "normal");
-        doc.text(`CGST ${gstSettings.cgstPercentage || gstSettings.gstPercentage/2}%`, summaryX + 10, currentY + 17);
-        doc.setFont("helvetica", "bold");
-        doc.text(` ${cgstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-        currentY += 25;
-        
-        drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-        doc.setFont("helvetica", "normal");
-        doc.text(`SGST ${gstSettings.sgstPercentage || gstSettings.gstPercentage/2}%`, summaryX + 10, currentY + 17);
-        doc.setFont("helvetica", "bold");
-        doc.text(` ${sgstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-        currentY += 25;
-      }
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.setFont("helvetica", "normal");
+      doc.text(`GST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.text(` ${totalGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      currentY += 25;
     }
+    
+
 
     // Discount
     if (summary.discount > 0) {
@@ -1821,6 +1680,56 @@ const generateProfessionalGSTInvoice = () => {
     doc.text("GRAND TOTAL", summaryX + 10, currentY + 23);
     doc.text(` ${Math.round(finalAmount).toFixed(2)}`, summaryX + summaryWidth - 120, currentY + 23);
     currentY += 50;
+
+    // Quality Check Section
+    if (jobCardData?.qualityCheck) {
+      checkPageBreak(100);
+      const qualityCheckY = currentY;
+      
+      // Quality Check Header
+      drawBorderedRect(margin, qualityCheckY, contentWidth, 30, 'darkblue');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text("QUALITY CHECK DETAILS", margin + 10, qualityCheckY + 20);
+      currentY += 30;
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      
+      // Quality Check Notes
+      if (jobCardData.qualityCheck.notes) {
+        drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
+        doc.setFont("helvetica", "normal");
+        doc.text("Notes:", margin + 10, currentY + 17);
+        doc.setFont("helvetica", "bold");
+        doc.text(jobCardData.qualityCheck.notes, margin + 50, currentY + 17);
+        currentY += 30;
+      }
+      
+      // Quality Check Date
+      if (jobCardData.qualityCheck.date) {
+        drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
+        doc.setFont("helvetica", "normal");
+        doc.text("Date:", margin + 10, currentY + 17);
+        doc.setFont("helvetica", "bold");
+        const qualityDate = new Date(jobCardData.qualityCheck.date).toLocaleDateString();
+        doc.text(qualityDate, margin + 50, currentY + 17);
+        currentY += 30;
+      }
+      
+      // Bill Approval Status
+      drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
+      doc.setFont("helvetica", "normal");
+      doc.text("Bill Approved:", margin + 10, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      const approvalStatus = jobCardData.qualityCheck.billApproved ? "YES" : "NO";
+      const approvalColor = jobCardData.qualityCheck.billApproved ? [39, 174, 96] : [231, 76, 60];
+      doc.setTextColor(...approvalColor);
+      doc.text(approvalStatus, margin + 100, currentY + 17);
+      doc.setTextColor(0, 0, 0);
+      currentY += 30;
+    }
 
     // Amount in Words
     doc.setTextColor(0, 0, 0);
@@ -2146,16 +2055,7 @@ Thank you!`;
               tableCellStyle={tableCellStyle}
               disabled={isBillAlreadyGenerated}
             />
-            <ServicesSection 
-              services={services} 
-              removeService={removeService} 
-              openEditPrice={openEditPrice} 
-              setShowNewServiceDialog={setShowNewServiceDialog} 
-              isMobile={isMobile}
-              tableCellStyle={tableCellStyle}
-              getStatusColor={getStatusColor}
-              disabled={isBillAlreadyGenerated}
-            />
+
             <FinalInspectionSection 
               finalInspection={finalInspection} 
               setFinalInspection={setFinalInspection}
@@ -2236,14 +2136,7 @@ Thank you!`;
             includeHsnField={true}
           />
           
-          <AddServiceDialog 
-            showNewServiceDialog={showNewServiceDialog} 
-            setShowNewServiceDialog={setShowNewServiceDialog} 
-            isMobile={isMobile} 
-            newService={newService} 
-            setNewService={setNewService} 
-            addNewService={addNewService} 
-          />
+
         </>
       )}
 
