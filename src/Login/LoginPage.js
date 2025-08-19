@@ -257,11 +257,13 @@ const LoginPage = () => {
           email: forgotPasswordData.email
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to send OTP');
-      }
+      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send OTP');
+      }
+      
       setForgotPasswordSuccess('OTP sent successfully! Please check your email.');
       setOtpSent(true);
       setForgotPasswordStep(1);
@@ -276,7 +278,8 @@ const LoginPage = () => {
         });
       }, 1000);
     } catch (err) {
-      setForgotPasswordError(err.message);
+      console.error('Error sending OTP:', err);
+      setForgotPasswordError(err.message || 'Failed to send OTP. Please try again.');
     } finally {
       setForgotPasswordLoading(false);
     }
@@ -304,16 +307,19 @@ const LoginPage = () => {
           otp: forgotPasswordData.otp
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Invalid OTP');
-      }
+      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid OTP');
+      }
+      
       setForgotPasswordSuccess('OTP verified successfully!');
       setOtpVerified(true);
       setForgotPasswordStep(2);
     } catch (err) {
-      setForgotPasswordError(err.message);
+      console.error('Error verifying OTP:', err);
+      setForgotPasswordError(err.message || 'Invalid OTP. Please try again.');
     } finally {
       setForgotPasswordLoading(false);
     }
@@ -351,17 +357,20 @@ const LoginPage = () => {
           newPassword: forgotPasswordData.newPassword
         })
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Password reset failed');
-      }
+      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Password reset failed');
+      }
+      
       setForgotPasswordSuccess('Password reset successfully! You can now login with your new password.');
       setTimeout(() => {
         closeForgotPasswordDialog();
       }, 3000);
     } catch (err) {
-      setForgotPasswordError(err.message);
+      console.error('Error resetting password:', err);
+      setForgotPasswordError(err.message || 'Password reset failed. Please try again.');
     } finally {
       setForgotPasswordLoading(false);
     }
@@ -903,7 +912,258 @@ const LoginPage = () => {
           }
         }}
       >
-        {/* ... existing dialog content ... */}
+        <DialogTitle sx={{ 
+          textAlign: 'center', 
+          fontWeight: 600, 
+          fontSize: '1.5rem',
+          color: colors.primary,
+          pb: 1
+        }}>
+          Reset Password
+        </DialogTitle>
+        
+        <DialogContent sx={{ pb: 2 }}>
+          {/* Stepper */}
+          <Stepper activeStep={forgotPasswordStep} sx={{ mb: 3 }}>
+            <Step>
+              <StepLabel>Enter Email</StepLabel>
+            </Step>
+            <Step>
+              <StepLabel>Verify OTP</StepLabel>
+            </Step>
+            <Step>
+              <StepLabel>New Password</StepLabel>
+            </Step>
+          </Stepper>
+
+          {/* Error/Success Messages */}
+          {forgotPasswordError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {forgotPasswordError}
+            </Alert>
+          )}
+          
+          {forgotPasswordSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {forgotPasswordSuccess}
+            </Alert>
+          )}
+
+          {/* Step 0: Enter Email */}
+          {forgotPasswordStep === 0 && (
+            <Box component="form" onSubmit={handleSendOtp}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter your email address to receive a verification code.
+              </Typography>
+              
+              <TextField
+                fullWidth
+                label="Email Address"
+                name="email"
+                type="email"
+                value={forgotPasswordData.email}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 3 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color="action" />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <DialogActions sx={{ px: 0 }}>
+                <Button
+                  onClick={closeForgotPasswordDialog}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={forgotPasswordLoading}
+                  sx={{
+                    backgroundColor: colors.primary,
+                    '&:hover': {
+                      backgroundColor: colors.secondary
+                    }
+                  }}
+                >
+                  {forgotPasswordLoading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    'Send OTP'
+                  )}
+                </Button>
+              </DialogActions>
+            </Box>
+          )}
+
+          {/* Step 1: Verify OTP */}
+          {forgotPasswordStep === 1 && (
+            <Box component="form" onSubmit={handleVerifyOtp}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter the verification code sent to {forgotPasswordData.email}
+              </Typography>
+              
+              <TextField
+                fullWidth
+                label="Verification Code"
+                name="otp"
+                type="text"
+                value={forgotPasswordData.otp}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <VerifiedUser color="action" />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Didn't receive the code?
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0 || forgotPasswordLoading}
+                  sx={{ 
+                    color: colors.primary,
+                    textTransform: 'none',
+                    minWidth: 'auto'
+                  }}
+                >
+                  {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}
+                </Button>
+              </Box>
+
+              <DialogActions sx={{ px: 0 }}>
+                <Button
+                  onClick={() => setForgotPasswordStep(0)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={forgotPasswordLoading}
+                  sx={{
+                    backgroundColor: colors.primary,
+                    '&:hover': {
+                      backgroundColor: colors.secondary
+                    }
+                  }}
+                >
+                  {forgotPasswordLoading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    'Verify OTP'
+                  )}
+                </Button>
+              </DialogActions>
+            </Box>
+          )}
+
+          {/* Step 2: New Password */}
+          {forgotPasswordStep === 2 && (
+            <Box component="form" onSubmit={handleResetPassword}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Enter your new password
+              </Typography>
+              
+              <TextField
+                fullWidth
+                label="New Password"
+                name="newPassword"
+                type={showNewPassword ? 'text' : 'password'}
+                value={forgotPasswordData.newPassword}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        edge="end"
+                      >
+                        {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <TextField
+                fullWidth
+                label="Confirm New Password"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={forgotPasswordData.confirmPassword}
+                onChange={handleForgotPasswordChange}
+                required
+                sx={{ mb: 3 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        edge="end"
+                      >
+                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <DialogActions sx={{ px: 0 }}>
+                <Button
+                  onClick={() => setForgotPasswordStep(1)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={forgotPasswordLoading}
+                  sx={{
+                    backgroundColor: colors.primary,
+                    '&:hover': {
+                      backgroundColor: colors.secondary
+                    }
+                  }}
+                >
+                  {forgotPasswordLoading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    'Reset Password'
+                  )}
+                </Button>
+              </DialogActions>
+            </Box>
+          )}
+        </DialogContent>
       </Dialog>
     </>
   );

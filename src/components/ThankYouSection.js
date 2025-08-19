@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Button, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Button, Typography, useMediaQuery, useTheme, CircularProgress } from "@mui/material";
 import {
   Check as CheckIcon,
   Download as DownloadIcon,
@@ -19,6 +19,7 @@ const ThankYouSection = ({
   sendBillViaWhatsApp,
   sendingWhatsApp,
   openEmailDialog,
+  sendingEmail,
 }) => {
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -138,11 +139,11 @@ const ThankYouSection = ({
               backgroundColor: "#128c7e",
             },
           }}
-          startIcon={<WhatsAppIcon />}
+          startIcon={sendingWhatsApp ? <CircularProgress size={20} color="inherit" /> : <WhatsAppIcon />}
           onClick={sendBillViaWhatsApp}
           disabled={sendingWhatsApp}
         >
-          {sendingWhatsApp ? "Preparing..." : "WhatsApp Invoice"}
+          {sendingWhatsApp ? "Sending..." : "WhatsApp Invoice"}
         </Button>
 
         {/* Email */}
@@ -156,10 +157,11 @@ const ThankYouSection = ({
               backgroundColor: "rgba(255,255,255,0.3)",
             },
           }}
-          startIcon={<EmailIcon />}
+          startIcon={sendingEmail ? <CircularProgress size={20} color="inherit" /> : <EmailIcon />}
           onClick={openEmailDialog}
+          disabled={sendingEmail}
         >
-          Email Invoice
+          {sendingEmail ? "Sending..." : "Email Invoice"}
         </Button>
       </Box>
     </Box>

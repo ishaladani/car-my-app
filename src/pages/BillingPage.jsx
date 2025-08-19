@@ -1873,31 +1873,126 @@ const printInvoice = () => {
   }
 };
 
-  // Enhanced email function
+  // Enhanced email function with PDF attachment and fallback
  const sendBillViaEmail = async () => {
-  const doc = generateProfessionalGSTInvoice();
-  const pdfBlob = doc.output('blob');
-  const url = URL.createObjectURL(pdfBlob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
-  link.click();
-
-  const subject = `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`;
-  const body = `Dear ${carDetails.customerName},\n\nPlease find your invoice attached.\n\nTotal: ₹${summary.totalAmount}\n\nRegards,\n${garageDetails.name}`;
-  window.open(`mailto:${carDetails.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-
-  setTimeout(() => URL.revokeObjectURL(url), 100);
+  try {
+    setSendingEmail(true);
+    
+    // Generate PDF
+    const doc = generateProfessionalGSTInvoice();
+    const pdfBlob = doc.output('blob');
+    
+    // Try to send via API first
+    try {
+      const formData = new FormData();
+      formData.append('pdf', pdfBlob, `Invoice_${carDetails.invoiceNo}.pdf`);
+      formData.append('email', emailRecipient || carDetails.email);
+      formData.append('subject', emailSubject || `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`);
+      formData.append('message', emailMessage || `Dear ${carDetails.customerName},\n\nPlease find your invoice attached.\n\nTotal: ₹${summary.totalAmount}\n\nRegards,\n${garageDetails.name}`);
+      formData.append('garageId', localStorage.getItem('garageId'));
+      
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/send-invoice-email', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        setSnackbar({
+          open: true,
+          message: "Invoice sent via email successfully!",
+          severity: "success"
+        });
+        setShowEmailDialog(false);
+        return;
+      }
+    } catch (apiError) {
+      console.log('API not available, using fallback method');
+    }
+    
+    // Fallback: Download PDF and open email client
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
+    link.click();
+    
+    const subject = `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`;
+    const body = `Dear ${carDetails.customerName},\n\nPlease find your invoice attached.\n\nTotal: ₹${summary.totalAmount}\n\nRegards,\n${garageDetails.name}`;
+    window.open(`mailto:${emailRecipient || carDetails.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    
+    setSnackbar({
+      open: true,
+      message: "PDF downloaded! Email client opened. Please attach the PDF manually.",
+      severity: "info"
+    });
+    
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    
+  } catch (error) {
+    console.error('Error sending email:', error);
+    setSnackbar({
+      open: true,
+      message: "Failed to send email. Please try again.",
+      severity: "error"
+    });
+  } finally {
+    setSendingEmail(false);
+  }
 };
 
-  // UPDATED: WhatsApp function with bill type information
- const sendBillViaWhatsApp = () => {
-  const gstInfo = gstSettings.billType === 'gst'
-    ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}`
-    : 'Non-GST Bill';
+  // UPDATED: WhatsApp function with PDF attachment and fallback
+ const sendBillViaWhatsApp = async () => {
+  try {
+    setSendingWhatsApp(true);
+    
+    // Generate PDF
+    const doc = generateProfessionalGSTInvoice();
+    const pdfBlob = doc.output('blob');
+    
+    // Try to send via API first
+    try {
+      const formData = new FormData();
+      formData.append('pdf', pdfBlob, `Invoice_${carDetails.invoiceNo}.pdf`);
+      formData.append('phone', carDetails.contact);
+      formData.append('message', `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*\n*${garageDetails.name}*\n\nInvoice #${carDetails.invoiceNo}\nTotal: ₹${summary.totalAmount}\n\nPlease find your invoice attached.`);
+      formData.append('garageId', localStorage.getItem('garageId'));
+      
+      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/send-invoice-whatsapp', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        setSnackbar({
+          open: true,
+          message: "Invoice sent via WhatsApp successfully!",
+          severity: "success"
+        });
+        return;
+      }
+    } catch (apiError) {
+      console.log('API not available, using fallback method');
+    }
+    
+    // Fallback: Download PDF and send text message
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
+    link.click();
+    
+    // Send WhatsApp text message with invoice details
+    const gstInfo = gstSettings.billType === 'gst'
+      ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}`
+      : 'Non-GST Bill';
 
-  const msg = `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*
+    const msg = `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*
 *${garageDetails.name}*
 📞 ${garageDetails.phone}
 📍 ${garageDetails.address}
@@ -1915,11 +2010,32 @@ ${gstInfo}
 ${summary.discount > 0 ? `*Discount:* -₹${summary.discount}` : ''}
 *Total:* *₹${summary.totalAmount}*
 
+📄 PDF invoice has been downloaded. Please share it manually.
+
 Thank you!`;
 
-  const phone = `91${carDetails.contact.replace(/\D/g, '')}`;
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-};
+    const phone = `91${carDetails.contact.replace(/\D/g, '')}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    
+    setSnackbar({
+      open: true,
+      message: "PDF downloaded! WhatsApp message opened. Please share the PDF manually.",
+      severity: "info"
+    });
+    
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    
+  } catch (error) {
+    console.error('Error sending WhatsApp:', error);
+    setSnackbar({
+      open: true,
+      message: "Failed to send WhatsApp message. Please try again.",
+      severity: "error"
+    });
+  } finally {
+    setSendingWhatsApp(false);
+  }
+ };
 
   const openEmailDialog = () => setShowEmailDialog(true);
 
@@ -2085,6 +2201,7 @@ Thank you!`;
   sendBillViaWhatsApp={sendBillViaWhatsApp} 
   sendingWhatsApp={sendingWhatsApp} 
   openEmailDialog={openEmailDialog} 
+  sendingEmail={sendingEmail}
   garageDetails={garageDetails}
   parts={parts}
   laborServicesTotal={laborServicesTotal}
