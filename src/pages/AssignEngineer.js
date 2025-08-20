@@ -87,6 +87,7 @@ const AssignEngineer = () => {
   const [success, setSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [selectedParts, setSelectedParts] = useState([]); // For Autocomplete selection
+  const [showInventoryConfirmation, setShowInventoryConfirmation] = useState(false);
 
 
 
@@ -784,9 +785,12 @@ const AssignEngineer = () => {
 
         allParts.push({
           partName: part.partName,
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
           quantity: quantity,
           pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
           totalPrice: parseFloat(totalPrice.toFixed(2)),
+          taxPercentage: part.taxAmount || part.gstPercentage || 0,
           isPreLoaded: true
         });
       } else {
@@ -798,9 +802,12 @@ const AssignEngineer = () => {
 
         allParts.push({
           partName: part.partName,
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
           quantity: selectedQuantity,
           pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
           totalPrice: parseFloat(totalPrice.toFixed(2)),
+          taxPercentage: taxRate,
           isPreLoaded: false
         });
       }
@@ -818,9 +825,12 @@ const AssignEngineer = () => {
       // Format parts data according to the workprogress API structure
       const formattedParts = allParts.map(part => ({
         partName: part.partName || '',
+        partNumber: part.partNumber || '',
+        hsnNumber: part.hsnNumber || '',
         quantity: Number(part.quantity || 1),
         pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
+        taxPercentage: Number(part.taxPercentage || 0)
       }));
 
       const updatePayload = {
@@ -849,12 +859,115 @@ const AssignEngineer = () => {
     }
   };
 
+  // Function to validate inventory quantities before assignment
+  const validateInventoryQuantities = (partsUsed) => {
+    const errors = [];
+    
+    partsUsed.forEach(part => {
+      if (part._id && part.selectedQuantity && !part.isPreLoaded) {
+        // Get the current inventory quantity from the inventoryParts state
+        const inventoryPart = inventoryParts.find(invPart => invPart._id === part._id);
+        const currentQuantity = inventoryPart ? inventoryPart.quantity : 0;
+        const requestedQuantity = part.selectedQuantity;
+        
+        console.log(`Validating part ${part.partName}: Available=${currentQuantity}, Requested=${requestedQuantity}`);
+        
+        if (requestedQuantity > currentQuantity) {
+          errors.push(`Insufficient quantity for ${part.partName}. Available: ${currentQuantity}, Requested: ${requestedQuantity}`);
+        }
+      }
+    });
+    
+    return errors;
+  };
+
+  // Function to update inventory quantities
+  const updateInventoryQuantities = async (partsUsed) => {
+    try {
+      console.log('🔄 Updating inventory quantities for parts:', partsUsed);
+      
+      // Validate quantities before updating
+      const validationErrors = validateInventoryQuantities(partsUsed);
+      if (validationErrors.length > 0) {
+        throw new Error(`Inventory validation failed: ${validationErrors.join(', ')}`);
+      }
+      
+      const updatePromises = partsUsed.map(async (part) => {
+        if (part._id && part.selectedQuantity) {
+          const currentQuantity = part.quantity || 0;
+          const usedQuantity = part.selectedQuantity;
+          const newQuantity = Math.max(0, currentQuantity - usedQuantity);
+          
+          console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
+          
+          // Update inventory quantity
+          await axios.put(
+            `${API_BASE_URL}/inventory/update/${part._id}`,
+            {
+              quantity: newQuantity,
+              carName: part.carName,
+              model: part.model,
+              partNumber: part.partNumber,
+              partName: part.partName,
+              hsnNumber: part.hsnNumber,
+              igst: part.igst || 0,
+              cgstSgst: part.cgstSgst || 0,
+              purchasePrice: part.purchasePrice,
+              sellingPrice: part.sellingPrice,
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+              }
+            }
+          );
+          
+          // If quantity becomes 0, delete the item from inventory
+          if (newQuantity === 0) {
+            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
+            await axios.delete(
+              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
+              {
+                headers: {
+                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                }
+              }
+            );
+          }
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      console.log('✅ Inventory quantities updated successfully');
+      
+      // Refresh inventory data after update
+      await fetchInventoryParts();
+    } catch (error) {
+      console.error('❌ Error updating inventory quantities:', error);
+      throw new Error(`Failed to update inventory: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   // Updated handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
+    // Check if there are parts that will reduce inventory
+    const partsToReduceInventory = assignment.parts.filter(part => part._id && part.selectedQuantity);
+    
+    if (partsToReduceInventory.length > 0) {
+      setShowInventoryConfirmation(true);
+      return;
+    }
+
+    await processAssignment();
+  };
+
+  // Process the actual assignment
+  const processAssignment = async () => {
     setIsSubmitting(true);
     setError(null);
     setFormErrors({});
@@ -907,6 +1020,12 @@ const AssignEngineer = () => {
         await Promise.all(jobCardUpdatePromises);
       }
 
+      // Refresh inventory data before validation to ensure we have the latest data
+      await fetchInventoryParts();
+      
+      // Update inventory quantities for all parts used
+      await updateInventoryQuantities(assignment.parts);
+
       // Execute assignment
       await assignmentPromise;
 
@@ -918,10 +1037,11 @@ const AssignEngineer = () => {
       const userSelectedParts = allPartsUsed.filter(part => !part.isPreLoaded);
 
       // Show success message with detailed breakdown
+      const inventoryReduction = assignment.parts.reduce((total, part) => total + (part.selectedQuantity || 1), 0);
       const successMessage = `✅ Assignment completed! 
         Total Cost: ₹${totalCost.toFixed(2)}
         Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedParts.length} user-selected = ${allPartsUsed.length} total
-        (Inventory already updated when parts were added)`;
+        Inventory reduced by ${inventoryReduction} units successfully`;
 
       setSnackbar({
         open: true,
@@ -936,7 +1056,17 @@ const AssignEngineer = () => {
 
     } catch (err) {
       console.error('Assignment error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || err.message || 'Failed to assign to engineers');
+      
+      // Check if it's an inventory validation error
+      if (err.message && err.message.includes('Inventory validation failed')) {
+        setSnackbar({
+          open: true,
+          message: `❌ ${err.message}. Please check inventory quantities and try again.`,
+          severity: 'error'
+        });
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to assign to engineers');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1692,7 +1822,7 @@ const AssignEngineer = () => {
                                 getOptionLabel={(option) =>
                                   `${option.partName} (${
                                     option.partNumber || "N/A"
-                                  }) - ₹${option.sellingPrice || 0} | GST: ${
+                                  }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST: ${
                                     option.gstPercentage || option.taxAmount || 0
                                   }% | Available: ${getAvailableQuantity(option._id)}`
                                 }
@@ -1724,9 +1854,9 @@ const AssignEngineer = () => {
                                         variant="caption"
                                         color="text.secondary"
                                       >
-                                        Part : {option.partNumber || "N/A"} | Price: ₹
+                                        Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
                                         {option.sellingPrice || 0} | GST:{" "}
-                                        {option.gstPercentage || option.taxAmount || 0}|
+                                        {option.gstPercentage || option.taxAmount || 0}% |
                                         Available: {getAvailableQuantity(option._id)} |
                                         {option.carName} - {option.model}
                                       </Typography>
@@ -1816,6 +1946,11 @@ const AssignEngineer = () => {
                                     sx={{ fontSize: '0.7rem' }}
                                   />
                                 </Grid>
+                                <Grid item xs={12}>
+                                  <Typography variant="caption" color="warning.main" sx={{ fontStyle: 'italic' }}>
+                                    ⚠️ Total inventory reduction: {selectedParts.reduce((total, part) => total + (part.selectedQuantity || 1), 0)} units
+                                  </Typography>
+                                </Grid>
                               </Grid>
                             </Box>
                           )}
@@ -1853,7 +1988,7 @@ const AssignEngineer = () => {
                                     const unitPrice = part.sellingPrice || 0;
                                     const gstPercentage = part.taxAmount || 0;
                                     const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
-                                    const totalTax = (gstPercentage * selectedQuantity) / 100;
+                                    const totalTax = (gstPercentage * selectedQuantity);
                                     const totalPrice = unitPrice * selectedQuantity;
                                     const gstAmount = (totalPrice * gstPercentage) / 100;
                                     const finalPrice = totalPrice + totalTax;
@@ -1908,7 +2043,17 @@ const AssignEngineer = () => {
                                                 fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                               }}
                                             >
-                                              Part #: {part.partNumber || 'N/A'} | {part.carName} - {part.model}
+                                              Part #: {part.partNumber || 'N/A'} | HSN: {part.hsnNumber || 'N/A'} | {part.carName} - {part.model}
+                                            </Typography>
+                                            <Typography
+                                              variant="caption"
+                                              color="text.secondary"
+                                              sx={{
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                              }}
+                                            >
+                                              Tax: {(part.taxAmount || part.gstPercentage || 0)}% | Price: ₹{part.sellingPrice || 0}
                                             </Typography>
 
                                             <Typography
@@ -1920,6 +2065,17 @@ const AssignEngineer = () => {
                                               }}
                                             >
                                               Max Selectable: {maxSelectableQuantity} | Selected: {selectedQuantity}
+                                            </Typography>
+                                            <Typography
+                                              variant="caption"
+                                              color="warning.main"
+                                              sx={{
+                                                display: 'block',
+                                                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                                fontStyle: 'italic'
+                                              }}
+                                            >
+                                              ⚠️ Inventory will be reduced by {selectedQuantity} on assignment
                                             </Typography>
                                           </Box>
                                           <Box sx={{
@@ -2884,6 +3040,61 @@ const AssignEngineer = () => {
               sx={{ flex: { xs: 1, sm: 'none' } }}
             >
               {addingEngineer ? 'Adding...' : 'Add Engineer'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Inventory Confirmation Dialog */}
+        <Dialog
+          open={showInventoryConfirmation}
+          onClose={() => setShowInventoryConfirmation(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { bgcolor: 'background.paper' }
+          }}
+        >
+          <DialogTitle sx={{ color: 'warning.main' }}>
+            ⚠️ Confirm Inventory Reduction
+          </DialogTitle>
+          <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              The following parts will be removed from inventory when you assign the engineer:
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              {assignment.parts.filter(part => part._id && part.selectedQuantity).map((part, index) => (
+                <Typography key={part._id} variant="body2" sx={{ mb: 1 }}>
+                  • <strong>{part.partName}</strong>: {part.selectedQuantity} units
+                </Typography>
+              ))}
+            </Box>
+            <Typography variant="body2" color="warning.main" sx={{ fontStyle: 'italic' }}>
+              Total inventory reduction: {assignment.parts.reduce((total, part) => total + (part.selectedQuantity || 1), 0)} units
+            </Typography>
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This action cannot be undone. Are you sure you want to proceed?
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
+            <Button
+              onClick={() => setShowInventoryConfirmation(false)}
+              disabled={isSubmitting}
+              sx={{ flex: { xs: 1, sm: 'none' } }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowInventoryConfirmation(false);
+                processAssignment();
+              }}
+              disabled={isSubmitting}
+              variant="contained"
+              color="warning"
+              startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : null}
+              sx={{ flex: { xs: 1, sm: 'none' } }}
+            >
+              {isSubmitting ? 'Processing...' : 'Confirm & Assign'}
             </Button>
           </DialogActions>
         </Dialog>

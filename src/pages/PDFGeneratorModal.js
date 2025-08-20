@@ -1,6 +1,26 @@
 
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box,
+  Paper,
+  IconButton,
+  CircularProgress,
+  useTheme,
+} from '@mui/material';
+import {
+  FileDownload as FileDownloadIcon,
+  Close as CloseIcon,
+  Print as PrintIcon,
+} from '@mui/icons-material';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
 
 // Enhanced PDF Generator Modal Component with proper download functionality
 const PDFGeneratorModal = ({ open, onClose, jobData }) => {
@@ -275,6 +295,10 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
   const generatePDFWithJsPDF = () => {
     setIsGenerating(true);
     try {
+      if (!jobData) {
+        throw new Error('No job data available');
+      }
+      
       const doc = new jsPDF();
   
       doc.setFontSize(16);
@@ -301,7 +325,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
         ['Created Date', formatDate(jobData.createdAt)],
       ];
   
-      autoTable(doc, {
+      doc.autoTable({
         startY: 30,
         head: [['Field', 'Value']],
         body: tableData,
@@ -321,6 +345,7 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
   
       doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
       setIsGenerating(false);
+      alert('PDF generated successfully!');
       onClose();
     } catch (err) {
       console.error("PDF generation failed", err);
@@ -648,3 +673,5 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
     </Dialog>
   );
 };
+
+export default PDFGeneratorModal;

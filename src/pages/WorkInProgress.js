@@ -118,8 +118,14 @@ const WorkInProgress = () => {
   const [assignedEngineers, setAssignedEngineers] = useState([]);
 
   const [inventoryParts, setInventoryParts] = useState([]);
-  const [selectedParts, setSelectedParts] = useState([]);
+  const [selectedParts, setSelectedParts] = useState([]); // For Autocomplete selection
   const [allParts, setAllParts] = useState([]);
+  const [assignment, setAssignment] = useState({
+    parts: [],
+    priority: 'medium',
+    estimatedDuration: '',
+    notes: ''
+  });
   const [partIdCounter, setPartIdCounter] = useState(1);
   const [status, setStatus] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -163,6 +169,52 @@ const WorkInProgress = () => {
     { value: "on_hold", label: "On Hold", color: "default" },
   ];
 
+  // Enhanced function to collect all parts (pre-loaded + user-selected) for API
+  const getAllPartsForAPI = () => {
+    const allParts = [];
+
+    assignment.parts.forEach(part => {
+      const selectedQuantity = part.selectedQuantity || 1;
+
+      // For pre-loaded parts, use original values from job card
+      if (part.isPreLoaded) {
+        const quantity = part.originalQuantity || selectedQuantity;
+        const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
+        const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
+
+        allParts.push({
+          partName: part.partName,
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
+          quantity: quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2)),
+          taxPercentage: part.taxAmount || part.gstPercentage || 0,
+          isPreLoaded: true
+        });
+      } else {
+        // For user-selected parts, calculate normally
+        const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
+        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+        const totalPrice = pricePerPiece * selectedQuantity;
+
+        allParts.push({
+          partName: part.partName,
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
+          quantity: selectedQuantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          totalPrice: parseFloat(totalPrice.toFixed(2)),
+          taxPercentage: taxRate,
+          isPreLoaded: false
+        });
+      }
+    });
+
+    return allParts;
+  };
+
   const handlePartSelection = async (newParts, previousParts = []) => {
     try {
       const partsMap = new Map();
@@ -190,7 +242,11 @@ const WorkInProgress = () => {
         } else {
           const availableQuantity = getAvailableQuantity(newPart._id);
           if (availableQuantity < 1) {
-            setError(`Part "${newPart.partName}" is out of stock!`);
+            setSnackbar({
+              open: true,
+              message: `❌ Part "${newPart.partName}" is out of stock! Available quantity: ${availableQuantity}`,
+              severity: 'error'
+            });
             return;
           }
           partsMap.set(newPart._id, {
@@ -203,6 +259,15 @@ const WorkInProgress = () => {
 
       const updatedParts = Array.from(partsMap.values());
       setSelectedParts(updatedParts);
+      
+      // Update assignment.parts to include both pre-loaded and user-selected parts
+      const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
+      const allParts = [...preLoadedParts, ...updatedParts];
+      
+      setAssignment(prev => ({
+        ...prev,
+        parts: allParts
+      }));
       
       // Update API with the new parts selection
       if (updatedParts.length > 0) {
@@ -220,6 +285,15 @@ const WorkInProgress = () => {
     try {
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
       setSelectedParts(updatedParts);
+      
+      // Update assignment.parts to include both pre-loaded and updated user-selected parts
+      const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
+      const allParts = [...preLoadedParts, ...updatedParts];
+      
+      setAssignment(prev => ({
+        ...prev,
+        parts: allParts
+      }));
       
       // Update API with the remaining parts
       if (updatedParts.length > 0) {
@@ -258,6 +332,15 @@ const WorkInProgress = () => {
         idx === partIndex ? { ...p, selectedQuantity: newQuantity } : p
       );
       setSelectedParts(updatedParts);
+      
+      // Update assignment.parts to include both pre-loaded and updated user-selected parts
+      const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
+      const allParts = [...preLoadedParts, ...updatedParts];
+      
+      setAssignment(prev => ({
+        ...prev,
+        parts: allParts
+      }));
       
       // Update API with the updated parts
       await updateJobCardWithParts(updatedParts);
@@ -775,44 +858,67 @@ const WorkInProgress = () => {
         }
 
         if (data.partsUsed && data.partsUsed.length > 0) {
+          console.log('Processing partsUsed from job card:', data.partsUsed);
+          
+          // Convert partsUsed from job card to format expected by the form
+          const validParts = data.partsUsed.filter(usedPart => usedPart && (usedPart.partName || usedPart._id));
+          
+          let formattedParts = [];
+          if (validParts.length > 0) {
+            formattedParts = validParts.map(usedPart => {
+              // For parts from job card, pricePerPiece is the final price including tax
+              let sellingPrice = usedPart.sellingPrice || 0;
+              let taxAmount = usedPart.gstPercentage || 0;
+              
+              // If we have pricePerPiece from job card, treat it as the final price
+              if (usedPart.pricePerPiece && !sellingPrice) {
+                sellingPrice = usedPart.pricePerPiece;
+                taxAmount = 0; // Since pricePerPiece already includes tax
+              }
+              
+              return {
+                id: usedPart._id || `existing-${Math.random()}`,
+                type: "existing",
+                partName: usedPart.partName || "",
+                partNumber: usedPart.partNumber || "",
+                selectedQuantity: usedPart.quantity || 1,
+                sellingPrice: usedPart.pricePerPiece || sellingPrice,
+                totalPrice: usedPart.totalPrice || 0,
+                gstPercentage: taxAmount,
+                carName: usedPart.carName || "",
+                model: usedPart.model || "",
+                isExisting: true,
+                isPreLoaded: true, // Mark as pre-loaded from job card
+                _id: usedPart._id,
+                quantity: usedPart.quantity || 1,
+                taxAmount: taxAmount,
+                originalQuantity: usedPart.quantity || 1,
+                originalPricePerPiece: usedPart.pricePerPiece || sellingPrice,
+                originalTotalPrice: usedPart.totalPrice || 0,
+              };
+            });
+          }
 
-          const existingParts = data.partsUsed.map((part, index) => {
-            // For parts from job card, pricePerPiece is the final price including tax
-            // We need to extract the base selling price and tax amount
-            let sellingPrice = part.sellingPrice || 0;
-            let taxAmount = part.gstPercentage || 0;
-            
-            // If we have pricePerPiece from job card, treat it as the final price
-            if (part.pricePerPiece && !sellingPrice) {
-              // For job card parts, pricePerPiece is already the final price
-              // We'll set sellingPrice to pricePerPiece and taxAmount to 0 for display
-              sellingPrice = part.pricePerPiece;
-              taxAmount = 0; // Since pricePerPiece already includes tax
-            }
-            
-            return {
-              id: index + 1,
-              type: "existing",
-              partName: part.partName || "",
-              partNumber: part.partNumber || "",
-              selectedQuantity: part.quantity || 1,
-              sellingPrice: part.pricePerPiece || sellingPrice, // Use original pricePerPiece
-              totalPrice: part.totalPrice || 0, // Use original totalPrice
-              gstPercentage: taxAmount, // Use as %
-              carName: part.carName || "",
-              model: part.model || "",
-              isExisting: true,
-              _id: part._id,
-              quantity: part.quantity || 1, // Original quantity
-              taxAmount: taxAmount,
-            };
-          });
-
-          setAllParts(existingParts);
-          setSelectedParts(existingParts);
-          setPartIdCounter(existingParts.length + 1);
+          console.log('Formatted pre-loaded parts:', formattedParts);
+          
+          // Set both allParts and assignment.parts with pre-loaded parts
+          setAllParts(formattedParts);
+          setAssignment(prev => ({
+            ...prev,
+            parts: formattedParts
+          }));
+          
+          // Initialize selectedParts with user-selected parts (non-pre-loaded)
+          const userSelectedParts = formattedParts.filter(part => !part.isPreLoaded);
+          setSelectedParts(userSelectedParts);
+          
+          setPartIdCounter(formattedParts.length + 1);
         } else {
           setAllParts([]);
+          setAssignment(prev => ({
+            ...prev,
+            parts: []
+          }));
           setSelectedParts([]);
           setPartIdCounter(1);
         }
@@ -861,6 +967,96 @@ const WorkInProgress = () => {
     fetchEngineers();
   }, [fetchInventoryParts, fetchEngineers, garageId, navigate]);
 
+  // Function to validate inventory quantities before assignment
+  const validateInventoryQuantities = (partsUsed) => {
+    const errors = [];
+    
+    partsUsed.forEach(part => {
+      if (part._id && part.selectedQuantity && !part.isPreLoaded) {
+        // Get the current inventory quantity from the inventoryParts state
+        const inventoryPart = inventoryParts.find(invPart => invPart._id === part._id);
+        const currentQuantity = inventoryPart ? inventoryPart.quantity : 0;
+        const requestedQuantity = part.selectedQuantity;
+        
+        console.log(`Validating part ${part.partName}: Available=${currentQuantity}, Requested=${requestedQuantity}`);
+        
+        if (requestedQuantity > currentQuantity) {
+          errors.push(`Insufficient quantity for ${part.partName}. Available: ${currentQuantity}, Requested: ${requestedQuantity}`);
+        }
+      }
+    });
+    
+    return errors;
+  };
+
+  // Function to update inventory quantities
+  const updateInventoryQuantities = async (partsUsed) => {
+    try {
+      console.log('🔄 Updating inventory quantities for parts:', partsUsed);
+      
+      // Validate quantities before updating
+      const validationErrors = validateInventoryQuantities(partsUsed);
+      if (validationErrors.length > 0) {
+        throw new Error(`Inventory validation failed: ${validationErrors.join(', ')}`);
+      }
+      
+      const updatePromises = partsUsed.map(async (part) => {
+        if (part._id && part.selectedQuantity && !part.isExisting) {
+          const currentQuantity = part.quantity || 0;
+          const usedQuantity = part.selectedQuantity;
+          const newQuantity = Math.max(0, currentQuantity - usedQuantity);
+          
+          console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
+          
+          // Update inventory quantity
+          await axios.put(
+            `${API_BASE_URL}/inventory/update/${part._id}`,
+            {
+              quantity: newQuantity,
+              carName: part.carName,
+              model: part.model,
+              partNumber: part.partNumber,
+              partName: part.partName,
+              hsnNumber: part.hsnNumber,
+              igst: part.igst || 0,
+              cgstSgst: part.cgstSgst || 0,
+              purchasePrice: part.purchasePrice,
+              sellingPrice: part.sellingPrice,
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+              }
+            }
+          );
+          
+          // If quantity becomes 0, delete the item from inventory
+          if (newQuantity === 0) {
+            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
+            await axios.delete(
+              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
+              {
+                headers: {
+                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                }
+              }
+            );
+          }
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      console.log('✅ Inventory quantities updated successfully');
+      
+      // Refresh inventory data after update
+      await fetchInventoryParts();
+    } catch (error) {
+      console.error('❌ Error updating inventory quantities:', error);
+      throw new Error(`Failed to update inventory: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (assignedEngineers.length === 0) {
@@ -875,103 +1071,36 @@ const WorkInProgress = () => {
     try {
       setIsLoading(true);
 
-      const allPartsUsed = [];
-      const existingParts = allParts.filter(
-        (part) => part.type === "existing" && part.partName && part.partName.trim() !== ""
-      );
-      const inventoryParts = allParts.filter(
-        (part) => part.type === "inventory" && part.partName && part.partName.trim() !== ""
-      );
-      const newSelectedParts = selectedParts.filter(
-        (part) => part.partName && part.partName.trim() !== ""
-      );
+      // Get all parts (pre-loaded + user-selected) using the enhanced function
+      const allPartsUsed = getAllPartsForAPI();
+      
+      // Get user-selected parts that will reduce inventory
+      const userSelectedParts = assignment.parts.filter(part => !part.isPreLoaded && part._id);
 
-      existingParts.forEach((part) => {
-        // For existing parts, use the original values as-is from the job card
-        allPartsUsed.push({
-          _id: part._id,
-          partName: part.partName,
-          partNumber: part.partNumber || "",
-          quantity: parseInt(part.quantity) || 1, // Use original quantity, not selectedQuantity
-          pricePerPiece: parseFloat(part.sellingPrice) || 0, // Use original pricePerPiece
-          totalPrice: parseFloat(part.totalPrice) || 0, // Use original totalPrice
-          gstPercentage: part.gstPercentage || 0,
-          originalQuantity: parseInt(part.quantity) || 1,
-          carName: part.carName || "",
-          model: part.model || "",
-        });
-      });
-
-      for (const part of inventoryParts) {
-        const selectedQuantity = part.selectedQuantity || 1;
-        allPartsUsed.push({
-          partId: part.inventoryId,
-          partName: part.partName,
-          partNumber: part.partNumber || "",
-          quantity: selectedQuantity,
-          sellingPrice: part.sellingPrice || 0,
-          gstPercentage: part.gstPercentage || 0,
-          totalPrice: calculatePartFinalPrice(part),
-          originalQuantity: parseInt(part.quantity) || 1,
-          carName: part.carName || "",
-          model: part.model || "",
-        });
-        const currentPart = inventoryParts.find((p) => p._id === part.inventoryId);
-        if (currentPart) {
-          const newQuantity = currentPart.quantity - selectedQuantity;
-          if (newQuantity < 0) {
-            throw new Error(`Insufficient stock for "${part.partName}"`);
-          }
-          await updatePartQuantity(part.inventoryId, newQuantity);
-        }
+      // Refresh inventory data before validation to ensure we have the latest data
+      await fetchInventoryParts();
+      
+      // Update inventory quantities for user-selected parts
+      if (userSelectedParts.length > 0) {
+        await updateInventoryQuantities(userSelectedParts);
       }
 
-      for (const part of newSelectedParts) {
-        const selectedQuantity = part.selectedQuantity || 1;
-        allPartsUsed.push({
-          partId: part._id,
-          partName: part.partName,
-          partNumber: part.partNumber || "",
-          quantity: selectedQuantity,
-          sellingPrice: part.sellingPrice || 0,
-          gstPercentage: part.gstPercentage || 0,
-          totalPrice: calculatePartFinalPrice(part),
-          originalQuantity: parseInt(part.quantity) || 1,
-          carName: part.carName || "",
-          model: part.model || "",
-        });
-        const currentPart = inventoryParts.find((p) => p._id === part._id);
-        if (currentPart) {
-          const newQuantity = currentPart.quantity - selectedQuantity;
-          if (newQuantity < 0) {
-            throw new Error(`Insufficient stock for "${part.partName}"`);
-          }
-          await updatePartQuantity(part._id, newQuantity);
-        }
-      }
-
-      const partsArray = allPartsUsed.map((part) => {
-        const selectedQuantity = Number(part.quantity) || 1;
-        const sellingPrice = Number(part.sellingPrice) || 0;
-        const taxPercentage = Number(part.gstPercentage || 0);
-        const total = sellingPrice * selectedQuantity;
-        const calculatedTaxAmount = (total * taxPercentage) / 100;
-        const finalPrice = total + calculatedTaxAmount;
-        return {
-          partName: part.partName || "",
-          sellingPrice: sellingPrice,
-          txt: calculatedTaxAmount,
-          selectedQuantity: selectedQuantity,
-          finalPrice: finalPrice,
-        };
-      });
+      // Format parts for API
+      const formattedParts = allPartsUsed.map(part => ({
+        partName: part.partName || '',
+        partNumber: part.partNumber || '',
+        hsnNumber: part.hsnNumber || '',
+        quantity: Number(part.quantity || 1),
+        pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
+        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
+        taxPercentage: Number(part.taxPercentage || 0)
+      }));
 
       const requestData = {
         engineerRemarks: remarks || "",
         status: status || "in_progress",
         assignedEngineerId: assignedEngineers.map((eng) => eng._id),
-        partsUsed: allPartsUsed,
-        partsArray: partsArray,
+        partsUsed: formattedParts,
         jobCardNumber: jobId,
       };
 
@@ -988,11 +1117,16 @@ const WorkInProgress = () => {
         }
       );
 
+      // Calculate inventory reduction for success message
+      const inventoryReduction = userSelectedParts.reduce((total, part) => total + (part.selectedQuantity || 1), 0);
+      const preLoadedParts = allPartsUsed.filter(part => part.isPreLoaded);
+      const userSelectedPartsCount = allPartsUsed.filter(part => !part.isPreLoaded);
+      
       setSnackbar({
         open: true,
         message: `✅ Work progress updated! Job Card: ${jobCardNumber}, Engineers: ${assignedEngineers
           .map((e) => e.name)
-          .join(", ")}, Parts: ${allPartsUsed.length} items`,
+          .join(", ")}, Parts: ${preLoadedParts.length} pre-loaded + ${userSelectedPartsCount.length} user-selected = ${allPartsUsed.length} total${inventoryReduction > 0 ? `, Inventory reduced by ${inventoryReduction} units` : ''}`,
         severity: "success",
       });
 
@@ -1001,15 +1135,25 @@ const WorkInProgress = () => {
       }, 1500);
     } catch (error) {
       console.error("Error updating work progress:", error);
-      setSnackbar({
-        open: true,
-        message: `Error: ${
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update work progress"
-        }`,
-        severity: "error",
-      });
+      
+      // Check if it's an inventory validation error
+      if (error.message && error.message.includes('Inventory validation failed')) {
+        setSnackbar({
+          open: true,
+          message: `❌ ${error.message}. Please check inventory quantities and try again.`,
+          severity: 'error'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: `Error: ${
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to update work progress"
+          }`,
+          severity: "error",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1437,6 +1581,74 @@ const WorkInProgress = () => {
                     </Box>
     
                     <CardContent sx={{ p: 3 }}>
+                      {/* Parts Summary */}
+                      {assignment.parts.length > 0 && (
+                        <Box sx={{ mb: 3 }}>
+                          <Typography
+                            variant="subtitle2"
+                            fontWeight={600}
+                            sx={{ mb: 2 }}
+                          >
+                            Parts Summary
+                          </Typography>
+                          
+                          {/* Pre-loaded Parts */}
+                          {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
+                            <Box sx={{ mb: 2 }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight={600}
+                                color="info.main"
+                                sx={{ mb: 1 }}
+                              >
+                                📋 Pre-loaded Parts from Job Card ({assignment.parts.filter(part => part.isPreLoaded).length}):
+                              </Typography>
+                              <Alert severity="info" sx={{ mb: 1 }}>
+                                <Typography variant="body2">
+                                  These parts were already assigned to this job card and cannot be modified.
+                                </Typography>
+                              </Alert>
+                              <List dense>
+                                {assignment.parts.filter(part => part.isPreLoaded).map((part, index) => (
+                                  <ListItem key={part._id || index} sx={{ py: 0.5 }}>
+                                    <ListItemText
+                                      primary={part.partName}
+                                      secondary={`Part #: ${part.partNumber || 'N/A'} | HSN: ${part.hsnNumber || 'N/A'} | Quantity: ${part.selectedQuantity || 1} | Price: ₹${part.sellingPrice || 0} | Tax: ${(part.taxAmount || part.gstPercentage || 0)}%`}
+                                    />
+                                    <Chip
+                                      label="Pre-loaded"
+                                      size="small"
+                                      color="info"
+                                      variant="outlined"
+                                      sx={{ fontSize: '0.7rem' }}
+                                    />
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Box>
+                          )}
+
+                          {/* User Selected Parts */}
+                          {selectedParts.length > 0 && (
+                            <Box sx={{ mb: 2 }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight={600}
+                                color="primary.main"
+                                sx={{ mb: 1 }}
+                              >
+                                🔧 User Selected Parts ({selectedParts.length}):
+                              </Typography>
+                              <Alert severity="warning" sx={{ mb: 1 }}>
+                                <Typography variant="body2">
+                                  These parts will be removed from inventory when you update the work progress.
+                                </Typography>
+                              </Alert>
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+
                       {/* Parts Selection */}
                       <Box sx={{ mb: 3 }}>
                         <Typography
@@ -1444,7 +1656,7 @@ const WorkInProgress = () => {
                           fontWeight={600}
                           sx={{ mb: 1 }}
                         >
-                          Select Parts from Inventory (Optional)
+                          Select Additional Parts from Inventory (Optional)
                         </Typography>
     
                         {isLoadingInventory ? (
@@ -1460,23 +1672,24 @@ const WorkInProgress = () => {
                             <Typography sx={{ ml: 2 }}>Loading parts...</Typography>
                           </Box>
                         ) : (
-                          <Autocomplete
-                            multiple
-                            fullWidth
-                            options={inventoryParts.filter(
-                              (part) => getAvailableQuantity(part._id) > 0
-                            )}
-                            getOptionLabel={(option) =>
-                              `${option.partName} (${
-                                option.partNumber || "N/A"
-                              }) - ₹${option.sellingPrice || 0} | GST: ${
-                                option.gstPercentage || option.taxAmount || 0
-                              }% | Available: ${getAvailableQuantity(option._id)}`
-                            }
-                            value={selectedParts}
-                            onChange={(event, newValue) => {
-                              handlePartSelection(newValue, selectedParts);
-                            }}
+                                                     <Autocomplete
+                             multiple
+                             fullWidth
+                             options={inventoryParts.filter(
+                               (part) => getAvailableQuantity(part._id) > 0
+                             )}
+                             getOptionLabel={(option) =>
+                               `${option.partName} (${
+                                 option.partNumber || "N/A"
+                               }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST: ${
+                                 option.gstPercentage || option.taxAmount || 0
+                               }% | Available: ${getAvailableQuantity(option._id)}`
+                             }
+                             value={selectedParts}
+                             onChange={(event, newValue) => {
+                               handlePartSelection(newValue, selectedParts);
+                             }}
+                             noOptionsText="No parts available in stock"
                             renderTags={(value, getTagProps) =>
                               value.map((option, index) => (
                                 <Chip
@@ -1501,9 +1714,9 @@ const WorkInProgress = () => {
                                     variant="caption"
                                     color="text.secondary"
                                   >
-                                    Part : {option.partNumber || "N/A"} | Price: ₹
+                                    Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
                                     {option.sellingPrice || 0} | GST:{" "}
-                                    {option.gstPercentage || option.taxAmount || 0}|
+                                    {option.gstPercentage || option.taxAmount || 0}% |
                                     Available: {getAvailableQuantity(option._id)} |
                                     {option.carName} - {option.model}
                                   </Typography>
@@ -1528,7 +1741,6 @@ const WorkInProgress = () => {
                                 }}
                               />
                             )}
-                            noOptionsText="No parts available in stock"
                             filterOptions={(options, { inputValue }) => {
                               return options.filter(
                                 (option) =>
@@ -1559,6 +1771,13 @@ const WorkInProgress = () => {
                             >
                               Selected Parts with Details:
                             </Typography>
+                            
+                            {/* Inventory Impact Summary */}
+                            <Box sx={{ mb: 2, p: 1, bgcolor: 'warning.light', borderRadius: 1 }}>
+                              <Typography variant="caption" color="warning.dark" sx={{ fontStyle: 'italic' }}>
+                                ⚠️ Total inventory reduction: {selectedParts.reduce((total, part) => total + (part.selectedQuantity || 1), 0)} units
+                              </Typography>
+                            </Box>
                             <List dense>
                               {selectedParts.map((part, partIndex) => {
                                 const selectedQuantity = part.selectedQuantity || 1;
@@ -1628,8 +1847,15 @@ const WorkInProgress = () => {
                                           color="text.secondary"
                                           sx={{ display: "block" }}
                                         >
-                                          Part #: {part.partNumber || "N/A"} |{" "}
+                                          Part #: {part.partNumber || "N/A"} | HSN: {part.hsnNumber || "N/A"} |{" "}
                                           {part.carName} - {part.model}
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ display: "block" }}
+                                        >
+                                          Tax: {(part.taxAmount || part.gstPercentage || 0)}% | Price: ₹{part.sellingPrice || 0}
                                         </Typography>
                                         <Typography
                                           variant="caption"
@@ -1642,6 +1868,19 @@ const WorkInProgress = () => {
                                             `Max Selectable: ${maxSelectableQuantity} | Selected: ${selectedQuantity}`
                                           )}
                                         </Typography>
+                                        {!part.isExisting && (
+                                          <Typography
+                                            variant="caption"
+                                            color="warning.main"
+                                            sx={{
+                                              display: "block",
+                                              fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                              fontStyle: 'italic'
+                                            }}
+                                          >
+                                            ⚠️ Inventory will be reduced by {selectedQuantity} on update
+                                          </Typography>
+                                        )}
                                       </Box>
                                       <Box
                                         sx={{

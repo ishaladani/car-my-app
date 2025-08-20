@@ -25,10 +25,6 @@ import {
   Select,
   useTheme,
   Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TablePagination,
   Stack,
   Alert,
@@ -37,16 +33,15 @@ import {
 import { 
   Search as SearchIcon,
   ArrowBack as ArrowBackIcon,
-  FileDownload as FileDownloadIcon,
   Work as WorkIcon,
   Receipt as ReceiptIcon,
-  Close as CloseIcon,
   FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import { useThemeContext } from '../Layout/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
+
+import JobDetailsModal from "./jobDetailsModal";
 
 const RecordReport = () => {
   const navigate = useNavigate();
@@ -72,7 +67,7 @@ const RecordReport = () => {
   const [allJobsData, setAllJobsData] = useState([]); // Store all data before user filtering
   const [filteredData, setFilteredData] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [jobDetailsModalOpen, setJobDetailsModalOpen] = useState(false);
   const [availableCreators, setAvailableCreators] = useState([]); // For filter dropdown
 
   // Pagination States
@@ -141,59 +136,7 @@ const RecordReport = () => {
     });
   };
 
-  // Generate PDF Function
-  const generatePDFWithJsPDF = (jobData) => {
-    try {
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.setTextColor(33, 33, 33);
-      doc.text("Job Card Details", 14, 20);
 
-      const tableData = [
-        ['Customer Name', jobData.customerName || 'N/A'],
-        ['Contact Number', jobData.contactNumber || 'N/A'],
-        ['Email', jobData.email || 'N/A'],
-        ['Company', jobData.company || 'N/A'],
-        ['Car Number', jobData.carNumber || jobData.registrationNumber || 'N/A'],
-        ['Model', jobData.model || 'N/A'],
-        ['Kilometer', jobData.kilometer ? `${jobData.kilometer} km` : 'N/A'],
-        ['Fuel Type', jobData.fuelType || 'N/A'],
-        ['Insurance Provider', jobData.insuranceProvider || 'N/A'],
-        ['Policy Number', jobData.policyNumber || 'N/A'],
-        ['Expiry Date', formatDate(jobData.expiryDate)],
-        ['Excess Amount', jobData.excessAmount ? `₹${jobData.excessAmount}` : 'N/A'],
-        ['Job Type', jobData.type || 'N/A'],
-        ['Engineer', getEngineerName(jobData.engineerId) || 'Not Assigned'],
-        ['Engineer Remarks', jobData.engineerRemarks || 'N/A'],
-        ['Status', jobData.status || 'N/A'],
-        ['Created Date', formatDate(jobData.createdAt)],
-        ['Created By', getCreatedByName(jobData.createdBy) || 'N/A'],
-      ];
-
-      autoTable(doc, {
-        startY: 30,
-        head: [['Field', 'Value']],
-        body: tableData,
-        theme: 'grid',
-        styles: {
-          fontSize: 10,
-          cellPadding: 3,
-        },
-        headStyles: {
-          fillColor: [25, 118, 210],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-        },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { left: 10, right: 10 },
-      });
-
-      doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (err) {
-      console.error("PDF generation failed", err);
-      alert("PDF generation failed. Please try again.");
-    }
-  };
 
   // Format job details for display
   const formatJobDetails = (jobDetailsString) => {
@@ -227,11 +170,7 @@ const RecordReport = () => {
     }
   };
 
-  // Handle Download PDF
-  const handleDownloadPDF = (job) => {
-    if (!job) return;
-    generatePDFWithJsPDF(job);
-  };
+
 
   // Fetch job data from API
   useEffect(() => {
@@ -515,15 +454,9 @@ const RecordReport = () => {
   };
 
   // View job details
-  const handleViewClick = (job) => {
+  const handleViewDetails = (job) => {
     setSelectedJob(job);
-    setOpenDialog(true);
-  };
-
-  // Close dialog
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedJob(null);
+    setJobDetailsModalOpen(true);
   };
 
   // Clear all filters and re-sort
@@ -673,16 +606,15 @@ const RecordReport = () => {
                 </Grid>
               )}
               <Grid item xs={12} md={isUserTypeUser ? 3 : 1}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={handleClearFilters}
-                  startIcon={<FileDownloadIcon />}
-                  size="small"
-                  sx={{ height: '40px' }}
-                >
-                  Clear Filters
-                </Button>
+                                 <Button
+                   fullWidth
+                   variant="outlined"
+                   onClick={handleClearFilters}
+                   size="small"
+                   sx={{ height: '40px' }}
+                 >
+                   Clear Filters
+                 </Button>
               </Grid>
             </Grid>
 
@@ -714,7 +646,7 @@ const RecordReport = () => {
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Created By</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Status</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Last Updated</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} align="center">Actions</TableCell>
+                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold', minWidth: '200px' }} align="center">Actions</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -765,23 +697,23 @@ const RecordReport = () => {
                                 </Typography>
                               </TableCell>
                               <TableCell align="center">
-                                <Stack direction="row" spacing={1} justifyContent="center">
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<ReceiptIcon />}
-                                    onClick={() => handleViewBill(job._id)}
-                                  >
-                                    Bill
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handleViewClick(job)}
-                                  >
-                                    Details
-                                  </Button>
-                                </Stack>
+                                                                 <Stack direction="row" spacing={1} justifyContent="center">
+                                   <Button
+                                     variant="outlined"
+                                     size="small"
+                                     startIcon={<ReceiptIcon />}
+                                     onClick={() => handleViewBill(job._id)}
+                                   >
+                                     Bill
+                                   </Button>
+                                   <Button
+                                     variant="outlined"
+                                     size="small"
+                                     onClick={() => handleViewDetails(job)}
+                                   >
+                                     Details
+                                   </Button>
+                                 </Stack>
                               </TableCell>
                             </TableRow>
                           ))
@@ -817,140 +749,14 @@ const RecordReport = () => {
         </Card>
       </Container>
 
-      {/* Job Details Dialog - Same as before */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
-        <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', p: 3 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 600 }}>Job Card Details</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {selectedJob?.carNumber || selectedJob?.registrationNumber}
-              </Typography>
-            </Box>
-            <IconButton onClick={handleCloseDialog} sx={{ color: 'white' }}><CloseIcon /></IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          {selectedJob && (
-            <Box>
-              <Box sx={{ p: 3, bgcolor: theme.palette.background.default }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">Job ID</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>{selectedJob._id?.slice(-8) || 'N/A'}</Typography>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">Status</Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={selectedJob.status || 'Unknown'} 
-                          color={selectedJob.status?.toLowerCase() === 'completed' ? 'success' : selectedJob.status?.toLowerCase() === 'in progress' ? 'warning' : 'info'} 
-                          sx={{ fontWeight: 600 }} 
-                        />
-                      </Box>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} md={4}>
-                    <Card elevation={0} sx={{ p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                      <Typography variant="overline" color="text.secondary">Bill Type</Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip 
-                          label={selectedJob.gstApplicable ? 'GST' : 'Non-GST'} 
-                          color={selectedJob.gstApplicable ? 'primary' : 'secondary'} 
-                          variant="outlined" 
-                          sx={{ fontWeight: 600 }} 
-                        />
-                      </Box>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </Box>
-              <Divider />
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>Detailed Information</Typography>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Vehicle Number</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.carNumber || selectedJob.registrationNumber || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Customer Name</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.customerName || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Subaccount</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {getSubaccountName(selectedJob.subaccountId) || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Contact Number</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.contactNumber || selectedJob.phone || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Job Details</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500, whiteSpace: 'pre-line' }}>
-                        {formatJobDetails(selectedJob.jobDetails)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Created Date</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {formatDate(selectedJob.createdAt)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Last Updated</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {formatDate(selectedJob.updatedAt || selectedJob.createdAt)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Created By</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {getCreatedByName(selectedJob.createdBy) || 'N/A'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Labor Hours</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {selectedJob.laborHours || 'N/A'} hours
-                      </Typography>
-                    </Box>
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Engineer</Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {getEngineerName(selectedJob.engineerId) || 'Not Assigned'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, bgcolor: theme.palette.background.default }}>
-          <Button onClick={() => handleDownloadPDF(selectedJob)} variant="contained" startIcon={<FileDownloadIcon />}>
-            Download PDF
-          </Button>
-          <Button onClick={() => handleViewBill(selectedJob?._id)} variant="outlined" startIcon={<ReceiptIcon />}>
-            View Bill
-          </Button>
-          <Button onClick={handleCloseDialog} variant="outlined">Close</Button>
-        </DialogActions>
-      </Dialog>
+             {/* Job Details Modal */}
+       <JobDetailsModal
+         open={jobDetailsModalOpen}
+         onClose={() => setJobDetailsModalOpen(false)}
+         jobData={selectedJob}
+       />
+
+      
     </Box>
   );
 };
