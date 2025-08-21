@@ -181,9 +181,13 @@ const AssignEngineer = () => {
 
       const formattedParts = allParts.map(part => ({
         partName: part.partName,
+        partNumber: part.partNumber || '',
+        hsnNumber: part.hsnNumber || '',
         quantity: Number(part.quantity || 1),
         pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
+        igst: parseFloat((part.igst || 0).toFixed(2)),
+        cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
       }));
 
       await axios.put(
@@ -830,7 +834,9 @@ const AssignEngineer = () => {
         quantity: Number(part.quantity || 1),
         pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
         totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
-        taxPercentage: Number(part.taxPercentage || 0)
+        taxPercentage: Number(part.taxPercentage || 0),
+        igst: parseFloat((part.igst || 0).toFixed(2)),
+        cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
       }));
 
       const updatePayload = {
@@ -900,21 +906,23 @@ const AssignEngineer = () => {
           
           console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
           
-          // Update inventory quantity
+          // Update inventory quantity using the same API structure as InventoryManagement
+          const requestData = {
+            quantity: newQuantity,
+            sellingPrice: parseFloat(part.sellingPrice || 0),
+            purchasePrice: parseFloat(part.purchasePrice || 0),
+            carName: part.carName || '',
+            model: part.model || '',
+            partNumber: part.partNumber || '',
+            partName: part.partName || '',
+            hsnNumber: part.hsnNumber || '',
+            igst: parseFloat(part.igst || 0),
+            cgstSgst: parseFloat(part.cgstSgst || 0),
+          };
+
           await axios.put(
             `${API_BASE_URL}/inventory/update/${part._id}`,
-            {
-              quantity: newQuantity,
-              carName: part.carName,
-              model: part.model,
-              partNumber: part.partNumber,
-              partName: part.partName,
-              hsnNumber: part.hsnNumber,
-              igst: part.igst || 0,
-              cgstSgst: part.cgstSgst || 0,
-              purchasePrice: part.purchasePrice,
-              sellingPrice: part.sellingPrice,
-            },
+            requestData,
             {
               headers: {
                 'Content-Type': 'application/json',
@@ -2599,9 +2607,13 @@ const AssignEngineer = () => {
                         {
                           partsUsed: allParts.map(part => ({
                             partName: part.partName || '',
+                            partNumber: part.partNumber || '',
+                            hsnNumber: part.hsnNumber || '',
                             quantity: Number(part.quantity || 1),
                             pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-                            totalPrice: parseFloat((part.totalPrice || 0).toFixed(2))
+                            totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
+                            igst: parseFloat((part.igst || 0).toFixed(2)),
+                            cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
                           }))
                         },
                         {

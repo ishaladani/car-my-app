@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CssBaseline } from "@mui/material";
 import { ThemeProviderWrapper } from "./Layout/ThemeContext";
+import { initEmailJS } from "./config/emailjs";
 import Dashboard from "./pages/Dashboard";
 import AppLayout from "./pages/AppLayout";
 import JobCards from "./pages/JobCards";
@@ -27,6 +28,11 @@ import InventoryDashboard from "./pages/InventoryDashboard";
 import History from "./pages/History";
 
 function App() {
+  // Initialize EmailJS when app starts
+  useEffect(() => {
+    initEmailJS();
+  }, []);
+
   return (
     <ThemeProviderWrapper>
       <CssBaseline />

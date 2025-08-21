@@ -192,6 +192,12 @@ const AppLayout = () => {
           let allowedItems = allNavItems.filter((item) => {
             // Always allow Dashboard
             if (item.path === "/") return true;
+            
+            // Special case: Show History page if "Create Job Cards" permission is allowed
+            if (item.text === "History" && response.data.permissions.includes("Create Job Cards")) {
+              return true;
+            }
+            
             // Check if user has permission for this item
             return response.data.permissions.includes(item.text);
           });

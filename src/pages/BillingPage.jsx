@@ -1449,7 +1449,7 @@ const generateProfessionalGSTInvoice = () => {
     drawBorderedRect(margin + leftSectionWidth + 10, detailsY, rightSectionWidth, 130, 'lightgray');
     doc.setFont("helvetica", "bold");
     doc.setTextColor(52, 152, 219);
-    doc.text("INVOICE DETAILS", margin + leftSectionWidth + 20, detailsY + 20);
+    doc.text("SHIP", margin + leftSectionWidth + 20, detailsY + 20);
     
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");

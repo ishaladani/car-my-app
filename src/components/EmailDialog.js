@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Box,
   Button,
@@ -13,6 +13,7 @@ import {
 import { Email as EmailIcon } from '@mui/icons-material';
 import jsPDF from 'jspdf';
 import emailjs from 'emailjs-com';
+import { EMAILJS_CONFIG, initEmailJS } from '../config/emailjs';
 
 const EmailDialog = ({
   showEmailDialog,
@@ -26,6 +27,11 @@ const EmailDialog = ({
   setEmailMessage,
   carDetails
 }) => {
+
+  // Initialize EmailJS when component mounts
+  useEffect(() => {
+    initEmailJS();
+  }, []);
 
   const sendBillViaEmail = async () => {
     try {
@@ -49,10 +55,10 @@ const EmailDialog = ({
       };
 
       await emailjs.send(
-        'your_service_id',
-        'your_template_id',
+        EMAILJS_CONFIG.SERVICE_ID,
+        EMAILJS_CONFIG.TEMPLATE_ID,
         templateParams,
-        'your_public_key'
+        EMAILJS_CONFIG.PUBLIC_KEY
       );
 
       alert('✅ Invoice sent successfully!');
