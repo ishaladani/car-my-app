@@ -27,7 +27,10 @@ const PartsSection = ({
   isMobile,
   tableCellStyle,
   disabled,
+  gstSettings
 }) => {
+  console.log('gstSettings:', gstSettings);
+  
   return (
     <Card
       elevation={0}
@@ -111,10 +114,15 @@ const PartsSection = ({
                   <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
                     Price/Unit
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                    Total
+                  {/* <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                    Tax (%)
                   </TableCell>
-
+                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                    Tax Amount
+                  </TableCell> */}
+                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                    Total Price + Tax
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -140,16 +148,25 @@ const PartsSection = ({
                         ₹{part.pricePerUnit?.toFixed(2) || "0.00"}
                       </Typography>
                     </TableCell>
+                    {/* <TableCell {...tableCellStyle}>
+                      <Typography variant="body2" color="info.main" fontWeight={500}>
+                        {part.taxPercentage || 0}%
+                      </Typography>
+                    </TableCell>
                     <TableCell {...tableCellStyle}>
+                      <Typography variant="body2" color="success.main" fontWeight={500}>
+                        ₹{part.taxAmount?.toFixed(2) || "0.00"}
+                      </Typography>
+                    </TableCell> */}
+                   <TableCell {...tableCellStyle}>
                       <Typography
                         variant="body2"
                         fontWeight={600}
                         color="primary"
                       >
-                        ₹{part.total?.toFixed(2) || "0.00"}
+                        ₹{part.totalPrice?.toFixed(2) || part.total?.toFixed(2) || "0.00"}
                       </Typography>
                     </TableCell>
-
                   </TableRow>
                 ))}
               </TableBody>
@@ -166,12 +183,68 @@ const PartsSection = ({
               color="success.contrastText"
             >
               Total Parts Cost: ₹
-              {parts
-                .reduce((sum, part) => sum + (part.total || 0), 0)
-                .toFixed(2)}
+              {gstSettings?.includeGst === false 
+                ? parts
+                    .reduce((sum, part) => sum + ((part.pricePerUnit || 0) * (part.quantity || 0)), 0)
+                    .toFixed(2)
+                : parts
+                    .reduce((sum, part) => sum + (part.total || 0), 0)
+                    .toFixed(2)
+              }
             </Typography>
           </Box>
         )}
+
+        {/* API Data Summary */}
+        {/* {parts.length > 0 && (
+          <Box sx={{ mt: 2, p: 2, bgcolor: "primary.light", borderRadius: 1 }}>
+            <Typography
+              variant="subtitle2"
+              fontWeight={600}
+              color="primary.dark"
+              sx={{ mb: 1 }}
+            >
+              📊 API Data Summary - HSN Numbers & Tax Details:
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {parts.map((part, index) => (
+                <Box key={part.id} sx={{ 
+                  p: 1, 
+                  bgcolor: 'background.paper', 
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}>
+                  <Typography variant="body2" fontWeight={500} color="primary">
+                    Part {index + 1}: {part.name}
+                  </Typography>
+                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 0.5 }}>
+                     <Typography variant="caption" color="text.secondary">
+                       HSN: {part.hsnNumber || 'N/A'}
+                     </Typography>
+                     <Typography variant="caption" color="text.secondary">
+                       Price/Unit: ₹{part.pricePerUnit?.toFixed(2) || '0.00'}
+                     </Typography>
+                     <Typography variant="caption" color="info.main" fontWeight={500}>
+                       Tax: {part.taxPercentage || 0}%
+                     </Typography>
+                     <Typography variant="caption" color="success.main" fontWeight={500}>
+                       Tax Amount: ₹{part.taxAmount?.toFixed(2) || '0.00'}
+                     </Typography>
+                     <Typography variant="caption" color="primary" fontWeight={600}>
+                       Total Price: ₹{part.totalPrice?.toFixed(2) || part.total?.toFixed(2) || '0.00'}
+                     </Typography>
+                   </Box>
+                </Box>
+              ))}
+            </Box>
+            <Box sx={{ mt: 2, p: 1, bgcolor: 'primary.main', borderRadius: 1 }}>
+              <Typography variant="caption" color="white" fontWeight={600}>
+                💡 Console Log: Check browser console for detailed API data breakdown
+              </Typography>
+            </Box>
+          </Box>
+        )} */}
       </CardContent>
     </Card>
   );

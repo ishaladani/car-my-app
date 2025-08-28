@@ -300,12 +300,16 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
       }
       
       const doc = new jsPDF();
+      let currentY = 20;
   
-      doc.setFontSize(16);
-      doc.setTextColor(33, 33, 33);
-      doc.text("🧾 Job Card Details", 14, 20);
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(25, 118, 210);
+      doc.text("🧾 Job Card Details", 14, currentY);
+      currentY += 15;
   
-      const tableData = [
+      // Job Information Table
+      const jobTableData = [
         ['Customer Name', jobData.customerName || 'N/A'],
         ['Contact Number', jobData.contactNumber || 'N/A'],
         ['Email', jobData.email || 'N/A'],
@@ -326,22 +330,121 @@ const PDFGeneratorModal = ({ open, onClose, jobData }) => {
       ];
   
       doc.autoTable({
-        startY: 30,
+        startY: currentY,
         head: [['Field', 'Value']],
-        body: tableData,
+        body: jobTableData,
         theme: 'grid',
         styles: {
-          fontSize: 10,
+          fontSize: 9,
           cellPadding: 3,
         },
         headStyles: {
-          fillColor: [25, 118, 210], // MUI Primary
+          fillColor: [25, 118, 210],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
         },
         alternateRowStyles: { fillColor: [245, 245, 245] },
         margin: { left: 10, right: 10 },
       });
+      
+      currentY = doc.lastAutoTable.finalY + 15;
+  
+      // Parts Used Table (if parts exist)
+      if (jobData.partsUsed && jobData.partsUsed.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(25, 118, 210);
+        doc.text("🔧 Parts Used", 14, currentY);
+        currentY += 10;
+        
+        const partsTableData = jobData.partsUsed.map((part, index) => [
+          index + 1,
+          part.partName || 'N/A',
+          part.hsnNumber || 'N/A',
+          part.quantity || 0,
+          `₹${(part.pricePerPiece || 0).toFixed(2)}`,
+          `${part.taxPercentage || 0}%`,
+          `₹${(part.taxAmount || 0).toFixed(2)}`,
+          `₹${(part.totalPrice || 0).toFixed(2)}`
+        ]);
+  
+        doc.autoTable({
+          startY: currentY,
+          head: [['S.No.', 'Part Name', 'HSN Code', 'Qty', 'Price/Unit', 'Tax %', 'Tax Amount', 'Total Price']],
+          body: partsTableData,
+          theme: 'grid',
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+          },
+          headStyles: {
+            fillColor: [25, 118, 210],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+          },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          margin: { left: 10, right: 10 },
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 10;
+        
+        // Parts Total
+        const partsTotal = jobData.partsUsed.reduce((sum, part) => sum + (part.totalPrice || 0), 0);
+        doc.setFontSize(12);
+        doc.setTextColor(25, 118, 210);
+        doc.text(`Total Parts Cost: ₹${partsTotal.toFixed(2)}`, 14, currentY);
+        currentY += 15;
+      }
+  
+      // Service Details Table (if job details exist)
+      const parsedJobDetails = parseJobDetails(jobData?.jobDetails);
+      if (parsedJobDetails && parsedJobDetails.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(25, 118, 210);
+        doc.text("⚙️ Service Details", 14, currentY);
+        currentY += 10;
+        
+        const serviceTableData = parsedJobDetails.map((service, index) => [
+          index + 1,
+          service.description || 'N/A',
+          `₹${(parseFloat(service.price) || 0).toFixed(2)}`
+        ]);
+  
+        doc.autoTable({
+          startY: currentY,
+          head: [['S.No.', 'Service Description', 'Amount (₹)']],
+          body: serviceTableData,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+          },
+          headStyles: {
+            fillColor: [25, 118, 210],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+          },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          margin: { left: 10, right: 10 },
+        });
+        
+        currentY = doc.lastAutoTable.finalY + 10;
+        
+        // Service Total
+        const serviceTotal = calculateJobDetailsTotal(jobData?.jobDetails);
+        doc.setFontSize(12);
+        doc.setTextColor(25, 118, 210);
+        doc.text(`Total Service Cost: ₹${serviceTotal.toFixed(2)}`, 14, currentY);
+        currentY += 15;
+      }
+  
+      // Grand Total
+      const partsTotal = jobData.partsUsed ? jobData.partsUsed.reduce((sum, part) => sum + (part.totalPrice || 0), 0) : 0;
+      const serviceTotal = calculateJobDetailsTotal(jobData?.jobDetails);
+      const grandTotal = partsTotal + serviceTotal;
+      
+      doc.setFontSize(14);
+      doc.setTextColor(25, 118, 210);
+      doc.text(`💰 Grand Total: ₹${grandTotal.toFixed(2)}`, 14, currentY);
   
       doc.save(`JobCard_${jobData.carNumber || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`);
       setIsGenerating(false);

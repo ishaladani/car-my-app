@@ -119,14 +119,12 @@ const WorkInProgress = () => {
 
   const [inventoryParts, setInventoryParts] = useState([]);
   const [selectedParts, setSelectedParts] = useState([]); // For Autocomplete selection
-  const [allParts, setAllParts] = useState([]);
   const [assignment, setAssignment] = useState({
     parts: [],
     priority: 'medium',
     estimatedDuration: '',
     notes: ''
   });
-  const [partIdCounter, setPartIdCounter] = useState(1);
   const [status, setStatus] = useState("");
   const [remarks, setRemarks] = useState("");
   const [error, setError] = useState(null);
@@ -159,7 +157,6 @@ const WorkInProgress = () => {
   const [partAddError, setPartAddError] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [jobId, setJobId] = useState("");
-  const [addPartMode, setAddPartMode] = useState("");
 
   const statusOptions = [
     { value: "pending", label: "Pending", color: "warning" },
@@ -173,7 +170,14 @@ const WorkInProgress = () => {
   const getAllPartsForAPI = () => {
     const allParts = [];
 
-    assignment.parts.forEach(part => {
+    console.log('🔍 getAllPartsForAPI - Processing parts:');
+    assignment.parts.forEach((part, index) => {
+      console.log(`Part ${index + 1} (${part.partName}):`);
+      console.log(`  Is Pre-loaded: ${part.isPreLoaded}`);
+      console.log(`  taxAmount: ${part.taxAmount}`);
+      console.log(`  taxPercentage: ${part.taxPercentage}`);
+      console.log(`  gstPercentage: ${part.gstPercentage}`);
+      
       const selectedQuantity = part.selectedQuantity || 1;
 
       // For pre-loaded parts, use original values from job card
@@ -181,6 +185,9 @@ const WorkInProgress = () => {
         const quantity = part.originalQuantity || selectedQuantity;
         const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
         const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
+        const taxPercentage = part.taxPercentage || part.gstPercentage || 0;
+
+        console.log(`  Pre-loaded - Using taxPercentage: ${taxPercentage}`);
 
         allParts.push({
           partName: part.partName,
@@ -189,22 +196,24 @@ const WorkInProgress = () => {
           quantity: quantity,
           pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
           totalPrice: parseFloat(totalPrice.toFixed(2)),
-          taxPercentage: part.taxAmount || part.gstPercentage || 0,
+          taxPercentage: taxPercentage, // Use taxPercentage, not taxAmount
           isPreLoaded: true
         });
       } else {
         // For user-selected parts, calculate normally
         const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
         const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-        const totalPrice = pricePerPiece * selectedQuantity;
+        const pricePerPiece = sellingPrice; // Base price without tax
+        const totalPrice = (sellingPrice + (sellingPrice * taxRate / 100)) * selectedQuantity;
+
+        console.log(`  User-selected - Using taxRate: ${taxRate}`);
 
         allParts.push({
           partName: part.partName,
           partNumber: part.partNumber || '',
           hsnNumber: part.hsnNumber || '',
           quantity: selectedQuantity,
-          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)), // Base price without tax
           totalPrice: parseFloat(totalPrice.toFixed(2)),
           taxPercentage: taxRate,
           isPreLoaded: false
@@ -212,6 +221,7 @@ const WorkInProgress = () => {
       }
     });
 
+    console.log('📊 Final allParts array:', allParts);
     return allParts;
   };
 
@@ -235,9 +245,20 @@ const WorkInProgress = () => {
             );
             return;
           }
+          // Calculate tax amounts using InventoryManagement style for updated quantity
+          const sellingPrice = existingPart.sellingPrice || existingPart.pricePerUnit || 0;
+          const taxPercentage = existingPart.taxAmount || existingPart.gstPercentage || 0;
+          const baseAmount = sellingPrice * newQuantity;
+          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const totalWithGST = baseAmount + gstAmount;
+
           partsMap.set(newPart._id, {
             ...existingPart,
             selectedQuantity: newQuantity,
+            // Update GST amounts for new quantity
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            gstAmount: parseFloat(gstAmount.toFixed(2)),
+            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         } else {
           const availableQuantity = getAvailableQuantity(newPart._id);
@@ -249,10 +270,22 @@ const WorkInProgress = () => {
             });
             return;
           }
+          // Calculate tax amounts using InventoryManagement style
+          const sellingPrice = newPart.sellingPrice || newPart.pricePerUnit || 0;
+          const taxPercentage = newPart.taxAmount || newPart.gstPercentage || 0;
+          const quantity = 1;
+          const baseAmount = sellingPrice * quantity;
+          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const totalWithGST = baseAmount + gstAmount;
+
           partsMap.set(newPart._id, {
             ...newPart,
             selectedQuantity: 1,
             availableQuantity: availableQuantity,
+            // Calculate GST amounts
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            gstAmount: parseFloat(gstAmount.toFixed(2)),
+            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         }
       });
@@ -260,19 +293,32 @@ const WorkInProgress = () => {
       const updatedParts = Array.from(partsMap.values());
       setSelectedParts(updatedParts);
       
-      // Update assignment.parts to include both pre-loaded and user-selected parts
+      // Update assignment with new parts (excluding pre-loaded parts)
       const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
-      const allParts = [...preLoadedParts, ...updatedParts];
+      const userSelectedParts = updatedParts.map(part => ({
+        ...part,
+        isPreLoaded: false
+      }));
+      
+      // Ensure no duplicates by creating a map of parts by ID
+      const partsMapForAssignment = new Map();
+      
+      // Add pre-loaded parts first
+      preLoadedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      // Add user-selected parts, overwriting any duplicates
+      userSelectedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      const finalParts = Array.from(partsMapForAssignment.values());
       
       setAssignment(prev => ({
         ...prev,
-        parts: allParts
+        parts: finalParts
       }));
-      
-      // Update API with the new parts selection
-      if (updatedParts.length > 0) {
-        await updateJobCardWithParts(updatedParts);
-      }
       
       if (error) setError(null);
     } catch (err) {
@@ -281,27 +327,64 @@ const WorkInProgress = () => {
     }
   };
 
+  // Function to remove duplicate parts from assignment
+  const removeDuplicateParts = () => {
+    const uniqueParts = [];
+    const seenIds = new Set();
+    
+    console.log('Checking for duplicates in assignment.parts:', assignment.parts.length, 'parts');
+    
+    assignment.parts.forEach(part => {
+      if (!seenIds.has(part._id)) {
+        seenIds.add(part._id);
+        uniqueParts.push(part);
+      } else {
+        console.log('Found duplicate part:', part.partName, 'with ID:', part._id, 'isPreLoaded:', part.isPreLoaded);
+      }
+    });
+    
+    if (uniqueParts.length !== assignment.parts.length) {
+      console.log('Removed duplicate parts:', assignment.parts.length - uniqueParts.length);
+      console.log('Original parts:', assignment.parts.map(p => ({ id: p._id, name: p.partName, isPreLoaded: p.isPreLoaded })));
+      console.log('Unique parts:', uniqueParts.map(p => ({ id: p._id, name: p.partName, isPreLoaded: p.isPreLoaded })));
+      setAssignment(prev => ({
+        ...prev,
+        parts: uniqueParts
+      }));
+    }
+  };
+
   const handlePartRemoval = async (partIndex) => {
     try {
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
       setSelectedParts(updatedParts);
       
-      // Update assignment.parts to include both pre-loaded and updated user-selected parts
+      // Update assignment with new parts (excluding pre-loaded parts)
       const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
-      const allParts = [...preLoadedParts, ...updatedParts];
+      const userSelectedParts = updatedParts.map(part => ({
+        ...part,
+        isPreLoaded: false
+      }));
+      
+      // Ensure no duplicates by creating a map of parts by ID
+      const partsMapForAssignment = new Map();
+      
+      // Add pre-loaded parts first
+      preLoadedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      // Add user-selected parts, overwriting any duplicates
+      userSelectedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      const finalParts = Array.from(partsMapForAssignment.values());
       
       setAssignment(prev => ({
         ...prev,
-        parts: allParts
+        parts: finalParts
       }));
-      
-      // Update API with the remaining parts
-      if (updatedParts.length > 0) {
-        await updateJobCardWithParts(updatedParts);
-      } else {
-        // If no parts remain, send empty array to clear parts
-        await updateJobCardWithParts([]);
-      }
     } catch (err) {
       console.error("Error removing part:", err);
       setError(`Failed to remove part`);
@@ -328,22 +411,51 @@ const WorkInProgress = () => {
         return;
       }
 
+      // Calculate tax amounts using InventoryManagement style for updated quantity
+      const sellingPrice = part.sellingPrice || part.pricePerUnit || 0;
+      const taxPercentage = part.taxAmount || part.gstPercentage || 0;
+      const baseAmount = sellingPrice * newQuantity;
+      const gstAmount = (baseAmount * taxPercentage) / 100;
+      const totalWithGST = baseAmount + gstAmount;
+
       const updatedParts = selectedParts.map((p, idx) =>
-        idx === partIndex ? { ...p, selectedQuantity: newQuantity } : p
+        idx === partIndex ? { 
+          ...p, 
+          selectedQuantity: newQuantity,
+          // Update GST amounts for new quantity
+          baseAmount: parseFloat(baseAmount.toFixed(2)),
+          gstAmount: parseFloat(gstAmount.toFixed(2)),
+          totalWithGST: parseFloat(totalWithGST.toFixed(2)),
+        } : p
       );
       setSelectedParts(updatedParts);
       
-      // Update assignment.parts to include both pre-loaded and updated user-selected parts
+      // Update assignment with new parts (excluding pre-loaded parts)
       const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
-      const allParts = [...preLoadedParts, ...updatedParts];
+      const userSelectedParts = updatedParts.map(part => ({
+        ...part,
+        isPreLoaded: false
+      }));
+      
+      // Ensure no duplicates by creating a map of parts by ID
+      const partsMapForAssignment = new Map();
+      
+      // Add pre-loaded parts first
+      preLoadedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      // Add user-selected parts, overwriting any duplicates
+      userSelectedParts.forEach(part => {
+        partsMapForAssignment.set(part._id, part);
+      });
+      
+      const finalParts = Array.from(partsMapForAssignment.values());
       
       setAssignment(prev => ({
         ...prev,
-        parts: allParts
+        parts: finalParts
       }));
-      
-      // Update API with the updated parts
-      await updateJobCardWithParts(updatedParts);
       
       if (error && error.includes(part.partName)) {
         setError(null);
@@ -473,16 +585,21 @@ const WorkInProgress = () => {
     if (!originalPart) return 0;
 
     let totalSelected = 0;
+    
+    // Check selectedParts (user-selected parts)
     selectedParts.forEach((part) => {
       if (part._id === inventoryPartId) {
         totalSelected += part.selectedQuantity || 1;
       }
     });
-    allParts.forEach((part) => {
-      if (part.type === "inventory" && part.inventoryId === inventoryPartId) {
+    
+    // Check assignment.parts (all parts including pre-loaded and user-selected)
+    assignment.parts.forEach((part) => {
+      if (part._id === inventoryPartId && !part.isPreLoaded) {
         totalSelected += part.selectedQuantity || 1;
       }
     });
+    
     return Math.max(0, originalPart.quantity - totalSelected);
   };
 
@@ -521,19 +638,39 @@ const WorkInProgress = () => {
       const partsForAPI = partsToUpdate.map(part => {
         const quantity = Number(part.selectedQuantity) || Number(part.quantity) || 1;
         const sellingPrice = Number(part.sellingPrice) || 0;
-        const totalPrice = sellingPrice * quantity;
+        const taxPercentage = Number(part.taxAmount || part.gstPercentage || 0);
+        
+        // Calculate total price with tax included
+        const baseAmount = sellingPrice * quantity;
+        const taxAmount = (baseAmount * taxPercentage) / 100;
+        const totalPrice = baseAmount + taxAmount;
         
         return {
           partName: part.partName || '',
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
           quantity: quantity,
-          totalPrice: totalPrice,
+          pricePerPiece: sellingPrice, // Base price without tax
+          totalPrice: parseFloat(totalPrice.toFixed(2)), // Total with tax included
+          taxAmount: taxPercentage, // Tax percentage
           _id: part._id || part.partId || Date.now().toString() // Generate _id if not present
         };
       });
 
       const updatePayload = { partsUsed: partsForAPI };
       
-
+      // Debug: Log the parts being sent to job card update
+      console.log('📝 Job Card Update - Parts being sent:');
+      partsForAPI.forEach((part, index) => {
+        console.log(`Part ${index + 1}:`, {
+          partName: part.partName,
+          hsnNumber: part.hsnNumber,
+          quantity: part.quantity,
+          pricePerPiece: part.pricePerPiece,
+          totalPrice: part.totalPrice,
+          taxAmount: part.taxAmount
+        });
+      });
 
       const response = await axios.put(
         `${API_BASE_URL}/jobCards/${id}`,
@@ -565,141 +702,9 @@ const WorkInProgress = () => {
     }
   };
 
-  const addInventoryPartToList = async (inventoryPart) => {
-    const availableQuantity = getAvailableQuantity(inventoryPart._id);
-    if (availableQuantity <= 0) {
-      setSnackbar({
-        open: true,
-        message: `No stock available for "${inventoryPart.partName}"`,
-        severity: "error",
-      });
-      return;
-    }
-    const newPart = {
-      id: partIdCounter,
-      type: "inventory",
-      inventoryId: inventoryPart._id,
-      partName: inventoryPart.partName,
-      partNumber: inventoryPart.partNumber || "",
-      selectedQuantity: 1,
-      sellingPrice: inventoryPart.sellingPrice || 0,
-      gstPercentage: inventoryPart.gstPercentage || inventoryPart.taxAmount || 0, // Use as %
-      carName: inventoryPart.carName || "",
-      model: inventoryPart.model || "",
-      availableQuantity: availableQuantity,
-      totalPrice: 0,
-      isExisting: false,
-    };
-    setAllParts((prev) => [...prev, newPart]);
-    setPartIdCounter((prev) => prev + 1);
-    
-    // Update API with the new part added to the list
-    try {
-      const currentSelectedParts = [...selectedParts];
-      const partForAPI = {
-        _id: inventoryPart._id,
-        partName: inventoryPart.partName,
-        selectedQuantity: 1,
-        sellingPrice: inventoryPart.sellingPrice || 0,
-      };
-      
-      const updatedParts = [...currentSelectedParts, partForAPI];
-      await updateJobCardWithParts(updatedParts);
-    } catch (err) {
-      console.error("Error updating API when adding inventory part:", err);
-    }
-  };
 
-  const removePartFromList = async (partId) => {
-    const partToRemove = allParts.find((part) => part.id === partId);
-    setAllParts((prev) => prev.filter((part) => part.id !== partId));
-    
-    // Update API by removing the part from selected parts
-    if (partToRemove) {
-      try {
-        const updatedSelectedParts = selectedParts.filter(
-          (part) => part._id !== partToRemove.inventoryId && part._id !== partToRemove._id
-        );
-        await updateJobCardWithParts(updatedSelectedParts);
-      } catch (err) {
-        console.error("Error updating API when removing part from list:", err);
-      }
-    }
-  };
 
-  const updatePartInList = (partId, field, value) => {
-    setAllParts((prev) =>
-      prev.map((part) => (part.id === partId ? { ...part, [field]: value } : part))
-    );
-  };
 
-  const handleInventoryPartQuantityChange = async (partId, newQuantity) => {
-    const part = allParts.find((p) => p.id === partId);
-    if (!part) return;
-    if (part.type === "existing") {
-      if (newQuantity < 1) {
-        setSnackbar({
-          open: true,
-          message: "Quantity must be at least 1",
-          severity: "error",
-        });
-        return;
-      }
-      updatePartInList(partId, "selectedQuantity", newQuantity);
-      
-      // Update API with the updated existing part
-      try {
-        const updatedSelectedParts = selectedParts.map(p => 
-          p._id === part._id ? { ...p, selectedQuantity: newQuantity } : p
-        );
-        await updateJobCardWithParts(updatedSelectedParts);
-      } catch (err) {
-        console.error("Error updating API when changing existing part quantity:", err);
-      }
-      return;
-    }
-    if (part.type === "inventory") {
-      const availableQuantity = getAvailableQuantity(part.inventoryId);
-      const currentlySelected = part.selectedQuantity || 1;
-      const maxSelectableQuantity = availableQuantity + currentlySelected;
-      if (newQuantity > maxSelectableQuantity) {
-        setSnackbar({
-          open: true,
-          message: `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`,
-          severity: "error",
-        });
-        return;
-      }
-      if (newQuantity < 1) {
-        setSnackbar({
-          open: true,
-          message: "Quantity must be at least 1",
-          severity: "error",
-        });
-        return;
-      }
-      updatePartInList(partId, "selectedQuantity", newQuantity);
-      
-      // Update API with the updated inventory part
-      try {
-        const updatedSelectedParts = selectedParts.map(p => 
-          p._id === part.inventoryId ? { ...p, selectedQuantity: newQuantity } : p
-        );
-        await updateJobCardWithParts(updatedSelectedParts);
-      } catch (err) {
-        console.error("Error updating API when changing inventory part quantity:", err);
-      }
-    }
-  };
-
-  const calculatePartFinalPrice = (part) => {
-    const unitPrice = parseFloat(part.sellingPrice);
-    const selectedQuantity = parseInt(part.selectedQuantity || 1);
-    const taxPercentage = parseFloat(part.gstPercentage || 0); // Now treated as %
-    const total = unitPrice * selectedQuantity;
-    const calculatedTax = (total * taxPercentage) / 100;
-    return total + calculatedTax;
-  };
 
   // ✅ FIXED: Correct tax calculation
   const handleAddPart = async () => {
@@ -805,6 +810,13 @@ const WorkInProgress = () => {
     }
   };
 
+  // Clean up duplicate parts whenever assignment.parts changes
+  useEffect(() => {
+    if (assignment.parts.length > 0) {
+      removeDuplicateParts();
+    }
+  }, [assignment.parts]);
+
   useEffect(() => {
     const fetchJobCardData = async () => {
       if (!id) return;
@@ -817,6 +829,10 @@ const WorkInProgress = () => {
           },
         });
         const data = response.data;
+        
+        // Test HSN numbers from API data
+        testHSNNumbers(data);
+        
         setJobCardNumber(data.jobId || "");
         setJobId(data._id || "");
 
@@ -860,49 +876,69 @@ const WorkInProgress = () => {
         if (data.partsUsed && data.partsUsed.length > 0) {
           console.log('Processing partsUsed from job card:', data.partsUsed);
           
+          // Print HSN Numbers and Tax Amounts from API data
+          console.log('📊 HSN Numbers and Tax Amounts from API:');
+          data.partsUsed.forEach((part, index) => {
+            console.log(`Part ${index + 1}: ${part.partName}`);
+            console.log(`  HSN Number: ${part.hsnNumber || 'N/A'}`);
+            console.log(`  Tax Amount: ₹${part.taxAmount || 0}`);
+            console.log(`  Tax Percentage: ${part.taxPercentage || 0}%`);
+            console.log(`  Total Price: ₹${part.totalPrice || 0}`);
+            console.log('---');
+          });
+          
           // Convert partsUsed from job card to format expected by the form
           const validParts = data.partsUsed.filter(usedPart => usedPart && (usedPart.partName || usedPart._id));
           
           let formattedParts = [];
           if (validParts.length > 0) {
             formattedParts = validParts.map(usedPart => {
-              // For parts from job card, pricePerPiece is the final price including tax
-              let sellingPrice = usedPart.sellingPrice || 0;
-              let taxAmount = usedPart.gstPercentage || 0;
-              
-              // If we have pricePerPiece from job card, treat it as the final price
-              if (usedPart.pricePerPiece && !sellingPrice) {
-                sellingPrice = usedPart.pricePerPiece;
-                taxAmount = 0; // Since pricePerPiece already includes tax
-              }
+              // For parts from job card, preserve the original values
+              let taxAmount = usedPart.taxAmount || 0; // Use taxAmount from API
+              let taxPercentage = usedPart.taxPercentage || 0; // Use taxPercentage from API
+              let pricePerPiece = usedPart.pricePerPiece || 0; // Base price per piece
+              let totalPrice = usedPart.totalPrice || 0; // Total price including tax
               
               return {
                 id: usedPart._id || `existing-${Math.random()}`,
                 type: "existing",
                 partName: usedPart.partName || "",
                 partNumber: usedPart.partNumber || "",
+                hsnNumber: usedPart.hsnNumber || "", // Add HSN Number
                 selectedQuantity: usedPart.quantity || 1,
-                sellingPrice: usedPart.pricePerPiece || sellingPrice,
-                totalPrice: usedPart.totalPrice || 0,
-                gstPercentage: taxAmount,
+                sellingPrice: pricePerPiece, // Base price per piece
+                pricePerPiece: pricePerPiece, // Base price per piece
+                totalPrice: totalPrice, // Total price including tax
+                gstPercentage: taxPercentage, // Use taxPercentage for backward compatibility
                 carName: usedPart.carName || "",
                 model: usedPart.model || "",
                 isExisting: true,
                 isPreLoaded: true, // Mark as pre-loaded from job card
                 _id: usedPart._id,
                 quantity: usedPart.quantity || 1,
-                taxAmount: taxAmount,
+                taxAmount: taxAmount, // Store the actual tax amount
+                taxPercentage: taxPercentage, // Store the tax percentage
                 originalQuantity: usedPart.quantity || 1,
-                originalPricePerPiece: usedPart.pricePerPiece || sellingPrice,
-                originalTotalPrice: usedPart.totalPrice || 0,
+                originalPricePerPiece: pricePerPiece,
+                originalTotalPrice: totalPrice,
               };
             });
           }
 
           console.log('Formatted pre-loaded parts:', formattedParts);
           
-          // Set both allParts and assignment.parts with pre-loaded parts
-          setAllParts(formattedParts);
+          // Debug: Check HSN numbers in formatted parts
+          console.log('🔍 HSN Numbers in formatted parts:');
+          formattedParts.forEach((part, index) => {
+            console.log(`Part ${index + 1}: ${part.partName}`);
+            console.log(`  HSN Number: "${part.hsnNumber}"`);
+            console.log(`  Part Number: "${part.partNumber}"`);
+            console.log(`  Tax Amount: ₹${part.taxAmount}`);
+            console.log(`  Tax Percentage: ${part.taxPercentage}%`);
+            console.log('---');
+          });
+          
+          // Set assignment.parts with pre-loaded parts
           setAssignment(prev => ({
             ...prev,
             parts: formattedParts
@@ -911,17 +947,13 @@ const WorkInProgress = () => {
           // Initialize selectedParts with user-selected parts (non-pre-loaded)
           const userSelectedParts = formattedParts.filter(part => !part.isPreLoaded);
           setSelectedParts(userSelectedParts);
-          
-          setPartIdCounter(formattedParts.length + 1);
-        } else {
-          setAllParts([]);
-          setAssignment(prev => ({
-            ...prev,
-            parts: []
-          }));
-          setSelectedParts([]);
-          setPartIdCounter(1);
-        }
+                  } else {
+            setAssignment(prev => ({
+              ...prev,
+              parts: []
+            }));
+            setSelectedParts([]);
+          }
 
         if (data.status) {
           const statusMapping = {
@@ -1085,16 +1117,37 @@ const WorkInProgress = () => {
         await updateInventoryQuantities(userSelectedParts);
       }
 
-      // Format parts for API
-      const formattedParts = allPartsUsed.map(part => ({
-        partName: part.partName || '',
-        partNumber: part.partNumber || '',
-        hsnNumber: part.hsnNumber || '',
-        quantity: Number(part.quantity || 1),
-        pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
-        taxPercentage: Number(part.taxPercentage || 0)
-      }));
+      // Format parts for API - Updated to match API specification
+      const formattedParts = allPartsUsed.map(part => {
+        // For pre-loaded parts, use the original taxPercentage from the job card
+        // For user-selected parts, calculate taxAmount based on taxPercentage
+        let taxAmount;
+        if (part.isPreLoaded) {
+          // For pre-loaded parts, calculate taxAmount from taxPercentage
+          const taxPercentage = Number(part.taxPercentage || 0);
+          const basePrice = parseFloat(part.pricePerPiece || 0);
+          taxAmount = parseFloat(((basePrice * taxPercentage) / 100).toFixed(2));
+        } else {
+          // Calculate taxAmount based on taxPercentage for user-selected parts
+          const taxPercentage = Number(part.taxPercentage || 0);
+          const basePrice = parseFloat(part.pricePerPiece || 0);
+          taxAmount = parseFloat(((basePrice * taxPercentage) / 100).toFixed(2));
+        }
+        
+        const quantity = Number(part.quantity || 1);
+        const pricePerPiece = parseFloat((part.pricePerPiece || 0).toFixed(2)); // Base price without tax
+        const totalPrice = parseFloat((part.totalPrice || 0).toFixed(2)); // Total with tax included
+        
+        return {
+          partName: part.partName || '',
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
+          quantity: quantity,
+          pricePerPiece: pricePerPiece, // Base price without tax
+          totalPrice: totalPrice, // Total with tax included
+          taxAmount: taxAmount // Actual tax amount (not percentage)
+        };
+      });
 
       const requestData = {
         engineerRemarks: remarks || "",
@@ -1103,6 +1156,37 @@ const WorkInProgress = () => {
         partsUsed: formattedParts,
         jobCardNumber: jobId,
       };
+
+      // Debug: Log the API request data
+      console.log('🚀 API Request Data being sent:');
+      console.log('Request URL:', `${API_BASE_URL}/garage/jobcards/${id}/workprogress`);
+      console.log('Request Data:', JSON.stringify(requestData, null, 2));
+      console.log('Parts being sent:');
+      requestData.partsUsed.forEach((part, index) => {
+        console.log(`Part ${index + 1}:`, {
+          partName: part.partName,
+          hsnNumber: part.hsnNumber,
+          quantity: part.quantity,
+          pricePerPiece: part.pricePerPiece,
+          totalPrice: part.totalPrice,
+          taxAmount: part.taxAmount,
+          isPreLoaded: allPartsUsed[index]?.isPreLoaded || false
+        });
+      });
+      
+      // Additional debug: Show original vs formatted data
+      console.log('🔍 Original vs Formatted Data Comparison:');
+      allPartsUsed.forEach((originalPart, index) => {
+        const formattedPart = requestData.partsUsed[index];
+        console.log(`Part ${index + 1} (${originalPart.partName}):`);
+        console.log(`  Original taxAmount: ${originalPart.taxAmount}`);
+        console.log(`  Original taxPercentage: ${originalPart.taxPercentage}`);
+        console.log(`  Formatted taxAmount: ${formattedPart.taxAmount}`);
+        console.log(`  Is Pre-loaded: ${originalPart.isPreLoaded}`);
+        console.log(`  Price Per Piece: ${originalPart.pricePerPiece}`);
+        console.log(`  Calculated Tax Amount: ${((originalPart.pricePerPiece || 0) * (originalPart.taxPercentage || 0) / 100).toFixed(2)}`);
+        console.log('---');
+      });
 
 
 
@@ -1212,6 +1296,23 @@ const WorkInProgress = () => {
 
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  // Test function to verify HSN numbers from API data
+  const testHSNNumbers = (apiData) => {
+    console.log('🧪 Testing HSN Numbers from API Data:');
+    if (apiData && apiData.partsUsed && Array.isArray(apiData.partsUsed)) {
+      apiData.partsUsed.forEach((part, index) => {
+        console.log(`Part ${index + 1}:`);
+        console.log(`  Name: ${part.partName}`);
+        console.log(`  HSN Number: "${part.hsnNumber}" (type: ${typeof part.hsnNumber})`);
+        console.log(`  Tax Amount: ${part.taxAmount}`);
+        console.log(`  Tax Percentage: ${part.taxPercentage}`);
+        console.log('  ---');
+      });
+    } else {
+      console.log('No parts data found in API response');
+    }
   };
 
   if (fetchLoading) {
@@ -1592,7 +1693,7 @@ const WorkInProgress = () => {
                             Parts Summary
                           </Typography>
                           
-                          {/* Pre-loaded Parts */}
+                
                           {assignment.parts.filter(part => part.isPreLoaded).length > 0 && (
                             <Box sx={{ mb: 2 }}>
                               <Typography
@@ -1613,7 +1714,7 @@ const WorkInProgress = () => {
                                   <ListItem key={part._id || index} sx={{ py: 0.5 }}>
                                     <ListItemText
                                       primary={part.partName}
-                                      secondary={`Part #: ${part.partNumber || 'N/A'} | HSN: ${part.hsnNumber || 'N/A'} | Quantity: ${part.selectedQuantity || 1} | Price: ₹${part.sellingPrice || 0} | Tax: ${(part.taxAmount || part.gstPercentage || 0)}%`}
+                                      secondary={`Part #: ${part.partNumber || 'N/A'} | HSN: ${part.hsnNumber || 'N/A'} | Quantity: ${part.selectedQuantity || 1} | Total Price: ₹${part.totalPrice || 0} | Tax: ${(part.taxPercentage || 0)}%`}
                                     />
                                     <Chip
                                       label="Pre-loaded"
@@ -1628,7 +1729,7 @@ const WorkInProgress = () => {
                             </Box>
                           )}
 
-                          {/* User Selected Parts */}
+  
                           {selectedParts.length > 0 && (
                             <Box sx={{ mb: 2 }}>
                               <Typography
@@ -1646,6 +1747,109 @@ const WorkInProgress = () => {
                               </Alert>
                             </Box>
                           )}
+
+                  
+                          {/* {assignment.parts && assignment.parts.length > 0 && (
+                            <Box sx={{ mb: 2 }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight={600}
+                                color="success.main"
+                                sx={{ mb: 1 }}
+                              >
+                                📊 Parts Summary - HSN Numbers & Tax Amounts:
+                              </Typography>
+                              <Alert severity="success" sx={{ mb: 1 }}>
+                                <Typography variant="body2">
+                                  Detailed breakdown of HSN numbers and tax amounts for all parts.
+                                </Typography>
+                              </Alert>
+                              <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+                                <Table size="small" stickyHeader>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={{ fontWeight: 600 }}>Part Name</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }}>HSN Number</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }}>Tax Amount (₹)</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }}>Tax %</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }}>Quantity</TableCell>
+                                      <TableCell sx={{ fontWeight: 600 }}>Total Price (₹)</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {assignment.parts.map((part, index) => {
+                                      const taxAmount = part.taxAmount || part.gstPercentage || 0;
+                                      const totalTaxAmount = (part.sellingPrice || 0) * (part.selectedQuantity || 1) * (taxAmount / 100);
+                                      
+                                     
+                                     
+                                      return (
+                                        <TableRow key={part._id || index} hover>
+                                          <TableCell>
+                                            <Typography variant="body2" fontWeight={500}>
+                                              {part.partName}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                              {part.partNumber || 'N/A'}
+                                            </Typography>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Chip
+                                              label={part.hsnNumber || 'N/A'}
+                                              size="small"
+                                              color="primary"
+                                              variant="outlined"
+                                            />
+                                          </TableCell>
+                                          <TableCell>
+                                            <Typography variant="body2" color="success.main" fontWeight={500}>
+                                              ₹{part.taxAmount * part.quantity}
+                                            </Typography>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Typography variant="body2" color="info.main">
+                                              {part.taxPercentage}%
+                                            </Typography>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Typography variant="body2">
+                                              {part.selectedQuantity || 1}
+                                            </Typography>
+                                          </TableCell>
+                                          <TableCell>
+                                            <Typography variant="body2" fontWeight={500}>
+                                              ₹{(part.totalPrice || 0).toFixed(2)}
+                                            </Typography>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+ 
+                              <Box sx={{ mt: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
+                                <Typography variant="body2" fontWeight={600} color="primary.dark">
+                                  📈 Summary Totals:
+                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                  <Typography variant="body2">
+                                    Total Parts: {assignment.parts.length}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    Total Tax Amount: ₹{assignment.parts.reduce((total, part) => {
+                                      const taxAmount = part.taxAmount || part.gstPercentage || 0;
+                                      const totalTaxAmount = (part.sellingPrice || 0) * (part.selectedQuantity || 1) * (taxAmount / 100);
+                                      return total + totalTaxAmount;
+                                    }, 0).toFixed(2)}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    Grand Total: ₹{assignment.parts.reduce((total, part) => total + (part.totalPrice || 0), 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </Box>
+                          )} */}
                         </Box>
                       )}
 
@@ -1761,6 +1965,51 @@ const WorkInProgress = () => {
                             }}
                           />
                         )}
+
+                        {/* Current Selection Summary */}
+                        {selectedParts.length > 0 && (
+                          <Box sx={{ 
+                            mt: 2, 
+                            p: 2, 
+                            bgcolor: 'primary.light', 
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'primary.main'
+                          }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.dark', mb: 1 }}>
+                              📋 Current Selection Summary:
+                            </Typography>
+                            <Grid container spacing={2}>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary">User Selected Parts:</Typography>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {selectedParts.length} parts
+                                </Typography>
+                              </Grid>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary">Total Quantity:</Typography>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {selectedParts.reduce((total, part) => total + (part.selectedQuantity || 1), 0)} units
+                                </Typography>
+                              </Grid>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary">Pre-loaded Parts:</Typography>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {assignment.parts.filter(part => part.isPreLoaded).length} parts
+                                </Typography>
+                              </Grid>
+                              <Grid item xs={6} sm={3}>
+                                <Typography variant="caption" color="text.secondary">Status:</Typography>
+                                <Chip 
+                                  label="Ready to Update" 
+                                  size="small" 
+                                  color="success" 
+                                  variant="outlined"
+                                />
+                              </Grid>
+                            </Grid>
+                          </Box>
+                        )}
     
                         {/* Selected Parts with Enhanced Quantity Management */}
                         {selectedParts.length > 0 && (
@@ -1855,7 +2104,8 @@ const WorkInProgress = () => {
                                           color="text.secondary"
                                           sx={{ display: "block" }}
                                         >
-                                          Tax: {(part.taxAmount || part.gstPercentage || 0)}% | Price: ₹{part.sellingPrice || 0}
+                                          {/* Tax Amount: ₹{(part.taxAmount || 0).toFixed(2)}  */}
+                                            Price: ₹{part.sellingPrice || 0}
                                         </Typography>
                                         <Typography
                                           variant="caption"
@@ -2067,18 +2317,18 @@ const WorkInProgress = () => {
                                               color: part.isExisting ? 'text.disabled' : 'text.secondary'
                                             }}
                                           >
-                                            Price/Unit: ₹{pricePerPiece.toFixed(2)}
+                                            Price/Unit: ₹{part.sellingPrice.toFixed(2)}
                                             {part.isExisting && ' (Fixed)'}
                                           </Typography>
                                         </Grid>
-                                        {/* <Grid item xs={3}>
+                                        <Grid item xs={3}>
                                           <Typography
                                             variant="caption"
                                             color="text.secondary"
                                           >
                                             GST: ₹{taxAmount.toFixed(2)}
                                           </Typography>
-                                        </Grid> */}
+                                        </Grid>
                                         <Grid item xs={5}>
                                           <Typography
                                             variant="caption"
@@ -2103,132 +2353,7 @@ const WorkInProgress = () => {
                         )}
                       </Box>
     
-                      {/* Add from Inventory Section */}
-                      {addPartMode === "inventory" && (
-                        <Box
-                          sx={{
-                            mb: 3,
-                            p: 2,
-                            border: 1,
-                            borderColor: "primary.main",
-                            borderRadius: 1,
-                            bgcolor: "primary.light",
-                            opacity: 0.1,
-                          }}
-                        >
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 2, fontWeight: 600, color: "primary.main" }}
-                          >
-                            Select from Inventory
-                          </Typography>
-                          {isLoadingInventory ? (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                py: 2,
-                              }}
-                            >
-                              <CircularProgress size={20} />
-                              <Typography sx={{ ml: 2 }}>
-                                Loading inventory...
-                              </Typography>
-                            </Box>
-                          ) : (
-                            <Box
-                              sx={{ display: "flex", gap: 1, alignItems: "center" }}
-                            >
-                              <Autocomplete
-                                fullWidth
-                                options={inventoryParts.filter(
-                                  (part) => getAvailableQuantity(part._id) > 0
-                                )}
-                                getOptionLabel={(option) =>
-                                  `${option.partName} (${
-                                    option.partNumber || "N/A"
-                                  }) - ₹${
-                                    option.sellingPrice || 0
-                                  } | Available: ${getAvailableQuantity(
-                                    option._id
-                                  )}`
-                                }
-                                renderOption={(props, option) => (
-                                  <Box component="li" {...props}>
-                                    <Box sx={{ width: "100%" }}>
-                                      <Typography variant="body2" fontWeight={500}>
-                                        {option.partName}
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        Part #: {option.partNumber || "N/A"} |
-                                        Price: ₹{option.sellingPrice || 0} | GST:{" "}
-                                        {option.taxAmount || 0}% | Available:{" "}
-                                        {getAvailableQuantity(option._id)} |
-                                        {option.carName} - {option.model}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                )}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    placeholder="Search and select parts from inventory"
-                                    variant="outlined"
-                                    size="small"
-                                    InputProps={{
-                                      ...params.InputProps,
-                                      startAdornment: (
-                                        <>
-                                          <InputAdornment position="start">
-                                            <InventoryIcon color="action" />
-                                          </InputAdornment>
-                                          {params.InputProps.startAdornment}
-                                        </>
-                                      ),
-                                    }}
-                                  />
-                                )}
-                                onChange={(event, newValue) => {
-                                  if (newValue) {
-                                    addInventoryPartToList(newValue);
-                                    event.target.value = "";
-                                  }
-                                }}
-                                noOptionsText="No parts available in inventory"
-                                filterOptions={(options, { inputValue }) => {
-                                  return options.filter(
-                                    (option) =>
-                                      getAvailableQuantity(option._id) > 0 &&
-                                      (option.partName
-                                        .toLowerCase()
-                                        .includes(inputValue.toLowerCase()) ||
-                                        option.partNumber
-                                          ?.toLowerCase()
-                                          .includes(inputValue.toLowerCase()) ||
-                                        option.carName
-                                          ?.toLowerCase()
-                                          .includes(inputValue.toLowerCase()) ||
-                                        option.model
-                                          ?.toLowerCase()
-                                          .includes(inputValue.toLowerCase()))
-                                  );
-                                }}
-                              />
-                              <Button
-                                variant="outlined"
-                                onClick={() => setAddPartMode("")}
-                                size="small"
-                              >
-                                Cancel
-                              </Button>
-                            </Box>
-                          )}
-                        </Box>
-                      )}
+
     
                       {/* Parts Display */}
                       <Box>

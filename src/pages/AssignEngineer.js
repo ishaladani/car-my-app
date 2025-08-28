@@ -108,11 +108,12 @@ const AssignEngineer = () => {
     partNumber: "",
     partName: "",
     quantity: 1,
-    pricePerUnit: 0,
-    sgstEnabled: false,
-    sgstPercentage: '',
-    cgstEnabled: false,
-    cgstPercentage: '',
+    purchasePrice: 0,
+    sellingPrice: 0,
+    hsnNumber: "",
+    igst: '',
+    cgstSgst: '',
+    taxType: 'igst',
     taxAmount: 0
   });
   const [addingPart, setAddingPart] = useState(false);
@@ -272,9 +273,26 @@ const AssignEngineer = () => {
         return;
       }
 
-      const updatedParts = selectedParts.map((p, idx) =>
-        idx === partIndex ? { ...p, selectedQuantity: newQuantity } : p
-      );
+      const updatedParts = selectedParts.map((p, idx) => {
+        if (idx === partIndex) {
+          // Calculate tax amounts using InventoryManagement style for new quantity
+          const sellingPrice = p.sellingPrice || p.pricePerUnit || 0;
+          const taxPercentage = p.taxAmount || p.gstPercentage || 0;
+          const baseAmount = sellingPrice * newQuantity;
+          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const totalWithGST = baseAmount + gstAmount;
+
+          return {
+            ...p,
+            selectedQuantity: newQuantity,
+            // Update GST amounts for new quantity
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            gstAmount: parseFloat(gstAmount.toFixed(2)),
+            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
+          };
+        }
+        return p;
+      });
       setSelectedParts(updatedParts);
       
       // Update assignment with new parts (excluding pre-loaded parts)
@@ -351,6 +369,47 @@ const AssignEngineer = () => {
     const totalTax = calculateTotalTaxAmount(pricePerUnit, quantity, sgstEnabled, sgstPercentage, cgstEnabled, cgstPercentage);
 
     return basePrice + totalTax;
+  };
+
+  // Enhanced tax calculation function similar to InventoryManagement
+  const calculateInventoryTaxAmount = (purchasePrice, quantity, igst, cgstSgst) => {
+    if (!purchasePrice || !quantity) return 0;
+    const totalPrice = parseFloat(purchasePrice) * parseInt(quantity);
+    const igstAmount = igst ? (totalPrice * parseFloat(igst)) / 100 : 0;
+    const cgstSgstAmount = cgstSgst ? (totalPrice * parseFloat(cgstSgst) * 2) / 100 : 0; // CGST + SGST
+    return igstAmount + cgstSgstAmount;
+  };
+
+  // Calculate total price including tax (InventoryManagement style)
+  const calculateInventoryTotalPrice = (purchasePrice, quantity, igst, cgstSgst) => {
+    const basePrice = parseFloat(purchasePrice) * parseInt(quantity || 0);
+    const taxAmount = calculateInventoryTaxAmount(purchasePrice, quantity, igst, cgstSgst);
+    return basePrice + taxAmount;
+  };
+
+  // Function to calculate total GST/tax amount for all parts
+  const calculateTotalGSTAmount = () => {
+    const allParts = getAllPartsForAPI();
+    let totalGST = 0;
+    let totalBaseAmount = 0;
+    let totalAmountWithGST = 0;
+
+    allParts.forEach(part => {
+      // Use the pre-calculated values from getAllPartsForAPI
+      const baseAmount = part.baseAmount || 0;
+      const gstAmount = part.gstAmount || 0;
+      const amountWithGST = part.totalPrice || 0;
+      
+      totalBaseAmount += baseAmount;
+      totalGST += gstAmount;
+      totalAmountWithGST += amountWithGST;
+    });
+
+    return {
+      totalBaseAmount: parseFloat(totalBaseAmount.toFixed(2)),
+      totalGST: parseFloat(totalGST.toFixed(2)),
+      totalAmountWithGST: parseFloat(totalAmountWithGST.toFixed(2))
+    };
   };
 
   // Check if part number already exists
@@ -509,45 +568,69 @@ const AssignEngineer = () => {
           );
 
           if (inventoryPart) {
+            // Calculate tax amount using InventoryManagement style
+            const sellingPrice = inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0;
+            const taxPercentage = inventoryPart.taxAmount || inventoryPart.gstPercentage || 0;
+            const quantity = usedPart.quantity || 1;
+            const baseAmount = sellingPrice * quantity;
+            const gstAmount = (baseAmount * taxPercentage) / 100;
+            const totalWithGST = baseAmount + gstAmount;
+
             return {
               ...inventoryPart,
-              selectedQuantity: usedPart.quantity || 1,
+              selectedQuantity: quantity,
               availableQuantity: inventoryPart.quantity,
               // Ensure sellingPrice and taxAmount are properly set
-              sellingPrice: inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0,
-              taxAmount: inventoryPart.taxAmount || inventoryPart.gstPercentage || 0,
+              sellingPrice: sellingPrice,
+              taxAmount: taxPercentage,
+              // Calculate GST amounts
+              baseAmount: parseFloat(baseAmount.toFixed(2)),
+              gstAmount: parseFloat(gstAmount.toFixed(2)),
+              totalWithGST: parseFloat(totalWithGST.toFixed(2)),
               // Mark as pre-loaded from job card
               isPreLoaded: true,
-              // Preserve original values from job card
+              // Preserve original values from job card API response
               originalQuantity: usedPart.quantity || 1,
               originalPricePerPiece: usedPart.pricePerPiece || 0,
-              originalTotalPrice: usedPart.totalPrice || 0
+              originalTotalPrice: usedPart.totalPrice || 0,
+              originalTaxAmount: usedPart.taxAmount || 0
             };
           } else {
             // If part not found in inventory, create a part object using job card data
             const pricePerPiece = usedPart.pricePerPiece || 0;
             const sellingPrice = pricePerPiece > 0 ? pricePerPiece : 100;
             const taxRate = 0;
+            const quantity = usedPart.quantity || 1;
+            
+            // Calculate GST amounts using InventoryManagement style
+            const baseAmount = sellingPrice * quantity;
+            const gstAmount = (baseAmount * taxRate) / 100;
+            const totalWithGST = baseAmount + gstAmount;
 
             return {
               _id: usedPart._id || `mock-${Date.now()}-${usedPart.partName || 'unknown'}`,
               partName: usedPart.partName || 'Unknown Part',
               partNumber: usedPart.partNumber || '',
               quantity: 0, // No stock available in inventory
-              selectedQuantity: usedPart.quantity || 1,
+              selectedQuantity: quantity,
               sellingPrice: sellingPrice,
               pricePerUnit: sellingPrice,
               taxAmount: taxRate,
               gstPercentage: taxRate,
+              // Calculate GST amounts
+              baseAmount: parseFloat(baseAmount.toFixed(2)),
+              gstAmount: parseFloat(gstAmount.toFixed(2)),
+              totalWithGST: parseFloat(totalWithGST.toFixed(2)),
               carName: usedPart.carName || '',
               model: usedPart.model || '',
               availableQuantity: 0,
               // Mark as pre-loaded from job card
               isPreLoaded: true,
-              // Preserve original values from job card
+              // Preserve original values from job card API response
               originalQuantity: usedPart.quantity || 1,
               originalPricePerPiece: usedPart.pricePerPiece || 0,
-              originalTotalPrice: usedPart.totalPrice || 0
+              originalTotalPrice: usedPart.totalPrice || 0,
+              originalTaxAmount: usedPart.taxAmount || 0
             };
           }
         });
@@ -664,9 +747,20 @@ const AssignEngineer = () => {
             );
             return;
           }
+          // Calculate tax amounts using InventoryManagement style for updated quantity
+          const sellingPrice = existingPart.sellingPrice || existingPart.pricePerUnit || 0;
+          const taxPercentage = existingPart.taxAmount || existingPart.gstPercentage || 0;
+          const baseAmount = sellingPrice * newQuantity;
+          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const totalWithGST = baseAmount + gstAmount;
+
           partsMap.set(newPart._id, {
             ...existingPart,
             selectedQuantity: newQuantity,
+            // Update GST amounts for new quantity
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            gstAmount: parseFloat(gstAmount.toFixed(2)),
+            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         } else {
           const availableQuantity = getAvailableQuantity(newPart._id);
@@ -674,10 +768,22 @@ const AssignEngineer = () => {
             setError(`Part "${newPart.partName}" is out of stock!`);
             return;
           }
+          // Calculate tax amounts using InventoryManagement style
+          const sellingPrice = newPart.sellingPrice || newPart.pricePerUnit || 0;
+          const taxPercentage = newPart.taxAmount || newPart.gstPercentage || 0;
+          const quantity = 1;
+          const baseAmount = sellingPrice * quantity;
+          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const totalWithGST = baseAmount + gstAmount;
+
           partsMap.set(newPart._id, {
             ...newPart,
             selectedQuantity: 1,
             availableQuantity: availableQuantity,
+            // Calculate GST amounts
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            gstAmount: parseFloat(gstAmount.toFixed(2)),
+            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         }
       });
@@ -786,6 +892,12 @@ const AssignEngineer = () => {
         const quantity = part.originalQuantity || selectedQuantity;
         const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
         const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
+        const taxPercentage = part.taxAmount || part.gstPercentage || 0;
+        
+        // Calculate GST amount using InventoryManagement style calculation
+        const baseAmount = pricePerPiece * quantity;
+        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const totalWithGST = baseAmount + gstAmount;
 
         allParts.push({
           partName: part.partName,
@@ -793,25 +905,32 @@ const AssignEngineer = () => {
           hsnNumber: part.hsnNumber || '',
           quantity: quantity,
           pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-          totalPrice: parseFloat(totalPrice.toFixed(2)),
-          taxPercentage: part.taxAmount || part.gstPercentage || 0,
+          totalPrice: parseFloat(totalWithGST.toFixed(2)),
+          taxPercentage: taxPercentage,
+          gstAmount: parseFloat(gstAmount.toFixed(2)),
+          baseAmount: parseFloat(baseAmount.toFixed(2)),
           isPreLoaded: true
         });
       } else {
-        // For user-selected parts, calculate normally
+        // For user-selected parts, calculate using InventoryManagement style
         const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-        const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
-        const totalPrice = pricePerPiece * selectedQuantity;
+        const taxPercentage = Number(part.taxAmount || part.gstPercentage || 0);
+        
+        // Calculate GST amount using InventoryManagement style calculation
+        const baseAmount = sellingPrice * selectedQuantity;
+        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const totalWithGST = baseAmount + gstAmount;
 
         allParts.push({
           partName: part.partName,
           partNumber: part.partNumber || '',
           hsnNumber: part.hsnNumber || '',
           quantity: selectedQuantity,
-          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
-          totalPrice: parseFloat(totalPrice.toFixed(2)),
-          taxPercentage: taxRate,
+          pricePerPiece: parseFloat(sellingPrice.toFixed(2)),
+          totalPrice: parseFloat(totalWithGST.toFixed(2)),
+          taxPercentage: taxPercentage,
+          gstAmount: parseFloat(gstAmount.toFixed(2)),
+          baseAmount: parseFloat(baseAmount.toFixed(2)),
           isPreLoaded: false
         });
       }
@@ -827,17 +946,31 @@ const AssignEngineer = () => {
       const allParts = getAllPartsForAPI();
 
       // Format parts data according to the workprogress API structure
-      const formattedParts = allParts.map(part => ({
-        partName: part.partName || '',
-        partNumber: part.partNumber || '',
-        hsnNumber: part.hsnNumber || '',
-        quantity: Number(part.quantity || 1),
-        pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-        totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
-        taxPercentage: Number(part.taxPercentage || 0),
-        igst: parseFloat((part.igst || 0).toFixed(2)),
-        cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
-      }));
+      const formattedParts = allParts.map(part => {
+        const pricePerPiece = part.originalPricePerPiece || part.pricePerPiece || part.sellingPrice || 0;
+        const taxPercentage = part.taxPercentage || part.gstPercentage || 0;
+        const quantity = Number(part.selectedQuantity || part.quantity || 1);
+      
+        // tax per piece
+        const taxAmount = (pricePerPiece * taxPercentage) / 100;
+      
+        return {
+          partName: part.partName || '',
+          partNumber: part.partNumber || '',
+          hsnNumber: part.hsnNumber || '',
+          quantity,
+          pricePerPiece: parseFloat(pricePerPiece.toFixed(2)),
+          taxPercentage: parseFloat(taxPercentage.toFixed(2)),
+          igst: parseFloat((part.igst || 0).toFixed(2)),
+          cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2)),
+          taxAmount: parseFloat(taxAmount.toFixed(2)), // tax per piece
+          totalPrice: parseFloat(
+            ((pricePerPiece + taxAmount) * quantity).toFixed(2) // ✅ price with tax included
+          ),
+        };
+      });
+      
+      
 
       const updatePayload = {
         partsUsed: formattedParts
@@ -899,51 +1032,51 @@ const AssignEngineer = () => {
       }
       
       const updatePromises = partsUsed.map(async (part) => {
-        if (part._id && part.selectedQuantity) {
-          const currentQuantity = part.quantity || 0;
-          const usedQuantity = part.selectedQuantity;
-          const newQuantity = Math.max(0, currentQuantity - usedQuantity);
+        // if (part._id && part.selectedQuantity) {
+        //   const currentQuantity = part.quantity || 0;
+        //   const usedQuantity = part.selectedQuantity;
+        //   const newQuantity = Math.max(0, currentQuantity - usedQuantity);
           
-          console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
+        //   console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
           
-          // Update inventory quantity using the same API structure as InventoryManagement
-          const requestData = {
-            quantity: newQuantity,
-            sellingPrice: parseFloat(part.sellingPrice || 0),
-            purchasePrice: parseFloat(part.purchasePrice || 0),
-            carName: part.carName || '',
-            model: part.model || '',
-            partNumber: part.partNumber || '',
-            partName: part.partName || '',
-            hsnNumber: part.hsnNumber || '',
-            igst: parseFloat(part.igst || 0),
-            cgstSgst: parseFloat(part.cgstSgst || 0),
-          };
+        //   // Update inventory quantity using the same API structure as InventoryManagement
+        //   const requestData = {
+        //     quantity: newQuantity,
+        //     sellingPrice: parseFloat(part.sellingPrice || 0),
+        //     purchasePrice: parseFloat(part.purchasePrice || 0),
+        //     carName: part.carName || '',
+        //     model: part.model || '',
+        //     partNumber: part.partNumber || '',
+        //     partName: part.partName || '',
+        //     hsnNumber: part.hsnNumber || '',
+        //     igst: parseFloat(part.igst || 0),
+        //     cgstSgst: parseFloat(part.cgstSgst || 0),
+        //   };
 
-          await axios.put(
-            `${API_BASE_URL}/inventory/update/${part._id}`,
-            requestData,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-              }
-            }
-          );
+        //   await axios.put(
+        //     `${API_BASE_URL}/inventory/update/${part._id}`,
+        //     requestData,
+        //     {
+        //       headers: {
+        //         'Content-Type': 'application/json',
+        //         'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+        //       }
+        //     }
+        //   );
           
-          // If quantity becomes 0, delete the item from inventory
-          if (newQuantity === 0) {
-            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
-            await axios.delete(
-              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
-              {
-                headers: {
-                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-                }
-              }
-            );
-          }
-        }
+        //   // If quantity becomes 0, delete the item from inventory
+        //   if (newQuantity === 0) {
+        //     console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
+        //     await axios.delete(
+        //       `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
+        //       {
+        //         headers: {
+        //           'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+        //         }
+        //       }
+        //     );
+        //   }
+        // }
       });
       
       await Promise.all(updatePromises);
@@ -1152,12 +1285,21 @@ const AssignEngineer = () => {
     setPartAddError(null);
 
     try {
+      // Calculate GST using InventoryManagement style
       const igst = parseFloat(newPart.igst) || 0;
       const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
       const baseAmount = newPart.sellingPrice * newPart.quantity;
-      const taxAmount = newPart.taxType === 'igst'
-        ? (baseAmount * igst) / 100
-        : 2 * ((baseAmount * cgstSgst) / 100);
+      
+      // Calculate single part GST amount
+      let singlePartGST = 0;
+      if (newPart.taxType === 'igst' && igst > 0) {
+        singlePartGST = (newPart.sellingPrice * igst) / 100;
+      } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+        singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100; // CGST + SGST
+      }
+      
+      // Calculate total tax amount for the quantity
+      const totalTaxAmount = singlePartGST * newPart.quantity;
 
       const requestData = {
         name: "abc",
@@ -1172,7 +1314,8 @@ const AssignEngineer = () => {
         hsnNumber: newPart.hsnNumber,
         igst: newPart.taxType === 'igst' ? igst : 0,
         cgstSgst: newPart.taxType === 'cgstSgst' ? cgstSgst : 0,
-        taxAmount
+        taxAmount: parseFloat(singlePartGST.toFixed(2)), // Store single part GST in taxAmount
+        totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)) // Store total tax for quantity
       };
 
       await axios.post(`${API_BASE_URL}/garage/inventory/add`, requestData, {
@@ -1184,9 +1327,15 @@ const AssignEngineer = () => {
 
       await fetchInventoryParts();
       setPartAddSuccess(true);
+      
+      // Show detailed success message with GST calculation
+      const gstMessage = singlePartGST > 0 
+        ? ` with GST: ₹${singlePartGST.toFixed(2)} per unit (${newPart.taxType === 'igst' ? `IGST: ${igst}%` : `CGST+SGST: ${cgstSgst}% each`})`
+        : ' (No GST applied)';
+      
       setSnackbar({
         open: true,
-        message: 'Part added successfully!',
+        message: `✅ Part "${newPart.partName}" added successfully!${gstMessage}`,
         severity: 'success'
       });
 
@@ -1203,7 +1352,8 @@ const AssignEngineer = () => {
         hsnNumber: "",
         igst: '',
         cgstSgst: '',
-        taxType: 'igst'
+        taxType: 'igst',
+        taxAmount: 0
       });
 
       setTimeout(() => {
@@ -1254,11 +1404,12 @@ const AssignEngineer = () => {
       partNumber: "",
       partName: "",
       quantity: 1,
-      pricePerUnit: 0,
-      sgstEnabled: false,
-      sgstPercentage: '',
-      cgstEnabled: false,
-      cgstPercentage: '',
+      purchasePrice: 0,
+      sellingPrice: 0,
+      hsnNumber: "",
+      igst: '',
+      cgstSgst: '',
+      taxType: 'igst',
       taxAmount: 0
     });
   };
@@ -1832,7 +1983,7 @@ const AssignEngineer = () => {
                                     option.partNumber || "N/A"
                                   }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST: ${
                                     option.gstPercentage || option.taxAmount || 0
-                                  }% | Available: ${getAvailableQuantity(option._id)}`
+                                  } | Available: ${getAvailableQuantity(option._id)}`
                                 }
                                 value={selectedParts}
                                 onChange={(event, newValue) => {
@@ -1864,7 +2015,7 @@ const AssignEngineer = () => {
                                       >
                                         Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
                                         {option.sellingPrice || 0} | GST:{" "}
-                                        {option.gstPercentage || option.taxAmount || 0}% |
+                                        {option.gstPercentage || option.taxAmount || 0} |
                                         Available: {getAvailableQuantity(option._id)} |
                                         {option.carName} - {option.model}
                                       </Typography>
@@ -1963,6 +2114,51 @@ const AssignEngineer = () => {
                             </Box>
                           )}
 
+                          {/* GST Summary Section - Display when page loads */}
+                          {/* {(() => {
+                            const gstSummary = calculateTotalGSTAmount();
+                            if (gstSummary.totalAmountWithGST > 0) {
+                              return (
+                                <Box sx={{ 
+                                  mt: 2, 
+                                  p: 2, 
+                                  bgcolor: 'success.light', 
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: 'success.main'
+                                }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'success.dark', mb: 1 }}>
+                                    💰 GST Summary (All Parts):
+                                  </Typography>
+                                  <Grid container spacing={2}>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" color="text.secondary">Base Amount:</Typography>
+                                      <Typography variant="body2" fontWeight={600} color="text.primary">
+                                        ₹{gstSummary.totalBaseAmount.toFixed(2)}
+                                      </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" color="text.secondary">Total GST:</Typography>
+                                      <Typography variant="body2" fontWeight={600} color="success.main">
+                                        ₹{gstSummary.totalGST.toFixed(2)}
+                                      </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={4}>
+                                      <Typography variant="caption" color="text.secondary">Total Amount (Including GST):</Typography>
+                                      <Typography variant="h6" fontWeight={700} color="success.dark">
+                                        ₹{gstSummary.totalAmountWithGST.toFixed(2)}
+                                      </Typography>
+                                    </Grid>
+                                  </Grid>
+                                  <Typography variant="caption" color="success.dark" sx={{ mt: 1, display: 'block', fontStyle: 'italic' }}>
+                                    ✅ Tax calculation completed automatically on page load
+                                  </Typography>
+                                </Box>
+                              );
+                            }
+                            return null;
+                          })()} */}
+
                           {/* User Selected Parts - Display First */}
                           {selectedParts.length > 0 && (
                             <Box sx={{ mt: 2 }}>
@@ -1995,11 +2191,12 @@ const AssignEngineer = () => {
                                     const quantity = part.quantity || 0;
                                     const unitPrice = part.sellingPrice || 0;
                                     const gstPercentage = part.taxAmount || 0;
-                                    const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
-                                    const totalTax = (gstPercentage * selectedQuantity);
-                                    const totalPrice = unitPrice * selectedQuantity;
-                                    const gstAmount = (totalPrice * gstPercentage) / 100;
-                                    const finalPrice = totalPrice + totalTax;
+                                    // Calculate GST using InventoryManagement style
+                                    const baseAmount = unitPrice * selectedQuantity;
+                                    const gstAmount = part.taxAmount * selectedQuantity;
+                                    const taxAmount = part.taxAmount * selectedQuantity;
+                                    const finalPrice = baseAmount + gstAmount;
+
 
                                     const availableQuantity = getAvailableQuantity(part._id);
                                     const maxSelectableQuantity = availableQuantity + selectedQuantity;
@@ -2061,7 +2258,7 @@ const AssignEngineer = () => {
                                                 fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                               }}
                                             >
-                                              Tax: {(part.taxAmount || part.gstPercentage || 0)}% | Price: ₹{part.sellingPrice || 0}
+                                              Tax: {(part.taxAmount || part.gstPercentage || 0)}| Price: ₹{part.sellingPrice || 0}
                                             </Typography>
 
                                             <Typography
@@ -2212,7 +2409,7 @@ const AssignEngineer = () => {
                                                   fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                                 }}
                                               >
-                                                Price/Unit: ₹{unitPrice.toFixed(2)}
+                                                Price/Unit: ₹{(part.pricePerPiece || unitPrice).toFixed(2)}
                                               </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={3}>
@@ -2221,7 +2418,10 @@ const AssignEngineer = () => {
                                                 color="text.secondary"
                                                 sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                               >
-                                                GST: ₹{gst}
+                                               
+                                                <Typography variant="caption" color="primary" fontWeight={600}>
+                                                  Tax Amount: ₹{(part.taxAmount * selectedQuantity ).toFixed(2)}
+                                                </Typography>
                                               </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={5}>
@@ -2233,7 +2433,7 @@ const AssignEngineer = () => {
                                                   fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                                 }}
                                               >
-                                                Total: ₹{finalPrice.toFixed(2)}
+                                                Total: ₹{(part.totalPrice || finalPrice).toFixed(2)}
                                               </Typography>
                                             </Grid>
                                           </Grid>
@@ -2276,11 +2476,11 @@ const AssignEngineer = () => {
                                     const quantity = part.quantity || 0;
                                     const unitPrice = part.sellingPrice || 0;
                                     const gstPercentage = part.taxAmount || 0;
-                                    const gst = quantity > 0 ? (part.taxAmount * selectedQuantity) / quantity : 0;
-                                    const totalTax = (gstPercentage * selectedQuantity) / 100;
-                                    const totalPrice = unitPrice * selectedQuantity;
-                                    const gstAmount = (totalPrice * gstPercentage) / 100;
-                                    const finalPrice = totalPrice + totalTax;
+                                    const taxAmount = part.taxAmount;
+                                    // Calculate GST using InventoryManagement style
+                                    const baseAmount = unitPrice * selectedQuantity;
+                                    const gstAmount = (baseAmount * gstPercentage) / 100;
+                                    const finalPrice = baseAmount + gstAmount;
 
                                     const availableQuantity = getAvailableQuantity(part._id);
                                     const maxSelectableQuantity = availableQuantity + selectedQuantity;
@@ -2473,7 +2673,7 @@ const AssignEngineer = () => {
                                                   fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                                 }}
                                               >
-                                                Price/Unit: ₹{unitPrice.toFixed(2)}
+                                                Price/Unit: ₹{(part.originalPricePerPiece || part.pricePerPiece || unitPrice).toFixed(2)}
                                                 {part.isPreLoaded && ' (Fixed)'}
                                               </Typography>
                                             </Grid>
@@ -2483,7 +2683,10 @@ const AssignEngineer = () => {
                                                 color="text.secondary"
                                                 sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                               >
-                                                GST: ₹{gst}
+                                               
+                                                <Typography variant="caption" color="primary" fontWeight={600}>
+                                                  Tax Amount: ₹{( part.taxAmount * selectedQuantity || taxAmount).toFixed(2)}
+                                                </Typography>
                                               </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={5}>
@@ -2497,7 +2700,7 @@ const AssignEngineer = () => {
                                                   fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                                 }}
                                               >
-                                                Total: ₹{finalPrice.toFixed(2)}
+                                                Total: ₹{(part.originalTotalPrice || part.totalPrice || finalPrice).toFixed(2)}
                                                 {part.isPreLoaded && ' (Fixed)'}
                                               </Typography>
                                             </Grid>
@@ -2609,9 +2812,11 @@ const AssignEngineer = () => {
                             partName: part.partName || '',
                             partNumber: part.partNumber || '',
                             hsnNumber: part.hsnNumber || '',
-                            quantity: Number(part.quantity || 1),
-                            pricePerPiece: parseFloat((part.pricePerPiece || 0).toFixed(2)),
-                            totalPrice: parseFloat((part.totalPrice || 0).toFixed(2)),
+                            quantity: Number(part.selectedQuantity || part.quantity || 1),
+                            pricePerPiece: parseFloat((part.originalPricePerPiece || part.pricePerPiece || part.sellingPrice || 0).toFixed(2)),
+                            totalPrice: parseFloat(((part.sellingPrice || part.pricePerPiece || 0) * (part.selectedQuantity || part.quantity || 1) + (part.taxAmount || 0) * (part.selectedQuantity || part.quantity || 1)).toFixed(2)),
+                            taxAmount: parseFloat((part.taxAmount * (part.selectedQuantity || part.quantity || 1) || 0).toFixed(2)),
+                            taxPercentage: parseFloat((part.taxPercentage || part.gstPercentage || 0).toFixed(2)),
                             igst: parseFloat((part.igst || 0).toFixed(2)),
                             cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
                           }))
@@ -2931,23 +3136,64 @@ const AssignEngineer = () => {
             </Box>
 
             {/* Tax Preview */}
-            {(newPart.purchasePrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
+            {(newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Tax Summary</Typography>
+                <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="text.secondary">
-                      Base: ₹{(newPart.purchasePrice * newPart.quantity).toFixed(2)}
+                      Selling Price per Unit: ₹{parseFloat(newPart.sellingPrice || 0).toFixed(2)}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Quantity: {newPart.quantity}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
                     <Typography variant="body2" color="primary">
-                      Tax: ₹{calculateTaxAmount(newPart.purchasePrice, newPart.quantity, newPart.taxType === 'igst' ? newPart.igst : newPart.cgstSgst * 2).toFixed(2)}
+                      Single Part GST: ₹{(() => {
+                        const igst = parseFloat(newPart.igst) || 0;
+                        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                        let singlePartGST = 0;
+                        if (newPart.taxType === 'igst' && igst > 0) {
+                          singlePartGST = (newPart.sellingPrice * igst) / 100;
+                        } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                        }
+                        return singlePartGST.toFixed(2);
+                      })()}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="h6">
-                      Total: ₹{calculateTotalPrice(newPart.purchasePrice, newPart.quantity, newPart.igst, newPart.cgstSgst).toFixed(2)}
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="success.main">
+                      Total GST for Quantity: ₹{(() => {
+                        const igst = parseFloat(newPart.igst) || 0;
+                        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                        let singlePartGST = 0;
+                        if (newPart.taxType === 'igst' && igst > 0) {
+                          singlePartGST = (newPart.sellingPrice * igst) / 100;
+                        } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                        }
+                        return (singlePartGST * newPart.quantity).toFixed(2);
+                      })()}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="h6" color="success.dark">
+                      Total Amount (Including GST): ₹{(() => {
+                        const igst = parseFloat(newPart.igst) || 0;
+                        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                        let singlePartGST = 0;
+                        if (newPart.taxType === 'igst' && igst > 0) {
+                          singlePartGST = (newPart.sellingPrice * igst) / 100;
+                        } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                        }
+                        const totalAmount = (newPart.sellingPrice + singlePartGST) * newPart.quantity;
+                        return totalAmount.toFixed(2);
+                      })()}
                     </Typography>
                   </Grid>
                 </Grid>

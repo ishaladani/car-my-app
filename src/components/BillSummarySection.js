@@ -51,11 +51,26 @@ const BillSummarySection = ({
   // Use laborServicesTotal (which may be manually set) or fallback to auto
   const displayLaborCost = laborServicesTotal !== undefined ? laborServicesTotal : autoLaborTotal;
 
-  // Calculate subtotal as parts only
+  // Parts subtotal (never taxed)
   const partsSubtotal = summary.totalPartsCost || 0;
-  
-  // Calculate total before tax (parts + labor)
+
+  // 🔑 Only apply GST on Labour/Service (not on parts)
+  const shouldApplyGst = gstSettings.includeGst && displayLaborCost > 0;
+
+  // ✅ GST ONLY on Labour
+  const laborGstAmount = shouldApplyGst ? (displayLaborCost * (gstSettings.gstPercentage / 100)) : 0;
+
+  // ❌ NO GST on Parts
+  const partsGstAmount = 0; // Always 0
+
+  // Total GST = Only Labour GST
+  const totalGstAmount = laborGstAmount;
+
+  // Subtotal (Parts + Labour)
   const totalBeforeTax = partsSubtotal + displayLaborCost;
+
+  // Final total: parts + labour + GST (only on labour) - discount
+  const finalTotal = totalBeforeTax + totalGstAmount - (summary.discount || 0);
 
   const toggleExpand = () => setExpanded(!expanded);
 
@@ -181,6 +196,37 @@ const BillSummarySection = ({
                   </Box>
                 </Box>
 
+                {/* GST on Labour Only */}
+                {shouldApplyGst && laborGstAmount > 0 && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      py: 0.5,
+                      mt: 0.5,
+                      pl: 4,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        color: 'text.secondary',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      <span>📋</span>
+                      GST ({gstSettings.gstPercentage}%):
+                    </Typography>
+                    <Typography variant="body2" fontWeight={500} color="text.secondary">
+                      {formatAmount(laborGstAmount)}
+                    </Typography>
+                  </Box>
+                )}
+
                 {/* Expand Button if jobDetails exist */}
                 {jobDetails.length > 0 && (
                   <Box sx={{ textAlign: 'right', mt: 0.5 }}>
@@ -233,8 +279,8 @@ const BillSummarySection = ({
                   py: 1.5,
                   borderBottom: `1px dashed ${theme.palette.divider}`,
                   mt: 1,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(255, 255, 255, 0.05)' 
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? 'rgba(255, 255, 255, 0.05)'
                     : 'rgba(0, 0, 0, 0.02)',
                   borderRadius: 1,
                   px: 2,
@@ -259,7 +305,7 @@ const BillSummarySection = ({
                 </Typography>
               </Box>
 
-              {/* Total Before Tax (Parts + Labour) */}
+              {/* Total Before Tax (Parts + Labour + Labour GST) */}
               <Box
                 sx={{
                   display: 'flex',
@@ -268,8 +314,8 @@ const BillSummarySection = ({
                   py: 1.5,
                   borderBottom: `1px dashed ${theme.palette.divider}`,
                   mt: 1,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(25, 118, 210, 0.1)' 
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? 'rgba(25, 118, 210, 0.1)'
                     : 'rgba(25, 118, 210, 0.05)',
                   borderRadius: 1,
                   px: 2,
@@ -287,15 +333,15 @@ const BillSummarySection = ({
                   }}
                 >
                   <span>💰</span>
-                  Total Before Tax (Parts + Labour):
+                  Total (Parts + Labour + GST):
                 </Typography>
                 <Typography variant="body1" fontWeight={600} color="primary.main">
-                  {formatAmount(totalBeforeTax)}
+                  {formatAmount(totalBeforeTax + totalGstAmount)}
                 </Typography>
               </Box>
 
-              {/* GST Details */}
-              {gstSettings.includeGst && (
+              {/* GST Details - Only on Labour */}
+              {shouldApplyGst && (
                 <Box
                   sx={{
                     mt: 2,
@@ -314,7 +360,7 @@ const BillSummarySection = ({
                     color="primary.main"
                     sx={{ mb: 1 }}
                   >
-                    📋 Tax Details:
+                    📋 Tax Details (on Labour Only):
                   </Typography>
                   {gstSettings.isInterState ? (
                     <Box
@@ -328,7 +374,7 @@ const BillSummarySection = ({
                         IGST ({gstSettings.gstPercentage}%):
                       </Typography>
                       <Typography variant="body2" fontWeight={600} color="text.primary">
-                        {formatAmount(summary.gstAmount)}
+                        {formatAmount(laborGstAmount)}
                       </Typography>
                     </Box>
                   ) : (
@@ -345,7 +391,7 @@ const BillSummarySection = ({
                           CGST ({gstSettings.cgstPercentage}%):
                         </Typography>
                         <Typography variant="body2" fontWeight={600} color="text.primary">
-                          {formatAmount(Math.round(summary.gstAmount / 2))}
+                          {formatAmount(Math.round(laborGstAmount / 2))}
                         </Typography>
                       </Box>
                       <Box
@@ -359,7 +405,7 @@ const BillSummarySection = ({
                           SGST ({gstSettings.sgstPercentage}%):
                         </Typography>
                         <Typography variant="body2" fontWeight={600} color="text.primary">
-                          {formatAmount(Math.round(summary.gstAmount / 2))}
+                          {formatAmount(Math.round(laborGstAmount / 2))}
                         </Typography>
                       </Box>
                     </>
@@ -415,7 +461,7 @@ const BillSummarySection = ({
                     Subtotal (After Discount):
                   </Typography>
                   <Typography variant="body1" fontWeight={600} color="primary.main">
-                    {formatAmount(totalBeforeTax - summary.discount)}
+                    {formatAmount(totalBeforeTax + totalGstAmount - summary.discount)}
                   </Typography>
                 </Box>
               )}
@@ -437,10 +483,10 @@ const BillSummarySection = ({
                 }}
               >
                 <Typography variant="subtitle2" sx={{ mb: 1, opacity: 0.9 }}>
-                  {!gstSettings.includeGst ? 'TOTAL (Excluding GST)' : 'GRAND TOTAL (Including GST)'}
+                  {shouldApplyGst ? 'GRAND TOTAL (Including GST)' : 'TOTAL (No GST)'}
                 </Typography>
                 <Typography variant="h4" fontWeight="bold">
-                  {formatAmount(summary.totalAmount)}
+                  {formatAmount(finalTotal)}
                 </Typography>
                 {summary.discount > 0 && (
                   <Typography variant="caption" sx={{ opacity: 0.8, mt: 1, display: 'block' }}>
@@ -474,12 +520,17 @@ const BillSummarySection = ({
                 <Typography variant="caption" color="text.secondary" display="block">
                   Labour: {formatAmount(displayLaborCost)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  Subtotal: {formatAmount(totalBeforeTax)}
-                </Typography>
-                {gstSettings.includeGst && (
+                {shouldApplyGst && (
                   <Typography variant="caption" color="text.secondary" display="block">
-                    GST: {formatAmount(summary.gstAmount)}
+                    Labour GST: {formatAmount(laborGstAmount)}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Subtotal: {formatAmount(totalBeforeTax + totalGstAmount)}
+                </Typography>
+                {shouldApplyGst && (
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Total GST: {formatAmount(totalGstAmount)}
                   </Typography>
                 )}
                 {summary.discount > 0 && (
@@ -488,7 +539,7 @@ const BillSummarySection = ({
                   </Typography>
                 )}
                 <Typography variant="caption" color="primary.main" display="block" fontWeight={600}>
-                  Total: {formatAmount(summary.totalAmount)}
+                  Total: {formatAmount(finalTotal)}
                 </Typography>
               </Box>
 
@@ -510,13 +561,13 @@ const BillSummarySection = ({
                     💸 Discount Summary
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Original Amount: {formatAmount(totalBeforeTax + (gstSettings.includeGst ? summary.gstAmount : 0))}
+                    Original Amount: {formatAmount(totalBeforeTax + totalGstAmount)}
                   </Typography>
                   <Typography variant="caption" color="success.main" display="block" fontWeight={500}>
                     Discount: -{formatAmount(summary.discount)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Final Amount: {formatAmount(summary.totalAmount)}
+                    Final Amount: {formatAmount(finalTotal)}
                   </Typography>
                 </Box>
               )}

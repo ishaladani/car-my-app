@@ -328,7 +328,9 @@ setGarageDetails({
 
   // Calculate totals
  const calculateTotals = () => {
-  const totalPartsCost = parts.reduce((sum, part) => sum + (part.total || 0), 0);
+  const totalPartsCost = gstSettings?.includeGst === false 
+    ? parts.reduce((sum, part) => sum + ((part.pricePerUnit || 0) * (part.quantity || 0)), 0)
+    : parts.reduce((sum, part) => sum + (part.total || 0), 0);
   
   // Use actual API data for labor services (same as PDF calculation)
   const laborTotal = jobCardData?.laborServicesTotal || laborServicesTotal || 0;
@@ -1287,23 +1289,43 @@ const generateProfessionalGSTInvoice = () => {
 
     // Calculate totals properly - only include valid parts
     const validParts = parts.filter(part => part && part.total > 0);
-    const partsTotal = validParts.reduce((total, part) => total + part.total, 0);
     
-    // Use actual API data for labor services
-    const laborTotal = jobCardData?.laborServicesTotal || laborServicesTotal || 0;
-    const actualLaborTax = jobCardData?.laborServicesTax || 0;
+    // Parts subtotal (never taxed) - match BillSummarySection logic
+    const partsSubtotal = summary.totalPartsCost || 0;
     
-    const subtotalAmount = partsTotal; // Subtotal is only parts
+    // Use actual API data for labor services - ensure we get the correct value
+    let laborTotal = 0;
     
-    // Calculate GST amounts using actual API data
-    let gstOnParts = 0;
-    if (gstSettings.billType === 'gst') {
-      gstOnParts = (partsTotal * gstSettings.gstPercentage) / 100;
+    // Try multiple sources for labor data - match BillSummarySection logic
+    if (jobCardData?.laborServicesTotal && jobCardData.laborServicesTotal > 0) {
+      laborTotal = jobCardData.laborServicesTotal;
+    } else if (laborServicesTotal && laborServicesTotal > 0) {
+      laborTotal = laborServicesTotal;
+    } else if (jobCardData?.laborServices && Array.isArray(jobCardData.laborServices)) {
+      // Calculate from labor services array if available
+      laborTotal = jobCardData.laborServices.reduce((sum, service) => sum + (parseFloat(service.amount) || 0), 0);
     }
     
-    const totalGstAmount = gstOnParts + actualLaborTax;
-    const totalAfterGst = subtotalAmount + laborTotal + totalGstAmount;
-    const finalAmount = totalAfterGst - (summary.discount || 0);
+    // For debugging - log the labor total
+    console.log('PDF Labor Total:', laborTotal, 'jobCardData:', jobCardData?.laborServicesTotal, 'laborServicesTotal:', laborServicesTotal);
+    
+    // 🔑 Only apply GST on Labour/Service (not on parts) - match BillSummarySection logic
+    const shouldApplyGst = gstSettings.billType === 'gst' && laborTotal > 0;
+    
+    // ✅ GST ONLY on Labour - match BillSummarySection logic
+    const laborGstAmount = shouldApplyGst ? (laborTotal * (gstSettings.gstPercentage / 100)) : 0;
+    
+    // ❌ NO GST on Parts - match BillSummarySection logic
+    const partsGstAmount = 0; // Always 0
+    
+    // Total GST = Only Labour GST - match BillSummarySection logic
+    const totalGstAmount = laborGstAmount;
+    
+    // Subtotal (Parts + Labour) - match BillSummarySection logic
+    const totalBeforeTax = partsSubtotal + laborTotal;
+    
+    // Final total: parts + labour + GST (only on labour) - discount - match BillSummarySection logic
+    const finalAmount = totalBeforeTax + totalGstAmount - (summary.discount || 0);
 
     // Number to Words function
     const numberToWords = (num) => {
@@ -1466,14 +1488,23 @@ const generateProfessionalGSTInvoice = () => {
     // ITEMS TABLE
     // -----------------------------
     const tableStartY = currentY;
-    const colWidths = { 
-      srNo: 35, 
-      productName: 240, 
-      qty: 40, 
-      rate: 70, 
-      gstPercent: 50, 
-      amount: 80 
-    };
+    const colWidths = gstSettings.billType === 'gst' 
+      ? { 
+          srNo: 35, 
+          productName: 240,
+          hsnCode: 60,  
+          qty: 40, 
+          rate: 70, 
+          amount: 80 
+        }
+      : { 
+          srNo: 35, 
+          productName: 240, 
+          hsnCode: 60, 
+          qty: 40, 
+          rate: 70, 
+          amount: 80 
+        };
     const totalTableWidth = Object.values(colWidths).reduce((a, b) => a + b, 0);
     
     // Table Header
@@ -1484,7 +1515,7 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(255, 255, 255);
     
     let colX = margin;
-    const headers = ["Sr.", "Product/Service Description", "Qty", "Rate", "GST%", "Amount"];
+    const headers = ["Sr.", "Product/Service Description", "HSN Code", "Qty", "Rate", "Amount"];
     headers.forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
@@ -1519,7 +1550,9 @@ const generateProfessionalGSTInvoice = () => {
         let display = cell.toString();
         
         // Format currency properly - use proper rupee symbol
-        if (i === 3 || i === 5) { // Rate and Amount columns
+        const isCurrencyColumn = (i === 4 || i === 5); // Rate and Amount columns
+          
+        if (isCurrencyColumn) {
           if (display !== '' && !isNaN(display)) {
             display = ' ' + parseFloat(display).toFixed(2);
           }
@@ -1536,12 +1569,13 @@ const generateProfessionalGSTInvoice = () => {
           }
         } else {
           const txtW = doc.getTextWidth(display);
+          
           // Right align for Sr.No, Qty, Rate, Amount columns
-          if (i === 0 || i === 2 || i === 3 || i === 5) {
+          if (i === 0 || i === 3 || i === 4 || i === 5) {
             doc.text(display, colX + w - txtW - 5, y + 20);
           } 
-          // Center align for GST% column  
-          else if (i === 4) {
+          // Center align for HSN Code column  
+          else if (i === 2) {
             doc.text(display, colX + (w - txtW) / 2, y + 20);
           }
           // Left align for Product Name
@@ -1562,38 +1596,58 @@ const generateProfessionalGSTInvoice = () => {
     // Add only valid parts rows
     validParts.forEach((part, index) => {
       checkPageBreak(35);
-      const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
+      
+      // Parts are never taxed - match BillSummarySection logic
+      const amount = part.pricePerUnit * part.quantity;
+      
       const row = [
         rowIndex++,
         part.name,
+        part.hsnNumber || 'N/A',
         part.quantity,
-        part.pricePerUnit.toFixed(2),
-        gstDisplay,
-        part.total.toFixed(2)
+        amount.toFixed(2),
+        amount.toFixed(2)
       ];
+      
       currentY += drawTableRow(row, currentY, index % 2 === 1);
     });
 
     // Add Labor & Services Row if exists
-    if (laborTotal > 0) {
+    console.log('Adding Labor & Services row, laborTotal:', laborTotal);
+    
+    // Always add Labor & Services row if there's any labor data (even 0.01)
+    if (laborTotal && laborTotal > 0) {
       checkPageBreak(35);
-      const gstDisplay = gstSettings.billType === 'gst' ? `${gstSettings.gstPercentage}%` : '0%';
+      
+      // Labor services - match BillSummarySection logic
       const row = [
         rowIndex++,
         "Labor & Services",
-        "1",
+        "-", // Default HSN for services
+        "-",
         laborTotal.toFixed(2),
-        gstDisplay,
         laborTotal.toFixed(2)
       ];
+      
+      console.log('Labor & Services row data:', row);
       currentY += drawTableRow(row, currentY, validParts.length % 2 === 0);
+    } else {
+      console.log('No labor total found, skipping Labor & Services row. laborTotal:', laborTotal);
+      console.log('Available data sources:', {
+        jobCardDataLaborServicesTotal: jobCardData?.laborServicesTotal,
+        laborServicesTotal: laborServicesTotal,
+        jobCardDataLaborServices: jobCardData?.laborServices
+      });
     }
 
     // Add empty rows only if needed (minimum 5 rows total)
     const totalDataRows = validParts.length + (laborTotal > 0 ? 1 : 0);
     const minRows = Math.max(5, totalDataRows);
     for (let i = totalDataRows; i < minRows; i++) {
-      currentY += drawTableRow(["", "", "", "", "", ""], currentY, i % 2 === 1);
+      const emptyRow = gstSettings.billType === 'gst' 
+        ? ["", "", "", "", "", ""] // GST: 6 columns
+        : ["", "", "", "", "", ""]; // Non-GST: 6 columns
+      currentY += drawTableRow(emptyRow, currentY, i % 2 === 1);
     }
 
     currentY += 20;
@@ -1617,31 +1671,47 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     
-    // Parts Total (Subtotal)
-    if (partsTotal > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "normal");
-      doc.text("Subtotal", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.text(` ${partsTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      currentY += 25;
-    }
+    // 💰 Cost Breakdown - match BillSummarySection exactly
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.setFont("helvetica", "normal");
+    doc.text("Parts:", summaryX + 10, currentY + 17);
+    doc.setFont("helvetica", "bold");
+    doc.text(` ${partsSubtotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+    currentY += 25;
     
-    // Service/Labor Cost
+    // Labour
     if (laborTotal > 0) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
       doc.setFont("helvetica", "normal");
-      doc.text("Service/Labor Cost", summaryX + 10, currentY + 17);
+      doc.text("Labour:", summaryX + 10, currentY + 17);
       doc.setFont("helvetica", "bold");
       doc.text(` ${laborTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       currentY += 25;
     }
 
-    // GST Calculation - Show total tax only
-    if (gstSettings.billType === 'gst' && totalGstAmount > 0) {
+    // Labour GST (only if GST is applied)
+    if (shouldApplyGst && laborGstAmount > 0) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25);
       doc.setFont("helvetica", "normal");
-      doc.text(`GST ${gstSettings.gstPercentage}%`, summaryX + 10, currentY + 17);
+      doc.text("Labour GST:", summaryX + 10, currentY + 17);
+      doc.setFont("helvetica", "bold");
+      doc.text(` ${laborGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      currentY += 25;
+    }
+
+    // Subtotal
+    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+    doc.setFont("helvetica", "normal");
+    doc.text("Subtotal:", summaryX + 10, currentY + 17);
+    doc.setFont("helvetica", "bold");
+    doc.text(` ${(totalBeforeTax + totalGstAmount).toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+    currentY += 25;
+
+    // Total GST (only if GST is applied)
+    if (shouldApplyGst && totalGstAmount > 0) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
+      doc.setFont("helvetica", "normal");
+      doc.text("Total GST:", summaryX + 10, currentY + 17);
       doc.setFont("helvetica", "bold");
       doc.text(` ${totalGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       currentY += 25;
@@ -1649,36 +1719,28 @@ const generateProfessionalGSTInvoice = () => {
     
 
 
-    // Discount
+    // Discount (only if discount exists)
     if (summary.discount > 0) {
       drawBorderedRect(summaryX, currentY, summaryWidth, 25);
       doc.setFont("helvetica", "normal");
-      doc.text("Discount", summaryX + 10, currentY + 17);
+      doc.text("Discount:", summaryX + 10, currentY + 17);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(220, 53, 69);
-      doc.text(`- ${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
+      doc.setTextColor(39, 174, 96); // Green color for discount
+      doc.text(`-${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
       doc.setTextColor(0, 0, 0);
       currentY += 25;
     }
 
-    // Round Off
-    const roundOff = Math.round(finalAmount) - finalAmount;
-    if (Math.abs(roundOff) > 0.01) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "normal");
-      doc.text("Round Off", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.text(` ${roundOff.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      currentY += 25;
-    }
-
-    // Grand Total
+    // Grand Total - match BillSummarySection exactly
     drawBorderedRect(summaryX, currentY, summaryWidth, 35, 'green');
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text("GRAND TOTAL", summaryX + 10, currentY + 23);
-    doc.text(` ${Math.round(finalAmount).toFixed(2)}`, summaryX + summaryWidth - 120, currentY + 23);
+    
+    // Show appropriate title based on GST setting
+    const totalTitle = shouldApplyGst ? 'GRAND TOTAL' : 'GRAND TOTAL';
+    doc.text(totalTitle, summaryX + 10, currentY + 23);
+    doc.text(` ${finalAmount.toFixed(2)}`, summaryX + summaryWidth - 120, currentY + 23);
     currentY += 50;
 
     // Quality Check Section
@@ -2170,6 +2232,7 @@ Thank you!`;
               isMobile={isMobile}
               tableCellStyle={tableCellStyle}
               disabled={isBillAlreadyGenerated}
+              gstSettings={gstSettings} 
             />
 
             <FinalInspectionSection 
