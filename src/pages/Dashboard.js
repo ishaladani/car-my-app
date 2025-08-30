@@ -486,7 +486,14 @@ const Dashboard = () => {
           ? data.data
           : [];
 
-        const activeJobs = jobsData.filter(
+        // Sort jobs by updatedAt date (most recent first)
+        const sortedJobsData = jobsData.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt);
+          const dateB = new Date(b.updatedAt || b.createdAt);
+          return dateB - dateA; // Descending order (newest first)
+        });
+
+        const activeJobs = sortedJobsData.filter(
           (job) => job.status === "Pending" || job.status === "In Progress"
         );
 
