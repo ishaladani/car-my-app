@@ -41,6 +41,7 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -96,7 +97,7 @@ const InventoryManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('partName');
-  const [sortDirection, setSortDirection] = 'asc';
+  const [sortDirection, setSortDirection] = useState('asc');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
@@ -407,6 +408,50 @@ const InventoryManagement = () => {
     setEditModalOpen(true);
   };
 
+  const handleDeleteItem = async (item) => {
+    console.log('handleDeleteItem called with:', item); // Debug log
+    const itemId = item._id || item.id;
+    if (!itemId) {
+      setNotification({
+        open: true,
+        message: 'Invalid item: ID missing.',
+        severity: 'error',
+      });
+      return;
+    }
+
+    // Confirm deletion
+    if (!window.confirm(`Are you sure you want to delete "${item.partName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await axios.delete(`${API_BASE_URL}/garage/inventory/delete/${itemId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : '',
+        },
+      });
+
+      setNotification({
+        open: true,
+        message: `✅ Part "${item.partName}" deleted successfully!`,
+        severity: 'success',
+      });
+      fetchInventory();
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      setNotification({
+        open: true,
+        message: error.response?.data?.message || 'Failed to delete part.',
+        severity: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCloseNotification = () => {
     setNotification(prev => ({ ...prev, open: false }));
   };
@@ -488,19 +533,19 @@ const InventoryManagement = () => {
             </Box>
 
             {/* Table */}
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: theme.palette.primary.main, '& .MuiTableCell-head': { color: '#fff' } }}>
-                    <TableCell onClick={() => handleSortChange('carName')}>Car Name</TableCell>
-                    <TableCell onClick={() => handleSortChange('model')}>Model</TableCell>
-                    <TableCell onClick={() => handleSortChange('partNumber')}>Part No.</TableCell>
-                    <TableCell onClick={() => handleSortChange('partName')}>Part Name</TableCell>
-                    <TableCell onClick={() => handleSortChange('quantity')}>Qty</TableCell>
-                    <TableCell onClick={() => handleSortChange('sellingPrice')}>Selling Price</TableCell>
-                    <TableCell>Single Part GST</TableCell>
-                    <TableCell>Total Value (with GST)</TableCell>
-                    <TableCell>Actions</TableCell>
+                  <TableRow>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('carName')}>Car Name</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('model')}>Model</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('partNumber')}>Part No.</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('partName')}>Part Name</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('quantity')}>Qty</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('sellingPrice')}>Selling Price</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Single Part GST</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Total Value (with GST)</TableCell>
+                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold', minWidth: '200px' }} align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -524,16 +569,40 @@ const InventoryManagement = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleOpenEditModal(row)}
-                          sx={{ borderRadius: 1 }}
-                        >
-                          Edit
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                          <Button
+                            variant="outlined"
+                            color="primary"
+                            size="small"
+                            startIcon={<EditIcon />}
+                            onClick={() => handleOpenEditModal(row)}
+                            sx={{ borderRadius: 1 }}
+                          >
+                            Edit
+                          </Button>
+                          <IconButton
+                            color="error"
+                            size="small"
+                            onClick={() => {
+                              console.log('Delete button clicked for:', row);
+                              if (typeof handleDeleteItem === 'function') {
+                                handleDeleteItem(row);
+                              } else {
+                                console.error('handleDeleteItem is not a function');
+                                alert('Delete function not available');
+                              }
+                            }}
+                            sx={{ 
+                              borderRadius: 1,
+                              '&:hover': { 
+                                backgroundColor: 'error.light',
+                                color: 'error.contrastText'
+                              }
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -580,8 +649,21 @@ const InventoryManagement = () => {
         </Card>
 
         {/* Add Modal */}
-        <Dialog open={addModalOpen} onClose={() => setAddModalOpen(false)} fullWidth maxWidth="md">
-          <DialogTitle>Add New Part</DialogTitle>
+        <Dialog 
+          open={addModalOpen} 
+          onClose={() => setAddModalOpen(false)} 
+          maxWidth="md" 
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6" fontWeight="bold" color="primary">Add New Part to Inventory</Typography>
+              <IconButton onClick={() => setAddModalOpen(false)} disabled={isSubmitting}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <Grid container spacing={2}>
@@ -599,6 +681,22 @@ const InventoryManagement = () => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField name="quantity" label="Quantity *" type="number" value={formData.quantity} onChange={handleInputChange} required fullWidth margin="normal" inputProps={{ min: 1 }} />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField 
+                    name="purchasePrice" 
+                    label="Purchase Price *" 
+                    type="number" 
+                    value={formData.purchasePrice} 
+                    onChange={handleInputChange} 
+                    required 
+                    fullWidth 
+                    margin="normal" 
+                    InputProps={{ 
+                      startAdornment: <InputAdornment position="start">₹</InputAdornment> 
+                    }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField name="sellingPrice" label="Selling Price *" type="number" value={formData.sellingPrice} onChange={handleInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />

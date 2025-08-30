@@ -1403,18 +1403,6 @@ const generateProfessionalGSTInvoice = () => {
     const centerX = (pageWidth - companyNameWidth) / 2;
     doc.text(companyName, centerX, currentY + 40);
 
-    // Invoice Type Banner
-    const billTypeText = gstSettings.billType === 'gst' ? 'GST TAX INVOICE' : 'NON-GST INVOICE';
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    const bannerWidth = 150;
-    const bannerX = (pageWidth - bannerWidth) / 2;
-    doc.setFillColor(52, 152, 219);
-    doc.rect(bannerX, currentY + 50, bannerWidth, 20, 'F');
-    const billTypeWidth = doc.getTextWidth(billTypeText);
-    doc.text(billTypeText, bannerX + (bannerWidth - billTypeWidth) / 2, currentY + 63);
-
     // Contact details
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);

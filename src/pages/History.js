@@ -120,8 +120,15 @@ const RecordReport = () => {
   // ✅ Sort by updatedAt (most recent first)
   const sortJobsByUpdatedAt = (jobs) => {
     return jobs.sort((a, b) => {
-      const dateA = new Date(a.updatedAt || a.createdAt);
-      const dateB = new Date(b.updatedAt || b.createdAt);
+      // Use updatedAt if available, otherwise fall back to createdAt
+      const dateA = new Date(a.updatedAt || a.createdAt || 0);
+      const dateB = new Date(b.updatedAt || b.createdAt || 0);
+      
+      // Handle invalid dates
+      if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+      if (isNaN(dateA.getTime())) return 1;
+      if (isNaN(dateB.getTime())) return -1;
+      
       return dateB - dateA; // Descending: latest first
     });
   };
@@ -129,10 +136,15 @@ const RecordReport = () => {
   // Format date helper
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    return date.toLocaleDateString('en-IN', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
@@ -645,7 +657,9 @@ const RecordReport = () => {
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Job Details</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Created By</TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Status</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Last Updated</TableCell>
+                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>
+                            Last Updated ⬇
+                          </TableCell>
                           <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold', minWidth: '200px' }} align="center">Actions</TableCell>
                         </TableRow>
                       </TableHead>

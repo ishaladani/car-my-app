@@ -2975,120 +2975,136 @@ const AssignEngineer = () => {
           </Card>
         </Container>
 
-        {/* Enhanced Add Part Dialog - Based on InventoryManagement */}
+        {/* Enhanced Add Part Dialog - Based on WorkInProgress Design */}
         <Dialog
           open={openAddPartDialog}
           onClose={handleCloseAddPartDialog}
-          maxWidth="sm"
+          maxWidth="md"
           fullWidth
-          fullScreen={{ xs: true, sm: false }}
+          PaperProps={{ sx: { borderRadius: 3 } }}
         >
           <DialogTitle>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">Add New Part</Typography>
-              <IconButton onClick={handleCloseAddPartDialog}><CloseIcon /></IconButton>
+              <Typography variant="h6" fontWeight="bold" color="primary">Add New Part to Inventory</Typography>
+              <IconButton onClick={handleCloseAddPartDialog} disabled={addingPart}>
+                <CloseIcon />
+              </IconButton>
             </Box>
           </DialogTitle>
           <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
-            {partAddSuccess && <Alert severity="success" sx={{ mb: 2 }}>Part added successfully!</Alert>}
-            {partAddError && <Alert severity="error" sx={{ mb: 2 }}>{partAddError}</Alert>}
+            {partAddSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Part added successfully!
+              </Alert>
+            )}
+            {partAddError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {partAddError}
+              </Alert>
+            )}
 
             <Grid container spacing={{ xs: 1, sm: 2 }}>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
                   label="Car Name *"
                   name="carName"
                   value={newPart.carName}
                   onChange={handlePartInputChange}
                   required
-                  fullWidth
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Model *"
-                  name="model"
-                  value={newPart.model}
-                  onChange={handlePartInputChange}
-                  required
-                  fullWidth
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Part Number *"
-                  name="partNumber"
-                  value={newPart.partNumber}
-                  onChange={handlePartInputChange}
-                  required
-                  fullWidth
-                  margin="normal"
-                  error={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber)}
-                  helperText={newPart.partNumber && checkDuplicatePartNumber(newPart.partNumber) ? "Already exists" : ""}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Part Name *"
-                  name="partName"
-                  value={newPart.partName}
-                  onChange={handlePartInputChange}
-                  required
-                  fullWidth
                   margin="normal"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
+                  label="Model *"
+                  name="model"
+                  value={newPart.model}
+                  onChange={handlePartInputChange}
+                  required
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Part Number *"
+                  name="partNumber"
+                  value={newPart.partNumber}
+                  onChange={handlePartInputChange}
+                  required
+                  margin="normal"
+                  error={checkDuplicatePartNumber(newPart.partNumber)}
+                  helperText={checkDuplicatePartNumber(newPart.partNumber) ? "Part number already exists" : ""}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Part Name *"
+                  name="partName"
+                  value={newPart.partName}
+                  onChange={handlePartInputChange}
+                  required
+                  margin="normal"
+                  error={!newPart.partName?.trim() && !!partAddError}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
                   label="Quantity *"
                   name="quantity"
                   type="number"
                   value={newPart.quantity}
                   onChange={handlePartInputChange}
                   required
-                  fullWidth
                   margin="normal"
                   inputProps={{ min: 1 }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
                   label="Purchase Price *"
                   name="purchasePrice"
                   type="number"
                   value={newPart.purchasePrice}
                   onChange={handlePartInputChange}
                   required
-                  fullWidth
                   margin="normal"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                  }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  fullWidth
                   label="Selling Price *"
                   name="sellingPrice"
                   type="number"
                   value={newPart.sellingPrice}
                   onChange={handlePartInputChange}
                   required
-                  fullWidth
                   margin="normal"
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                  }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
-                  label="HSN Number"
+                  fullWidth
+                  label="HSN Code"
                   name="hsnNumber"
                   value={newPart.hsnNumber}
                   onChange={handlePartInputChange}
-                  fullWidth
                   margin="normal"
+                  inputProps={{ maxLength: 8 }}
                 />
               </Grid>
             </Grid>
@@ -3108,7 +3124,7 @@ const AssignEngineer = () => {
                 </Select>
               </FormControl>
 
-              {newPart.taxType === 'igst' ? (
+              {newPart.taxType === "igst" ? (
                 <TextField
                   label="IGST (%)"
                   name="igst"
@@ -3118,7 +3134,9 @@ const AssignEngineer = () => {
                   fullWidth
                   margin="normal"
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  }}
                 />
               ) : (
                 <TextField
@@ -3130,13 +3148,15 @@ const AssignEngineer = () => {
                   fullWidth
                   margin="normal"
                   inputProps={{ min: 0, max: 100, step: 0.01 }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  }}
                 />
               )}
             </Box>
 
             {/* Tax Preview */}
-            {(newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst)) && (
+            {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
                 <Grid container spacing={2}>
@@ -3201,13 +3221,23 @@ const AssignEngineer = () => {
             )}
           </DialogContent>
           <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
-            <Button onClick={handleCloseAddPartDialog} color="inherit">Cancel</Button>
+            <Button
+              onClick={handleCloseAddPartDialog}
+              disabled={addingPart}
+              sx={{ width: 'auto' }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleAddPart}
+              disabled={addingPart || checkDuplicatePartNumber(newPart.partNumber) || !newPart.partName?.trim() || newPart.quantity <= 0 || newPart.sellingPrice <= 0}
               variant="contained"
-              disabled={addingPart || !newPart.partName.trim()}
-              startIcon={addingPart ? <CircularProgress size={20} /> : <AddIcon />}
-              sx={{ backgroundColor: '#ff4d4d', '&:hover': { backgroundColor: '#e63939' } }}
+              color="primary"
+              startIcon={addingPart ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+              sx={{
+                backgroundColor: '#ff4d4d',
+                '&:hover': { backgroundColor: '#e63939' }
+              }}
             >
               {addingPart ? 'Adding...' : 'Add Part'}
             </Button>
