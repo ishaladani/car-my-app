@@ -217,6 +217,7 @@ const AssignEngineer = () => {
   // Function to handle part removal (same pattern as WorkInProgress)
   const handlePartRemoval = async (partIndex) => {
     try {
+      const partToRemove = selectedParts[partIndex];
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
       setSelectedParts(updatedParts);
       
@@ -246,6 +247,48 @@ const AssignEngineer = () => {
         ...prev,
         parts: finalParts
       }));
+
+      // Restore inventory quantity for removed part
+      if (partToRemove && partToRemove._id && partToRemove.selectedQuantity) {
+        try {
+          const originalPart = inventoryParts.find(p => p._id === partToRemove._id);
+          if (originalPart) {
+            const currentQuantity = originalPart.quantity || 0;
+            const restoredQuantity = currentQuantity + partToRemove.selectedQuantity;
+            
+            console.log(`Restoring inventory for ${partToRemove.partName}: ${currentQuantity} + ${partToRemove.selectedQuantity} = ${restoredQuantity}`);
+            
+            // Update inventory quantity
+            await axios.put(
+              `${API_BASE_URL}/inventory/update/${partToRemove._id}`,
+              {
+                quantity: restoredQuantity,
+                carName: partToRemove.carName || '',
+                model: partToRemove.model || '',
+                partNumber: partToRemove.partNumber || '',
+                partName: partToRemove.partName || '',
+                hsnNumber: partToRemove.hsnNumber || '',
+                igst: parseFloat(partToRemove.igst || 0),
+                cgstSgst: parseFloat(partToRemove.cgstSgst || 0),
+                purchasePrice: parseFloat(partToRemove.purchasePrice || 0),
+                sellingPrice: parseFloat(partToRemove.sellingPrice || 0),
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                }
+              }
+            );
+            
+            // Refresh inventory data after update
+            await fetchInventoryParts();
+          }
+        } catch (err) {
+          console.error("Error restoring inventory for removed part:", err);
+          setError(`Failed to restore inventory for ${partToRemove.partName}`);
+        }
+      }
     } catch (err) {
       console.error("Error removing part:", err);
       setError(`Failed to remove part`);
@@ -258,13 +301,29 @@ const AssignEngineer = () => {
     if (!part) return;
 
     try {
-      const availableQuantity = getAvailableQuantity(part._id);
-      const currentlySelected = part.selectedQuantity || 1;
-      const maxSelectableQuantity = availableQuantity + currentlySelected;
+      // Calculate available quantity based on current state before making changes
+      const originalPart = inventoryParts.find((p) => p._id === part._id);
+      if (!originalPart) {
+        setError(`Part not found in inventory`);
+        return;
+      }
+
+      let totalSelected = 0;
+      
+      // Calculate total selected from all parts (pre-loaded + user-selected)
+      assignment.parts.forEach((assignmentPart) => {
+        if (assignmentPart._id === part._id) {
+          totalSelected += assignmentPart.selectedQuantity || 1;
+        }
+      });
+      
+      // Remove the old quantity from total to get the correct available quantity
+      const availableQuantity = Math.max(0, originalPart.quantity - totalSelected + oldQuantity);
+      const maxSelectableQuantity = availableQuantity + newQuantity;
 
       if (newQuantity > maxSelectableQuantity) {
         setError(
-          `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`
+          `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Requested: ${newQuantity}`
         );
         return;
       }
@@ -273,13 +332,23 @@ const AssignEngineer = () => {
         return;
       }
 
+      // Auto-remove part if quantity becomes 0
+      if (newQuantity === 0) {
+        await handlePartRemoval(partIndex);
+        return;
+      }
+
       const updatedParts = selectedParts.map((p, idx) => {
         if (idx === partIndex) {
-          // Calculate tax amounts using InventoryManagement style for new quantity
+          // Calculate tax amounts using API structure: igst + cgstSgst = total tax percentage
           const sellingPrice = p.sellingPrice || p.pricePerUnit || 0;
-          const taxPercentage = p.taxAmount || p.gstPercentage || 0;
+          const igst = p.igst || 0;
+          const cgstSgst = p.cgstSgst || 0;
+          const totalTaxPercentage = igst + cgstSgst;
+          
+          // Only calculate tax if there's a tax percentage
           const baseAmount = sellingPrice * newQuantity;
-          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const gstAmount = totalTaxPercentage > 0 ? (baseAmount * totalTaxPercentage) / 100 : 0;
           const totalWithGST = baseAmount + gstAmount;
 
           return {
@@ -321,6 +390,59 @@ const AssignEngineer = () => {
         ...prev,
         parts: finalParts
       }));
+
+      // Update inventory quantity for the part
+      try {
+        const quantityDifference = newQuantity - oldQuantity;
+        if (quantityDifference !== 0) {
+          const currentQuantity = originalPart.quantity || 0;
+          const newInventoryQuantity = Math.max(0, currentQuantity - quantityDifference);
+          
+          console.log(`Updating inventory for ${part.partName}: ${currentQuantity} - ${quantityDifference} = ${newInventoryQuantity}`);
+          
+          // Update inventory quantity
+          await axios.put(
+            `${API_BASE_URL}/inventory/update/${part._id}`,
+            {
+              quantity: newInventoryQuantity,
+              carName: part.carName || '',
+              model: part.model || '',
+              partNumber: part.partNumber || '',
+              partName: part.partName || '',
+              hsnNumber: part.hsnNumber || '',
+              igst: parseFloat(part.igst || 0),
+              cgstSgst: parseFloat(part.cgstSgst || 0),
+              purchasePrice: parseFloat(part.purchasePrice || 0),
+              sellingPrice: parseFloat(part.sellingPrice || 0),
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+              }
+            }
+          );
+          
+          // If quantity becomes 0, delete the item from inventory
+          if (newInventoryQuantity === 0) {
+            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
+            await axios.delete(
+              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
+              {
+                headers: {
+                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                }
+              }
+            );
+          }
+          
+          // Refresh inventory data after update
+          await fetchInventoryParts();
+        }
+      } catch (err) {
+        console.error("Error updating inventory for quantity change:", err);
+        setError(`Failed to update inventory for ${part.partName}`);
+      }
       
       if (error && error.includes(part.partName)) {
         setError(null);
@@ -470,14 +592,24 @@ const AssignEngineer = () => {
     }
 
     let totalSelected = 0;
+    
+    // Only check assignment.parts to avoid double-counting
+    // This includes both pre-loaded parts and user-selected parts
     assignment.parts.forEach(part => {
       if (part._id === partId) {
         totalSelected += part.selectedQuantity || 1;
       }
     });
 
-    const available = Math.max(0, originalPart.quantity - totalSelected);
-    return available;
+    const availableQuantity = Math.max(0, originalPart.quantity - totalSelected);
+    
+    // Special case: If selected quantity equals inventory quantity, allow selecting the same part
+    // This enables users to select the same part when they've selected all available quantity
+    if (totalSelected === originalPart.quantity && totalSelected > 0) {
+      return originalPart.quantity; // Return full inventory quantity to allow same part selection
+    }
+    
+    return availableQuantity;
   };
 
   // Update Part Quantity using PUT API, DELETE only when qty = 0
@@ -568,12 +700,14 @@ const AssignEngineer = () => {
           );
 
           if (inventoryPart) {
-            // Calculate tax amount using InventoryManagement style
+            // Calculate tax amount using API structure: igst + cgstSgst = total tax percentage
             const sellingPrice = inventoryPart.sellingPrice || inventoryPart.pricePerUnit || 0;
-            const taxPercentage = inventoryPart.taxAmount || inventoryPart.gstPercentage || 0;
+            const igst = inventoryPart.igst || 0;
+            const cgstSgst = inventoryPart.cgstSgst || 0;
+            const taxPercentage = igst + cgstSgst;
             const quantity = usedPart.quantity || 1;
             const baseAmount = sellingPrice * quantity;
-            const gstAmount = (baseAmount * taxPercentage) / 100;
+            const gstAmount = taxPercentage > 0 ? (baseAmount * taxPercentage) / 100 : 0;
             const totalWithGST = baseAmount + gstAmount;
 
             return {
@@ -739,19 +873,44 @@ const AssignEngineer = () => {
         if (existingPart) {
           const currentQuantity = existingPart.selectedQuantity || 1;
           const newQuantity = currentQuantity + 1;
-          const availableQuantity = getAvailableQuantity(newPart._id);
-          const maxSelectableQuantity = availableQuantity + currentQuantity;
-          if (newQuantity > maxSelectableQuantity) {
+          
+          // Calculate available quantity based on current state
+          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
+          if (!originalInventoryPart) {
+            setError(`Part "${newPart.partName}" not found in inventory`);
+            return;
+          }
+          
+          let totalSelected = 0;
+          
+          // Calculate total selected from all parts (pre-loaded + user-selected)
+          assignment.parts.forEach((assignmentPart) => {
+            if (assignmentPart._id === newPart._id) {
+              totalSelected += assignmentPart.selectedQuantity || 1;
+            }
+          });
+          
+          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
+          const maxSelectableQuantity = availableQuantity + newQuantity;
+          
+          // Special case: Allow selecting same part when quantity equals inventory
+          const isQuantityEqualToInventory = currentQuantity === originalInventoryPart.quantity;
+          
+          if (newQuantity > maxSelectableQuantity && !isQuantityEqualToInventory) {
             setError(
               `Cannot add more "${newPart.partName}". Maximum available: ${maxSelectableQuantity}, Current: ${currentQuantity}`
             );
             return;
           }
-          // Calculate tax amounts using InventoryManagement style for updated quantity
+          // Calculate tax amounts using API structure: igst + cgstSgst = total tax percentage
           const sellingPrice = existingPart.sellingPrice || existingPart.pricePerUnit || 0;
-          const taxPercentage = existingPart.taxAmount || existingPart.gstPercentage || 0;
+          const igst = existingPart.igst || 0;
+          const cgstSgst = existingPart.cgstSgst || 0;
+          const totalTaxPercentage = igst + cgstSgst;
+          
+          // Only calculate tax if there's a tax percentage
           const baseAmount = sellingPrice * newQuantity;
-          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const gstAmount = totalTaxPercentage > 0 ? (baseAmount * totalTaxPercentage) / 100 : 0;
           const totalWithGST = baseAmount + gstAmount;
 
           partsMap.set(newPart._id, {
@@ -763,17 +922,37 @@ const AssignEngineer = () => {
             totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         } else {
-          const availableQuantity = getAvailableQuantity(newPart._id);
+          // Calculate available quantity based on current state
+          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
+          if (!originalInventoryPart) {
+            setError(`Part "${newPart.partName}" not found in inventory`);
+            return;
+          }
+          
+          let totalSelected = 0;
+          
+          // Calculate total selected from all parts (pre-loaded + user-selected)
+          assignment.parts.forEach((assignmentPart) => {
+            if (assignmentPart._id === newPart._id) {
+              totalSelected += assignmentPart.selectedQuantity || 1;
+            }
+          });
+          
+          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
+          
           if (availableQuantity < 1) {
             setError(`Part "${newPart.partName}" is out of stock!`);
             return;
           }
-          // Calculate tax amounts using InventoryManagement style
+          // Calculate tax amounts using API structure: igst + cgstSgst = total tax percentage
           const sellingPrice = newPart.sellingPrice || newPart.pricePerUnit || 0;
-          const taxPercentage = newPart.taxAmount || newPart.gstPercentage || 0;
-          const quantity = 1;
-          const baseAmount = sellingPrice * quantity;
-          const gstAmount = (baseAmount * taxPercentage) / 100;
+          const igst = newPart.igst || 0;
+          const cgstSgst = newPart.cgstSgst || 0;
+          const totalTaxPercentage = igst + cgstSgst;
+          
+          // Only calculate tax if there's a tax percentage
+          const baseAmount = sellingPrice * 1;
+          const gstAmount = totalTaxPercentage > 0 ? (baseAmount * totalTaxPercentage) / 100 : 0;
           const totalWithGST = baseAmount + gstAmount;
 
           partsMap.set(newPart._id, {
@@ -789,11 +968,14 @@ const AssignEngineer = () => {
       });
 
       const updatedParts = Array.from(partsMap.values());
-      setSelectedParts(updatedParts);
+      
+      // Auto-remove parts with quantity 0
+      const validParts = updatedParts.filter(part => (part.selectedQuantity || 1) > 0);
+      setSelectedParts(validParts);
       
       // Update assignment with new parts (excluding pre-loaded parts)
       const preLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
-      const userSelectedParts = updatedParts.map(part => ({
+      const userSelectedParts = validParts.map(part => ({
         ...part,
         isPreLoaded: false
       }));
@@ -817,6 +999,16 @@ const AssignEngineer = () => {
         ...prev,
         parts: finalParts
       }));
+      
+      // Update inventory quantities for newly selected parts
+      if (userSelectedParts.length > 0) {
+        try {
+          await updateInventoryQuantities(userSelectedParts);
+        } catch (err) {
+          console.error("Error updating inventory:", err);
+          setError(`Failed to update inventory: ${err.message}`);
+        }
+      }
       
       if (error) setError(null);
     } catch (err) {
@@ -892,11 +1084,15 @@ const AssignEngineer = () => {
         const quantity = part.originalQuantity || selectedQuantity;
         const pricePerPiece = part.originalPricePerPiece || part.sellingPrice || 0;
         const totalPrice = part.originalTotalPrice || (pricePerPiece * quantity);
-        const taxPercentage = part.taxAmount || part.gstPercentage || 0;
         
-        // Calculate GST amount using InventoryManagement style calculation
+        // Use API structure: igst + cgstSgst = total tax percentage
+        const igst = part.igst || 0;
+        const cgstSgst = part.cgstSgst || 0;
+        const taxPercentage = igst + cgstSgst;
+        
+        // Calculate GST amount using API structure
         const baseAmount = pricePerPiece * quantity;
-        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const gstAmount = taxPercentage > 0 ? (baseAmount * taxPercentage) / 100 : 0;
         const totalWithGST = baseAmount + gstAmount;
 
         allParts.push({
@@ -912,13 +1108,17 @@ const AssignEngineer = () => {
           isPreLoaded: true
         });
       } else {
-        // For user-selected parts, calculate using InventoryManagement style
+        // For user-selected parts, calculate using API structure
         const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxPercentage = Number(part.taxAmount || part.gstPercentage || 0);
         
-        // Calculate GST amount using InventoryManagement style calculation
+        // Use API structure: igst + cgstSgst = total tax percentage
+        const igst = Number(part.igst || 0);
+        const cgstSgst = Number(part.cgstSgst || 0);
+        const taxPercentage = igst + cgstSgst;
+        
+        // Calculate GST amount using API structure
         const baseAmount = sellingPrice * selectedQuantity;
-        const gstAmount = (baseAmount * taxPercentage) / 100;
+        const gstAmount = taxPercentage > 0 ? (baseAmount * taxPercentage) / 100 : 0;
         const totalWithGST = baseAmount + gstAmount;
 
         allParts.push({
@@ -951,8 +1151,20 @@ const AssignEngineer = () => {
         const taxPercentage = part.taxPercentage || part.gstPercentage || 0;
         const quantity = Number(part.selectedQuantity || part.quantity || 1);
       
-        // tax per piece
-        const taxAmount = (pricePerPiece * taxPercentage) / 100;
+        // ✅ total tax for all qty
+        const taxAmount = ((pricePerPiece * taxPercentage) / 100) * quantity;
+      
+        // total price with tax
+        const totalPrice = (pricePerPiece * quantity) + taxAmount;
+      
+        // log
+        console.log(`--- Calculation for ${part.partName || 'Unknown Part'} ---`);
+        console.log(`Price per piece: ₹${pricePerPiece}`);
+        console.log(`Tax %: ${taxPercentage}%`);
+        console.log(`Quantity: ${quantity}`);
+        console.log(`Total Tax: ₹${taxAmount}`);
+        console.log(`Total (with tax): ₹${totalPrice}`);
+        console.log('----------------------------------');
       
         return {
           partName: part.partName || '',
@@ -963,12 +1175,11 @@ const AssignEngineer = () => {
           taxPercentage: parseFloat(taxPercentage.toFixed(2)),
           igst: parseFloat((part.igst || 0).toFixed(2)),
           cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2)),
-          taxAmount: parseFloat(taxAmount.toFixed(2)), // tax per piece
-          totalPrice: parseFloat(
-            ((pricePerPiece + taxAmount) * quantity).toFixed(2) // ✅ price with tax included
-          ),
+          taxAmount: parseFloat(taxAmount.toFixed(2)), // ✅ total tax for all qty
+          totalPrice: parseFloat(totalPrice.toFixed(2)), // ✅ price with tax included
         };
       });
+      
       
       
 
@@ -1032,51 +1243,51 @@ const AssignEngineer = () => {
       }
       
       const updatePromises = partsUsed.map(async (part) => {
-        // if (part._id && part.selectedQuantity) {
-        //   const currentQuantity = part.quantity || 0;
-        //   const usedQuantity = part.selectedQuantity;
-        //   const newQuantity = Math.max(0, currentQuantity - usedQuantity);
+        if (part._id && part.selectedQuantity && !part.isPreLoaded) {
+          const currentQuantity = part.quantity || 0;
+          const usedQuantity = part.selectedQuantity;
+          const newQuantity = Math.max(0, currentQuantity - usedQuantity);
           
-        //   console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
+          console.log(`Updating part ${part.partName}: ${currentQuantity} - ${usedQuantity} = ${newQuantity}`);
           
-        //   // Update inventory quantity using the same API structure as InventoryManagement
-        //   const requestData = {
-        //     quantity: newQuantity,
-        //     sellingPrice: parseFloat(part.sellingPrice || 0),
-        //     purchasePrice: parseFloat(part.purchasePrice || 0),
-        //     carName: part.carName || '',
-        //     model: part.model || '',
-        //     partNumber: part.partNumber || '',
-        //     partName: part.partName || '',
-        //     hsnNumber: part.hsnNumber || '',
-        //     igst: parseFloat(part.igst || 0),
-        //     cgstSgst: parseFloat(part.cgstSgst || 0),
-        //   };
+          // Update inventory quantity using the same API structure as InventoryManagement
+          const requestData = {
+            quantity: newQuantity,
+            sellingPrice: parseFloat(part.sellingPrice || 0),
+            purchasePrice: parseFloat(part.purchasePrice || 0),
+            carName: part.carName || '',
+            model: part.model || '',
+            partNumber: part.partNumber || '',
+            partName: part.partName || '',
+            hsnNumber: part.hsnNumber || '',
+            igst: parseFloat(part.igst || 0),
+            cgstSgst: parseFloat(part.cgstSgst || 0),
+          };
 
-        //   await axios.put(
-        //     `${API_BASE_URL}/inventory/update/${part._id}`,
-        //     requestData,
-        //     {
-        //       headers: {
-        //         'Content-Type': 'application/json',
-        //         'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-        //       }
-        //     }
-        //   );
+          await axios.put(
+            `${API_BASE_URL}/inventory/update/${part._id}`,
+            requestData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+              }
+            }
+          );
           
-        //   // If quantity becomes 0, delete the item from inventory
-        //   if (newQuantity === 0) {
-        //     console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
-        //     await axios.delete(
-        //       `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
-        //       {
-        //         headers: {
-        //           'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-        //         }
-        //       }
-        //     );
-        //   }
-        // }
+          // If quantity becomes 0, delete the item from inventory
+          if (newQuantity === 0) {
+            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
+            await axios.delete(
+              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
+              {
+                headers: {
+                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                }
+              }
+            );
+          }
+        }
       });
       
       await Promise.all(updatePromises);
@@ -1562,8 +1773,13 @@ const AssignEngineer = () => {
                         const partsCost = assignment.parts.reduce((partTotal, part) => {
                           const selectedQuantity = part.selectedQuantity || 1;
                           const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-                          const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
-                          const pricePerPiece = sellingPrice + (sellingPrice * taxRate / 100);
+                          
+                          // Use API structure: igst + cgstSgst = total tax percentage
+                          const igst = Number(part.igst || 0);
+                          const cgstSgst = Number(part.cgstSgst || 0);
+                          const taxRate = igst + cgstSgst;
+                          
+                          const pricePerPiece = taxRate > 0 ? sellingPrice + (sellingPrice * taxRate / 100) : sellingPrice;
                           const partTotalPrice = pricePerPiece * selectedQuantity;
                           return partTotal + partTotalPrice;
                         }, 0);
@@ -1890,13 +2106,71 @@ const AssignEngineer = () => {
                                     color="error"
                                     size="small"
                                     startIcon={<DeleteIcon />}
-                                    onClick={() => {
-                                      const existingPreLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
-                                      setAssignment(prev => ({
-                                        ...prev,
-                                        parts: existingPreLoadedParts
-                                      }));
-                                      setSuccess('All user-selected parts cleared');
+                                    onClick={async () => {
+                                      try {
+                                        // Get all user-selected parts that will be removed
+                                        const userSelectedParts = assignment.parts.filter(part => !part.isPreLoaded);
+                                        
+                                        // Restore inventory for all removed parts
+                                        for (const part of userSelectedParts) {
+                                          if (part._id && part.selectedQuantity) {
+                                            try {
+                                              const originalPart = inventoryParts.find(p => p._id === part._id);
+                                              if (originalPart) {
+                                                const currentQuantity = originalPart.quantity || 0;
+                                                const restoredQuantity = currentQuantity + part.selectedQuantity;
+                                                
+                                                console.log(`Restoring inventory for ${part.partName}: ${currentQuantity} + ${part.selectedQuantity} = ${restoredQuantity}`);
+                                                
+                                                // Update inventory quantity
+                                                await axios.put(
+                                                  `${API_BASE_URL}/inventory/update/${part._id}`,
+                                                  {
+                                                    quantity: restoredQuantity,
+                                                    carName: part.carName || '',
+                                                    model: part.model || '',
+                                                    partNumber: part.partNumber || '',
+                                                    partName: part.partName || '',
+                                                    hsnNumber: part.hsnNumber || '',
+                                                    igst: parseFloat(part.igst || 0),
+                                                    cgstSgst: parseFloat(part.cgstSgst || 0),
+                                                    purchasePrice: parseFloat(part.purchasePrice || 0),
+                                                    sellingPrice: parseFloat(part.sellingPrice || 0),
+                                                  },
+                                                  {
+                                                    headers: {
+                                                      'Content-Type': 'application/json',
+                                                      'Authorization': garageToken ? `Bearer ${garageToken}` : '',
+                                                    }
+                                                  }
+                                                );
+                                              }
+                                            } catch (err) {
+                                              console.error("Error restoring inventory for part:", part.partName, err);
+                                            }
+                                          }
+                                        }
+                                        
+                                        // Clear selected parts from state
+                                        setSelectedParts([]);
+                                        const existingPreLoadedParts = assignment.parts.filter(part => part.isPreLoaded);
+                                        setAssignment(prev => ({
+                                          ...prev,
+                                          parts: existingPreLoadedParts
+                                        }));
+                                        
+                                        // Refresh inventory data after update
+                                        await fetchInventoryParts();
+                                        
+                                        setSnackbar({
+                                          open: true,
+                                          message: '✅ All user-selected parts cleared and inventory restored',
+                                          severity: 'success'
+                                        });
+                                      } catch (err) {
+                                        console.error("Error clearing parts:", err);
+                                        setError('Failed to clear parts properly');
+                                      }
                                     }}
                                     sx={{ flex: { xs: 1, sm: 'none' } }}
                                   >
@@ -2190,11 +2464,14 @@ const AssignEngineer = () => {
                                     const selectedQuantity = part.selectedQuantity || 1;
                                     const quantity = part.quantity || 0;
                                     const unitPrice = part.sellingPrice || 0;
-                                    const gstPercentage = part.taxAmount || 0;
-                                    // Calculate GST using InventoryManagement style
+                                    // Use API structure: igst + cgstSgst = total tax percentage
+                                    const igst = part.igst || 0;
+                                    const cgstSgst = part.cgstSgst || 0;
+                                    const gstPercentage = igst + cgstSgst;
+                                    // Calculate GST using API structure
                                     const baseAmount = unitPrice * selectedQuantity;
-                                    const gstAmount = part.taxAmount * selectedQuantity;
-                                    const taxAmount = part.taxAmount * selectedQuantity;
+                                    const gstAmount = gstPercentage > 0 ? (baseAmount * gstPercentage) / 100 : 0;
+                                    const taxAmount = gstAmount;
                                     const finalPrice = baseAmount + gstAmount;
 
 
@@ -2258,7 +2535,7 @@ const AssignEngineer = () => {
                                                 fontSize: { xs: '0.7rem', sm: '0.75rem' }
                                               }}
                                             >
-                                              Tax: {(part.taxAmount || part.gstPercentage || 0)}| Price: ₹{part.sellingPrice || 0}
+                                              Tax: {((part.igst || 0) + (part.cgstSgst || 0))}% | Price: ₹{part.sellingPrice || 0}
                                             </Typography>
 
                                             <Typography
@@ -2320,10 +2597,10 @@ const AssignEngineer = () => {
                                                   label="Qty"
                                                   value={selectedQuantity}
                                                   onChange={(e) => {
-                                                    const newQuantity = parseInt(e.target.value) || 1;
+                                                    const newQuantity = parseInt(e.target.value) || 0;
                                                     const oldQuantity = selectedQuantity;
 
-                                                    if (newQuantity < 1) {
+                                                    if (newQuantity < 0) {
                                                       return;
                                                     }
 
@@ -2332,10 +2609,16 @@ const AssignEngineer = () => {
                                                       return;
                                                     }
 
+                                                    // Auto-remove part if quantity becomes 0
+                                                    if (newQuantity === 0) {
+                                                      handlePartRemoval(partIndex);
+                                                      return;
+                                                    }
+
                                                     handlePartQuantityChange(partIndex, newQuantity, oldQuantity);
                                                   }}
                                                   inputProps={{
-                                                    min: 1,
+                                                    min: 0,
                                                     max: maxSelectableQuantity,
                                                     style: { width: '50px', textAlign: 'center' },
                                                     readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity)
@@ -2420,7 +2703,7 @@ const AssignEngineer = () => {
                                               >
                                                
                                                 <Typography variant="caption" color="primary" fontWeight={600}>
-                                                  Tax Amount: ₹{(part.taxAmount * selectedQuantity ).toFixed(2)}
+                                                  Tax Amount: ₹{((part.igst || 0) + (part.cgstSgst || 0) > 0 ? ((part.sellingPrice || 0) * ((part.igst || 0) + (part.cgstSgst || 0)) / 100) * selectedQuantity : 0).toFixed(2)}
                                                 </Typography>
                                               </Typography>
                                             </Grid>
@@ -2475,8 +2758,11 @@ const AssignEngineer = () => {
                                     const selectedQuantity = part.selectedQuantity || 1;
                                     const quantity = part.quantity || 0;
                                     const unitPrice = part.sellingPrice || 0;
-                                    const gstPercentage = part.taxAmount || 0;
-                                    const taxAmount = part.taxAmount;
+                                            // Use API structure: igst + cgstSgst = total tax percentage
+        const igst = part.igst || 0;
+        const cgstSgst = part.cgstSgst || 0;
+        const gstPercentage = igst + cgstSgst;
+        const taxAmount = gstPercentage > 0 ? ((part.sellingPrice || 0) * gstPercentage) / 100 : 0;
                                     // Calculate GST using InventoryManagement style
                                     const baseAmount = unitPrice * selectedQuantity;
                                     const gstAmount = (baseAmount * gstPercentage) / 100;
@@ -2586,10 +2872,10 @@ const AssignEngineer = () => {
                                                 value={selectedQuantity}
                                                 onChange={(e) => {
                                                   if (part.isPreLoaded) return;
-                                                  const newQuantity = parseInt(e.target.value) || 1;
+                                                  const newQuantity = parseInt(e.target.value) || 0;
                                                   const oldQuantity = selectedQuantity;
 
-                                                  if (newQuantity < 1) {
+                                                  if (newQuantity < 0) {
                                                     return;
                                                   }
 
@@ -2598,10 +2884,16 @@ const AssignEngineer = () => {
                                                     return;
                                                   }
 
+                                                  // Auto-remove part if quantity becomes 0
+                                                  if (newQuantity === 0) {
+                                                    handlePartRemoval(partIndex);
+                                                    return;
+                                                  }
+
                                                   handlePartQuantityChange(partIndex, newQuantity, oldQuantity);
                                                 }}
                                                 inputProps={{
-                                                  min: 1,
+                                                  min: 0,
                                                   max: maxSelectableQuantity,
                                                   style: { width: '50px', textAlign: 'center' },
                                                   readOnly: (isMaxQuantityReached && selectedQuantity === maxSelectableQuantity) || part.isPreLoaded
@@ -2685,7 +2977,7 @@ const AssignEngineer = () => {
                                               >
                                                
                                                 <Typography variant="caption" color="primary" fontWeight={600}>
-                                                  Tax Amount: ₹{( part.taxAmount * selectedQuantity || taxAmount).toFixed(2)}
+                                                  Tax Amount: ₹{(((part.igst || 0) + (part.cgstSgst || 0)) > 0 ? ((part.sellingPrice || 0) * ((part.igst || 0) + (part.cgstSgst || 0)) / 100) * selectedQuantity : 0).toFixed(2)}
                                                 </Typography>
                                               </Typography>
                                             </Grid>
@@ -2721,7 +3013,10 @@ const AssignEngineer = () => {
                               const totalValue = userSelectedParts.reduce((sum, part) => {
                                 const unitPrice = part.sellingPrice || 0;
                                 const quantity = part.selectedQuantity || 1;
-                                const gstPercentage = part.taxAmount || 0;
+                                // Use API structure: igst + cgstSgst = total tax percentage
+        const igst = part.igst || 0;
+        const cgstSgst = part.cgstSgst || 0;
+        const gstPercentage = igst + cgstSgst;
                                 const basePrice = unitPrice * quantity;
                                 const gstAmount = (basePrice * gstPercentage) / 100;
                                 return sum + basePrice + gstAmount;
@@ -2798,11 +3093,7 @@ const AssignEngineer = () => {
                         return;
                       }
 
-                      console.log('🚀 Calling /workprogress API with all parts:', {
-                        jobCardId: currentJobCardId,
-                        allParts: allParts,
-                        partsCount: allParts.length
-                      });
+                      
                       
                       // Call the workprogress API with all parts
                       const response = await axios.post(
@@ -2814,8 +3105,8 @@ const AssignEngineer = () => {
                             hsnNumber: part.hsnNumber || '',
                             quantity: Number(part.selectedQuantity || part.quantity || 1),
                             pricePerPiece: parseFloat((part.originalPricePerPiece || part.pricePerPiece || part.sellingPrice || 0).toFixed(2)),
-                            totalPrice: parseFloat(((part.sellingPrice || part.pricePerPiece || 0) * (part.selectedQuantity || part.quantity || 1) + (part.taxAmount || 0) * (part.selectedQuantity || part.quantity || 1)).toFixed(2)),
-                            taxAmount: parseFloat((part.taxAmount * (part.selectedQuantity || part.quantity || 1) || 0).toFixed(2)),
+                                    totalPrice: parseFloat(((part.sellingPrice || part.pricePerPiece || 0) * (part.selectedQuantity || part.quantity || 1) + (((part.igst || 0) + (part.cgstSgst || 0)) > 0 ? ((part.sellingPrice || part.pricePerPiece || 0) * ((part.igst || 0) + (part.cgstSgst || 0)) / 100) * (part.selectedQuantity || part.quantity || 1) : 0)).toFixed(2)),
+        taxAmount: parseFloat((((part.igst || 0) + (part.cgstSgst || 0)) > 0 ? ((part.sellingPrice || part.pricePerPiece || 0) * ((part.igst || 0) + (part.cgstSgst || 0)) / 100) * (part.selectedQuantity || part.quantity || 1) : 0).toFixed(2)),
                             taxPercentage: parseFloat((part.taxPercentage || part.gstPercentage || 0).toFixed(2)),
                             igst: parseFloat((part.igst || 0).toFixed(2)),
                             cgstSgst: parseFloat((part.cgstSgst || 0).toFixed(2))
@@ -2828,12 +3119,9 @@ const AssignEngineer = () => {
                           }
                         }
                       );
-
-                      console.log('✅ /workprogress API response:', response.data);
                       setSuccess('All parts successfully sent to work progress API!');
                       
                     } catch (error) {
-                      console.error('❌ Error calling /workprogress API:', error);
                       setError(`Failed to send parts to work progress API: ${error.response?.data?.message || error.message}`);
                     }
                   };
@@ -3179,7 +3467,7 @@ const AssignEngineer = () => {
                         if (newPart.taxType === 'igst' && igst > 0) {
                           singlePartGST = (newPart.sellingPrice * igst) / 100;
                         } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
-                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100; // CGST + SGST
                         }
                         return singlePartGST.toFixed(2);
                       })()}

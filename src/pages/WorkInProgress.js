@@ -237,9 +237,30 @@ const WorkInProgress = () => {
         if (existingPart) {
           const currentQuantity = existingPart.selectedQuantity || 1;
           const newQuantity = currentQuantity + 1;
-          const availableQuantity = getAvailableQuantity(newPart._id);
-          const maxSelectableQuantity = availableQuantity + currentQuantity;
-          if (newQuantity > maxSelectableQuantity) {
+          
+          // Calculate available quantity based on current state
+          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
+          if (!originalInventoryPart) {
+            setError(`Part "${newPart.partName}" not found in inventory`);
+            return;
+          }
+          
+          let totalSelected = 0;
+          
+          // Calculate total selected from all parts (pre-loaded + user-selected)
+          assignment.parts.forEach((assignmentPart) => {
+            if (assignmentPart._id === newPart._id) {
+              totalSelected += assignmentPart.selectedQuantity || 1;
+            }
+          });
+          
+          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
+          const maxSelectableQuantity = availableQuantity + newQuantity;
+          
+          // Special case: Allow selecting same part when quantity equals inventory
+          const isQuantityEqualToInventory = currentQuantity === originalInventoryPart.quantity;
+          
+          if (newQuantity > maxSelectableQuantity && !isQuantityEqualToInventory) {
             setError(
               `Cannot add more "${newPart.partName}". Maximum available: ${maxSelectableQuantity}, Current: ${currentQuantity}`
             );
@@ -261,7 +282,28 @@ const WorkInProgress = () => {
             totalWithGST: parseFloat(totalWithGST.toFixed(2)),
           });
         } else {
-          const availableQuantity = getAvailableQuantity(newPart._id);
+          // Calculate available quantity based on current state
+          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
+          if (!originalInventoryPart) {
+            setSnackbar({
+              open: true,
+              message: `❌ Part "${newPart.partName}" not found in inventory`,
+              severity: 'error'
+            });
+            return;
+          }
+          
+          let totalSelected = 0;
+          
+          // Calculate total selected from all parts (pre-loaded + user-selected)
+          assignment.parts.forEach((assignmentPart) => {
+            if (assignmentPart._id === newPart._id) {
+              totalSelected += assignmentPart.selectedQuantity || 1;
+            }
+          });
+          
+          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
+          
           if (availableQuantity < 1) {
             setSnackbar({
               open: true,
@@ -396,13 +438,29 @@ const WorkInProgress = () => {
     if (!part) return;
 
     try {
-      const availableQuantity = getAvailableQuantity(part._id);
-      const currentlySelected = part.selectedQuantity || 1;
-      const maxSelectableQuantity = availableQuantity + currentlySelected;
+      // Calculate available quantity based on current state before making changes
+      const originalPart = inventoryParts.find((p) => p._id === part._id);
+      if (!originalPart) {
+        setError(`Part not found in inventory`);
+        return;
+      }
+
+      let totalSelected = 0;
+      
+      // Calculate total selected from all parts (pre-loaded + user-selected)
+      assignment.parts.forEach((assignmentPart) => {
+        if (assignmentPart._id === part._id) {
+          totalSelected += assignmentPart.selectedQuantity || 1;
+        }
+      });
+      
+      // Remove the old quantity from total to get the correct available quantity
+      const availableQuantity = Math.max(0, originalPart.quantity - totalSelected + oldQuantity);
+      const maxSelectableQuantity = availableQuantity + newQuantity;
 
       if (newQuantity > maxSelectableQuantity) {
         setError(
-          `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Currently Selected: ${currentlySelected}`
+          `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}". Available: ${availableQuantity}, Requested: ${newQuantity}`
         );
         return;
       }
@@ -586,21 +644,23 @@ const WorkInProgress = () => {
 
     let totalSelected = 0;
     
-    // Check selectedParts (user-selected parts)
-    selectedParts.forEach((part) => {
+    // Only check assignment.parts to avoid double-counting
+    // This includes both pre-loaded parts and user-selected parts
+    assignment.parts.forEach((part) => {
       if (part._id === inventoryPartId) {
         totalSelected += part.selectedQuantity || 1;
       }
     });
     
-    // Check assignment.parts (all parts including pre-loaded and user-selected)
-    assignment.parts.forEach((part) => {
-      if (part._id === inventoryPartId && !part.isPreLoaded) {
-        totalSelected += part.selectedQuantity || 1;
-      }
-    });
+    const availableQuantity = Math.max(0, originalPart.quantity - totalSelected);
     
-    return Math.max(0, originalPart.quantity - totalSelected);
+    // Special case: If selected quantity equals inventory quantity, allow selecting the same part
+    // This enables users to select the same part when they've selected all available quantity
+    if (totalSelected === originalPart.quantity && totalSelected > 0) {
+      return originalPart.quantity; // Return full inventory quantity to allow same part selection
+    }
+    
+    return availableQuantity;
   };
 
   const updatePartQuantity = useCallback(
@@ -1880,15 +1940,23 @@ const WorkInProgress = () => {
                              multiple
                              fullWidth
                              options={inventoryParts.filter(
-                               (part) => getAvailableQuantity(part._id) > 0
+                               (part) => {
+                                 const availableQuantity = getAvailableQuantity(part._id);
+                                 // Allow parts that have available quantity OR have been fully selected (to allow reselection)
+                                 return availableQuantity > 0 || availableQuantity === part.quantity;
+                               }
                              )}
-                             getOptionLabel={(option) =>
-                               `${option.partName} (${
+                             getOptionLabel={(option) => {
+                               const availableQuantity = getAvailableQuantity(option._id);
+                               const isFullySelected = availableQuantity === option.quantity;
+                               const statusText = isFullySelected ? "Fully Selected - Can Reselect" : `Available: ${availableQuantity}`;
+                               
+                               return `${option.partName} (${
                                  option.partNumber || "N/A"
-                               }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST: ${
+                               }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST11232: ${
                                  option.gstPercentage || option.taxAmount || 0
-                               }% | Available: ${getAvailableQuantity(option._id)}`
-                             }
+                               } | ${statusText}`;
+                             }}
                              value={selectedParts}
                              onChange={(event, newValue) => {
                                handlePartSelection(newValue, selectedParts);
@@ -1908,25 +1976,32 @@ const WorkInProgress = () => {
                                 />
                               ))
                             }
-                            renderOption={(props, option) => (
-                              <Box component="li" {...props}>
-                                <Box sx={{ width: "100%" }}>
-                                  <Typography variant="body2" fontWeight={500}>
-                                    {option.partName}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
-                                    {option.sellingPrice || 0} | GST:{" "}
-                                    {option.gstPercentage || option.taxAmount || 0}% |
-                                    Available: {getAvailableQuantity(option._id)} |
-                                    {option.carName} - {option.model}
-                                  </Typography>
+                            renderOption={(props, option) => {
+                              const availableQuantity = getAvailableQuantity(option._id);
+                              const isFullySelected = availableQuantity === option.quantity;
+                              const statusText = isFullySelected ? "Fully Selected - Can Reselect" : `Available: ${availableQuantity}`;
+                              const statusColor = isFullySelected ? "warning.main" : "text.secondary";
+                              
+                              return (
+                                <Box component="li" {...props}>
+                                  <Box sx={{ width: "100%" }}>
+                                    <Typography variant="body2" fontWeight={500}>
+                                      {option.partName}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color={statusColor}
+                                    >
+                                      Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
+                                      {option.sellingPrice || 0} | GST:{" "}
+                                      {option.gstPercentage || option.taxAmount || 0}% |
+                                      {statusText} |
+                                      {option.carName} - {option.model}
+                                    </Typography>
+                                  </Box>
                                 </Box>
-                              </Box>
-                            )}
+                              );
+                            }}
                             renderInput={(params) => (
                               <TextField
                                 {...params}
@@ -1947,20 +2022,24 @@ const WorkInProgress = () => {
                             )}
                             filterOptions={(options, { inputValue }) => {
                               return options.filter(
-                                (option) =>
-                                  getAvailableQuantity(option._id) > 0 &&
-                                  (option.partName
-                                    .toLowerCase()
-                                    .includes(inputValue.toLowerCase()) ||
-                                    option.partNumber
-                                      ?.toLowerCase()
+                                (option) => {
+                                  const availableQuantity = getAvailableQuantity(option._id);
+                                  const isAvailable = availableQuantity > 0 || availableQuantity === option.quantity;
+                                  
+                                  return isAvailable &&
+                                    (option.partName
+                                      .toLowerCase()
                                       .includes(inputValue.toLowerCase()) ||
-                                    option.carName
-                                      ?.toLowerCase()
-                                      .includes(inputValue.toLowerCase()) ||
-                                    option.model
-                                      ?.toLowerCase()
-                                      .includes(inputValue.toLowerCase()))
+                                      option.partNumber
+                                        ?.toLowerCase()
+                                        .includes(inputValue.toLowerCase()) ||
+                                      option.carName
+                                        ?.toLowerCase()
+                                        .includes(inputValue.toLowerCase()) ||
+                                      option.model
+                                        ?.toLowerCase()
+                                        .includes(inputValue.toLowerCase()));
+                                }
                               );
                             }}
                           />
@@ -2035,9 +2114,9 @@ const WorkInProgress = () => {
                                 const taxRate = part.taxAmount || 0; // percentage
                                 
                                 // For existing parts from job card, use the original values as-is
-                                const pricePerPiece = part.isExisting ? part.sellingPrice : (sellingPrice + (sellingPrice * taxRate / 100));
+                                const pricePerPiece = part.isExisting ? part.sellingPrice : sellingPrice + taxRate;
                                 const totalPrice = part.isExisting ? part.totalPrice : (pricePerPiece * selectedQuantity);
-                                const taxAmount = part.isExisting ? 0 : ((sellingPrice * taxRate / 100) * selectedQuantity);
+                                const taxAmount = part.isExisting ? 0 :  taxRate * selectedQuantity;
     
 
     
@@ -2090,6 +2169,19 @@ const WorkInProgress = () => {
                                               sx={{ fontSize: '0.7rem', height: '20px' }}
                                             />
                                           )}
+                                          {!part.isExisting && (() => {
+                                            const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                            const isFullySelected = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                            return isFullySelected ? (
+                                              <Chip
+                                                label="Fully Selected - Can Reselect"
+                                                size="small"
+                                                color="warning"
+                                                variant="outlined"
+                                                sx={{ fontSize: '0.7rem', height: '20px' }}
+                                              />
+                                            ) : null;
+                                          })()}
                                         </Box>
                                         <Typography
                                           variant="caption"
@@ -2114,9 +2206,13 @@ const WorkInProgress = () => {
                                         >
                                           {part.isExisting ? (
                                             `Quantity: ${selectedQuantity} (Fixed)`
-                                          ) : (
-                                            `Max Selectable: ${maxSelectableQuantity} | Selected: ${selectedQuantity}`
-                                          )}
+                                          ) : (() => {
+                                            const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                            const isFullySelected = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                            return isFullySelected ? 
+                                              `Fully Selected: ${selectedQuantity} (Can Reselect)` :
+                                              `Max Selectable: ${maxSelectableQuantity} | Selected: ${selectedQuantity}`;
+                                          })()}
                                         </Typography>
                                         {!part.isExisting && (
                                           <Typography
@@ -2128,7 +2224,13 @@ const WorkInProgress = () => {
                                               fontStyle: 'italic'
                                             }}
                                           >
-                                            ⚠️ Inventory will be reduced by {selectedQuantity} on update
+                                            {(() => {
+                                              const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                              const isFullySelected = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                              return isFullySelected ? 
+                                                `⚠️ Fully selected - can be reselected for additional quantity` :
+                                                `⚠️ Inventory will be reduced by ${selectedQuantity} on update`;
+                                            })()}
                                           </Typography>
                                         )}
                                       </Box>
@@ -2192,8 +2294,12 @@ const WorkInProgress = () => {
                                                 return;
                                               }
     
+                                              // Special case: Allow selecting same part when quantity equals inventory
+                                              const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                              const isQuantityEqualToInventory = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                              
                                               if (
-                                                newQuantity > maxSelectableQuantity
+                                                newQuantity > maxSelectableQuantity && !isQuantityEqualToInventory
                                               ) {
                                                 setError(
                                                   `Cannot select more than ${maxSelectableQuantity} units of "${part.partName}"`
@@ -2209,7 +2315,11 @@ const WorkInProgress = () => {
                                             }}
                                             inputProps={{
                                               min: 1,
-                                              max: maxSelectableQuantity,
+                                              max: (() => {
+                                                const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                                const isQuantityEqualToInventory = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                                return isQuantityEqualToInventory ? selectedQuantity + 1 : maxSelectableQuantity;
+                                              })(),
                                               style: {
                                                 width: "50px",
                                                 textAlign: "center",
@@ -2217,7 +2327,9 @@ const WorkInProgress = () => {
                                               readOnly:
                                                 (isMaxQuantityReached &&
                                                 selectedQuantity ===
-                                                  maxSelectableQuantity) || part.isExisting,
+                                                  maxSelectableQuantity && 
+                                                !(inventoryParts.find(p => p._id === part._id) && 
+                                                  selectedQuantity === inventoryParts.find(p => p._id === part._id).quantity)) || part.isExisting,
                                             }}
                                             sx={{
                                               width: "70px",
@@ -2234,8 +2346,13 @@ const WorkInProgress = () => {
                                             onClick={() => {
                                               const newQuantity =
                                                 selectedQuantity + 1;
+                                              
+                                              // Special case: Allow selecting same part when quantity equals inventory
+                                              const originalInventoryPart = inventoryParts.find(p => p._id === part._id);
+                                              const isQuantityEqualToInventory = originalInventoryPart && selectedQuantity === originalInventoryPart.quantity;
+                                              
                                               if (
-                                                newQuantity <= maxSelectableQuantity
+                                                newQuantity <= maxSelectableQuantity || isQuantityEqualToInventory
                                               ) {
                                                 handlePartQuantityChange(
                                                   partIndex,
@@ -2249,8 +2366,9 @@ const WorkInProgress = () => {
                                               }
                                             }}
                                             disabled={
-                                              selectedQuantity >=
-                                                maxSelectableQuantity ||
+                                              (selectedQuantity >= maxSelectableQuantity && 
+                                               !(inventoryParts.find(p => p._id === part._id) && 
+                                                 selectedQuantity === inventoryParts.find(p => p._id === part._id).quantity)) ||
                                               availableQuantity === 0 ||
                                               part.isExisting
                                             }
@@ -2326,7 +2444,7 @@ const WorkInProgress = () => {
                                             variant="caption"
                                             color="text.secondary"
                                           >
-                                            GST: ₹{taxAmount.toFixed(2)}
+                                            GST1: ₹{taxAmount.toFixed(2)}
                                           </Typography>
                                         </Grid>
                                         <Grid item xs={5}>

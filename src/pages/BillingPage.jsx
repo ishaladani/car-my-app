@@ -1218,14 +1218,16 @@ const generateProfessionalGSTInvoice = () => {
     const doc = new jsPDF('p', 'pt', 'a4');
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
-    const margin = 30;
-    const contentWidth = pageWidth - (margin * 2);
-    let currentY = 40;
+
+    // ——— compact layout tuning for single-page fit ———
+    const margin = 24;                      // was 30
+    const contentWidth = pageWidth - margin * 2;
+    let currentY = 28;                      // was 40
+    const lineGap = 14;                     // compact line height
 
     // Helper: Draw bordered rectangle
     const drawBorderedRect = (x, y, width, height, fillColor = null) => {
       if (fillColor) {
-        // Handle different color formats safely
         try {
           if (typeof fillColor === 'string' && fillColor.startsWith('#')) {
             const hex = fillColor.substring(1);
@@ -1235,620 +1237,395 @@ const generateProfessionalGSTInvoice = () => {
               const b = parseInt(hex.substring(4, 6), 16);
               doc.setFillColor(r, g, b);
             } else {
-              doc.setFillColor(240, 240, 240); // Default light gray
+              doc.setFillColor(240, 240, 240);
             }
           } else if (typeof fillColor === 'string') {
-            // Handle named colors
-            switch(fillColor) {
+            switch (fillColor) {
               case 'lightgray':
               case '#f8f9fa':
-                doc.setFillColor(248, 249, 250);
-                break;
+                doc.setFillColor(248, 249, 250); break;
               case 'darkblue':
               case '#34495e':
-                doc.setFillColor(52, 73, 94);
-                break;
+                doc.setFillColor(52, 73, 94); break;
               case 'blue':
               case '#3498db':
-                doc.setFillColor(52, 152, 219);
-                break;
+                doc.setFillColor(52, 152, 219); break;
               case 'green':
               case '#27ae60':
-                doc.setFillColor(39, 174, 96);
-                break;
+                doc.setFillColor(39, 174, 96); break;
               case 'lightgreen':
               case '#e8f5e8':
-                doc.setFillColor(232, 245, 232);
-                break;
+                doc.setFillColor(232, 245, 232); break;
               default:
                 doc.setFillColor(240, 240, 240);
             }
           } else {
-            doc.setFillColor(240, 240, 240); // Default
+            doc.setFillColor(240, 240, 240);
           }
           doc.rect(x, y, width, height, 'F');
-        } catch (error) {
-          console.warn('Color setting error:', error);
-          // Draw without fill if color fails
-        }
+        } catch (_) { /* ignore fill errors */ }
       }
       doc.setLineWidth(0.5);
       doc.setDrawColor(0, 0, 0);
       doc.rect(x, y, width, height);
     };
 
-    // Helper: Check if new page is needed
-    const checkPageBreak = (requiredSpace) => {
-      if (currentY + requiredSpace > pageHeight - 100) {
-        doc.addPage();
-        currentY = 40;
-        return true;
-      }
-      return false;
-    };
+    // Helper: NEVER add a second page — instead, stop adding rows/sections
+    const wouldOverflow = (requiredSpace) =>
+      currentY + requiredSpace > pageHeight - 80; // footer buffer
 
-    // Calculate totals properly - only include valid parts
-    const validParts = parts.filter(part => part && part.total > 0);
-    
-    // Parts subtotal (never taxed) - match BillSummarySection logic
+    // Calculate totals (unchanged business rules)
+    const validParts = parts.filter(p => p && Number(p.total) > 0);
     const partsSubtotal = summary.totalPartsCost || 0;
-    
-    // Use actual API data for labor services - ensure we get the correct value
+
     let laborTotal = 0;
-    
-    // Try multiple sources for labor data - match BillSummarySection logic
-    if (jobCardData?.laborServicesTotal && jobCardData.laborServicesTotal > 0) {
-      laborTotal = jobCardData.laborServicesTotal;
-    } else if (laborServicesTotal && laborServicesTotal > 0) {
-      laborTotal = laborServicesTotal;
-    } else if (jobCardData?.laborServices && Array.isArray(jobCardData.laborServices)) {
-      // Calculate from labor services array if available
-      laborTotal = jobCardData.laborServices.reduce((sum, service) => sum + (parseFloat(service.amount) || 0), 0);
+    if (jobCardData?.laborServicesTotal > 0) laborTotal = jobCardData.laborServicesTotal;
+    else if (laborServicesTotal > 0) laborTotal = laborServicesTotal;
+    else if (Array.isArray(jobCardData?.laborServices)) {
+      laborTotal = jobCardData.laborServices.reduce((s, srv) => s + (parseFloat(srv.amount) || 0), 0);
     }
-    
-    // For debugging - log the labor total
-    console.log('PDF Labor Total:', laborTotal, 'jobCardData:', jobCardData?.laborServicesTotal, 'laborServicesTotal:', laborServicesTotal);
-    
-    // 🔑 Only apply GST on Labour/Service (not on parts) - match BillSummarySection logic
+
     const shouldApplyGst = gstSettings.billType === 'gst' && laborTotal > 0;
-    
-    // ✅ GST ONLY on Labour - match BillSummarySection logic
     const laborGstAmount = shouldApplyGst ? (laborTotal * (gstSettings.gstPercentage / 100)) : 0;
-    
-    // ❌ NO GST on Parts - match BillSummarySection logic
-    const partsGstAmount = 0; // Always 0
-    
-    // Total GST = Only Labour GST - match BillSummarySection logic
-    const totalGstAmount = laborGstAmount;
-    
-    // Subtotal (Parts + Labour) - match BillSummarySection logic
+    const partsGstAmount = 0;
+    const totalGstAmount = laborGstAmount + partsGstAmount;
     const totalBeforeTax = partsSubtotal + laborTotal;
-    
-    // Final total: parts + labour + GST (only on labour) - discount - match BillSummarySection logic
     const finalAmount = totalBeforeTax + totalGstAmount - (summary.discount || 0);
 
-    // Number to Words function
+    // Number to Words (short + compact)
     const numberToWords = (num) => {
       const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
       const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
       const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
       if (num === 0) return 'Zero';
       let words = '';
-      if (num >= 10000000) {
-        words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
-        num %= 10000000;
-      }
-      if (num >= 100000) {
-        words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
-        num %= 100000;
-      }
-      if (num >= 1000) {
-        words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
-        num %= 1000;
-      }
-      if (num >= 100) {
-        words += ones[Math.floor(num / 100)] + ' Hundred ';
-        num %= 100;
-      }
-      if (num >= 20) {
-        words += tens[Math.floor(num / 10)];
-        if (num % 10 !== 0) words += ' ' + ones[num % 10];
-      } else if (num >= 10) {
-        words += teens[num - 10];
-      } else if (num > 0) {
-        words += ones[num];
-      }
+      const crore = Math.floor(num / 10000000); if (crore) { words += numberToWords(crore) + ' Crore '; num %= 10000000; }
+      const lakh = Math.floor(num / 100000); if (lakh) { words += numberToWords(lakh) + ' Lakh '; num %= 100000; }
+      const thousand = Math.floor(num / 1000); if (thousand) { words += numberToWords(thousand) + ' Thousand '; num %= 1000; }
+      const hundred = Math.floor(num / 100); if (hundred) { words += ones[hundred] + ' Hundred '; num %= 100; }
+      if (num >= 20) { words += tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : ''); }
+      else if (num >= 10) { words += teens[num - 10]; }
+      else if (num > 0) { words += ones[num]; }
       return words.trim();
     };
 
     // -----------------------------
-    // HEADER SECTION
+    // HEADER (shorter, centered)
     // -----------------------------
-    drawBorderedRect(margin, currentY, contentWidth, 120, 'lightgray');
+    drawBorderedRect(margin, currentY, contentWidth, 96, 'lightgray');
 
-    // Logo - Simple approach without complex graphics
-    const logoSize = 50;
-    const logoX = margin + 15;
-    const logoY = currentY + 15;
-    
+    // Logo (smaller)
+    const logoSize = 44;
+    const logoX = margin + 10;
+    const logoY = currentY + 10;
     if (garageDetails.logoUrl) {
-      try {
-        // Draw white background circle
-        // doc.setFillColor(255, 255, 255);
-        // doc.setDrawColor(200, 200, 200);
-        // doc.setLineWidth(2);
-        // doc.circle(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 'FD');
-        
-        // Add logo image (square crop will be contained within circle)
-        doc.addImage(garageDetails.logoUrl, 'JPEG', logoX + 5, logoY + 5, logoSize - 10, logoSize - 10);
-        
-      } catch (error) {
-        console.warn('Logo load failed:', error);
-        // Draw placeholder
-        doc.setFillColor(240, 240, 240);
-        doc.setDrawColor(180, 180, 180);
-        doc.circle(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 'FD');
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.text("LOGO", logoX + logoSize/2 - 15, logoY + logoSize/2 + 5);
-      }
+      try { doc.addImage(garageDetails.logoUrl, 'JPEG', logoX, logoY, logoSize, logoSize); } catch (_) {}
     }
 
     // Company Name
-    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(40, 40, 40);
-    const companyName = garageDetails.name.toUpperCase();
+    doc.setFontSize(16);
+    const companyName = (garageDetails.name || '').toUpperCase();
     const companyNameWidth = doc.getTextWidth(companyName);
     const centerX = (pageWidth - companyNameWidth) / 2;
-    doc.text(companyName, centerX, currentY + 40);
+    doc.text(companyName, centerX, currentY + 28);
 
-    // Contact details
+    // Address + GST + Contact (compact lines)
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const addressLine = garageDetails.address;
-    const addressWidth = doc.getTextWidth(addressLine);
-    doc.text(addressLine, (pageWidth - addressWidth) / 2, currentY + 80);
-
-    const gstLine = `GST No: ${garageDetails.gstNumber || 'N/A'}`;
-    const gstWidth = doc.getTextWidth(gstLine);
-    doc.text(gstLine, (pageWidth - gstWidth) / 2, currentY + 95);
-
+    doc.setFontSize(9);
+    const mkCenter = (t, dy) => {
+      const w = doc.getTextWidth(t);
+      doc.text(t, (pageWidth - w) / 2, currentY + dy);
+    };
+    if (garageDetails.address) mkCenter(garageDetails.address, 44);
+    mkCenter(`GST No: ${garageDetails.gstNumber || 'N/A'}`, 58);
     if (garageDetails.phone || garageDetails.email) {
       const contactLine = `${garageDetails.phone ? 'Ph: ' + garageDetails.phone : ''}${garageDetails.phone && garageDetails.email ? ' | ' : ''}${garageDetails.email ? 'Email: ' + garageDetails.email : ''}`;
-      const contactWidth = doc.getTextWidth(contactLine);
-      doc.text(contactLine, (pageWidth - contactWidth) / 2, currentY + 110);
+      mkCenter(contactLine, 72);
     }
-
-    currentY += 140;
+    currentY += 96 + 8;
 
     // -----------------------------
-    // CUSTOMER & INVOICE DETAILS
+    // CUSTOMER & INVOICE DETAILS (tight, two boxes)
     // -----------------------------
     const detailsY = currentY;
-    const leftSectionWidth = (contentWidth * 0.6) - 5;
-    const rightSectionWidth = (contentWidth * 0.4) - 5;
-    
-    // Bill To Section
-    drawBorderedRect(margin, detailsY, leftSectionWidth, 130);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(52, 152, 219);
-    doc.text("BILL TO", margin + 10, detailsY + 20);
-    
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Name: ${gstSettings.billToParty || carDetails.customerName}`, margin + 10, detailsY + 40);
-    doc.text(`Contact: ${carDetails.contact}`, margin + 10, detailsY + 55);
-    if (carDetails.email) doc.text(`Email: ${carDetails.email}`, margin + 10, detailsY + 70);
-    if (gstSettings.customerGstNumber && gstSettings.billType === 'gst') {
-      doc.text(`GST No: ${gstSettings.customerGstNumber}`, margin + 10, detailsY + 85);
-    }
-    
-    // Vehicle Details
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(52, 152, 219);
-    doc.text("VEHICLE DETAILS", margin + 10, detailsY + 105);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${carDetails.company} ${carDetails.model} | Reg: ${carDetails.carNumber}`, margin + 10, detailsY + 120);
+    const leftW = Math.floor(contentWidth * 0.60) - 6;
+    const rightW = Math.floor(contentWidth * 0.40) - 6;
 
-    // Invoice Details
-    drawBorderedRect(margin + leftSectionWidth + 10, detailsY, rightSectionWidth, 130, 'lightgray');
+    // BILL TO
+    drawBorderedRect(margin, detailsY, leftW, 110);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
     doc.setTextColor(52, 152, 219);
-    doc.text("SHIP", margin + leftSectionWidth + 20, detailsY + 20);
-    
+    doc.text("BILL TO", margin + 8, detailsY + 18);
+
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.text(`Invoice No: ${carDetails.invoiceNo}`, margin + leftSectionWidth + 20, detailsY + 40);
-    doc.text(`Job Card No: ${jobCardData?.jobCardNumber || 'N/A'}`, margin + leftSectionWidth + 20, detailsY + 55);
-    doc.text(`Date: ${carDetails.billingDate}`, margin + leftSectionWidth + 20, detailsY + 70);
+    doc.setFontSize(9);
+    let y = detailsY + 18 + lineGap;
+    const put = (label, val) => { if (!val) return; doc.text(`${label}: ${val}`, margin + 8, y); y += lineGap; };
+
+    put("Name", gstSettings.billToParty || carDetails.customerName);
+    put("Contact", carDetails.contact);
+    if (carDetails.email) put("Email", carDetails.email);
+    if (gstSettings.customerGstNumber && gstSettings.billType === 'gst') put("GST No", gstSettings.customerGstNumber);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(52, 152, 219);
+    doc.text("VEHICLE", margin + 8, detailsY + 18 + lineGap * 4 + 6);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${carDetails.company} ${carDetails.model} | Reg: ${carDetails.carNumber}`, margin + 8, detailsY + 18 + lineGap * 5 + 6);
+
+    // INVOICE BOX
+    drawBorderedRect(margin + leftW + 12, detailsY, rightW, 110, 'lightgray');
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(52, 152, 219);
+    doc.text("INVOICE", margin + leftW + 20, detailsY + 18);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    const rightX = margin + leftW + 20;
+    doc.text(`Invoice No: ${carDetails.invoiceNo}`, rightX, detailsY + 18 + lineGap);
+    doc.text(`Job Card No: ${jobCardData?.jobCardNumber || 'N/A'}`, rightX, detailsY + 18 + lineGap * 2);
+    doc.text(`Date: ${carDetails.billingDate}`, rightX, detailsY + 18 + lineGap * 3);
     if (jobCardData?.insuranceProvider) {
-      doc.text(`Insurance: ${jobCardData.insuranceProvider}`, margin + leftSectionWidth + 20, detailsY + 85);
+      doc.text(`Insurance: ${jobCardData.insuranceProvider}`, rightX, detailsY + 18 + lineGap * 4);
     }
-    
-    currentY = detailsY + 150;
+
+    currentY = detailsY + 110 + 10;
 
     // -----------------------------
-    // ITEMS TABLE
+    // ITEMS TABLE (full page width)
     // -----------------------------
-    const tableStartY = currentY;
-    const colWidths = gstSettings.billType === 'gst' 
-      ? { 
-          srNo: 35, 
-          productName: 240,
-          hsnCode: 60,  
-          qty: 40, 
-          rate: 70, 
-          amount: 80 
-        }
-      : { 
-          srNo: 35, 
-          productName: 240, 
-          hsnCode: 60, 
-          qty: 40, 
-          rate: 70, 
-          amount: 80 
-        };
-    const totalTableWidth = Object.values(colWidths).reduce((a, b) => a + b, 0);
-    
-    // Table Header
-    const headerY = tableStartY;
-    drawBorderedRect(margin, headerY, totalTableWidth, 35, 'darkblue');
-    doc.setFontSize(10);
+    // Calculate column widths to use full page width for better space utilization
+    const colWidths = { 
+      srNo: Math.floor(contentWidth * 0.08),      // 8% of content width
+      productName: Math.floor(contentWidth * 0.45), // 45% of content width - largest for descriptions
+      hsnCode: Math.floor(contentWidth * 0.15),   // 15% of content width
+      qty: Math.floor(contentWidth * 0.10),       // 10% of content width
+      rate: Math.floor(contentWidth * 0.12),      // 12% of content width
+      amount: Math.floor(contentWidth * 0.10)     // 10% of content width
+    };
+    const totalTableWidth = contentWidth; // Use full content width instead of fixed widths
+
+    const headerY = currentY;
+    drawBorderedRect(margin, headerY, totalTableWidth, 28, 'darkblue');
+    doc.setFontSize(9.2);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
-    
+
     let colX = margin;
-    const headers = ["Sr.", "Product/Service Description", "HSN Code", "Qty", "Rate", "Amount"];
-    headers.forEach((text, i) => {
+    ["Sr.", "Product/Service Description", "HSN Code", "Qty", "Rate (₹)", "Amount (₹)"].forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
+      
       if (i === 1) {
-        doc.text(text, colX + 5, headerY + 22);
+        // Product/Service - left aligned
+        doc.text(text, colX + 8, headerY + 19);
+      } else if (i === 0 || i === 2 || i === 3) {
+        // Sr, HSN, Qty - center aligned
+        doc.text(text, colX + (w - txtW) / 2, headerY + 19);
       } else {
-        doc.text(text, colX + (w - txtW) / 2, headerY + 22);
+        // Rate and Amount - right aligned
+        doc.text(text, colX + w - txtW - 8, headerY + 19);
       }
-      if (i < 6) {
+      
+      // Draw column separators
+      if (i < 5) {
         doc.setDrawColor(255, 255, 255);
-        doc.line(colX + w, headerY, colX + w, headerY + 35);
+        doc.line(colX + w, headerY, colX + w, headerY + 28);
       }
       colX += w;
     });
-    
-    doc.setTextColor(0, 0, 0);
-    currentY = headerY + 35;
 
-    // Table row drawing function
+    doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8.8);
+    currentY = headerY + 28;
+
+    const rowHeight = 24; // slightly taller for better readability
     let rowIndex = 1;
-    
-    const drawTableRow = (rowData, y, isAlternate = false) => {
-      const rowHeight = 30;
-      const bgColor = isAlternate ? 'lightgray' : null;
-      drawBorderedRect(margin, y, totalTableWidth, rowHeight, bgColor);
-      
-      colX = margin;
+
+    const drawTableRow = (rowData, y, shaded = false) => {
+      if (wouldOverflow(rowHeight)) return 0; // stop adding rows if overflow
+      drawBorderedRect(margin, y, totalTableWidth, rowHeight, shaded ? 'lightgray' : null);
+      let x = margin;
       rowData.forEach((cell, i) => {
         const w = colWidths[Object.keys(colWidths)[i]];
-        let display = cell.toString();
-        
-        // Format currency properly - use proper rupee symbol
-        const isCurrencyColumn = (i === 4 || i === 5); // Rate and Amount columns
-          
-        if (isCurrencyColumn) {
-          if (display !== '' && !isNaN(display)) {
-            display = ' ' + parseFloat(display).toFixed(2);
-          }
+        let display = (cell ?? '').toString();
+
+        if ((i === 4 || i === 5) && display !== '' && !isNaN(display)) {
+          display = ' ' + parseFloat(display).toFixed(2);
+        }
+
+        if (i === 1) {
+          // Product name - left aligned with more space for longer names
+          const maxLength = Math.floor(w / 6); // Approximate characters that fit
+          const text = display.length > maxLength ? display.slice(0, maxLength) + '…' : display;
+          doc.text(text, x + 8, y + 16);
+        } else if (i === 2) {
+          // HSN Code - center aligned
+          const tW = doc.getTextWidth(display);
+          doc.text(display, x + (w - tW) / 2, y + 16);
+        } else if (i === 0) {
+          // Sr No - center aligned
+          const tW = doc.getTextWidth(display);
+          doc.text(display, x + (w - tW) / 2, y + 16);
+        } else if (i === 3) {
+          // Quantity - center aligned
+          const tW = doc.getTextWidth(display);
+          doc.text(display, x + (w - tW) / 2, y + 16);
+        } else if (i === 4 || i === 5) {
+          // Rate and Amount - right aligned
+          const tW = doc.getTextWidth(display);
+          doc.text(display, x + w - tW - 8, y + 16);
         }
         
-        // Handle long text in product name
-        if (i === 1 && display.length > 30) {
-          const lines = doc.splitTextToSize(display, w - 10);
-          doc.text(lines[0], colX + 5, y + 20);
-          if (lines.length > 1) {
-            doc.setFontSize(8);
-            doc.text(lines[1].substring(0, 25) + '...', colX + 5, y + 28);
-            doc.setFontSize(9);
-          }
-        } else {
-          const txtW = doc.getTextWidth(display);
-          
-          // Right align for Sr.No, Qty, Rate, Amount columns
-          if (i === 0 || i === 3 || i === 4 || i === 5) {
-            doc.text(display, colX + w - txtW - 5, y + 20);
-          } 
-          // Center align for HSN Code column  
-          else if (i === 2) {
-            doc.text(display, colX + (w - txtW) / 2, y + 20);
-          }
-          // Left align for Product Name
-          else {
-            doc.text(display, colX + 5, y + 20);
-          }
-        }
-        
-        if (i < 6) {
+        // Draw column separators
+        if (i < 5) { // Don't draw line after last column
           doc.setDrawColor(220, 220, 220);
-          doc.line(colX + w, y, colX + w, y + rowHeight);
+          doc.line(x + w, y, x + w, y + rowHeight);
         }
-        colX += w;
+        x += w;
       });
       return rowHeight;
     };
 
-    // Add only valid parts rows
-    validParts.forEach((part, index) => {
-      checkPageBreak(35);
-      
-      // Parts are never taxed - match BillSummarySection logic
-      const amount = part.pricePerUnit * part.quantity;
-      
+    // Parts rows
+    validParts.forEach((part, idx) => {
+      if (wouldOverflow(rowHeight)) return;
+      const amount = (Number(part.pricePerUnit) || 0) * (Number(part.quantity) || 0);
       const row = [
         rowIndex++,
-        part.name,
-        part.hsnNumber || 'N/A',
-        part.quantity,
+        part.name || 'Part',
+        part.hsnNumber || '-',
+        part.quantity ?? '-',
+        (Number(part.pricePerUnit) || 0).toFixed(2),
         amount.toFixed(2),
-        amount.toFixed(2)
       ];
-      
-      currentY += drawTableRow(row, currentY, index % 2 === 1);
+      const h = drawTableRow(row, currentY, idx % 2 === 1);
+      currentY += h;
     });
 
-    // Add Labor & Services Row if exists
-    console.log('Adding Labor & Services row, laborTotal:', laborTotal);
-    
-    // Always add Labor & Services row if there's any labor data (even 0.01)
-    if (laborTotal && laborTotal > 0) {
-      checkPageBreak(35);
-      
-      // Labor services - match BillSummarySection logic
-      const row = [
-        rowIndex++,
-        "Labor & Services",
-        "-", // Default HSN for services
-        "-",
-        laborTotal.toFixed(2),
-        laborTotal.toFixed(2)
-      ];
-      
-      console.log('Labor & Services row data:', row);
-      currentY += drawTableRow(row, currentY, validParts.length % 2 === 0);
-    } else {
-      console.log('No labor total found, skipping Labor & Services row. laborTotal:', laborTotal);
-      console.log('Available data sources:', {
-        jobCardDataLaborServicesTotal: jobCardData?.laborServicesTotal,
-        laborServicesTotal: laborServicesTotal,
-        jobCardDataLaborServices: jobCardData?.laborServices
-      });
+    // Labour row
+    if (!wouldOverflow(rowHeight) && laborTotal > 0) {
+      const row = [rowIndex++, "Labor & Services", "-", "-", laborTotal.toFixed(2), laborTotal.toFixed(2)];
+      const h = drawTableRow(row, currentY, validParts.length % 2 === 0);
+      currentY += h;
     }
 
-    // Add empty rows only if needed (minimum 5 rows total)
-    const totalDataRows = validParts.length + (laborTotal > 0 ? 1 : 0);
-    const minRows = Math.max(5, totalDataRows);
-    for (let i = totalDataRows; i < minRows; i++) {
-      const emptyRow = gstSettings.billType === 'gst' 
-        ? ["", "", "", "", "", ""] // GST: 6 columns
-        : ["", "", "", "", "", ""]; // Non-GST: 6 columns
-      currentY += drawTableRow(emptyRow, currentY, i % 2 === 1);
-    }
-
-    currentY += 20;
+    currentY += 8;
 
     // -----------------------------
-    // BILLING SUMMARY
+    // BILLING SUMMARY (compact card)
     // -----------------------------
-    checkPageBreak(300);
-    
-    const summaryWidth = 250;
+    const summaryWidth = 240;
     const summaryX = pageWidth - margin - summaryWidth;
-    
-    // Summary Header
-    drawBorderedRect(summaryX, currentY, summaryWidth, 30, 'darkblue');
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(255, 255, 255);
-    doc.text("BILLING SUMMARY", summaryX + 10, currentY + 20);
-    currentY += 30;
-    
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    
-    // 💰 Cost Breakdown - match BillSummarySection exactly
-    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-    doc.setFont("helvetica", "normal");
-    doc.text("Parts:", summaryX + 10, currentY + 17);
-    doc.setFont("helvetica", "bold");
-    doc.text(` ${partsSubtotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-    currentY += 25;
-    
-    // Labour
-    if (laborTotal > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25, 'lightgray');
-      doc.setFont("helvetica", "normal");
-      doc.text("Labour:", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.text(` ${laborTotal.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      currentY += 25;
-    }
 
-    // Labour GST (only if GST is applied)
-    if (shouldApplyGst && laborGstAmount > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "normal");
-      doc.text("Labour GST:", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.text(` ${laborGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      currentY += 25;
-    }
+    const summaryBlockHeight =
+      26 * (1 + (laborTotal > 0 ? 1 : 0) + (shouldApplyGst && laborGstAmount > 0 ? 1 : 0) +
+        (summary.discount > 0 ? 2 : 1)); // includes subtotal & grand total lines
 
-    // Subtotal
-    drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-    doc.setFont("helvetica", "normal");
-    doc.text("Subtotal:", summaryX + 10, currentY + 17);
-    doc.setFont("helvetica", "bold");
-    doc.text(` ${(totalBeforeTax + totalGstAmount).toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-    currentY += 25;
+    if (!wouldOverflow(summaryBlockHeight + 40)) {
+      drawBorderedRect(summaryX, currentY, summaryWidth, 26, 'darkblue');
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
+      doc.text("BILLING SUMMARY", summaryX + 10, currentY + 18);
+      currentY += 26;
 
-    // Total GST (only if GST is applied)
-    if (shouldApplyGst && totalGstAmount > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "normal");
-      doc.text("Total GST:", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.text(` ${totalGstAmount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      currentY += 25;
-    }
-    
+      const lineRow = (label, value, shaded = false, bold = false, green = false) => {
+        if (wouldOverflow(26)) return false;
+        drawBorderedRect(summaryX, currentY, summaryWidth, 26, shaded ? 'lightgray' : null);
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(0, 0, 0);
+        doc.text(label, summaryX + 10, currentY + 17);
+        if (green) doc.setTextColor(39, 174, 96);
+        const valTxt = ` ${Number(value).toFixed(2)}`;
+        const tW = doc.getTextWidth(valTxt);
+        doc.text(valTxt, summaryX + summaryWidth - tW - 10, currentY + 17);
+        doc.setTextColor(0, 0, 0);
+        currentY += 26;
+        return true;
+      };
 
+      lineRow("Parts:", partsSubtotal, false, true);
+      if (laborTotal > 0) lineRow("Labour:", laborTotal, true, true);
+      if (shouldApplyGst && laborGstAmount > 0) lineRow("Labour GST:", laborGstAmount, false, true);
+      lineRow("Subtotal:", totalBeforeTax + totalGstAmount, true, true);
+      if (summary.discount > 0) lineRow("Discount:", summary.discount * -1, false, true, true);
 
-    // Discount (only if discount exists)
-    if (summary.discount > 0) {
-      drawBorderedRect(summaryX, currentY, summaryWidth, 25);
-      doc.setFont("helvetica", "normal");
-      doc.text("Discount:", summaryX + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(39, 174, 96); // Green color for discount
-      doc.text(`-${summary.discount.toFixed(2)}`, summaryX + summaryWidth - 90, currentY + 17);
-      doc.setTextColor(0, 0, 0);
-      currentY += 25;
-    }
-
-    // Grand Total - match BillSummarySection exactly
-    drawBorderedRect(summaryX, currentY, summaryWidth, 35, 'green');
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    
-    // Show appropriate title based on GST setting
-    const totalTitle = shouldApplyGst ? 'GRAND TOTAL' : 'GRAND TOTAL';
-    doc.text(totalTitle, summaryX + 10, currentY + 23);
-    doc.text(` ${finalAmount.toFixed(2)}`, summaryX + summaryWidth - 120, currentY + 23);
-    currentY += 50;
-
-    // Quality Check Section
-    if (jobCardData?.qualityCheck) {
-      checkPageBreak(100);
-      const qualityCheckY = currentY;
-      
-      // Quality Check Header
-      drawBorderedRect(margin, qualityCheckY, contentWidth, 30, 'darkblue');
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
-      doc.text("QUALITY CHECK DETAILS", margin + 10, qualityCheckY + 20);
-      currentY += 30;
-      
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      
-      // Quality Check Notes
-      if (jobCardData.qualityCheck.notes) {
-        drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
-        doc.setFont("helvetica", "normal");
-        doc.text("Notes:", margin + 10, currentY + 17);
+      // Grand Total
+      if (!wouldOverflow(32)) {
+        drawBorderedRect(summaryX, currentY, summaryWidth, 32, 'green');
         doc.setFont("helvetica", "bold");
-        doc.text(jobCardData.qualityCheck.notes, margin + 50, currentY + 17);
-        currentY += 30;
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text("GRAND TOTAL", summaryX + 10, currentY + 21);
+        const gt = ` ${finalAmount.toFixed(2)}`;
+        const gtw = doc.getTextWidth(gt);
+        doc.text(gt, summaryX + summaryWidth - gtw - 10, currentY + 21);
+        currentY += 36;
       }
-      
-      // Quality Check Date
-      if (jobCardData.qualityCheck.date) {
-        drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
-        doc.setFont("helvetica", "normal");
-        doc.text("Date:", margin + 10, currentY + 17);
-        doc.setFont("helvetica", "bold");
-        const qualityDate = new Date(jobCardData.qualityCheck.date).toLocaleDateString();
-        doc.text(qualityDate, margin + 50, currentY + 17);
-        currentY += 30;
-      }
-      
-      // Bill Approval Status
-      drawBorderedRect(margin, currentY, contentWidth, 30, 'lightgray');
-      doc.setFont("helvetica", "normal");
-      doc.text("Bill Approved:", margin + 10, currentY + 17);
-      doc.setFont("helvetica", "bold");
-      const approvalStatus = jobCardData.qualityCheck.billApproved ? "YES" : "NO";
-      const approvalColor = jobCardData.qualityCheck.billApproved ? [39, 174, 96] : [231, 76, 60];
-      doc.setTextColor(...approvalColor);
-      doc.text(approvalStatus, margin + 100, currentY + 17);
-      doc.setTextColor(0, 0, 0);
-      currentY += 30;
     }
-
-    // Amount in Words
-    doc.setTextColor(0, 0, 0);
-    const amountInWords = numberToWords(Math.round(finalAmount)) + " Rupees Only";
-    drawBorderedRect(margin, currentY, contentWidth, 35, 'lightgreen');
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("Amount in Words:", margin + 10, currentY + 15);
-    doc.setFont("helvetica", "normal");
-    doc.text(amountInWords, margin + 10, currentY + 28);
-    currentY += 50;
 
     // -----------------------------
-    // FOOTER SECTION
+    // BANK DETAILS (FULL-WIDTH, TWO COLUMNS)
     // -----------------------------
-    checkPageBreak(150);
-    
-    if (garageDetails.bankDetails.bankName) {
-      const footerY = currentY;
-      
-      // Bank Details
-      drawBorderedRect(margin, footerY, contentWidth / 2, 120, 'lightgray');
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(52, 152, 219);
-      doc.text("BANK DETAILS", margin + 10, footerY + 20);
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(`Bank: ${garageDetails.bankDetails.bankName}`, margin + 10, footerY + 35);
-      doc.text(`A/c Holder: ${garageDetails.bankDetails.accountHolderName}`, margin + 10, footerY + 50);
-      doc.text(`A/c No: ${garageDetails.bankDetails.accountNumber}`, margin + 10, footerY + 65);
-      doc.text(`IFSC: ${garageDetails.bankDetails.ifscCode}`, margin + 10, footerY + 80);
-      if (garageDetails.bankDetails.upiId) {
-        doc.text(`UPI: ${garageDetails.bankDetails.upiId}`, margin + 10, footerY + 95);
-      }
+    const bank = garageDetails.bankDetails || {};
+    if (bank.bankName && !wouldOverflow(110)) {
+      const blockH = 100;
+      const blockY = currentY;
+      drawBorderedRect(margin, blockY, contentWidth, blockH, 'lightgray');
 
-      // Terms & Conditions
-      const termsX = margin + (contentWidth / 2) + 10;
-      drawBorderedRect(termsX, footerY, contentWidth / 2 - 10, 120, 'lightgray');
+      // Header
       doc.setFont("helvetica", "bold");
       doc.setTextColor(52, 152, 219);
-      doc.text("TERMS & CONDITIONS", termsX + 10, footerY + 20);
+      doc.setFontSize(11);
+      doc.text("BANK DETAILS", margin + 10, blockY + 18);
+
+      // Two-column layout
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text("1. Goods once sold will not be taken back.", termsX + 10, footerY + 35);
-      doc.text("2. Our risk ceases as goods leave premises.", termsX + 10, footerY + 47);
-      doc.text("3. Subject to local jurisdiction only.", termsX + 10, footerY + 59);
-      doc.text("4. Payment terms: As agreed", termsX + 10, footerY + 71);
-      doc.text("5. E. & O.E.", termsX + 10, footerY + 83);
-      if (gstSettings.billType === 'gst') {
-        doc.text("6. GST as applicable.", termsX + 10, footerY + 95);
-      }
-      
-      currentY += 140;
+      doc.setFontSize(9.5);
+
+      const colPad = 10;
+      const colGap = 16;
+      const colWidth = (contentWidth - colGap - colPad * 2) / 2;
+
+      const leftX = margin + colPad;
+      const rightX = leftX + colWidth + colGap;
+      let yL = blockY + 18 + lineGap;
+      let yR = blockY + 18 + lineGap;
+
+      // Left column
+      const L = (label, val) => { if (!val) return; doc.text(`${label}: ${val}`, leftX, yL); yL += lineGap; };
+      L("Bank", bank.bankName);
+      L("A/c Holder", bank.accountHolderName);
+      L("A/c No", bank.accountNumber);
+      L("IFSC", bank.ifscCode);
+
+      // Right column
+      const R = (label, val) => { if (!val) return; doc.text(`${label}: ${val}`, rightX, yR); yR += lineGap; };
+      R("Branch", bank.branchName || bank.branch || "");
+      R("UPI", bank.upiId || "");
+      R("Notes", bank.notes || "");
+
+      currentY += blockH + 8;
     }
 
-    // Signature Section
-    checkPageBreak(80);
-    doc.setFont("helvetica", "bold");
-    doc.text("For " + garageDetails.name.toUpperCase(), pageWidth - margin - 120, currentY + 60);
-    doc.setFont("helvetica", "normal");
-    doc.text("Authorized Signatory", pageWidth - margin - 120, currentY + 75);
-
-    // Footer
+    // -----------------------------
+    // FOOTER (compact)
+    // -----------------------------
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 30);
-    doc.text(`Bill Type: ${gstSettings.billType.toUpperCase()} | Page 1`, pageWidth - margin - 100, pageHeight - 30);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, pageHeight - 28);
+    const pageInfo = `Bill Type: ${String(gstSettings.billType || '').toUpperCase()} | Page 1 of 1`;
+    const pW = doc.getTextWidth(pageInfo);
+    doc.text(pageInfo, pageWidth - margin - pW, pageHeight - 28);
 
     return doc;
   } catch (error) {
