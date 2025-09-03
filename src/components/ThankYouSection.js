@@ -20,6 +20,8 @@ const ThankYouSection = ({
   sendingWhatsApp,
   openEmailDialog,
   sendingEmail,
+  openWhatsAppConfig,          // ← New prop for WhatsApp configuration
+  whatsappConfigured,          // ← New prop to show configuration status
 }) => {
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
@@ -132,18 +134,37 @@ const ThankYouSection = ({
         <Button
           variant="contained"
           sx={{
-            backgroundColor: "#25d366",
+            backgroundColor: whatsappConfigured ? "#25d366" : "#ccc",
             color: "white",
             minWidth: isMobile ? "100%" : 200,
             "&:hover": {
-              backgroundColor: "#128c7e",
+              backgroundColor: whatsappConfigured ? "#128c7e" : "#ccc",
             },
           }}
           startIcon={sendingWhatsApp ? <CircularProgress size={20} color="inherit" /> : <WhatsAppIcon />}
           onClick={sendBillViaWhatsApp}
-          disabled={sendingWhatsApp}
+          disabled={sendingWhatsApp || !whatsappConfigured}
+          title={whatsappConfigured ? "Send invoice via WhatsApp Business API" : "Configure WhatsApp Business API first"}
         >
-          {sendingWhatsApp ? "Sending..." : "WhatsApp Invoice"}
+          {sendingWhatsApp ? "Sending..." : whatsappConfigured ? "WhatsApp Invoice" : "Configure WhatsApp First"}
+        </Button>
+
+        {/* WhatsApp Configuration */}
+        <Button
+          variant="outlined"
+          sx={{
+            borderColor: "#25d366",
+            color: "#25d366",
+            minWidth: isMobile ? "100%" : 200,
+            "&:hover": {
+              borderColor: "#128c7e",
+              backgroundColor: "rgba(37, 211, 102, 0.1)",
+            },
+          }}
+          startIcon={<WhatsAppIcon />}
+          onClick={openWhatsAppConfig}
+        >
+          Configure WhatsApp
         </Button>
 
         {/* Email */}

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Button, LinearProgress, Paper,
-  useMediaQuery, useTheme, Snackbar, Alert, IconButton
+  useMediaQuery, useTheme, Snackbar, Alert, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField
 } from "@mui/material";
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -1770,56 +1772,114 @@ const printInvoice = () => {
   }
 };
 
-  // UPDATED: WhatsApp function with PDF attachment and fallback
- const sendBillViaWhatsApp = async () => {
-  try {
-    setSendingWhatsApp(true);
-    
-    // Generate PDF
-    const doc = generateProfessionalGSTInvoice();
-    const pdfBlob = doc.output('blob');
-    
-    // Try to send via API first
+  // ENHANCED: WhatsApp Business API function for sending PDF invoices
+  const sendBillViaWhatsApp = async () => {
     try {
-      const formData = new FormData();
-      formData.append('pdf', pdfBlob, `Invoice_${carDetails.invoiceNo}.pdf`);
-      formData.append('phone', carDetails.contact);
-      formData.append('message', `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*\n*${garageDetails.name}*\n\nInvoice #${carDetails.invoiceNo}\nTotal: ₹${summary.totalAmount}\n\nPlease find your invoice attached.`);
-      formData.append('garageId', localStorage.getItem('garageId'));
+      setSendingWhatsApp(true);
       
-      const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/send-invoice-whatsapp', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+      // Generate PDF
+      const doc = generateProfessionalGSTInvoice();
+      const pdfBlob = doc.output('blob');
       
-      if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: "Invoice sent via WhatsApp successfully!",
-          severity: "success"
+      // Method 1: Try to send via your backend API with WhatsApp Business integration
+      try {
+        const formData = new FormData();
+        formData.append('pdf', pdfBlob, `Invoice_${carDetails.invoiceNo}.pdf`);
+        formData.append('phone', carDetails.contact);
+        formData.append('message', `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*\n*${garageDetails.name}*\n\nInvoice #${carDetails.invoiceNo}\nTotal: ₹${summary.totalAmount}\n\nPlease find your invoice attached.`);
+        formData.append('garageId', localStorage.getItem('garageId'));
+        formData.append('customerName', carDetails.customerName);
+        formData.append('invoiceDate', carDetails.billingDate);
+        
+        const response = await fetch('https://garage-management-zi5z.onrender.com/api/garage/send-invoice-whatsapp', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: formData
         });
-        return;
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setSnackbar({
+              open: true,
+              message: "✅ Invoice sent via WhatsApp Business successfully!",
+              severity: "success"
+            });
+            return;
+          } else {
+            console.log('API returned error, trying alternative method');
+          }
+        }
+      } catch (apiError) {
+        console.log('Backend API not available, using WhatsApp Business direct method');
       }
-    } catch (apiError) {
-      console.log('API not available, using fallback method');
-    }
-    
-    // Fallback: Download PDF and send text message
-    const url = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
-    link.click();
-    
-    // Send WhatsApp text message with invoice details
-    const gstInfo = gstSettings.billType === 'gst'
-      ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}`
-      : 'Non-GST Bill';
+      
+      // Method 2: Direct WhatsApp Business API integration (if you have API keys)
+      try {
+        // Check if WhatsApp Business API credentials are configured
+        const whatsappConfig = localStorage.getItem('whatsappBusinessConfig');
+        if (whatsappConfig) {
+          const config = JSON.parse(whatsappConfig);
+          const phoneNumberId = config.phoneNumberId;
+          const accessToken = config.accessToken;
+          
+          if (phoneNumberId && accessToken) {
+            // Convert PDF to base64
+            const reader = new FileReader();
+            reader.onload = async () => {
+              const base64PDF = reader.result.split(',')[1];
+              
+              // Send via WhatsApp Business API
+              const whatsappResponse = await fetch(`https://graph.facebook.com/v17.0/${phoneNumberId}/messages`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: `91${carDetails.contact.replace(/\D/g, '')}`,
+                  type: 'document',
+                  document: {
+                    link: `data:application/pdf;base64,${base64PDF}`,
+                    filename: `Invoice_${carDetails.invoiceNo}.pdf`,
+                    caption: `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*\n*${garageDetails.name}*\n\nInvoice #${carDetails.invoiceNo}\nTotal: ₹${summary.totalAmount}\n\nPlease find your invoice attached.`
+                  }
+                })
+              });
+              
+              if (whatsappResponse.ok) {
+                setSnackbar({
+                  open: true,
+                  message: "✅ Invoice sent via WhatsApp Business API successfully!",
+                  severity: "success"
+                });
+                return;
+              }
+            };
+            reader.readAsDataURL(pdfBlob);
+            return;
+          }
+        }
+      } catch (whatsappError) {
+        console.log('WhatsApp Business API not configured, using fallback method');
+      }
+      
+      // Method 3: Fallback - Download PDF and open WhatsApp with pre-filled message
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Invoice_${carDetails.invoiceNo}.pdf`;
+      link.click();
+      
+      // Create comprehensive WhatsApp message
+      const gstInfo = gstSettings.billType === 'gst'
+        ? `GST (${gstSettings.gstPercentage}%): ₹${summary.gstAmount}`
+        : 'Non-GST Bill';
 
-    const msg = `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*
+      const msg = `🚗 *${gstSettings.billType.toUpperCase()} INVOICE*
 *${garageDetails.name}*
 📞 ${garageDetails.phone}
 📍 ${garageDetails.address}
@@ -1837,34 +1897,77 @@ ${gstInfo}
 ${summary.discount > 0 ? `*Discount:* -₹${summary.discount}` : ''}
 *Total:* *₹${summary.totalAmount}*
 
-📄 PDF invoice has been downloaded. Please share it manually.
+📄 PDF invoice has been downloaded. Please attach it to this message.
 
 Thank you!`;
 
-    const phone = `91${carDetails.contact.replace(/\D/g, '')}`;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
-    
-    setSnackbar({
-      open: true,
-      message: "PDF downloaded! WhatsApp message opened. Please share the PDF manually.",
-      severity: "info"
-    });
-    
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-    
-  } catch (error) {
-    console.error('Error sending WhatsApp:', error);
-    setSnackbar({
-      open: true,
-      message: "Failed to send WhatsApp message. Please try again.",
-      severity: "error"
-    });
-  } finally {
-    setSendingWhatsApp(false);
-  }
- };
+      // Format phone number for WhatsApp
+      const phone = `91${carDetails.contact.replace(/\D/g, '')}`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+      
+      setSnackbar({
+        open: true,
+        message: "📱 PDF downloaded! WhatsApp opened. Please attach the PDF manually.",
+        severity: "info"
+      });
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      setSnackbar({
+        open: true,
+        message: "❌ Failed to send WhatsApp message. Please try again.",
+        severity: "error"
+      });
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
 
   const openEmailDialog = () => setShowEmailDialog(true);
+
+  // WhatsApp Business API configuration
+  const [showWhatsAppConfig, setShowWhatsAppConfig] = useState(false);
+  const [whatsappConfig, setWhatsappConfig] = useState({
+    phoneNumberId: '',
+    accessToken: '',
+    businessAccountId: ''
+  });
+
+  // Load WhatsApp Business configuration
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('whatsappBusinessConfig');
+    if (savedConfig) {
+      try {
+        setWhatsappConfig(JSON.parse(savedConfig));
+      } catch (e) {
+        console.error('Error parsing WhatsApp config:', e);
+      }
+    }
+  }, []);
+
+  // Save WhatsApp Business configuration
+  const saveWhatsAppConfig = () => {
+    try {
+      localStorage.setItem('whatsappBusinessConfig', JSON.stringify(whatsappConfig));
+      setSnackbar({
+        open: true,
+        message: "✅ WhatsApp Business API configuration saved successfully!",
+        severity: "success"
+      });
+      setShowWhatsAppConfig(false);
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: "❌ Failed to save WhatsApp configuration",
+        severity: "error"
+      });
+    }
+  };
+
+  // Open WhatsApp Business configuration dialog
+  const openWhatsAppConfig = () => setShowWhatsAppConfig(true);
 
   // Loading state UI
   if (isLoading) {
@@ -2033,6 +2136,8 @@ Thank you!`;
   garageDetails={garageDetails}
   parts={parts}
   laborServicesTotal={laborServicesTotal}
+  openWhatsAppConfig={openWhatsAppConfig}  // ← Add WhatsApp configuration
+  whatsappConfigured={!!whatsappConfig.phoneNumberId && !!whatsappConfig.accessToken}  // ← Add configuration status
 />
         )}
       </Paper>
@@ -2057,6 +2162,105 @@ Thank you!`;
         sendBillViaEmail={sendBillViaEmail} 
         carDetails={carDetails} 
       />
+
+      {/* WhatsApp Business API Configuration Dialog */}
+      <Dialog
+        open={showWhatsAppConfig}
+        onClose={() => setShowWhatsAppConfig(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            bgcolor: 'background.paper'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          bgcolor: 'success.main', 
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <WhatsAppIcon />
+          WhatsApp Business API Configuration
+          {whatsappConfig.phoneNumberId && whatsappConfig.accessToken && (
+            <Box sx={{ ml: 'auto', fontSize: '0.8em', opacity: 0.8 }}>
+              ✅ Configured
+            </Box>
+          )}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Configure your WhatsApp Business API credentials to send PDF invoices directly via WhatsApp.
+          </Typography>
+          
+          <TextField
+            fullWidth
+            label="Phone Number ID"
+            value={whatsappConfig.phoneNumberId}
+            onChange={(e) => setWhatsappConfig(prev => ({ ...prev, phoneNumberId: e.target.value }))}
+            placeholder="e.g., 123456789012345"
+            sx={{ mb: 2 }}
+            helperText="Your WhatsApp Business Phone Number ID from Meta Developer Console"
+          />
+          
+          <TextField
+            fullWidth
+            label="Access Token"
+            value={whatsappConfig.accessToken}
+            onChange={(e) => setWhatsappConfig(prev => ({ ...prev, accessToken: e.target.value }))}
+            placeholder="EAA..."
+            sx={{ mb: 2 }}
+            helperText="Your WhatsApp Business Access Token from Meta Developer Console"
+            type="password"
+          />
+          
+          <TextField
+            fullWidth
+            label="Business Account ID (Optional)"
+            value={whatsappConfig.businessAccountId}
+            onChange={(e) => setWhatsappConfig(prev => ({ ...prev, businessAccountId: e.target.value }))}
+            placeholder="e.g., 123456789012345"
+            sx={{ mb: 2 }}
+            helperText="Your WhatsApp Business Account ID (optional)"
+          />
+          
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>How to get these credentials:</strong>
+              <br />1. Go to <a href="https://developers.facebook.com/" target="_blank" rel="noopener">Meta Developer Console</a>
+              <br />2. Create a WhatsApp Business App
+              <br />3. Get your Phone Number ID and Access Token
+              <br />4. Configure webhook for message delivery
+            </Typography>
+          </Alert>
+          
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Important:</strong> You need a verified WhatsApp Business account and approval from Meta to send messages via API. 
+              The free tier allows limited messages per month.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => setShowWhatsAppConfig(false)}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={saveWhatsAppConfig}
+            variant="contained"
+            color="success"
+            startIcon={<WhatsAppIcon />}
+          >
+            Save Configuration
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Only show edit dialogs if bill is not generated */}
       {!isBillAlreadyGenerated && (
