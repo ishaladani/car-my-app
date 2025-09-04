@@ -112,7 +112,7 @@ const AssignEngineer = () => {
     sellingPrice: 0,
     hsnNumber: "",
     igst: '',
-    cgstSgst: '',
+    cgst: '',
     taxType: 'igst',
     taxAmount: 0
   });
@@ -1498,16 +1498,13 @@ const AssignEngineer = () => {
     try {
       // Calculate GST using InventoryManagement style
       const igst = parseFloat(newPart.igst) || 0;
-      const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+      const cgst = parseFloat(newPart.cgst) || 0;
       const baseAmount = newPart.sellingPrice * newPart.quantity;
       
       // Calculate single part GST amount
-      let singlePartGST = 0;
-      if (newPart.taxType === 'igst' && igst > 0) {
-        singlePartGST = (newPart.sellingPrice * igst) / 100;
-      } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
-        singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100; // CGST + SGST
-      }
+      const igstAmount = (newPart.sellingPrice * igst) / 100;
+      const cgstAmount = (newPart.sellingPrice * cgst) / 100;
+      const singlePartGST = igstAmount + cgstAmount;
       
       // Calculate total tax amount for the quantity
       const totalTaxAmount = singlePartGST * newPart.quantity;
@@ -1523,8 +1520,8 @@ const AssignEngineer = () => {
         purchasePrice: parseFloat(newPart.purchasePrice),
         sellingPrice: parseFloat(newPart.sellingPrice),
         hsnNumber: newPart.hsnNumber,
-        igst: newPart.taxType === 'igst' ? igst : 0,
-        cgstSgst: newPart.taxType === 'cgstSgst' ? cgstSgst : 0,
+        igst,
+        cgst,
         taxAmount: parseFloat(singlePartGST.toFixed(2)), // Store single part GST in taxAmount
         totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)) // Store total tax for quantity
       };
@@ -1541,7 +1538,7 @@ const AssignEngineer = () => {
       
       // Show detailed success message with GST calculation
       const gstMessage = singlePartGST > 0 
-        ? ` with GST: ₹${singlePartGST.toFixed(2)} per unit (${newPart.taxType === 'igst' ? `IGST: ${igst}%` : `CGST+SGST: ${cgstSgst}% each`})`
+        ? ` with GST: ₹${singlePartGST.toFixed(2)} per unit (${igst > 0 ? `IGST: ${igst}%` : ''}${igst > 0 && cgst > 0 ? ', ' : ''}${cgst > 0 ? `CGST: ${cgst}%` : ''})`
         : ' (No GST applied)';
       
       setSnackbar({
@@ -1562,7 +1559,7 @@ const AssignEngineer = () => {
         sellingPrice: 0,
         hsnNumber: "",
         igst: '',
-        cgstSgst: '',
+        cgst: '',
         taxType: 'igst',
         taxAmount: 0
       });
@@ -1619,7 +1616,7 @@ const AssignEngineer = () => {
       sellingPrice: 0,
       hsnNumber: "",
       igst: '',
-      cgstSgst: '',
+      cgst: '',
       taxType: 'igst',
       taxAmount: 0
     });
@@ -3397,54 +3394,44 @@ const AssignEngineer = () => {
               </Grid>
             </Grid>
 
-            {/* Tax Type Selection */}
+            {/* Tax Fields */}
             <Box sx={{ mt: 3 }}>
-              <FormControl fullWidth>
-                <InputLabel>Tax Type</InputLabel>
-                <Select
-                  name="taxType"
-                  value={newPart.taxType}
-                  onChange={handlePartInputChange}
-                  label="Tax Type"
-                >
-                  <MenuItem value="igst">IGST</MenuItem>
-                  <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
-                </Select>
-              </FormControl>
-
-              {newPart.taxType === "igst" ? (
-                <TextField
-                  label="IGST (%)"
-                  name="igst"
-                  type="number"
-                  value={newPart.igst}
-                  onChange={handlePartInputChange}
-                  fullWidth
-                  margin="normal"
-                  inputProps={{ min: 0, max: 100, step: 0.01 }}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                  }}
-                />
-              ) : (
-                <TextField
-                  label="CGST/SGST (each %)"
-                  name="cgstSgst"
-                  type="number"
-                  value={newPart.cgstSgst}
-                  onChange={handlePartInputChange}
-                  fullWidth
-                  margin="normal"
-                  inputProps={{ min: 0, max: 100, step: 0.01 }}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                  }}
-                />
-              )}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="IGST (%)"
+                    name="igst"
+                    type="number"
+                    value={newPart.igst}
+                    onChange={handlePartInputChange}
+                    fullWidth
+                    margin="normal"
+                    inputProps={{ min: 0, max: 30, step: 0.01 }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="CGST (%)"
+                    name="cgst"
+                    type="number"
+                    value={newPart.cgst}
+                    onChange={handlePartInputChange}
+                    fullWidth
+                    margin="normal"
+                    inputProps={{ min: 0, max: 15, step: 0.01 }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+              </Grid>
             </Box>
 
             {/* Tax Preview */}
-            {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
+            {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgst) && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
                 <Grid container spacing={2}>
@@ -3462,13 +3449,10 @@ const AssignEngineer = () => {
                     <Typography variant="body2" color="primary">
                       Single Part GST: ₹{(() => {
                         const igst = parseFloat(newPart.igst) || 0;
-                        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
-                        let singlePartGST = 0;
-                        if (newPart.taxType === 'igst' && igst > 0) {
-                          singlePartGST = (newPart.sellingPrice * igst) / 100;
-                        } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
-                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100; // CGST + SGST
-                        }
+                        const cgst = parseFloat(newPart.cgst) || 0;
+                        const igstAmount = (newPart.sellingPrice * igst) / 100;
+                        const cgstAmount = (newPart.sellingPrice * cgst) / 100;
+                        const singlePartGST = igstAmount + cgstAmount;
                         return singlePartGST.toFixed(2);
                       })()}
                     </Typography>
@@ -3477,19 +3461,16 @@ const AssignEngineer = () => {
                     <Typography variant="body2" color="success.main">
                       Total GST for Quantity: ₹{(() => {
                         const igst = parseFloat(newPart.igst) || 0;
-                        const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
-                        let singlePartGST = 0;
-                        if (newPart.taxType === 'igst' && igst > 0) {
-                          singlePartGST = (newPart.sellingPrice * igst) / 100;
-                        } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
-                          singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
-                        }
+                        const cgst = parseFloat(newPart.cgst) || 0;
+                        const igstAmount = (newPart.sellingPrice * igst) / 100;
+                        const cgstAmount = (newPart.sellingPrice * cgst) / 100;
+                        const singlePartGST = igstAmount + cgstAmount;
                         return (singlePartGST * newPart.quantity).toFixed(2);
                       })()}
                     </Typography>
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography variant="h6" color="success.dark">
+                    {/* <Typography variant="h6" color="success.dark">
                       Total Amount (Including GST): ₹{(() => {
                         const igst = parseFloat(newPart.igst) || 0;
                         const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
@@ -3502,7 +3483,7 @@ const AssignEngineer = () => {
                         const totalAmount = (newPart.sellingPrice + singlePartGST) * newPart.quantity;
                         return totalAmount.toFixed(2);
                       })()}
-                    </Typography>
+                    </Typography> */}
                   </Grid>
                 </Grid>
               </Box>

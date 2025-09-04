@@ -66,7 +66,7 @@ const InventoryManagement = () => {
     sellingPrice: '',
     hsnNumber: '',
     igst: '',
-    cgstSgst: '',
+    cgst: '',
     taxType: 'igst',
   });
 
@@ -81,7 +81,7 @@ const InventoryManagement = () => {
     sellingPrice: '',
     hsnNumber: '',
     igst: '',
-    cgstSgst: '',
+    cgst: '',
     taxType: 'igst',
   });
 
@@ -103,20 +103,20 @@ const InventoryManagement = () => {
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Calculate single part GST amount
-  const calculateSinglePartGST = (sellingPrice, igst, cgstSgst) => {
+  const calculateSinglePartGST = (sellingPrice, igst, cgst) => {
     if (!sellingPrice) return 0;
     const price = parseFloat(sellingPrice) || 0;
     const igstRate = parseFloat(igst) || 0;
-    const cgstSgstRate = parseFloat(cgstSgst) || 0;
+    const cgstRate = parseFloat(cgst) || 0;
 
     const igstAmount = (price * igstRate) / 100;
-    const cgstSgstAmount = (price * cgstSgstRate * 2) / 100; // CGST + SGST
-    return igstAmount + cgstSgstAmount;
+    const cgstAmount = (price * cgstRate) / 100;
+    return igstAmount + cgstAmount;
   };
 
   // Calculate total value with GST for a part
-  const calculateTotalValueWithGST = (sellingPrice, quantity, igst, cgstSgst) => {
-    const gstPerUnit = calculateSinglePartGST(sellingPrice, igst, cgstSgst);
+  const calculateTotalValueWithGST = (sellingPrice, quantity, igst, cgst) => {
+    const gstPerUnit = calculateSinglePartGST(sellingPrice, igst, cgst);
     const total = (parseFloat(sellingPrice) + gstPerUnit) * parseInt(quantity || 0);
     return isNaN(total) ? 0 : parseFloat(total.toFixed(2));
   };
@@ -130,10 +130,10 @@ const InventoryManagement = () => {
       const qty = item.quantity || 0;
       const price = item.sellingPrice || 0;
       const igst = item.igst || 0;
-      const cgstSgst = item.cgstSgst || 0;
+      const cgst = item.cgst || 0;
 
       const baseAmount = price * qty;
-      const gstAmount = calculateSinglePartGST(price, igst, cgstSgst) * qty;
+      const gstAmount = calculateSinglePartGST(price, igst, cgst) * qty;
       const amountWithGST = baseAmount + gstAmount;
 
       totalBaseAmount += baseAmount;
@@ -248,7 +248,7 @@ const InventoryManagement = () => {
       sellingPrice: '',
       hsnNumber: '',
       igst: '',
-      cgstSgst: '',
+      cgst: '',
       taxType: 'igst',
     });
     setAddModalOpen(true);
@@ -265,10 +265,19 @@ const InventoryManagement = () => {
       errors.push('Valid purchase price is required');
     if (!data.sellingPrice || parseFloat(data.sellingPrice) <= 0)
       errors.push('Valid selling price is required');
-    if (data.taxType === 'igst' && (!data.igst || parseFloat(data.igst) < 0))
-      errors.push('Valid IGST rate is required');
-    if (data.taxType === 'cgstSgst' && (!data.cgstSgst || parseFloat(data.cgstSgst) < 0))
-      errors.push('Valid CGST/SGST rate is required');
+    
+    // Check if at least one tax rate is provided
+    const igst = parseFloat(data.igst) || 0;
+    const cgst = parseFloat(data.cgst) || 0;
+    
+    if (igst === 0 && cgst === 0) {
+      errors.push('At least one tax rate (IGST or CGST) is required');
+    }
+    
+    if (igst < 0 || cgst < 0) {
+      errors.push('Tax rates cannot be negative');
+    }
+    
     return errors;
   };
 
@@ -279,10 +288,10 @@ const InventoryManagement = () => {
       const errors = validateFormData(formData);
       if (errors.length > 0) throw new Error(errors.join(', '));
 
-      const igst = formData.taxType === 'igst' ? parseFloat(formData.igst) : 0;
-      const cgstSgst = formData.taxType === 'cgstSgst' ? parseFloat(formData.cgstSgst) : 0;
+      const igst = parseFloat(formData.igst) || 0;
+      const cgst = parseFloat(formData.cgst) || 0;
 
-      const singlePartGST = calculateSinglePartGST(formData.sellingPrice, igst, cgstSgst);
+      const singlePartGST = calculateSinglePartGST(formData.sellingPrice, igst, cgst);
       const totalTaxAmount = singlePartGST * parseInt(formData.quantity);
 
       const requestData = {
@@ -296,7 +305,7 @@ const InventoryManagement = () => {
         sellingPrice: parseFloat(formData.sellingPrice),
         hsnNumber: formData.hsnNumber.trim(),
         igst,
-        cgstSgst,
+        cgst,
         taxAmount: parseFloat(singlePartGST.toFixed(2)),
         totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)),
       };
@@ -334,10 +343,10 @@ const InventoryManagement = () => {
       const errors = validateFormData(editItemData);
       if (errors.length > 0) throw new Error(errors.join(', '));
 
-      const igst = editItemData.taxType === 'igst' ? parseFloat(editItemData.igst) : 0;
-      const cgstSgst = editItemData.taxType === 'cgstSgst' ? parseFloat(editItemData.cgstSgst) : 0;
+      const igst = parseFloat(editItemData.igst) || 0;
+      const cgst = parseFloat(editItemData.cgst) || 0;
 
-      const singlePartGST = calculateSinglePartGST(editItemData.sellingPrice, igst, cgstSgst);
+      const singlePartGST = calculateSinglePartGST(editItemData.sellingPrice, igst, cgst);
       const totalTaxAmount = singlePartGST * parseInt(editItemData.quantity);
 
       const requestData = {
@@ -350,7 +359,7 @@ const InventoryManagement = () => {
         partName: editItemData.partName.trim(),
         hsnNumber: editItemData.hsnNumber.trim(),
         igst,
-        cgstSgst,
+        cgst,
         taxAmount: parseFloat(singlePartGST.toFixed(2)),
         totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)),
       };
@@ -402,8 +411,8 @@ const InventoryManagement = () => {
       sellingPrice: item.sellingPrice?.toString() || '',
       hsnNumber: item.hsnNumber || '',
       igst: item.igst?.toString() || '',
-      cgstSgst: item.cgstSgst?.toString() || '',
-      taxType: item.igst > 0 ? 'igst' : 'cgstSgst',
+      cgst: item.cgst?.toString() || '',
+      taxType: item.igst > 0 ? 'igst' : 'cgst',
     });
     setEditModalOpen(true);
   };
@@ -558,14 +567,15 @@ const InventoryManagement = () => {
                       <TableCell>{row.quantity || 0}</TableCell>
                       <TableCell>₹{parseFloat(row.sellingPrice || 0).toFixed(2)}</TableCell>
                       <TableCell>
-                        ₹{calculateSinglePartGST(row.sellingPrice, row.igst, row.cgstSgst).toFixed(2)}
+                        ₹{calculateSinglePartGST(row.sellingPrice, row.igst, row.cgst).toFixed(2)}
                         <Typography variant="caption" color="text.secondary" display="block">
-                          {row.igst > 0 ? `IGST: ${row.igst}%` : `CGST+SGST: ${row.cgstSgst}% each`}
+                          {row.igst > 0 && `IGST: ${row.igst}%`}
+                          {row.cgst > 0 && ` CGST: ${row.cgst}%`}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="bold" color="success.main">
-                          ₹{calculateTotalValueWithGST(row.sellingPrice, row.quantity, row.igst, row.cgstSgst).toFixed(2)}
+                          ₹{calculateTotalValueWithGST(row.sellingPrice, row.quantity, row.igst, row.cgst).toFixed(2)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -705,43 +715,29 @@ const InventoryManagement = () => {
                   <TextField name="hsnNumber" label="HSN Number" value={formData.hsnNumber} onChange={handleInputChange} fullWidth margin="normal" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Tax Type</InputLabel>
-                    <Select name="taxType" value={formData.taxType} onChange={handleInputChange} label="Tax Type">
-                      <MenuItem value="igst">IGST</MenuItem>
-                      <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <TextField
+                    label="IGST (%)"
+                    name="igst"
+                    type="number"
+                    value={formData.igst}
+                    onChange={handleInputChange}
+                    fullWidth
+                    inputProps={{ min: 0, max: 30, step: '0.01' }}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  />
                 </Grid>
-                {formData.taxType === 'igst' ? (
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="IGST (%)"
-                      name="igst"
-                      type="number"
-                      value={formData.igst}
-                      onChange={handleInputChange}
-                      required
-                      fullWidth
-                      inputProps={{ min: 0, max: 30, step: '0.01' }}
-                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                    />
-                  </Grid>
-                ) : (
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="CGST/SGST (each %)"
-                      name="cgstSgst"
-                      type="number"
-                      value={formData.cgstSgst}
-                      onChange={handleInputChange}
-                      required
-                      fullWidth
-                      inputProps={{ min: 0, max: 15, step: '0.01' }}
-                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                    />
-                  </Grid>
-                )}
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="CGST (%)"
+                    name="cgst"
+                    type="number"
+                    value={formData.cgst}
+                    onChange={handleInputChange}
+                    fullWidth
+                    inputProps={{ min: 0, max: 15, step: '0.01' }}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  />
+                </Grid>
               </Grid>
             </DialogContent>
             <DialogActions>
@@ -777,43 +773,29 @@ const InventoryManagement = () => {
                 <TextField name="sellingPrice" label="Selling Price *" type="number" value={editItemData.sellingPrice} onChange={handleEditInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Tax Type</InputLabel>
-                  <Select name="taxType" value={editItemData.taxType} onChange={handleEditInputChange} label="Tax Type">
-                    <MenuItem value="igst">IGST</MenuItem>
-                    <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
-                  </Select>
-                </FormControl>
+                <TextField
+                  label="IGST (%)"
+                  name="igst"
+                  type="number"
+                  value={editItemData.igst}
+                  onChange={handleEditInputChange}
+                  fullWidth
+                  inputProps={{ min: 0, max: 30, step: '0.01' }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                />
               </Grid>
-              {editItemData.taxType === 'igst' ? (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="IGST (%)"
-                    name="igst"
-                    type="number"
-                    value={editItemData.igst}
-                    onChange={handleEditInputChange}
-                    required
-                    fullWidth
-                    inputProps={{ min: 0, max: 30, step: '0.01' }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                  />
-                </Grid>
-              ) : (
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="CGST/SGST (each %)"
-                    name="cgstSgst"
-                    type="number"
-                    value={editItemData.cgstSgst}
-                    onChange={handleEditInputChange}
-                    required
-                    fullWidth
-                    inputProps={{ min: 0, max: 15, step: '0.01' }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                  />
-                </Grid>
-              )}
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="CGST (%)"
+                  name="cgst"
+                  type="number"
+                  value={editItemData.cgst}
+                  onChange={handleEditInputChange}
+                  fullWidth
+                  inputProps={{ min: 0, max: 15, step: '0.01' }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                />
+              </Grid>
             </Grid>
           </DialogContent>
           <DialogActions>
