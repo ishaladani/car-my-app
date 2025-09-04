@@ -791,13 +791,14 @@ const WorkInProgress = () => {
     setPartAddError(null);
 
     try {
-      const taxPercentage =
-        newPart.taxType === "igst"
-          ? newPart.igst
-          : parseFloat(newPart.cgstSgst) * 2;
+      const sgstAmount = newPart.sgstEnabled ?
+        calculateTaxAmount(newPart.sellingPrice, newPart.quantity, newPart.sgstPercentage) : 0;
+      const cgstAmount = newPart.cgstEnabled ?
+        calculateTaxAmount(newPart.sellingPrice, newPart.quantity, newPart.cgstPercentage) : 0;
+
+      const taxAmount = sgstAmount + cgstAmount;
 
       const requestData = {
-        name: newPart.name,
         garageId: garageId,
         quantity: parseInt(newPart.quantity),
         purchasePrice: parseFloat(newPart.purchasePrice),
@@ -808,13 +809,13 @@ const WorkInProgress = () => {
         model: newPart.model,
         hsnNumber: newPart.hsnNumber,
         taxType: newPart.taxType,
-        igst: newPart.taxType === "igst" ? parseFloat(newPart.igst) : 0,
-        cgstSgst: newPart.taxType === "cgstSgst" ? parseFloat(newPart.cgstSgst) : 0,
+        igst: parseFloat(newPart.igst) || 0,
+        cgstSgst: parseFloat(newPart.cgstSgst) || 0,
         sgstEnabled: newPart.sgstEnabled,
-        sgstPercentage: newPart.sgstEnabled ? parseFloat(newPart.sgstPercentage) : 0,
+        sgstPercentage: parseFloat(newPart.sgstPercentage) || 0,
         cgstEnabled: newPart.cgstEnabled,
-        cgstPercentage: newPart.cgstEnabled ? parseFloat(newPart.cgstPercentage) : 0,
-        taxAmount: taxPercentage, // ✅ Store as %, not ₹
+        cgstPercentage: parseFloat(newPart.cgstPercentage) || 0,
+        taxAmount: taxAmount
       };
 
       const response = await axios.post(
@@ -3087,48 +3088,69 @@ const WorkInProgress = () => {
               </Box>
     
               {/* Tax Preview */}
-              {newPart.purchasePrice &&
-                newPart.quantity &&
-                (newPart.igst || newPart.cgstSgst) && (
-                  <Box
-                    sx={{ mt: 3, p: 2, bgcolor: "action.hover", borderRadius: 1 }}
-                  >
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                      Tax Summary
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Base: ₹
-                          {(newPart.sellingPrice * newPart.quantity).toFixed(2)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <Typography variant="body2" color="primary">
-                          Tax: ₹
-                          {calculateTaxAmount(
-                            newPart.sellingPrice,
-                            newPart.quantity,
-                            newPart.taxType === "igst"
-                              ? newPart.igst
-                              : newPart.cgstSgst * 2
-                          ).toFixed(2)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <Typography variant="h6">
-                          Total: ₹
-                          {calculateTotalPrice(
-                            newPart.sellingPrice,
-                            newPart.quantity,
-                            newPart.igst,
-                            newPart.cgstSgst
-                          ).toFixed(2)}
-                        </Typography>
-                      </Grid>
+              {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
+                <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                  <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Selling Price per Unit: ₹{parseFloat(newPart.sellingPrice || 0).toFixed(2)}
+                      </Typography>
                     </Grid>
-                  </Box>
-                )}
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Quantity: {newPart.quantity}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="primary">
+                        Single Part GST: ₹{(() => {
+                          const igst = parseFloat(newPart.igst) || 0;
+                          const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                          let singlePartGST = 0;
+                          if (newPart.taxType === 'igst' && igst > 0) {
+                            singlePartGST = (newPart.sellingPrice * igst) / 100;
+                          } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                            singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                          }
+                          return singlePartGST.toFixed(2);
+                        })()}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="success.main">
+                        Total GST for Quantity: ₹{(() => {
+                          const igst = parseFloat(newPart.igst) || 0;
+                          const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                          let singlePartGST = 0;
+                          if (newPart.taxType === 'igst' && igst > 0) {
+                            singlePartGST = (newPart.sellingPrice * igst) / 100;
+                          } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                            singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                          }
+                          return (singlePartGST * newPart.quantity).toFixed(2);
+                        })()}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="h6" color="success.dark">
+                        Total Amount (Including GST): ₹{(() => {
+                          const igst = parseFloat(newPart.igst) || 0;
+                          const cgstSgst = parseFloat(newPart.cgstSgst) || 0;
+                          let singlePartGST = 0;
+                          if (newPart.taxType === 'igst' && igst > 0) {
+                            singlePartGST = (newPart.sellingPrice * igst) / 100;
+                          } else if (newPart.taxType === 'cgstSgst' && cgstSgst > 0) {
+                            singlePartGST = (newPart.sellingPrice * cgstSgst * 2) / 100;
+                          }
+                          const totalAmount = (newPart.sellingPrice + singlePartGST) * newPart.quantity;
+                          return totalAmount.toFixed(2);
+                        })()}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseAddPartDialog} color="inherit">

@@ -26,6 +26,20 @@ const ThankYouSection = ({
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Calculate final amount using same logic as BillSummarySection
+  const calculateFinalAmount = () => {
+    const partsSubtotal = summary.totalPartsCost || 0;
+    const displayLaborCost = summary.totalLaborCost || 0;
+    
+    // Only apply GST on Labour/Service (not on parts)
+    const shouldApplyGst = gstSettings.includeGst && displayLaborCost > 0;
+    const laborGstAmount = shouldApplyGst ? (displayLaborCost * (gstSettings.gstPercentage / 100)) : 0;
+    const totalGstAmount = laborGstAmount;
+    
+    // Final total: parts + labour + GST (only on labour) - discount
+    return partsSubtotal + displayLaborCost + totalGstAmount - (summary.discount || 0);
+  };
+
   return (
     <Box
       sx={{
@@ -74,7 +88,10 @@ const ThankYouSection = ({
           📄 Invoice #{carDetails.invoiceNo}
         </Typography>
         <Typography variant="h5" fontWeight="bold">
-          Amount: ₹{summary.totalAmount.toLocaleString("en-IN")}
+          Amount: ₹{new Intl.NumberFormat("en-IN", { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+          }).format(calculateFinalAmount())}
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
           {gstSettings.billType === 'gst' ? "Including GST" : "Excluding GST"} •

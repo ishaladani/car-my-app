@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -8,12 +8,13 @@ import {
   DialogTitle,
   Grid,
   TextField,
-  Typography
+  Typography,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { Email as EmailIcon } from '@mui/icons-material';
-import jsPDF from 'jspdf';
 import emailjs from 'emailjs-com';
-import { EMAILJS_CONFIG, initEmailJS } from '../config/emailjs';
+import { EMAILJS_CONFIG, initEmailJS, isEmailJSConfigured } from '../config/emailjs';
 
 const EmailDialog = ({
   showEmailDialog,
@@ -25,8 +26,16 @@ const EmailDialog = ({
   setEmailSubject,
   emailMessage,
   setEmailMessage,
-  carDetails
+  carDetails,
+  garageDetails,
+  gstSettings,
+  summary,
+  jobCardData,
+  generateProfessionalGSTInvoice // Pass the PDF generation function from parent
 }) => {
+  const [isSending, setIsSending] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
 
   // Initialize EmailJS when component mounts
   useEffect(() => {
@@ -34,38 +43,72 @@ const EmailDialog = ({
   }, []);
 
   const sendBillViaEmail = async () => {
+    if (!emailRecipient || !emailRecipient.includes('@')) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    // Check if EmailJS is configured
+    if (!isEmailJSConfigured()) {
+      setEmailError('❌ EmailJS is not configured. Please update the configuration in src/config/emailjs.js');
+      return;
+    }
+
+    setIsSending(true);
+    setEmailError('');
+    setEmailSuccess('');
+
     try {
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Invoice", 20, 20);
-      doc.setFontSize(12);
-      doc.text(`Car: ${carDetails?.carName || 'N/A'}`, 20, 40);
-      doc.text(`Model: ${carDetails?.model || 'N/A'}`, 20, 50);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 60);
-      doc.text(`Thanks for choosing our service.`, 20, 80);
+      // Generate the professional PDF using the same function as download
+      const doc = generateProfessionalGSTInvoice();
+      
+      // Convert PDF to base64 for email attachment
+      const pdfDataUri = doc.output('datauristring');
+      const base64 = pdfDataUri.split(',')[1];
 
-      const pdfDataUri = doc.output('datauristring'); // base64 PDF
-      const base64 = pdfDataUri.split(',')[1]; // remove the data: prefix
-
+      // Prepare email template parameters
       const templateParams = {
         to_email: emailRecipient,
-        subject: emailSubject,
-        message: emailMessage,
-        attachment: base64
+        subject: emailSubject || `Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`,
+        message: emailMessage || `Dear ${carDetails.customerName},\n\nPlease find your invoice #${carDetails.invoiceNo} attached.\n\nThank you for choosing our services!\n\nBest regards,\n${garageDetails.name}`,
+        invoice_number: carDetails.invoiceNo,
+        customer_name: carDetails.customerName,
+        total_amount: summary.totalAmount,
+        garage_name: garageDetails.name,
+        attachment: base64,
+        attachment_name: `Invoice_${carDetails.invoiceNo}.pdf`
       };
 
-      await emailjs.send(
+      // Send email using EmailJS
+      const response = await emailjs.send(
         EMAILJS_CONFIG.SERVICE_ID,
         EMAILJS_CONFIG.TEMPLATE_ID,
         templateParams,
         EMAILJS_CONFIG.PUBLIC_KEY
       );
 
-      alert('✅ Invoice sent successfully!');
-      setShowEmailDialog(false);
+      if (response.status === 200) {
+        setEmailSuccess('✅ Invoice sent successfully!');
+        setTimeout(() => {
+          setShowEmailDialog(false);
+          setEmailSuccess('');
+        }, 2000);
+      } else {
+        throw new Error('Email service returned non-200 status');
+      }
     } catch (err) {
       console.error('Error sending email:', err);
-      alert('❌ Failed to send invoice.');
+      if (err.message && err.message.includes('Public Key is invalid')) {
+        setEmailError('❌ EmailJS configuration error. Please check your PUBLIC_KEY in src/config/emailjs.js');
+      } else if (err.message && err.message.includes('Service ID')) {
+        setEmailError('❌ EmailJS service error. Please check your SERVICE_ID in src/config/emailjs.js');
+      } else if (err.message && err.message.includes('Template ID')) {
+        setEmailError('❌ EmailJS template error. Please check your TEMPLATE_ID in src/config/emailjs.js');
+      } else {
+        setEmailError(`❌ Failed to send invoice: ${err.message || 'Unknown error'}`);
+      }
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -83,6 +126,18 @@ const EmailDialog = ({
         </Typography>
       </DialogTitle>
       <DialogContent sx={{ p: 3 }}>
+        {/* Error/Success Messages */}
+        {emailError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {emailError}
+          </Alert>
+        )}
+        {emailSuccess && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {emailSuccess}
+          </Alert>
+        )}
+
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <TextField
@@ -94,6 +149,7 @@ const EmailDialog = ({
               onChange={(e) => setEmailRecipient(e.target.value)}
               required
               helperText="Enter the customer's email address"
+              disabled={isSending}
             />
           </Grid>
           <Grid item xs={12}>
@@ -103,7 +159,8 @@ const EmailDialog = ({
               variant="outlined"
               value={emailSubject}
               onChange={(e) => setEmailSubject(e.target.value)}
-              required
+              placeholder={`Invoice #${carDetails.invoiceNo} - ${garageDetails.name}`}
+              disabled={isSending}
             />
           </Grid>
           <Grid item xs={12}>
@@ -111,39 +168,45 @@ const EmailDialog = ({
               fullWidth
               label="Email Message"
               multiline
-              rows={8}
+              rows={6}
               variant="outlined"
               value={emailMessage}
               onChange={(e) => setEmailMessage(e.target.value)}
-              helperText="This message will be sent along with the PDF invoice attachment"
+              placeholder={`Dear ${carDetails.customerName},\n\nPlease find your invoice #${carDetails.invoiceNo} attached.\n\nThank you for choosing our services!\n\nBest regards,\n${garageDetails.name}`}
+              helperText="This message will be sent along with the professional PDF invoice attachment"
+              disabled={isSending}
             />
           </Grid>
           <Grid item xs={12}>
             <Box sx={{ p: 3, backgroundColor: 'primary.light', borderRadius: 2, color: 'primary.contrastText' }}>
               <Typography variant="body2" fontWeight={500}>
-                📎 PDF invoice will be auto-attached
+                📎 Professional PDF invoice will be auto-attached
               </Typography>
               <Typography variant="caption" display="block" sx={{ mt: 1, opacity: 0.8 }}>
-                Includes car details and formatted layout
+                Includes complete invoice details, GST breakdown, and professional formatting
               </Typography>
             </Box>
           </Grid>
         </Grid>
       </DialogContent>
       <DialogActions sx={{ p: 3 }}>
-        <Button onClick={() => setShowEmailDialog(false)} sx={{ width: isMobile ? '100%' : 'auto' }}>
+        <Button 
+          onClick={() => setShowEmailDialog(false)} 
+          sx={{ width: isMobile ? '100%' : 'auto' }}
+          disabled={isSending}
+        >
           Cancel
         </Button>
         <Button
           variant="contained"
           color="primary"
-          startIcon={<EmailIcon />}
+          startIcon={isSending ? <CircularProgress size={20} color="inherit" /> : <EmailIcon />}
           onClick={sendBillViaEmail}
-          disabled={!emailRecipient.includes('@')}
+          disabled={!emailRecipient.includes('@') || isSending}
           fullWidth={isMobile}
           sx={{ background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)' }}
         >
-          Send Professional Invoice
+          {isSending ? 'Sending Invoice...' : 'Send Professional Invoice'}
         </Button>
       </DialogActions>
     </Dialog>

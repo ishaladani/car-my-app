@@ -538,7 +538,10 @@ useEffect(() => {
   };
 
   const formatAmount = (amount) => {
-    return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount)}`;
+    return `₹${new Intl.NumberFormat("en-IN", { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }).format(amount)}`;
   };
 
   // Payment method selection
@@ -1407,10 +1410,10 @@ const generateProfessionalGSTInvoice = () => {
     const colWidths = { 
       srNo: Math.floor(contentWidth * 0.08),      // 8% of content width
       productName: Math.floor(contentWidth * 0.45), // 45% of content width - largest for descriptions
-      hsnCode: Math.floor(contentWidth * 0.15),   // 15% of content width
+      hsnCode: Math.floor(contentWidth * 0.10),   // 15% of content width
       qty: Math.floor(contentWidth * 0.10),       // 10% of content width
       rate: Math.floor(contentWidth * 0.12),      // 12% of content width
-      amount: Math.floor(contentWidth * 0.10)     // 10% of content width
+      amount: Math.floor(contentWidth * 0.15)     // 10% of content width
     };
     const totalTableWidth = contentWidth; // Use full content width instead of fixed widths
 
@@ -1421,7 +1424,7 @@ const generateProfessionalGSTInvoice = () => {
     doc.setTextColor(255, 255, 255);
 
     let colX = margin;
-    ["Sr.", "Product/Service Description", "HSN Code", "Qty", "Rate (₹)", "Amount (₹)"].forEach((text, i) => {
+    ["Sr.", "Product/Service Description", "HSN Code", "Qty", "Rate ", "Amount"].forEach((text, i) => {
       const w = colWidths[Object.keys(colWidths)[i]];
       const txtW = doc.getTextWidth(text);
       
@@ -2159,8 +2162,12 @@ Thank you!`;
         setEmailSubject={setEmailSubject} 
         emailMessage={emailMessage} 
         setEmailMessage={setEmailMessage} 
-        sendBillViaEmail={sendBillViaEmail} 
-        carDetails={carDetails} 
+        carDetails={carDetails}
+        garageDetails={garageDetails}
+        gstSettings={gstSettings}
+        summary={summary}
+        jobCardData={jobCardData}
+        generateProfessionalGSTInvoice={generateProfessionalGSTInvoice}
       />
 
       {/* WhatsApp Business API Configuration Dialog */}

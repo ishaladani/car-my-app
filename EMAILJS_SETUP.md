@@ -34,11 +34,16 @@ export const EMAILJS_CONFIG = {
 ### Step 4: Create Email Template
 
 1. In EmailJS Dashboard, go to "Email Templates"
-2. Create a new template with variables:
-   - `{{to_email}}` - recipient email
-   - `{{subject}}` - email subject
-   - `{{message}}` - email message
-   - `{{attachment}}` - PDF attachment (base64)
+2. Create a new template with these variables:
+   - `{{to_email}}` - recipient email address
+   - `{{subject}}` - email subject line
+   - `{{message}}` - email message body
+   - `{{invoice_number}}` - invoice number
+   - `{{customer_name}}` - customer name
+   - `{{total_amount}}` - total invoice amount
+   - `{{garage_name}}` - garage/service provider name
+   - `{{attachment}}` - PDF attachment (base64 encoded)
+   - `{{attachment_name}}` - PDF filename
 3. Note down the Template ID
 
 ### Step 5: Test the Email Function
@@ -52,17 +57,38 @@ Here's an example of what your EmailJS template might look like:
 ```html
 Subject: {{subject}}
 
-Dear Customer,
+Dear {{customer_name}},
 
 {{message}}
 
-Please find your invoice attached.
+Invoice Details:
+- Invoice Number: {{invoice_number}}
+- Total Amount: ₹{{total_amount}}
+- Service Provider: {{garage_name}}
+
+Please find your professional invoice attached as a PDF document.
 
 Best regards,
-Your Service Team
+{{garage_name}} Team
 
-[PDF attachment will be automatically included]
+[PDF attachment: {{attachment_name}} will be automatically included]
 ```
+
+### Important Notes for PDF Attachments:
+
+1. **EmailJS Template Settings**: In your EmailJS template, make sure to:
+   - Set the attachment field to use `{{attachment}}`
+   - Set the attachment filename to use `{{attachment_name}}`
+   - Configure the attachment type as "application/pdf"
+
+2. **Template Variables**: The system automatically provides these variables:
+   - `{{attachment}}` - Base64 encoded PDF data
+   - `{{attachment_name}}` - Formatted filename like "Invoice_INV001.pdf"
+   - All other variables are populated from the invoice data
+
+3. **File Size Limits**: EmailJS has attachment size limits. For large invoices, consider:
+   - Optimizing the PDF generation
+   - Using a cloud storage service for very large files
 
 ## Troubleshooting
 
