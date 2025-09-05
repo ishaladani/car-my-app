@@ -713,7 +713,7 @@ const RecordReport = () => {
                           }}>
                             Customer Name
                           </TableCell>
-                          <TableCell sx={{ 
+                          {/* <TableCell sx={{ 
                             bgcolor: 'primary.main', 
                             color: '#fff', 
                             fontWeight: 'bold',
@@ -721,8 +721,8 @@ const RecordReport = () => {
                             fontSize: { xs: '0.75rem', sm: '0.875rem' }
                           }}>
                             Subaccount
-                          </TableCell>
-                          <TableCell sx={{ 
+                          </TableCell> */}
+                          {/* <TableCell sx={{ 
                             bgcolor: 'primary.main', 
                             color: '#fff', 
                             fontWeight: 'bold',
@@ -730,7 +730,7 @@ const RecordReport = () => {
                             fontSize: { xs: '0.75rem', sm: '0.875rem' }
                           }}>
                             Job Details
-                          </TableCell>
+                          </TableCell> */}
                           <TableCell sx={{ 
                             bgcolor: 'primary.main', 
                             color: '#fff', 
@@ -792,7 +792,7 @@ const RecordReport = () => {
                                   {job.customerName || 'N/A'}
                                 </Typography>
                               </TableCell>
-                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                              {/* <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 {getSubaccountName(job.subaccountId) ? (
                                   <Chip 
                                     label={getSubaccountName(job.subaccountId)} 
@@ -812,7 +812,7 @@ const RecordReport = () => {
                                 fontSize: { xs: '0.75rem', sm: '0.875rem' }
                               }}>
                                 <JobDetailsComponent jobDetails={job.jobDetails} compact={true} />
-                              </TableCell>
+                              </TableCell> */}
                               <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Chip 
                                   label={getCreatedByName(job.createdBy) || 'Unknown'} 
