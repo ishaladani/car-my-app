@@ -217,12 +217,6 @@ const AssignEngineer = () => {
 
   // Function to handle part removal (same pattern as WorkInProgress)
   const handlePartRemoval = async (partIndex) => {
-    // Only allow part removal when in assignment mode
-    if (!isAssignmentMode) {
-      setError("Parts can only be removed when assigning an engineer. Please click 'Assign Engineer & Update Job Card' first.");
-      return;
-    }
-
     try {
       const partToRemove = selectedParts[partIndex];
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
@@ -543,19 +537,12 @@ const AssignEngineer = () => {
     return availableQuantity;
   };
 
-  // Update Part Quantity using PUT API, DELETE only when qty = 0
+  // Update Part Quantity - no immediate API calls
   const updatePartQuantity = useCallback(async (partId, newQuantity) => {
     try {
-
-      if (newQuantity === 0) {
-        // When quantity reaches 0, use DELETE API
-        await apiCall(`/garage/inventory/delete/${partId}`, {
-          method: 'DELETE'
-        });
-      } else {
-        // Note: Inventory update will be handled when assignment is submitted
-        console.log(`Planning inventory update for part ${partId}: quantity will be set to ${newQuantity} (will be applied on assignment submission)`);
-      }
+      // Note: Inventory update will be handled when assignment is submitted
+      // This prevents premature inventory changes during quantity adjustments
+      console.log(`Planning inventory update for part ${partId}: quantity will be set to ${newQuantity} (will be applied on assignment submission)`);
 
     } catch (err) {
       console.error(`Failed to update quantity for part ${partId}:`, err);
@@ -2530,7 +2517,7 @@ const AssignEngineer = () => {
                                                 </span>
                                               </Tooltip>
                                             </Box>
-                                            <Tooltip title={!isAssignmentMode ? "Click 'Assign Engineer & Update Job Card' to enable part modifications" : isSubmitting ? "Remove button disabled during submission" : "Remove part from selection"}>
+                                            <Tooltip title={isSubmitting ? "Remove button disabled during submission" : "Remove part from selection"}>
                                               <span>
                                                 <IconButton
                                                   size="small"
@@ -2538,7 +2525,7 @@ const AssignEngineer = () => {
                                                   onClick={() => {
                                                     handlePartRemoval(partIndex);
                                                   }}
-                                                  disabled={isSubmitting || !isAssignmentMode}
+                                                  disabled={isSubmitting}
                                                 >
                                                   <DeleteIcon fontSize="small" />
                                                 </IconButton>
@@ -2812,7 +2799,7 @@ const AssignEngineer = () => {
                                               </span>
                                             </Tooltip>
                                             </Box>
-                                            <Tooltip title={!isAssignmentMode ? "Click 'Assign Engineer & Update Job Card' to enable part modifications" : part.isPreLoaded ? "Pre-loaded parts cannot be removed" : "Remove part"}>
+                                            <Tooltip title={part.isPreLoaded ? "Pre-loaded parts cannot be removed" : isSubmitting ? "Remove button disabled during submission" : "Remove part"}>
                                               <span>
                                                 <IconButton
                                               size="small"
@@ -2824,7 +2811,7 @@ const AssignEngineer = () => {
                                                 }
                                                 handlePartRemoval(partIndex);
                                               }}
-                                              disabled={part.isPreLoaded || !isAssignmentMode}
+                                              disabled={part.isPreLoaded || isSubmitting}
                                             >
                                               <DeleteIcon fontSize="small" />
                                             </IconButton>
