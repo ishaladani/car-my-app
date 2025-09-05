@@ -824,9 +824,15 @@ const RecordReport = () => {
     };
 
   return (
-    <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: "auto" }}>
+    <Box sx={{ 
+      flexGrow: 1, 
+      mb: 4, 
+      ml: { xs: 0, sm: 35 }, 
+      overflow: "auto",
+      px: { xs: 1, sm: 0 } // Add horizontal padding for mobile
+    }}>
       <CssBaseline />
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 3 } }}>
         {/* Header */}
         <Card
           elevation={0}
@@ -842,11 +848,13 @@ const RecordReport = () => {
             <Box
               sx={{
                 display: "flex",
-                alignItems: "center",
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'flex-start', sm: 'center' },
                 justifyContent: "space-between",
+                gap: { xs: 2, sm: 0 }
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
                 <IconButton
                   onClick={() => navigate("/")}
                   sx={{
@@ -859,15 +867,15 @@ const RecordReport = () => {
                   <ArrowBackIcon />
                 </IconButton>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
+                  <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
                     📊 Reports And Analytics
                   </Typography>
-                  <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                  <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                     Comprehensive reports for inventory and financial analysis
                   </Typography>
                 </Box>
               </Box>
-              <Box sx={{ display: "flex", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 1, width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
                 <Button
                   variant="contained"
                   startIcon={<RefreshIcon />}
@@ -882,6 +890,7 @@ const RecordReport = () => {
                     bgcolor: "rgba(255,255,255,0.2)",
                     color: "white",
                     "&:hover": { bgcolor: "rgba(255,255,255,0.3)" },
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' }
                   }}
                 >
                   Refresh
@@ -911,24 +920,38 @@ const RecordReport = () => {
             <Tabs
               value={activeTab}
               onChange={(e, newValue) => setActiveTab(newValue)}
+              variant="scrollable"
+              scrollButtons="auto"
               sx={{
                 borderBottom: 1,
                 borderColor: "divider",
                 "& .MuiTab-root": {
-                  minHeight: 64,
-                  fontSize: "1rem",
+                  minHeight: { xs: 48, sm: 64 },
+                  fontSize: { xs: "0.75rem", sm: "1rem" },
                   fontWeight: 500,
+                  px: { xs: 1, sm: 2 },
+                },
+                "& .MuiTabs-scrollButtons": {
+                  "&.Mui-disabled": {
+                    opacity: 0.3,
+                  },
                 },
               }}
             >
               <Tab
-                icon={<ReceiptIcon />}
+                icon={<ReceiptIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                 label={
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <span>Financial Report</span>
+                  <Box sx={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: { xs: 0.5, sm: 1 },
+                    flexDirection: { xs: 'column', sm: 'row' }
+                  }}>
+                    <span style={{ fontSize: 'inherit' }}>Financial Report</span>
                     <Badge
                       sx={{
-                        top: -14,
+                        top: { xs: -8, sm: -14 },
+                        fontSize: { xs: '0.6rem', sm: '0.75rem' }
                       }}
                       badgeContent={financialSummary.totalJobs}
                       color="primary"
@@ -938,12 +961,21 @@ const RecordReport = () => {
                 iconPosition="start"
               />
               <Tab
-                icon={<InventoryIcon />}
+                icon={<InventoryIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
                 label={
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <span>Inventory Report</span>
+                  <Box sx={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: { xs: 0.5, sm: 1 },
+                    flexDirection: { xs: 'column', sm: 'row' }
+                  }}>
+                    <span style={{ fontSize: 'inherit' }}>Inventory Report</span>
                     {inventoryData && (
                       <Badge
+                        sx={{
+                          top: { xs: -8, sm: -14 },
+                          fontSize: { xs: '0.6rem', sm: '0.75rem' }
+                        }}
                         badgeContent={inventoryData.summary?.lowStockCount || 0}
                         color="warning"
                       />
@@ -960,13 +992,13 @@ const RecordReport = () => {
         {activeTab === 0 && (
           <>
             {/* Financial Summary Cards */}
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6} md={3}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={6} sm={6} md={3}>
                 <Card
                   elevation={0}
                   sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -979,33 +1011,34 @@ const RecordReport = () => {
                           variant="h4"
                           fontWeight="bold"
                           color="primary"
+                          sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                         >
                           {financialSummary.totalJobs}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           Total Jobs
                         </Typography>
                       </Box>
                       <Box
                         sx={{
-                          p: 2,
+                          p: { xs: 1.5, sm: 2 },
                           borderRadius: 2,
                           bgcolor: "primary.light",
                           color: "white",
                         }}
                       >
-                        <WorkIcon />
+                        <WorkIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                       </Box>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={6} sm={6} md={3}>
                 <Card
                   elevation={0}
                   sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -1018,33 +1051,34 @@ const RecordReport = () => {
                           variant="h4"
                           fontWeight="bold"
                           color="success.main"
+                          sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                         >
                           {formatCurrency(financialSummary.totalRevenue)}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           Total Revenue
                         </Typography>
                       </Box>
                       <Box
                         sx={{
-                          p: 2,
+                          p: { xs: 1.5, sm: 2 },
                           borderRadius: 2,
                           bgcolor: "success.light",
                           color: "white",
                         }}
                       >
-                        <TrendingUpIcon />
+                        <TrendingUpIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                       </Box>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={6} sm={6} md={3}>
                 <Card
                   elevation={0}
                   sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -1057,33 +1091,34 @@ const RecordReport = () => {
                           variant="h4"
                           fontWeight="bold"
                           color="info.main"
+                          sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                         >
                           {formatCurrency(financialSummary.averageRevenue)}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           Average Revenue
                         </Typography>
                       </Box>
                       <Box
                         sx={{
-                          p: 2,
+                          p: { xs: 1.5, sm: 2 },
                           borderRadius: 2,
                           bgcolor: "info.light",
                           color: "white",
                         }}
                       >
-                        <TrendingUpIcon />
+                        <TrendingUpIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                       </Box>
                     </Box>
                   </CardContent>
                 </Card>
               </Grid>
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={6} sm={6} md={3}>
                 <Card
                   elevation={0}
                   sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -1096,22 +1131,23 @@ const RecordReport = () => {
                           variant="h4"
                           fontWeight="bold"
                           color="warning.main"
+                          sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                         >
                           {formatCurrency(financialSummary.thisMonthRevenue)}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                           This Month
                         </Typography>
                       </Box>
                       <Box
                         sx={{
-                          p: 2,
+                          p: { xs: 1.5, sm: 2 },
                           borderRadius: 2,
                           bgcolor: "warning.light",
                           color: "white",
                         }}
                       >
-                        <CalendarTodayIcon />
+                        <CalendarTodayIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                       </Box>
                     </Box>
                   </CardContent>
@@ -1132,6 +1168,7 @@ const RecordReport = () => {
                       placeholder="Search jobs..."
                       value={search}
                       onChange={handleSearch}
+                      size="small"
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -1141,8 +1178,8 @@ const RecordReport = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
-                    <FormControl fullWidth>
+                  <Grid item xs={6} sm={3} md={2}>
+                    <FormControl fullWidth size="small">
                       <InputLabel>Bill Type</InputLabel>
                       <Select
                         value={billTypeFilter}
@@ -1155,7 +1192,7 @@ const RecordReport = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={6} sm={3} md={2}>
                     <TextField
                       fullWidth
                       type="date"
@@ -1163,9 +1200,10 @@ const RecordReport = () => {
                       value={startDate}
                       onChange={handleStartDateChange}
                       InputLabelProps={{ shrink: true }}
+                      size="small"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={2}>
+                  <Grid item xs={6} sm={3} md={2}>
                     <TextField
                       fullWidth
                       type="date"
@@ -1173,14 +1211,17 @@ const RecordReport = () => {
                       value={endDate}
                       onChange={handleEndDateChange}
                       InputLabelProps={{ shrink: true }}
+                      size="small"
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Box sx={{ display: "flex", gap: 1 }}>
+                  <Grid item xs={6} sm={6} md={3}>
+                    <Box sx={{ display: "flex", gap: 1, flexDirection: { xs: 'column', sm: 'row' } }}>
                       <Button
                         variant="outlined"
                         onClick={handleClearFilters}
                         startIcon={<FilterListIcon />}
+                        size="small"
+                        fullWidth={false}
                       >
                         Clear
                       </Button>
@@ -1188,6 +1229,8 @@ const RecordReport = () => {
                         variant="contained"
                         onClick={() => generateJobsPDF(filteredJobsData)}
                         startIcon={<FileDownloadIcon />}
+                        size="small"
+                        fullWidth={false}
                       >
                         Export PDF
                       </Button>
@@ -1209,37 +1252,82 @@ const RecordReport = () => {
                   </Box>
                 ) : (
                   <>
-                    <TableContainer>
-                      <Table>
+                    <TableContainer
+                      sx={{
+                        overflowX: 'auto',
+                        '&::-webkit-scrollbar': {
+                          height: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                          borderRadius: '4px',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          backgroundColor: theme.palette.primary.main,
+                          borderRadius: '4px',
+                        },
+                      }}
+                    >
+                      <Table sx={{ minWidth: 600 }}>
                         <TableHead>
                           <TableRow sx={{ bgcolor: "#f8fafc" }}>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '80px', sm: '100px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Job ID
                             </TableCell>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '120px', sm: '150px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Customer
                             </TableCell>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '100px', sm: '120px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Vehicle
                             </TableCell>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '100px', sm: '120px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Amount
                             </TableCell>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '120px', sm: '150px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Completed Date
                             </TableCell>
                             <TableCell
-                              sx={{ fontWeight: 600, color: "#475569" }}
+                              sx={{ 
+                                fontWeight: 600, 
+                                color: "#475569",
+                                minWidth: { xs: '80px', sm: '100px' },
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}
                             >
                               Actions
                             </TableCell>
@@ -1248,27 +1336,28 @@ const RecordReport = () => {
                         <TableBody>
                           {getCurrentPageData().map((job) => (
                             <TableRow key={job._id} hover>
-                              <TableCell>
-                                <Typography variant="body2" fontWeight={500}>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Typography variant="body2" fontWeight={500} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                   {job.jobId || "N/A"}
                                 </Typography>
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Box>
-                                  <Typography variant="body2" fontWeight={500}>
+                                  <Typography variant="body2" fontWeight={500} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                     {job.customerName || "N/A"}
                                   </Typography>
                                   <Typography
                                     variant="caption"
                                     color="text.secondary"
+                                    sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                   >
                                     {job.contactNumber || "N/A"}
                                   </Typography>
                                 </Box>
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Box>
-                                  <Typography variant="body2" fontWeight={500}>
+                                  <Typography variant="body2" fontWeight={500} sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                     {job.carNumber ||
                                       job.registrationNumber ||
                                       "N/A"}
@@ -1276,30 +1365,37 @@ const RecordReport = () => {
                                   <Typography
                                     variant="caption"
                                     color="text.secondary"
+                                    sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                   >
                                     {job.model || "N/A"}
                                   </Typography>
                                 </Box>
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Typography
                                   variant="body2"
                                   fontWeight={500}
                                   color="success.main"
+                                  sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                                 >
                                   {formatCurrency(job.totalAmount || 0)}
                                 </Typography>
                               </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                   {formatDate(job.completedAt || job.updatedAt)}
                                 </Typography>
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <IconButton
                                   size="small"
                                   onClick={() => handleViewBill(job._id)}
-                                  sx={{ color: "primary.main" }}
+                                  sx={{ 
+                                    color: "primary.main",
+                                    '& .MuiSvgIcon-root': {
+                                      fontSize: { xs: '1rem', sm: '1.25rem' }
+                                    }
+                                  }}
                                 >
                                   <VisibilityIcon />
                                 </IconButton>
@@ -1317,6 +1413,19 @@ const RecordReport = () => {
                       rowsPerPage={rowsPerPage}
                       onRowsPerPageChange={handleChangeRowsPerPage}
                       rowsPerPageOptions={[5, 10, 25, 50]}
+                      sx={{ 
+                        '& .MuiTablePagination-toolbar': {
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          gap: { xs: 1, sm: 0 },
+                          alignItems: { xs: 'flex-start', sm: 'center' }
+                        },
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                          fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                        },
+                        '& .MuiTablePagination-actions': {
+                          marginLeft: { xs: 0, sm: 'auto' }
+                        }
+                      }}
                     />
                   </>
                 )}
@@ -1330,13 +1439,13 @@ const RecordReport = () => {
           <>
             {/* Inventory Summary Cards */}
             {inventoryData && (
-              <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={6} md={3}>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Card
                     elevation={0}
                     sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                   >
-                    <CardContent sx={{ p: 3 }}>
+                    <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                       <Box
                         sx={{
                           display: "flex",
@@ -1349,33 +1458,34 @@ const RecordReport = () => {
                             variant="h4"
                             fontWeight="bold"
                             color="primary"
+                            sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                           >
                             {inventoryData?.summary?.totalParts || 0}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             Total Parts
                           </Typography>
                         </Box>
                         <Box
                           sx={{
-                            p: 2,
+                            p: { xs: 1.5, sm: 2 },
                             borderRadius: 2,
                             bgcolor: "primary.light",
                             color: "white",
                           }}
                         >
-                          <InventoryIcon />
+                          <InventoryIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                         </Box>
                       </Box>
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Card
                     elevation={0}
                     sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                   >
-                    <CardContent sx={{ p: 3 }}>
+                    <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                       <Box
                         sx={{
                           display: "flex",
@@ -1388,35 +1498,36 @@ const RecordReport = () => {
                             variant="h4"
                             fontWeight="bold"
                             color="success.main"
+                            sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                           >
                             {formatCurrency(
                               inventoryData?.summary?.totalSellingValue || 0
                             )}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             Total Value
                           </Typography>
                         </Box>
                         <Box
                           sx={{
-                            p: 2,
+                            p: { xs: 1.5, sm: 2 },
                             borderRadius: 2,
                             bgcolor: "success.light",
                             color: "white",
                           }}
                         >
-                          <TrendingUpIcon />
+                          <TrendingUpIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                         </Box>
                       </Box>
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Card
                     elevation={0}
                     sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                   >
-                    <CardContent sx={{ p: 3 }}>
+                    <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                       <Box
                         sx={{
                           display: "flex",
@@ -1429,33 +1540,34 @@ const RecordReport = () => {
                             variant="h4"
                             fontWeight="bold"
                             color="warning.main"
+                            sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                           >
                             {inventoryData?.summary?.lowStockCount || 0}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             Low Stock
                           </Typography>
                         </Box>
                         <Box
                           sx={{
-                            p: 2,
+                            p: { xs: 1.5, sm: 2 },
                             borderRadius: 2,
                             bgcolor: "warning.light",
                             color: "white",
                           }}
                         >
-                          <WarningIcon />
+                          <WarningIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                         </Box>
                       </Box>
                     </CardContent>
                   </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid item xs={6} sm={6} md={3}>
                   <Card
                     elevation={0}
                     sx={{ borderRadius: 3, border: "1px solid #e2e8f0" }}
                   >
-                    <CardContent sx={{ p: 3 }}>
+                    <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                       <Box
                         sx={{
                           display: "flex",
@@ -1468,22 +1580,23 @@ const RecordReport = () => {
                             variant="h4"
                             fontWeight="bold"
                             color="error.main"
+                            sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}
                           >
                             {inventoryData?.summary?.outOfStockCount || 0}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             Out of Stock
                           </Typography>
                         </Box>
                         <Box
                           sx={{
-                            p: 2,
+                            p: { xs: 1.5, sm: 2 },
                             borderRadius: 2,
                             bgcolor: "error.light",
                             color: "white",
                           }}
                         >
-                          <CloseIcon />
+                          <CloseIcon sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
                         </Box>
                       </Box>
                     </CardContent>
@@ -1498,11 +1611,22 @@ const RecordReport = () => {
               sx={{ mb: 3, borderRadius: 3, border: "1px solid #e2e8f0" }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: "flex", gap: 2, alignItems: "center", justifyContent: "space-between" }}>
-                  <Typography variant="h6" fontWeight="bold">
+                <Box sx={{ 
+                  display: "flex", 
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 2, 
+                  alignItems: { xs: 'flex-start', sm: 'center' }, 
+                  justifyContent: "space-between" 
+                }}>
+                  <Typography variant="h6" fontWeight="bold" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                     Inventory Management
                   </Typography>
-                  <Box sx={{ display: "flex", gap: 2 }}>
+                  <Box sx={{ 
+                    display: "flex", 
+                    gap: 2, 
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    width: { xs: '100%', sm: 'auto' }
+                  }}>
                     <Button
                       variant="outlined"
                       onClick={fetchInventoryData}
@@ -1514,6 +1638,8 @@ const RecordReport = () => {
                           <RefreshIcon />
                         )
                       }
+                      size="small"
+                      fullWidth={false}
                     >
                       {inventoryLoading ? "Loading..." : "Refresh Data"}
                     </Button>
@@ -1522,6 +1648,8 @@ const RecordReport = () => {
                         variant="contained"
                         onClick={() => generateInventoryPDF(inventoryData)}
                         startIcon={<FileDownloadIcon />}
+                        size="small"
+                        fullWidth={false}
                       >
                         Export PDF
                       </Button>

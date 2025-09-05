@@ -11,3 +11,8 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Custom styling for Material-UI table cell */
+.css-uktwsj-MuiTableCell-root {
+  background-color: #1976d2 !important;
+}

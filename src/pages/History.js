@@ -500,14 +500,27 @@ const RecordReport = () => {
   const isUserTypeUser = userType === "user";
 
   return (
-    <Box sx={{ flexGrow: 1, mb: 4, ml: { xs: 0, sm: 35 }, overflow: 'auto' }}>
+    <Box sx={{ 
+      flexGrow: 1, 
+      mb: 4, 
+      ml: { xs: 0, sm: 35 }, 
+      overflow: 'auto',
+      px: { xs: 1, sm: 0 } // Add horizontal padding for mobile
+    }}>
       <CssBaseline />
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ px: { xs: 1, sm: 3 } }}>
         <Card sx={{ mb: 4, overflow: 'visible', borderRadius: 2 }}>
           <CardContent>
             {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Box display="flex" alignItems="center">
+            <Box 
+              display="flex" 
+              flexDirection={{ xs: 'column', sm: 'row' }}
+              justifyContent="space-between" 
+              alignItems={{ xs: 'flex-start', sm: 'center' }} 
+              mb={2}
+              gap={{ xs: 2, sm: 0 }}
+            >
+              <Box display="flex" alignItems="center" flexWrap="wrap">
                 <IconButton 
                   sx={{ mr: 1, backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }}
                   onClick={() => navigate(-1)}
@@ -515,11 +528,11 @@ const RecordReport = () => {
                   <ArrowBackIcon />
                 </IconButton>
                 <Box>
-                  <Typography variant="h5" color="primary">
+                  <Typography variant="h5" color="primary" sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                     Completed Job Records & Reports
                   </Typography>
                   {isUserTypeUser && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       Showing records created by: {name || 'Unknown User'}
                     </Typography>
                   )}
@@ -530,7 +543,11 @@ const RecordReport = () => {
                 label={`${filteredData.length} Completed Jobs${isUserTypeUser ? ' (Your Records)' : ''}`}
                 color="success" 
                 variant="outlined"
-                sx={{ fontWeight: 500 }}
+                sx={{ 
+                  fontWeight: 500,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  height: { xs: '28px', sm: '32px' }
+                }}
               />
             </Box>
             <Divider sx={{ my: 3 }} />
@@ -550,7 +567,7 @@ const RecordReport = () => {
 
             {/* Filters */}
             <Grid container spacing={2} sx={{ mb: 4 }}>
-              <Grid item xs={12} md={3}>
+              <Grid item xs={12} sm={6} md={3}>
                 <TextField
                   fullWidth
                   value={search}
@@ -561,7 +578,7 @@ const RecordReport = () => {
                   InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={6} sm={3} md={2}>
                 <TextField
                   fullWidth
                   type="date"
@@ -572,7 +589,7 @@ const RecordReport = () => {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={6} sm={3} md={2}>
                 <TextField
                   fullWidth
                   type="date"
@@ -583,7 +600,7 @@ const RecordReport = () => {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={6} sm={6} md={2}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Bill Type</InputLabel>
                   <Select
@@ -599,7 +616,7 @@ const RecordReport = () => {
               </Grid>
               {/* Show Created By filter only for non-user types */}
               {!isUserTypeUser && (
-                <Grid item xs={12} md={2}>
+                <Grid item xs={6} sm={6} md={2}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Created By</InputLabel>
                     <Select
@@ -617,16 +634,16 @@ const RecordReport = () => {
                   </FormControl>
                 </Grid>
               )}
-              <Grid item xs={12} md={isUserTypeUser ? 3 : 1}>
-                                 <Button
-                   fullWidth
-                   variant="outlined"
-                   onClick={handleClearFilters}
-                   size="small"
-                   sx={{ height: '40px' }}
-                 >
-                   Clear Filters
-                 </Button>
+              <Grid item xs={12} sm={12} md={isUserTypeUser ? 3 : 1}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={handleClearFilters}
+                  size="small"
+                  sx={{ height: '40px' }}
+                >
+                  Clear Filters
+                </Button>
               </Grid>
             </Grid>
 
@@ -646,88 +663,214 @@ const RecordReport = () => {
                 </Box>
               ) : (
                 <>
-                  <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
-                    <Table>
+                  <TableContainer 
+                    component={Paper} 
+                    elevation={0} 
+                    sx={{ 
+                      border: `1px solid ${theme.palette.divider}`, 
+                      borderRadius: 2,
+                      overflowX: 'auto', // Enable horizontal scroll
+                      '&::-webkit-scrollbar': {
+                        height: '8px',
+                      },
+                      '&::-webkit-scrollbar-track': {
+                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderRadius: '4px',
+                      },
+                      '&::-webkit-scrollbar-thumb': {
+                        backgroundColor: theme.palette.primary.main,
+                        borderRadius: '4px',
+                      },
+                    }}
+                  >
+                    <Table sx={{ minWidth: 800 }}> {/* Set minimum width for table */}
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Job ID</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Car Number</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Customer Name</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Subaccount</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Job Details</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Created By</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Status</TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '80px', sm: '100px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Job ID
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '100px', sm: '120px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Car Number
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '120px', sm: '150px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Customer Name
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '100px', sm: '120px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Subaccount
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '200px', sm: '300px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Job Details
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '100px', sm: '120px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Created By
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '80px', sm: '100px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
+                            Status
+                          </TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold',
+                            minWidth: { xs: '120px', sm: '150px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }}>
                             Last Updated ⬇
                           </TableCell>
-                          <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold', minWidth: '200px' }} align="center">Actions</TableCell>
+                          <TableCell sx={{ 
+                            bgcolor: 'primary.main', 
+                            color: '#fff', 
+                            fontWeight: 'bold', 
+                            minWidth: { xs: '150px', sm: '200px' },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                          }} align="center">
+                            Actions
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {getCurrentPageData().length > 0 ? (
                           getCurrentPageData().map((job, index) => (
                             <TableRow key={job._id || index}>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Chip 
                                   label={job._id?.slice(-6) || 'N/A'} 
                                   size="small" 
                                   variant="outlined" 
                                   color="primary"
+                                  sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                 />
                               </TableCell>
-                              <TableCell>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                   {job.carNumber || job.registrationNumber || 'N/A'}
                                 </Typography>
                               </TableCell>
-                              <TableCell>{job.customerName || 'N/A'}</TableCell>
-                              <TableCell>
-                                {getSubaccountName(job.subaccountId) ? (
-                                  <Chip label={getSubaccountName(job.subaccountId)} size="small" variant="outlined" />
-                                ) : 'N/A'}
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                  {job.customerName || 'N/A'}
+                                </Typography>
                               </TableCell>
-                              <TableCell sx={{ maxWidth: '300px', whiteSpace: 'pre-line' }}>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                {getSubaccountName(job.subaccountId) ? (
+                                  <Chip 
+                                    label={getSubaccountName(job.subaccountId)} 
+                                    size="small" 
+                                    variant="outlined"
+                                    sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                  />
+                                ) : (
+                                  <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                    N/A
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell sx={{ 
+                                maxWidth: { xs: '200px', sm: '300px' }, 
+                                whiteSpace: 'pre-line',
+                                fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              }}>
                                 <JobDetailsComponent jobDetails={job.jobDetails} compact={true} />
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Chip 
                                   label={getCreatedByName(job.createdBy) || 'Unknown'} 
                                   size="small" 
                                   variant="outlined"
                                   color={getCreatedByName(job.createdBy) === name ? 'primary' : 'default'}
-                                  sx={{ fontWeight: getCreatedByName(job.createdBy) === name ? 600 : 400 }}
+                                  sx={{ 
+                                    fontWeight: getCreatedByName(job.createdBy) === name ? 600 : 400,
+                                    fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                                  }}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                 <Chip 
                                   label={job.status || 'Unknown'} 
                                   color={job.status?.toLowerCase() === 'completed' ? 'success' : job.status?.toLowerCase() === 'in progress' ? 'warning' : 'info'} 
-                                  size="small" 
+                                  size="small"
+                                  sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                                 />
                               </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                                   {formatDate(job.updatedAt || job.createdAt)}
                                 </Typography>
                               </TableCell>
-                              <TableCell align="center">
-                                                                 <Stack direction="row" spacing={1} justifyContent="center">
-                                   <Button
-                                     variant="outlined"
-                                     size="small"
-                                     startIcon={<ReceiptIcon />}
-                                     onClick={() => handleViewBill(job._id)}
-                                   >
-                                     Bill
-                                   </Button>
-                                   <Button
-                                     variant="outlined"
-                                     size="small"
-                                     onClick={() => handleViewDetails(job)}
-                                   >
-                                     Details
-                                   </Button>
-                                 </Stack>
+                              <TableCell align="center" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                <Stack 
+                                  direction={{ xs: 'column', sm: 'row' }} 
+                                  spacing={{ xs: 0.5, sm: 1 }} 
+                                  justifyContent="center"
+                                  alignItems="center"
+                                >
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<ReceiptIcon />}
+                                    onClick={() => handleViewBill(job._id)}
+                                    sx={{ 
+                                      fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                      minWidth: { xs: '60px', sm: 'auto' },
+                                      px: { xs: 1, sm: 2 }
+                                    }}
+                                  >
+                                    Bill
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => handleViewDetails(job)}
+                                    sx={{ 
+                                      fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                      minWidth: { xs: '60px', sm: 'auto' },
+                                      px: { xs: 1, sm: 2 }
+                                    }}
+                                  >
+                                    Details
+                                  </Button>
+                                </Stack>
                               </TableCell>
                             </TableRow>
                           ))
@@ -754,7 +897,20 @@ const RecordReport = () => {
                     rowsPerPage={rowsPerPage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
                     rowsPerPageOptions={[5, 10, 25, 50]}
-                    sx={{ mt: 2 }}
+                    sx={{ 
+                      mt: 2,
+                      '& .MuiTablePagination-toolbar': {
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        gap: { xs: 1, sm: 0 },
+                        alignItems: { xs: 'flex-start', sm: 'center' }
+                      },
+                      '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                        fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                      },
+                      '& .MuiTablePagination-actions': {
+                        marginLeft: { xs: 0, sm: 'auto' }
+                      }
+                    }}
                   />
                 </>
               )}

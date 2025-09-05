@@ -491,7 +491,10 @@ const InventoryManagement = () => {
             <TableContainer component={Paper}>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: theme.palette.primary.main, '& .MuiTableCell-head': { color: '#fff' } }}>
+                  <TableRow sx={{ 
+                    backgroundColor: theme.palette.mode === 'light' ? '#1976d2' : theme.palette.primary.main, 
+                    '& .MuiTableCell-head': { color: '#fff' } 
+                  }}>
                     <TableCell onClick={() => handleSortChange('carName')}>Car Name</TableCell>
                     <TableCell onClick={() => handleSortChange('model')}>Model</TableCell>
                     <TableCell onClick={() => handleSortChange('partNumber')}>Part No.</TableCell>
