@@ -1235,7 +1235,7 @@ const Dashboard = () => {
                               <TableRow>
                                 <TableCell>Part Name</TableCell>
                                 <TableCell align="center">Quantity</TableCell>
-                                <TableCell align="right">Unit Price</TableCell>
+                                {/* <TableCell align="right">Unit Price</TableCell> */}
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -1260,9 +1260,9 @@ const Dashboard = () => {
                                       }}
                                     />
                                   </TableCell>
-                                  <TableCell align="right">
+                                  {/* <TableCell align="right">
                                     {item.price.toLocaleString()}
-                                  </TableCell>
+                                  </TableCell> */}
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -1361,7 +1361,7 @@ const Dashboard = () => {
                               <TableRow>
                                 <TableCell>Part Name</TableCell>
                                 <TableCell align="center">Quantity</TableCell>
-                                <TableCell align="right">Unit Price</TableCell>
+                                {/* <TableCell align="right">Unit Price</TableCell> */}
                               </TableRow>
                             </TableHead>
                             <TableBody>
@@ -1386,9 +1386,9 @@ const Dashboard = () => {
                                       }}
                                     />
                                   </TableCell>
-                                  <TableCell align="right">
+                                  {/* <TableCell align="right">
                                     {item.price.toLocaleString()}
-                                  </TableCell>
+                                  </TableCell> */}
                                 </TableRow>
                               ))}
                             </TableBody>

@@ -81,6 +81,7 @@ const AssignEngineer = () => {
   const [inventoryParts, setInventoryParts] = useState([]);
   const [jobCardIds, setJobCardIds] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAssignmentMode, setIsAssignmentMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [error, setError] = useState(null);
@@ -216,6 +217,12 @@ const AssignEngineer = () => {
 
   // Function to handle part removal (same pattern as WorkInProgress)
   const handlePartRemoval = async (partIndex) => {
+    // Only allow part removal when in assignment mode
+    if (!isAssignmentMode) {
+      setError("Parts can only be removed when assigning an engineer. Please click 'Assign Engineer & Update Job Card' first.");
+      return;
+    }
+
     try {
       const partToRemove = selectedParts[partIndex];
       const updatedParts = selectedParts.filter((_, idx) => idx !== partIndex);
@@ -248,45 +255,15 @@ const AssignEngineer = () => {
         parts: finalParts
       }));
 
-      // Restore inventory quantity for removed part
+      // Note: Inventory restoration will be handled when assignment is submitted
+      // This prevents premature inventory changes during part removal
       if (partToRemove && partToRemove._id && partToRemove.selectedQuantity) {
-        try {
-          const originalPart = inventoryParts.find(p => p._id === partToRemove._id);
-          if (originalPart) {
-            const currentQuantity = originalPart.quantity || 0;
-            const restoredQuantity = currentQuantity + partToRemove.selectedQuantity;
-            
-            console.log(`Restoring inventory for ${partToRemove.partName}: ${currentQuantity} + ${partToRemove.selectedQuantity} = ${restoredQuantity}`);
-            
-            // Update inventory quantity
-            await axios.put(
-              `${API_BASE_URL}/inventory/update/${partToRemove._id}`,
-              {
-                quantity: restoredQuantity,
-                carName: partToRemove.carName || '',
-                model: partToRemove.model || '',
-                partNumber: partToRemove.partNumber || '',
-                partName: partToRemove.partName || '',
-                hsnNumber: partToRemove.hsnNumber || '',
-                igst: parseFloat(partToRemove.igst || 0),
-                cgstSgst: parseFloat(partToRemove.cgstSgst || 0),
-                purchasePrice: parseFloat(partToRemove.purchasePrice || 0),
-                sellingPrice: parseFloat(partToRemove.sellingPrice || 0),
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-                }
-              }
-            );
-            
-            // Refresh inventory data after update
-            await fetchInventoryParts();
-          }
-        } catch (err) {
-          console.error("Error restoring inventory for removed part:", err);
-          setError(`Failed to restore inventory for ${partToRemove.partName}`);
+        const originalPart = inventoryParts.find(p => p._id === partToRemove._id);
+        if (originalPart) {
+          const currentQuantity = originalPart.quantity || 0;
+          const restoredQuantity = currentQuantity + partToRemove.selectedQuantity;
+          
+          console.log(`Planning inventory restoration for ${partToRemove.partName}: ${currentQuantity} + ${partToRemove.selectedQuantity} = ${restoredQuantity} (will be applied on assignment submission)`);
         }
       }
     } catch (err) {
@@ -319,7 +296,7 @@ const AssignEngineer = () => {
       
       // Remove the old quantity from total to get the correct available quantity
       const availableQuantity = Math.max(0, originalPart.quantity - totalSelected + oldQuantity);
-      const maxSelectableQuantity = availableQuantity + newQuantity;
+      const maxSelectableQuantity = originalPart.quantity;
 
       if (newQuantity > maxSelectableQuantity) {
         setError(
@@ -392,56 +369,15 @@ const AssignEngineer = () => {
       }));
 
       // Update inventory quantity for the part
-      try {
-        const quantityDifference = newQuantity - oldQuantity;
-        if (quantityDifference !== 0) {
-          const currentQuantity = originalPart.quantity || 0;
-          const newInventoryQuantity = Math.max(0, currentQuantity - quantityDifference);
-          
-          console.log(`Updating inventory for ${part.partName}: ${currentQuantity} - ${quantityDifference} = ${newInventoryQuantity}`);
-          
-          // Update inventory quantity
-          await axios.put(
-            `${API_BASE_URL}/inventory/update/${part._id}`,
-            {
-              quantity: newInventoryQuantity,
-              carName: part.carName || '',
-              model: part.model || '',
-              partNumber: part.partNumber || '',
-              partName: part.partName || '',
-              hsnNumber: part.hsnNumber || '',
-              igst: parseFloat(part.igst || 0),
-              cgstSgst: parseFloat(part.cgstSgst || 0),
-              purchasePrice: parseFloat(part.purchasePrice || 0),
-              sellingPrice: parseFloat(part.sellingPrice || 0),
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-              }
-            }
-          );
-          
-          // If quantity becomes 0, delete the item from inventory
-          if (newInventoryQuantity === 0) {
-            console.log(`Deleting part ${part.partName} from inventory (quantity = 0)`);
-            await axios.delete(
-              `${API_BASE_URL}/garage/inventory/delete/${part._id}`,
-              {
-                headers: {
-                  'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-                }
-              }
-            );
-          }
-          
-          // Refresh inventory data after update
-          await fetchInventoryParts();
-        }
-      } catch (err) {
-        console.error("Error updating inventory for quantity change:", err);
-        setError(`Failed to update inventory for ${part.partName}`);
+      const quantityDifference = newQuantity - oldQuantity;
+      if (quantityDifference !== 0) {
+        const currentQuantity = originalPart.quantity || 0;
+        const newInventoryQuantity = Math.max(0, currentQuantity - quantityDifference);
+        
+        console.log(`Planning inventory update for ${part.partName}: ${currentQuantity} - ${quantityDifference} = ${newInventoryQuantity} (will be applied on assignment submission)`);
+        
+        // Note: Inventory will be updated when assignment is submitted, not immediately
+        // This prevents premature inventory changes during quantity adjustments
       }
       
       if (error && error.includes(part.partName)) {
@@ -603,12 +539,7 @@ const AssignEngineer = () => {
 
     const availableQuantity = Math.max(0, originalPart.quantity - totalSelected);
     
-    // Special case: If selected quantity equals inventory quantity, allow selecting the same part
-    // This enables users to select the same part when they've selected all available quantity
-    if (totalSelected === originalPart.quantity && totalSelected > 0) {
-      return originalPart.quantity; // Return full inventory quantity to allow same part selection
-    }
-    
+    // Return the actual available quantity (what's left in inventory)
     return availableQuantity;
   };
 
@@ -622,15 +553,9 @@ const AssignEngineer = () => {
           method: 'DELETE'
         });
       } else {
-        // Use PUT API to update quantity
-        await apiCall(`/garage/inventory/update/${partId}`, {
-          method: 'PUT',
-          data: { quantity: newQuantity }
-        });
+        // Note: Inventory update will be handled when assignment is submitted
+        console.log(`Planning inventory update for part ${partId}: quantity will be set to ${newQuantity} (will be applied on assignment submission)`);
       }
-
-      // Refresh inventory after updating
-      await fetchInventoryParts();
 
     } catch (err) {
       console.error(`Failed to update quantity for part ${partId}:`, err);
@@ -1261,6 +1186,9 @@ const AssignEngineer = () => {
 
     if (!validateForm()) return;
 
+    // Activate assignment mode when form is submitted
+    setIsAssignmentMode(true);
+
     // Check if there are parts that will reduce inventory
     const partsToReduceInventory = assignment.parts.filter(part => part._id && part.selectedQuantity);
     
@@ -1356,6 +1284,7 @@ const AssignEngineer = () => {
       });
 
       setSuccess(true);
+      setIsAssignmentMode(false); // Deactivate assignment mode on success
       setTimeout(() => {
         navigate(`/Work-In-Progress/${id}`);
       }, 2000);
@@ -1375,6 +1304,7 @@ const AssignEngineer = () => {
       }
     } finally {
       setIsSubmitting(false);
+      setIsAssignmentMode(false); // Deactivate assignment mode on completion/error
     }
   };
 
@@ -1840,6 +1770,22 @@ const AssignEngineer = () => {
           {/* Enhanced Job Details Section with Price */}
 
 
+          {/* Assignment Mode Alert */}
+          {isAssignmentMode && (
+            <Alert 
+              severity="info" 
+              sx={{ mb: 3 }}
+              // icon={<WorkIcon />}
+            >
+              <Typography variant="body2" fontWeight="bold">
+                Assignment Mode Active
+              </Typography>
+              <Typography variant="body2">
+                You can now remove parts. Part quantities can always be modified. Changes will be applied when the assignment is completed.
+              </Typography>
+            </Alert>
+          )}
+
           {/* Main Form Card */}
           <Card sx={{ mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
@@ -2065,45 +2011,9 @@ const AssignEngineer = () => {
                                         // Get all user-selected parts that will be removed
                                         const userSelectedParts = assignment.parts.filter(part => !part.isPreLoaded);
                                         
-                                        // Restore inventory for all removed parts
-                                        for (const part of userSelectedParts) {
-                                          if (part._id && part.selectedQuantity) {
-                                            try {
-                                              const originalPart = inventoryParts.find(p => p._id === part._id);
-                                              if (originalPart) {
-                                                const currentQuantity = originalPart.quantity || 0;
-                                                const restoredQuantity = currentQuantity + part.selectedQuantity;
-                                                
-                                                console.log(`Restoring inventory for ${part.partName}: ${currentQuantity} + ${part.selectedQuantity} = ${restoredQuantity}`);
-                                                
-                                                // Update inventory quantity
-                                                await axios.put(
-                                                  `${API_BASE_URL}/inventory/update/${part._id}`,
-                                                  {
-                                                    quantity: restoredQuantity,
-                                                    carName: part.carName || '',
-                                                    model: part.model || '',
-                                                    partNumber: part.partNumber || '',
-                                                    partName: part.partName || '',
-                                                    hsnNumber: part.hsnNumber || '',
-                                                    igst: parseFloat(part.igst || 0),
-                                                    cgstSgst: parseFloat(part.cgstSgst || 0),
-                                                    purchasePrice: parseFloat(part.purchasePrice || 0),
-                                                    sellingPrice: parseFloat(part.sellingPrice || 0),
-                                                  },
-                                                  {
-                                                    headers: {
-                                                      'Content-Type': 'application/json',
-                                                      'Authorization': garageToken ? `Bearer ${garageToken}` : '',
-                                                    }
-                                                  }
-                                                );
-                                              }
-                                            } catch (err) {
-                                              console.error("Error restoring inventory for part:", part.partName, err);
-                                            }
-                                          }
-                                        }
+                                        // Note: Inventory restoration will be handled when assignment is submitted
+                                        // This prevents premature inventory changes during form reset
+                                        console.log(`Planning inventory restoration for ${userSelectedParts.length} parts (will be applied on assignment submission)`);
                                         
                                         // Clear selected parts from state
                                         setSelectedParts([]);
@@ -2435,7 +2345,8 @@ const AssignEngineer = () => {
 
 
                                     const availableQuantity = getAvailableQuantity(part._id);
-                                    const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                    const originalPart = inventoryParts.find(p => p._id === part._id);
+                                    const maxSelectableQuantity = originalPart ? originalPart.quantity : 0;
                                     const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
 
                                     return (
@@ -2527,7 +2438,7 @@ const AssignEngineer = () => {
                                             justifyContent: { xs: 'space-between', sm: 'flex-end' }
                                           }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Decrease quantity (inventory will be updated on form submission)"}>
+                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Decrease quantity"}>
                                                 <span>
                                                   <IconButton
                                                     size="small"
@@ -2549,7 +2460,7 @@ const AssignEngineer = () => {
                                                   </IconButton>
                                                 </span>
                                               </Tooltip>
-                                              <Tooltip title={isSubmitting ? "Quantity input disabled during submission" : "Enter quantity (inventory will be updated on form submission)"}>
+                                              <Tooltip title={isSubmitting ? "Quantity input disabled during submission" : "Enter quantity"}>
                                                 <TextField
                                                   size="small"
                                                   type="number"
@@ -2593,7 +2504,7 @@ const AssignEngineer = () => {
                                                   disabled={maxSelectableQuantity === 0 || isSubmitting}
                                                 />
                                               </Tooltip>
-                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Increase quantity (inventory will be updated on form submission)"}>
+                                              <Tooltip title={isSubmitting ? "Quantity controls disabled during submission" : "Increase quantity"}>
                                                 <span>
                                                   <IconButton
                                                     size="small"
@@ -2619,7 +2530,7 @@ const AssignEngineer = () => {
                                                 </span>
                                               </Tooltip>
                                             </Box>
-                                            <Tooltip title={isSubmitting ? "Remove button disabled during submission" : "Remove part from selection"}>
+                                            <Tooltip title={!isAssignmentMode ? "Click 'Assign Engineer & Update Job Card' to enable part modifications" : isSubmitting ? "Remove button disabled during submission" : "Remove part from selection"}>
                                               <span>
                                                 <IconButton
                                                   size="small"
@@ -2627,7 +2538,7 @@ const AssignEngineer = () => {
                                                   onClick={() => {
                                                     handlePartRemoval(partIndex);
                                                   }}
-                                                  disabled={isSubmitting}
+                                                  disabled={isSubmitting || !isAssignmentMode}
                                                 >
                                                   <DeleteIcon fontSize="small" />
                                                 </IconButton>
@@ -2728,7 +2639,8 @@ const AssignEngineer = () => {
                                     const finalPrice = baseAmount + gstAmount;
 
                                     const availableQuantity = getAvailableQuantity(part._id);
-                                    const maxSelectableQuantity = availableQuantity + selectedQuantity;
+                                    const originalPart = inventoryParts.find(p => p._id === part._id);
+                                    const maxSelectableQuantity = originalPart ? originalPart.quantity : 0;
                                     const isMaxQuantityReached = selectedQuantity >= maxSelectableQuantity;
 
                                     return (
@@ -2805,16 +2717,18 @@ const AssignEngineer = () => {
                                             justifyContent: { xs: 'space-between', sm: 'flex-end' }
                                           }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                              <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                  if (part.isPreLoaded) return;
-                                                  const newQuantity = selectedQuantity - 1;
-                                                  if (newQuantity >= 1) {
-                                                    handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
-                                                  }
-                                                }}
-                                                disabled={selectedQuantity <= 1 || part.isPreLoaded}
+                                              <Tooltip title={part.isPreLoaded ? "Pre-loaded parts cannot be modified" : "Decrease quantity"}>
+                                                <span>
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={() => {
+                                                      if (part.isPreLoaded) return;
+                                                      const newQuantity = selectedQuantity - 1;
+                                                      if (newQuantity >= 1) {
+                                                        handlePartQuantityChange(partIndex, newQuantity, selectedQuantity);
+                                                      }
+                                                    }}
+                                                    disabled={selectedQuantity <= 1 || part.isPreLoaded}
                                                 sx={{
                                                   minWidth: '24px',
                                                   width: '24px',
@@ -2824,6 +2738,9 @@ const AssignEngineer = () => {
                                               >
                                                 <Typography variant="caption" fontWeight="bold">-</Typography>
                                               </IconButton>
+                                              </span>
+                                            </Tooltip>
+                                            <Tooltip title={part.isPreLoaded ? "Pre-loaded parts cannot be modified" : "Enter quantity"}>
                                               <TextField
                                                 size="small"
                                                 type="number"
@@ -2867,7 +2784,10 @@ const AssignEngineer = () => {
                                                 error={availableQuantity === 0}
                                                 disabled={maxSelectableQuantity === 0 || part.isPreLoaded}
                                               />
-                                              <IconButton
+                                            </Tooltip>
+                                            <Tooltip title={part.isPreLoaded ? "Pre-loaded parts cannot be modified" : "Increase quantity"}>
+                                              <span>
+                                                <IconButton
                                                 size="small"
                                                 onClick={() => {
                                                   if (part.isPreLoaded) return;
@@ -2889,8 +2809,12 @@ const AssignEngineer = () => {
                                               >
                                                 <Typography variant="caption" fontWeight="bold">+</Typography>
                                               </IconButton>
+                                              </span>
+                                            </Tooltip>
                                             </Box>
-                                            <IconButton
+                                            <Tooltip title={!isAssignmentMode ? "Click 'Assign Engineer & Update Job Card' to enable part modifications" : part.isPreLoaded ? "Pre-loaded parts cannot be removed" : "Remove part"}>
+                                              <span>
+                                                <IconButton
                                               size="small"
                                               color="error"
                                               onClick={() => {
@@ -2900,10 +2824,12 @@ const AssignEngineer = () => {
                                                 }
                                                 handlePartRemoval(partIndex);
                                               }}
-                                              disabled={part.isPreLoaded}
+                                              disabled={part.isPreLoaded || !isAssignmentMode}
                                             >
                                               <DeleteIcon fontSize="small" />
                                             </IconButton>
+                                              </span>
+                                            </Tooltip>
                                           </Box>
                                         </Box>
                                         {/* Price Details */}
@@ -3403,7 +3329,7 @@ const AssignEngineer = () => {
             </Box>
 
             {/* Tax Preview */}
-            {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
+            {/* {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
                 <Grid container spacing={2}>
@@ -3465,7 +3391,7 @@ const AssignEngineer = () => {
                   </Grid>
                 </Grid>
               </Box>
-            )}
+            )} */}
           </DialogContent>
           <DialogActions sx={{ p: { xs: 2, sm: 3 } }}>
             <Button

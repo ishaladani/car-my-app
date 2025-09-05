@@ -624,27 +624,19 @@ const WorkInProgress = () => {
   const updatePartQuantity = useCallback(
     async (partId, newQuantity) => {
       try {
-        if (newQuantity === 0) {
-          await apiCall(`/garage/inventory/delete/${partId}`, {
-            method: "DELETE",
-          });
-        } else {
-          await apiCall(`/garage/inventory/update/${partId}`, {
-            method: "PUT",
-            data: { quantity: newQuantity },
-          });
-        }
-        await fetchInventoryParts();
+        // Note: Inventory update will be handled when work progress is submitted
+        // This prevents premature inventory changes during quantity adjustments
+        console.log(`Planning inventory update for part ${partId}: quantity will be set to ${newQuantity} (will be applied on work progress submission)`);
       } catch (err) {
-        console.error(`Failed to update quantity for part ${partId}:`, err);
+        console.error(`Failed to plan quantity update for part ${partId}:`, err);
         throw new Error(
-          `Failed to update part quantity: ${
+          `Failed to plan part quantity update: ${
             err.response?.data?.message || err.message
           }`
         );
       }
     },
-    [apiCall, fetchInventoryParts]
+    []
   );
 
   // Function to update job card with parts in API
@@ -3050,7 +3042,7 @@ const WorkInProgress = () => {
               </Box>
     
               {/* Tax Preview */}
-              {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
+              {/* {newPart.sellingPrice && newPart.quantity && (newPart.igst || newPart.cgstSgst) && (
                 <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                   <Typography variant="h6" sx={{ mb: 2 }}>GST Calculation Preview</Typography>
                   <Grid container spacing={2}>
@@ -3112,7 +3104,7 @@ const WorkInProgress = () => {
                     </Grid>
                   </Grid>
                 </Box>
-              )}
+              )} */}
             </DialogContent>
             <DialogActions>
               <Button onClick={handleCloseAddPartDialog} color="inherit">
