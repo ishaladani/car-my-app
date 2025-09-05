@@ -1989,20 +1989,39 @@ Thank you!`;
   }
 
   return (
-    <Box sx={{ ml: { xs: 0, md: "280px" }, px: { xs: 2, md: 3 }, py: 4 }}>
-      <Paper elevation={3} sx={{ mb: 4, p: isMobile ? 2 : 3, borderRadius: 2 }}>
+    <Box sx={{ 
+      ml: { xs: 0, md: "280px" }, 
+      px: { xs: 1, sm: 2, md: 3 }, 
+      py: { xs: 2, sm: 3, md: 4 },
+      maxWidth: '100%',
+      overflow: 'hidden'
+    }}>
+      <Paper elevation={3} sx={{ 
+        mb: 4, 
+        p: { xs: 1, sm: 2, md: 3 }, 
+        borderRadius: 2,
+        maxWidth: '100%',
+        overflow: 'hidden'
+      }}>
         {/* Header with Back Button */}
         <Box sx={{ 
           display: "flex", 
           flexDirection: isMobile ? "column" : "row", 
           justifyContent: "space-between", 
           alignItems: isMobile ? "flex-start" : "center", 
-          mb: 3, 
-          gap: isMobile ? 2 : 0 
+          mb: { xs: 2, sm: 3 }, 
+          gap: { xs: 2, sm: 0 } 
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: { xs: 1, sm: 2 },
+            flexWrap: 'wrap',
+            width: isMobile ? '100%' : 'auto'
+          }}>
             <IconButton 
               onClick={handleGoBack}
+              size={isMobile ? "small" : "medium"}
               sx={{ 
                 backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
                 '&:hover': {
@@ -2012,15 +2031,29 @@ Thank you!`;
             >
               <ArrowBackIcon />
             </IconButton>
-            <Typography variant={isMobile ? "h5" : "h4"} color="primary" fontWeight="bold">
+            <Typography 
+              variant={isMobile ? "h6" : "h4"} 
+              color="primary" 
+              fontWeight="bold"
+              sx={{
+                fontSize: { xs: '1.1rem', sm: '1.5rem', md: '2rem' },
+                lineHeight: { xs: 1.2, sm: 1.3 },
+                wordBreak: 'break-word'
+              }}
+            >
               Professional Billing System ({gstSettings.billType.toUpperCase()})
             </Typography>
           </Box>
           
           {/* Action Buttons */}
           {!isBillAlreadyGenerated && !billGenerated ? (
-            <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
-            
+            <Box sx={{ 
+              display: 'flex', 
+              gap: 1, 
+              flexDirection: isMobile ? 'column' : 'row',
+              width: isMobile ? '100%' : 'auto',
+              mt: isMobile ? 1 : 0
+            }}>
               <Button
                 variant="contained"
                 color="primary"
@@ -2028,13 +2061,22 @@ Thank you!`;
                 onClick={generateBill}
                 fullWidth={isMobile}
                 size={isMobile ? "small" : "medium"}
-                
+                sx={{
+                  fontSize: { xs: '0.875rem', sm: '0.95rem' },
+                  py: { xs: 1, sm: 1.5 }
+                }}
               >
                 Generate {gstSettings.billType.toUpperCase()} Bill
               </Button>
             </Box>
           ) : (
-            <Box sx={{ display: 'flex', gap: 1, flexDirection: isMobile ? 'column' : 'row' }}>
+            <Box sx={{ 
+              display: 'flex', 
+              gap: 1, 
+              flexDirection: isMobile ? 'column' : 'row',
+              width: isMobile ? '100%' : 'auto',
+              mt: isMobile ? 1 : 0
+            }}>
               <Button
                 variant="outlined"
                 color="success"
@@ -2042,6 +2084,10 @@ Thank you!`;
                 disabled
                 fullWidth={isMobile}
                 size={isMobile ? "small" : "medium"}
+                sx={{
+                  fontSize: { xs: '0.875rem', sm: '0.95rem' },
+                  py: { xs: 1, sm: 1.5 }
+                }}
               >
                 {gstSettings.billType.toUpperCase()} Bill Generated ✓
               </Button>
@@ -2052,6 +2098,10 @@ Thank you!`;
                 onClick={downloadPdfBill}
                 fullWidth={isMobile}
                 size={isMobile ? "small" : "medium"}
+                sx={{
+                  fontSize: { xs: '0.875rem', sm: '0.95rem' },
+                  py: { xs: 1, sm: 1.5 }
+                }}
               >
                 Download {gstSettings.billType.toUpperCase()} Invoice
               </Button>

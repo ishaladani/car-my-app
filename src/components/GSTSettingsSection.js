@@ -1,16 +1,14 @@
 import React from 'react';
 import { 
-  Box, Card, CardContent, FormControl, FormControlLabel, Grid, 
-  InputLabel, MenuItem, Select, Switch, TextField, Typography ,InputAdornment,
+  Box, Card, CardContent, FormControlLabel, Grid, 
+  Switch, TextField, Typography, InputAdornment,
 } from '@mui/material';
 
 
 const GSTSettingsSection = ({ 
   gstSettings, 
   handleGstIncludeChange,
-  handleGstTypeChange,
   handleGstPercentageChange,
-  handleGstAmountChange,
   handleCustomerGstChange,
   handleInterStateChange,
   summary,
@@ -63,53 +61,22 @@ const GSTSettingsSection = ({
                 />
               </Grid>
               
-              <Grid item xs={12} sm={6} md={2}>
-                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                  <InputLabel>GST Type</InputLabel>
-                  <Select
-                    value={gstSettings.gstType}
-                    onChange={handleGstTypeChange}
-                    label="GST Type"
-                  >
-                    <MenuItem value="percentage">Percentage</MenuItem>
-                    <MenuItem value="amount">Fixed Amount</MenuItem>
-                  </Select>
-                </FormControl>
+              <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                  fullWidth
+                  label="GST Percentage"
+                  type="number"
+                  value={gstSettings.gstPercentage}
+                  onChange={handleGstPercentageChange}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  }}
+                  size={isMobile ? "small" : "medium"}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                />
               </Grid>
               
-              {gstSettings.gstType === 'percentage' ? (
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="GST Percentage"
-                    type="number"
-                    value={gstSettings.gstPercentage}
-                    onChange={handleGstPercentageChange}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                    }}
-                    size={isMobile ? "small" : "medium"}
-                    inputProps={{ min: 0, max: 100, step: 0.1 }}
-                  />
-                </Grid>
-              ) : (
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="GST Amount"
-                    type="number"
-                    value={gstSettings.gstAmount}
-                    onChange={handleGstAmountChange}
-                    InputProps={{
-                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                    }}
-                    size={isMobile ? "small" : "medium"}
-                    inputProps={{ min: 0, step: 1 }}
-                  />
-                </Grid>
-              )}
-              
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6} md={3}>
                 <Box sx={{ p: 2, backgroundColor: 'primary.light', borderRadius: 2, border: '1px solid rgba(25, 118, 210, 0.5)' }}>
                   <Typography variant="body2" fontWeight={500} color="primary.contrastText">
                     {gstSettings.isInterState ? 

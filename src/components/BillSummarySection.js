@@ -105,9 +105,9 @@ const BillSummarySection = ({
                 : 'rgba(25, 118, 210, 0.2)',
           }}
         >
-          <Grid container spacing={2}>
+          <Grid container spacing={{ xs: 1, sm: 2 }}>
             {/* Left Column: Cost Breakdown */}
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} lg={8}>
               {/* Parts & Materials */}
               <Box
                 sx={{
@@ -116,6 +116,9 @@ const BillSummarySection = ({
                   alignItems: 'center',
                   py: 1.5,
                   borderBottom: `1px dashed ${theme.palette.divider}`,
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: { xs: 0.5, sm: 0 },
+                  textAlign: { xs: 'center', sm: 'left' }
                 }}
               >
                 <Typography
@@ -148,6 +151,9 @@ const BillSummarySection = ({
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     mb: 0.5,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 0 },
+                    textAlign: { xs: 'center', sm: 'left' }
                   }}
                 >
                   <Typography
@@ -468,7 +474,7 @@ const BillSummarySection = ({
             </Grid>
 
             {/* Right Column: Grand Total & Summary */}
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} lg={4}>
               <Box
                 sx={{
                   p: 3,

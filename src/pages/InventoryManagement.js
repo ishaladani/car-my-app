@@ -41,7 +41,6 @@ import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
   Add as AddIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -66,7 +65,7 @@ const InventoryManagement = () => {
     sellingPrice: '',
     hsnNumber: '',
     igst: '',
-    cgst: '',
+    cgstSgst: '',
     taxType: 'igst',
   });
 
@@ -81,7 +80,7 @@ const InventoryManagement = () => {
     sellingPrice: '',
     hsnNumber: '',
     igst: '',
-    cgst: '',
+    cgstSgst: '',
     taxType: 'igst',
   });
 
@@ -97,26 +96,26 @@ const InventoryManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('partName');
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [sortDirection, setSortDirection] = 'asc';
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
 
   // Calculate single part GST amount
-  const calculateSinglePartGST = (sellingPrice, igst, cgst) => {
+  const calculateSinglePartGST = (sellingPrice, igst, cgstSgst) => {
     if (!sellingPrice) return 0;
     const price = parseFloat(sellingPrice) || 0;
     const igstRate = parseFloat(igst) || 0;
-    const cgstRate = parseFloat(cgst) || 0;
+    const cgstSgstRate = parseFloat(cgstSgst) || 0;
 
     const igstAmount = (price * igstRate) / 100;
-    const cgstAmount = (price * cgstRate) / 100;
-    return igstAmount + cgstAmount;
+    const cgstSgstAmount = (price * cgstSgstRate * 2) / 100; // CGST + SGST
+    return igstAmount + cgstSgstAmount;
   };
 
   // Calculate total value with GST for a part
-  const calculateTotalValueWithGST = (sellingPrice, quantity, igst, cgst) => {
-    const gstPerUnit = calculateSinglePartGST(sellingPrice, igst, cgst);
+  const calculateTotalValueWithGST = (sellingPrice, quantity, igst, cgstSgst) => {
+    const gstPerUnit = calculateSinglePartGST(sellingPrice, igst, cgstSgst);
     const total = (parseFloat(sellingPrice) + gstPerUnit) * parseInt(quantity || 0);
     return isNaN(total) ? 0 : parseFloat(total.toFixed(2));
   };
@@ -130,10 +129,10 @@ const InventoryManagement = () => {
       const qty = item.quantity || 0;
       const price = item.sellingPrice || 0;
       const igst = item.igst || 0;
-      const cgst = item.cgst || 0;
+      const cgstSgst = item.cgstSgst || 0;
 
       const baseAmount = price * qty;
-      const gstAmount = calculateSinglePartGST(price, igst, cgst) * qty;
+      const gstAmount = calculateSinglePartGST(price, igst, cgstSgst) * qty;
       const amountWithGST = baseAmount + gstAmount;
 
       totalBaseAmount += baseAmount;
@@ -248,7 +247,7 @@ const InventoryManagement = () => {
       sellingPrice: '',
       hsnNumber: '',
       igst: '',
-      cgst: '',
+      cgstSgst: '',
       taxType: 'igst',
     });
     setAddModalOpen(true);
@@ -265,19 +264,10 @@ const InventoryManagement = () => {
       errors.push('Valid purchase price is required');
     if (!data.sellingPrice || parseFloat(data.sellingPrice) <= 0)
       errors.push('Valid selling price is required');
-    
-    // Check if at least one tax rate is provided
-    const igst = parseFloat(data.igst) || 0;
-    const cgst = parseFloat(data.cgst) || 0;
-    
-    if (igst === 0 && cgst === 0) {
-      errors.push('At least one tax rate (IGST or CGST) is required');
-    }
-    
-    if (igst < 0 || cgst < 0) {
-      errors.push('Tax rates cannot be negative');
-    }
-    
+    if (data.taxType === 'igst' && (!data.igst || parseFloat(data.igst) < 0))
+      errors.push('Valid IGST rate is required');
+    if (data.taxType === 'cgstSgst' && (!data.cgstSgst || parseFloat(data.cgstSgst) < 0))
+      errors.push('Valid CGST/SGST rate is required');
     return errors;
   };
 
@@ -288,10 +278,10 @@ const InventoryManagement = () => {
       const errors = validateFormData(formData);
       if (errors.length > 0) throw new Error(errors.join(', '));
 
-      const igst = parseFloat(formData.igst) || 0;
-      const cgst = parseFloat(formData.cgst) || 0;
+      const igst = formData.taxType === 'igst' ? parseFloat(formData.igst) : (formData.taxType === 'cgstSgst' ? parseFloat(formData.cgstSgst) : 0);
+      const cgstSgst = formData.taxType === 'cgstSgst' ? parseFloat(formData.cgstSgst) : 0;
 
-      const singlePartGST = calculateSinglePartGST(formData.sellingPrice, igst, cgst);
+      const singlePartGST = calculateSinglePartGST(formData.sellingPrice, igst, cgstSgst);
       const totalTaxAmount = singlePartGST * parseInt(formData.quantity);
 
       const requestData = {
@@ -305,7 +295,7 @@ const InventoryManagement = () => {
         sellingPrice: parseFloat(formData.sellingPrice),
         hsnNumber: formData.hsnNumber.trim(),
         igst,
-        cgst,
+        cgstSgst,
         taxAmount: parseFloat(singlePartGST.toFixed(2)),
         totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)),
       };
@@ -343,10 +333,10 @@ const InventoryManagement = () => {
       const errors = validateFormData(editItemData);
       if (errors.length > 0) throw new Error(errors.join(', '));
 
-      const igst = parseFloat(editItemData.igst) || 0;
-      const cgst = parseFloat(editItemData.cgst) || 0;
+      const igst = editItemData.taxType === 'igst' ? parseFloat(editItemData.igst) : (editItemData.taxType === 'cgstSgst' ? parseFloat(editItemData.cgstSgst) : 0);
+      const cgstSgst = editItemData.taxType === 'cgstSgst' ? parseFloat(editItemData.cgstSgst) : 0;
 
-      const singlePartGST = calculateSinglePartGST(editItemData.sellingPrice, igst, cgst);
+      const singlePartGST = calculateSinglePartGST(editItemData.sellingPrice, igst, cgstSgst);
       const totalTaxAmount = singlePartGST * parseInt(editItemData.quantity);
 
       const requestData = {
@@ -359,7 +349,7 @@ const InventoryManagement = () => {
         partName: editItemData.partName.trim(),
         hsnNumber: editItemData.hsnNumber.trim(),
         igst,
-        cgst,
+        cgstSgst,
         taxAmount: parseFloat(singlePartGST.toFixed(2)),
         totalTaxAmount: parseFloat(totalTaxAmount.toFixed(2)),
       };
@@ -411,54 +401,10 @@ const InventoryManagement = () => {
       sellingPrice: item.sellingPrice?.toString() || '',
       hsnNumber: item.hsnNumber || '',
       igst: item.igst?.toString() || '',
-      cgst: item.cgst?.toString() || '',
-      taxType: item.igst > 0 ? 'igst' : 'cgst',
+      cgstSgst: item.cgstSgst?.toString() || '',
+      taxType: item.igst > 0 ? 'igst' : 'cgstSgst',
     });
     setEditModalOpen(true);
-  };
-
-  const handleDeleteItem = async (item) => {
-    console.log('handleDeleteItem called with:', item); // Debug log
-    const itemId = item._id || item.id;
-    if (!itemId) {
-      setNotification({
-        open: true,
-        message: 'Invalid item: ID missing.',
-        severity: 'error',
-      });
-      return;
-    }
-
-    // Confirm deletion
-    if (!window.confirm(`Are you sure you want to delete "${item.partName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      await axios.delete(`${API_BASE_URL}/garage/inventory/delete/${itemId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
-        },
-      });
-
-      setNotification({
-        open: true,
-        message: `✅ Part "${item.partName}" deleted successfully!`,
-        severity: 'success',
-      });
-      fetchInventory();
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      setNotification({
-        open: true,
-        message: error.response?.data?.message || 'Failed to delete part.',
-        severity: 'error',
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleCloseNotification = () => {
@@ -542,19 +488,19 @@ const InventoryManagement = () => {
             </Box>
 
             {/* Table */}
-            <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+            <TableContainer component={Paper}>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('carName')}>Car Name</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('model')}>Model</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('partNumber')}>Part No.</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('partName')}>Part Name</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('quantity')}>Qty</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }} onClick={() => handleSortChange('sellingPrice')}>Selling Price</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Single Part GST</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold' }}>Total Value (with GST)</TableCell>
-                    <TableCell sx={{ bgcolor: 'primary.main', color: '#fff', fontWeight: 'bold', minWidth: '200px' }} align="center">Actions</TableCell>
+                  <TableRow sx={{ backgroundColor: theme.palette.primary.main, '& .MuiTableCell-head': { color: '#fff' } }}>
+                    <TableCell onClick={() => handleSortChange('carName')}>Car Name</TableCell>
+                    <TableCell onClick={() => handleSortChange('model')}>Model</TableCell>
+                    <TableCell onClick={() => handleSortChange('partNumber')}>Part No.</TableCell>
+                    <TableCell onClick={() => handleSortChange('partName')}>Part Name</TableCell>
+                    <TableCell onClick={() => handleSortChange('quantity')}>Qty</TableCell>
+                    <TableCell onClick={() => handleSortChange('sellingPrice')}>Selling Price</TableCell>
+                    <TableCell>Single Part GST</TableCell>
+                    <TableCell>Total Value (with GST)</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -567,52 +513,27 @@ const InventoryManagement = () => {
                       <TableCell>{row.quantity || 0}</TableCell>
                       <TableCell>₹{parseFloat(row.sellingPrice || 0).toFixed(2)}</TableCell>
                       <TableCell>
-                        ₹{calculateSinglePartGST(row.sellingPrice, row.igst, row.cgst).toFixed(2)}
+                        ₹{calculateSinglePartGST(row.sellingPrice, row.igst, row.cgstSgst).toFixed(2)}
                         <Typography variant="caption" color="text.secondary" display="block">
-                          {row.igst > 0 && `IGST: ${row.igst}%`}
-                          {row.cgst > 0 && ` CGST: ${row.cgst}%`}
+                          {row.igst > 0 ? `IGST: ${row.igst}%` : `CGST+SGST: ${row.cgstSgst}% each`}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="bold" color="success.main">
-                          ₹{calculateTotalValueWithGST(row.sellingPrice, row.quantity, row.igst, row.cgst).toFixed(2)}
+                          ₹{calculateTotalValueWithGST(row.sellingPrice, row.quantity, row.igst, row.cgstSgst).toFixed(2)}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <Button
-                            variant="outlined"
-                            color="primary"
-                            size="small"
-                            startIcon={<EditIcon />}
-                            onClick={() => handleOpenEditModal(row)}
-                            sx={{ borderRadius: 1 }}
-                          >
-                            Edit
-                          </Button>
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {
-                              console.log('Delete button clicked for:', row);
-                              if (typeof handleDeleteItem === 'function') {
-                                handleDeleteItem(row);
-                              } else {
-                                console.error('handleDeleteItem is not a function');
-                                alert('Delete function not available');
-                              }
-                            }}
-                            sx={{ 
-                              borderRadius: 1,
-                              '&:hover': { 
-                                backgroundColor: 'error.light',
-                                color: 'error.contrastText'
-                              }
-                            }}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          size="small"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleOpenEditModal(row)}
+                          sx={{ borderRadius: 1 }}
+                        >
+                          Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -659,21 +580,8 @@ const InventoryManagement = () => {
         </Card>
 
         {/* Add Modal */}
-        <Dialog 
-          open={addModalOpen} 
-          onClose={() => setAddModalOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
-        >
-          <DialogTitle>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" fontWeight="bold" color="primary">Add New Part to Inventory</Typography>
-              <IconButton onClick={() => setAddModalOpen(false)} disabled={isSubmitting}>
-                <CloseIcon />
-              </IconButton>
-            </Box>
-          </DialogTitle>
+        <Dialog open={addModalOpen} onClose={() => setAddModalOpen(false)} fullWidth maxWidth="md">
+          <DialogTitle>Add New Part</DialogTitle>
           <form onSubmit={handleSubmit}>
             <DialogContent>
               <Grid container spacing={2}>
@@ -693,20 +601,7 @@ const InventoryManagement = () => {
                   <TextField name="quantity" label="Quantity *" type="number" value={formData.quantity} onChange={handleInputChange} required fullWidth margin="normal" inputProps={{ min: 1 }} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField 
-                    name="purchasePrice" 
-                    label="Purchase Price *" 
-                    type="number" 
-                    value={formData.purchasePrice} 
-                    onChange={handleInputChange} 
-                    required 
-                    fullWidth 
-                    margin="normal" 
-                    InputProps={{ 
-                      startAdornment: <InputAdornment position="start">₹</InputAdornment> 
-                    }}
-                    inputProps={{ min: 0, step: 0.01 }}
-                  />
+                  <TextField name="purchasePrice" label="Purchase Price *" type="number" value={formData.purchasePrice} onChange={handleInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField name="sellingPrice" label="Selling Price *" type="number" value={formData.sellingPrice} onChange={handleInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
@@ -715,29 +610,43 @@ const InventoryManagement = () => {
                   <TextField name="hsnNumber" label="HSN Number" value={formData.hsnNumber} onChange={handleInputChange} fullWidth margin="normal" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="IGST (%)"
-                    name="igst"
-                    type="number"
-                    value={formData.igst}
-                    onChange={handleInputChange}
-                    fullWidth
-                    inputProps={{ min: 0, max: 30, step: '0.01' }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                  />
+                  <FormControl fullWidth>
+                    <InputLabel>Tax Type</InputLabel>
+                    <Select name="taxType" value={formData.taxType} onChange={handleInputChange} label="Tax Type">
+                      <MenuItem value="igst">IGST</MenuItem>
+                      <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="CGST (%)"
-                    name="cgst"
-                    type="number"
-                    value={formData.cgst}
-                    onChange={handleInputChange}
-                    fullWidth
-                    inputProps={{ min: 0, max: 15, step: '0.01' }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                  />
-                </Grid>
+                {formData.taxType === 'igst' ? (
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="IGST (%)"
+                      name="igst"
+                      type="number"
+                      value={formData.igst}
+                      onChange={handleInputChange}
+                      required
+                      fullWidth
+                      inputProps={{ min: 0, max: 30, step: '0.01' }}
+                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    />
+                  </Grid>
+                ) : (
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="CGST/SGST (each %)"
+                      name="cgstSgst"
+                      type="number"
+                      value={formData.cgstSgst}
+                      onChange={handleInputChange}
+                      required
+                      fullWidth
+                      inputProps={{ min: 0, max: 15, step: '0.01' }}
+                      InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    />
+                  </Grid>
+                )}
               </Grid>
             </DialogContent>
             <DialogActions>
@@ -770,32 +679,49 @@ const InventoryManagement = () => {
                 <TextField name="quantity" label="Quantity *" type="number" value={editItemData.quantity} onChange={handleEditInputChange} required fullWidth margin="normal" inputProps={{ min: 1 }} />
               </Grid>
               <Grid item xs={12} sm={6}>
+                <TextField name="purchasePrice" label="Purchase Price *" type="number" value={editItemData.purchasePrice} onChange={handleEditInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <TextField name="sellingPrice" label="Selling Price *" type="number" value={editItemData.sellingPrice} onChange={handleEditInputChange} required fullWidth margin="normal" InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }} />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  label="IGST (%)"
-                  name="igst"
-                  type="number"
-                  value={editItemData.igst}
-                  onChange={handleEditInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, max: 30, step: '0.01' }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Tax Type</InputLabel>
+                  <Select name="taxType" value={editItemData.taxType} onChange={handleEditInputChange} label="Tax Type">
+                    <MenuItem value="igst">IGST</MenuItem>
+                    <MenuItem value="cgstSgst">CGST + SGST</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="CGST (%)"
-                  name="cgst"
-                  type="number"
-                  value={editItemData.cgst}
-                  onChange={handleEditInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, max: 15, step: '0.01' }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                />
-              </Grid>
+              {editItemData.taxType === 'igst' ? (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="IGST (%)"
+                    name="igst"
+                    type="number"
+                    value={editItemData.igst}
+                    onChange={handleEditInputChange}
+                    required
+                    fullWidth
+                    inputProps={{ min: 0, max: 30, step: '0.01' }}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  />
+                </Grid>
+              ) : (
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="CGST/SGST (each %)"
+                    name="cgstSgst"
+                    type="number"
+                    value={editItemData.cgstSgst}
+                    onChange={handleEditInputChange}
+                    required
+                    fullWidth
+                    inputProps={{ min: 0, max: 15, step: '0.01' }}
+                    InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                  />
+                </Grid>
+              )}
             </Grid>
           </DialogContent>
           <DialogActions>

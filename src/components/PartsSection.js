@@ -97,30 +97,67 @@ const PartsSection = ({
           <TableContainer
             component={Paper}
             elevation={0}
-            sx={{ border: 1, borderColor: "divider" }}
+            sx={{ 
+              border: 1, 
+              borderColor: "divider",
+              overflowX: 'auto',
+              '&::-webkit-scrollbar': {
+                height: 8,
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'rgba(0,0,0,0.1)',
+                borderRadius: 4,
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                borderRadius: 4,
+                '&:hover': {
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                },
+              },
+            }}
           >
-            <Table>
+            <Table sx={{ minWidth: 600 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                  <TableCell sx={{ 
+                    fontWeight: 600, 
+                    color: "#475569",
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    py: { xs: 1, sm: 1.5 }
+                  }}>
                     Part Name
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                  <TableCell sx={{ 
+                    fontWeight: 600, 
+                    color: "#475569",
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    py: { xs: 1, sm: 1.5 }
+                  }}>
                     HSN Code
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                  <TableCell sx={{ 
+                    fontWeight: 600, 
+                    color: "#475569",
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    py: { xs: 1, sm: 1.5 }
+                  }}>
                     Quantity
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                  <TableCell sx={{ 
+                    fontWeight: 600, 
+                    color: "#475569",
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    py: { xs: 1, sm: 1.5 }
+                  }}>
                     Price/Unit
                   </TableCell>
-                  {/* <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                    Tax (%)
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
-                    Tax Amount
-                  </TableCell> */}
-                  <TableCell sx={{ fontWeight: 600, color: "#475569" }}>
+                  <TableCell sx={{ 
+                    fontWeight: 600, 
+                    color: "#475569",
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    py: { xs: 1, sm: 1.5 }
+                  }}>
                     Total Price + Tax
                   </TableCell>
                 </TableRow>
@@ -128,41 +165,68 @@ const PartsSection = ({
               <TableBody>
                 {parts.map((part) => (
                   <TableRow key={part.id}>
-                    <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" fontWeight={500}>
+                    <TableCell sx={{
+                      ...tableCellStyle,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      py: { xs: 1, sm: 1.5 }
+                    }}>
+                      <Typography 
+                        variant="body2" 
+                        fontWeight={500}
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
                         {part.name}
                       </Typography>
                     </TableCell>
-                    <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" color="text.secondary">
+                    <TableCell sx={{
+                      ...tableCellStyle,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      py: { xs: 1, sm: 1.5 }
+                    }}>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
                         {part.hsnNumber || "8708"}
                       </Typography>
                     </TableCell>
-                    <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" color="text.secondary">
+                    <TableCell sx={{
+                      ...tableCellStyle,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      py: { xs: 1, sm: 1.5 }
+                    }}>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
                         {part.quantity}
                       </Typography>
                     </TableCell>
-                    <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" color="text.secondary">
+                    <TableCell sx={{
+                      ...tableCellStyle,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      py: { xs: 1, sm: 1.5 }
+                    }}>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
+                      >
                         ₹{part.pricePerUnit?.toFixed(2) || "0.00"}
                       </Typography>
                     </TableCell>
-                    {/* <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" color="info.main" fontWeight={500}>
-                        {part.taxPercentage || 0}%
-                      </Typography>
-                    </TableCell>
-                    <TableCell {...tableCellStyle}>
-                      <Typography variant="body2" color="success.main" fontWeight={500}>
-                        ₹{part.taxAmount?.toFixed(2) || "0.00"}
-                      </Typography>
-                    </TableCell> */}
-                   <TableCell {...tableCellStyle}>
+                   <TableCell sx={{
+                      ...tableCellStyle,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      py: { xs: 1, sm: 1.5 }
+                    }}>
                       <Typography
                         variant="body2"
                         fontWeight={600}
                         color="primary"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                       >
                         ₹{part.totalPrice?.toFixed(2) || part.total?.toFixed(2) || "0.00"}
                       </Typography>
