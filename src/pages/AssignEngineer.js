@@ -860,7 +860,7 @@ const AssignEngineer = () => {
 
 
 
-  // Function to handle part selection using Autocomplete (same pattern as WorkInProgress)
+  // Function to handle part selection using Autocomplete (modified to prevent duplicate selections)
   const handlePartSelection = async (newParts, previousParts = []) => {
     try {
       const partsMap = new Map();
@@ -871,56 +871,10 @@ const AssignEngineer = () => {
       newParts.forEach((newPart) => {
         const existingPart = partsMap.get(newPart._id);
         if (existingPart) {
-          const currentQuantity = existingPart.selectedQuantity || 1;
-          const newQuantity = currentQuantity + 1;
-          
-          // Calculate available quantity based on current state
-          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
-          if (!originalInventoryPart) {
-            setError(`Part "${newPart.partName}" not found in inventory`);
-            return;
-          }
-          
-          let totalSelected = 0;
-          
-          // Calculate total selected from all parts (pre-loaded + user-selected)
-          assignment.parts.forEach((assignmentPart) => {
-            if (assignmentPart._id === newPart._id) {
-              totalSelected += assignmentPart.selectedQuantity || 1;
-            }
-          });
-          
-          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
-          const maxSelectableQuantity = availableQuantity + newQuantity;
-          
-          // Special case: Allow selecting same part when quantity equals inventory
-          const isQuantityEqualToInventory = currentQuantity === originalInventoryPart.quantity;
-          
-          if (newQuantity > maxSelectableQuantity && !isQuantityEqualToInventory) {
-            setError(
-              `Cannot add more "${newPart.partName}". Maximum available: ${maxSelectableQuantity}, Current: ${currentQuantity}`
-            );
-            return;
-          }
-          // Calculate tax amounts using API structure: igst + cgstSgst = total tax percentage
-          const sellingPrice = existingPart.sellingPrice || existingPart.pricePerUnit || 0;
-          const igst = existingPart.igst || 0;
-          const cgstSgst = existingPart.cgstSgst || 0;
-          const totalTaxPercentage = igst + cgstSgst;
-          
-          // Only calculate tax if there's a tax percentage
-          const baseAmount = sellingPrice * newQuantity;
-          const gstAmount = totalTaxPercentage > 0 ? (baseAmount * totalTaxPercentage) / 100 : 0;
-          const totalWithGST = baseAmount + gstAmount;
-
-          partsMap.set(newPart._id, {
-            ...existingPart,
-            selectedQuantity: newQuantity,
-            // Update GST amounts for new quantity
-            baseAmount: parseFloat(baseAmount.toFixed(2)),
-            gstAmount: parseFloat(gstAmount.toFixed(2)),
-            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
-          });
+          // Part is already selected - do nothing, ignore the selection attempt
+          // User should use +/- buttons to update quantity
+          console.log(`Part "${newPart.partName}" is already selected. Use +/- buttons to update quantity.`);
+          return;
         } else {
           // Calculate available quantity based on current state
           const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
@@ -2317,20 +2271,25 @@ const AssignEngineer = () => {
                                 noOptionsText="No parts available in stock"
                                 filterOptions={(options, { inputValue }) => {
                                   return options.filter(
-                                    (option) =>
-                                      getAvailableQuantity(option._id) > 0 &&
-                                      (option.partName
-                                        .toLowerCase()
-                                        .includes(inputValue.toLowerCase()) ||
-                                        option.partNumber
-                                          ?.toLowerCase()
+                                    (option) => {
+                                      // Exclude parts that are already selected
+                                      const isAlreadySelected = selectedParts.some(selectedPart => selectedPart._id === option._id);
+                                      
+                                      return !isAlreadySelected &&
+                                        getAvailableQuantity(option._id) > 0 &&
+                                        (option.partName
+                                          .toLowerCase()
                                           .includes(inputValue.toLowerCase()) ||
-                                        option.carName
-                                          ?.toLowerCase()
-                                          .includes(inputValue.toLowerCase()) ||
-                                        option.model
-                                          ?.toLowerCase()
-                                          .includes(inputValue.toLowerCase()))
+                                          option.partNumber
+                                            ?.toLowerCase()
+                                            .includes(inputValue.toLowerCase()) ||
+                                          option.carName
+                                            ?.toLowerCase()
+                                            .includes(inputValue.toLowerCase()) ||
+                                          option.model
+                                            ?.toLowerCase()
+                                            .includes(inputValue.toLowerCase()));
+                                    }
                                   );
                                 }}
                               />

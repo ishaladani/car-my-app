@@ -235,52 +235,10 @@ const WorkInProgress = () => {
       newParts.forEach((newPart) => {
         const existingPart = partsMap.get(newPart._id);
         if (existingPart) {
-          const currentQuantity = existingPart.selectedQuantity || 1;
-          const newQuantity = currentQuantity + 1;
-          
-          // Calculate available quantity based on current state
-          const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
-          if (!originalInventoryPart) {
-            setError(`Part "${newPart.partName}" not found in inventory`);
-            return;
-          }
-          
-          let totalSelected = 0;
-          
-          // Calculate total selected from all parts (pre-loaded + user-selected)
-          assignment.parts.forEach((assignmentPart) => {
-            if (assignmentPart._id === newPart._id) {
-              totalSelected += assignmentPart.selectedQuantity || 1;
-            }
-          });
-          
-          const availableQuantity = Math.max(0, originalInventoryPart.quantity - totalSelected);
-          const maxSelectableQuantity = availableQuantity + newQuantity;
-          
-          // Special case: Allow selecting same part when quantity equals inventory
-          const isQuantityEqualToInventory = currentQuantity === originalInventoryPart.quantity;
-          
-          if (newQuantity > maxSelectableQuantity && !isQuantityEqualToInventory) {
-            setError(
-              `Cannot add more "${newPart.partName}". Maximum available: ${maxSelectableQuantity}, Current: ${currentQuantity}`
-            );
-            return;
-          }
-          // Calculate tax amounts using InventoryManagement style for updated quantity
-          const sellingPrice = existingPart.sellingPrice || existingPart.pricePerUnit || 0;
-          const taxPercentage = existingPart.taxAmount || existingPart.gstPercentage || 0;
-          const baseAmount = sellingPrice * newQuantity;
-          const gstAmount = (baseAmount * taxPercentage) / 100;
-          const totalWithGST = baseAmount + gstAmount;
-
-          partsMap.set(newPart._id, {
-            ...existingPart,
-            selectedQuantity: newQuantity,
-            // Update GST amounts for new quantity
-            baseAmount: parseFloat(baseAmount.toFixed(2)),
-            gstAmount: parseFloat(gstAmount.toFixed(2)),
-            totalWithGST: parseFloat(totalWithGST.toFixed(2)),
-          });
+          // Part is already selected - do nothing, ignore the selection attempt
+          // User should use +/- buttons to update quantity
+          console.log(`Part "${newPart.partName}" is already selected. Use +/- buttons to update quantity.`);
+          return;
         } else {
           // Calculate available quantity based on current state
           const originalInventoryPart = inventoryParts.find(p => p._id === newPart._id);
@@ -2024,10 +1982,14 @@ const WorkInProgress = () => {
                             filterOptions={(options, { inputValue }) => {
                               return options.filter(
                                 (option) => {
+                                  // Exclude parts that are already selected
+                                  const isAlreadySelected = selectedParts.some(selectedPart => selectedPart._id === option._id);
+                                  
                                   const availableQuantity = getAvailableQuantity(option._id);
                                   const isAvailable = availableQuantity > 0 || availableQuantity === option.quantity;
                                   
-                                  return isAvailable &&
+                                  return !isAlreadySelected &&
+                                    isAvailable &&
                                     (option.partName
                                       .toLowerCase()
                                       .includes(inputValue.toLowerCase()) ||
