@@ -87,6 +87,7 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { handleTokenError, withTokenValidation } from "../utils/authUtils";
 
 // Styled components
 const VisuallyHiddenInput = styled("input")({
@@ -1009,7 +1010,8 @@ const JobCards = () => {
       if (!id) return;
       setFetchingData(true);
       setIsEditMode(true);
-      try {
+      
+      const apiCall = async () => {
         const response = await axios.get(
           `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
           {
@@ -1020,6 +1022,11 @@ const JobCards = () => {
             },
           }
         );
+        return response;
+      };
+
+      try {
+        const response = await withTokenValidation(apiCall, navigate);
         const jobCardData = response.data;
 
         console.log("Fetched Job Card Data:", jobCardData);
@@ -1091,20 +1098,23 @@ const JobCards = () => {
         });
       } catch (error) {
         console.error("Error fetching job card data:", error);
-        setSnackbar({
-          open: true,
-          message:
-            "Failed to load job card data: " +
-            (error.response?.data?.message || error.message),
-          severity: "error",
-        });
+        // Only show error message if it's not a token error (token errors are handled by the utility)
+        if (!error.message.includes('Session expired')) {
+          setSnackbar({
+            open: true,
+            message:
+              "Failed to load job card data: " +
+              (error.response?.data?.message || error.message),
+            severity: "error",
+          });
+        }
       } finally {
         setFetchingData(false);
       }
     };
     
     fetchJobCardData();
-  }, [id]); 
+  }, [id, navigate]); 
 
   // Fields that should be converted to uppercase
   const uppercaseFields = [
@@ -1227,9 +1237,9 @@ const JobCards = () => {
 
   const updateJobCardStatus = async (newStatus) => {
     if (!id) return;
-    try {
-      setLoading(true);
-      const response = await axios.put(
+    
+    const apiCall = async () => {
+      return await axios.put(
         `https://garage-management-zi5z.onrender.com/api/garage/jobCards/${id}`,
         { status: newStatus },
         {
@@ -1241,6 +1251,11 @@ const JobCards = () => {
           },
         }
       );
+    };
+
+    try {
+      setLoading(true);
+      const response = await withTokenValidation(apiCall, navigate);
       setFormData((prev) => ({ ...prev, status: newStatus }));
       setSnackbar({
         open: true,
@@ -1249,13 +1264,16 @@ const JobCards = () => {
       });
     } catch (error) {
       console.error("Error updating status:", error);
-      setSnackbar({
-        open: true,
-        message:
-          "Failed to update status: " +
-          (error.response?.data?.message || error.message),
-        severity: "error",
-      });
+      // Only show error message if it's not a token error (token errors are handled by the utility)
+      if (!error.message.includes('Session expired')) {
+        setSnackbar({
+          open: true,
+          message:
+            "Failed to update status: " +
+            (error.response?.data?.message || error.message),
+          severity: "error",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -1489,11 +1507,15 @@ const JobCards = () => {
             timeout: 60000,
           };
 
-          response = await axios.put(
-            `${apiBaseUrl}/api/garage/jobCards/${id}`,
-            formDataToSend,
-            configWithFiles
-          );
+          const apiCall = async () => {
+            return await axios.put(
+              `${apiBaseUrl}/api/garage/jobCards/${id}`,
+              formDataToSend,
+              configWithFiles
+            );
+          };
+
+          response = await withTokenValidation(apiCall, navigate);
         } else {
           // Use JSON for updates without new files
           const jobCardPayload = {
@@ -1531,11 +1553,15 @@ const JobCards = () => {
             },
           };
 
-          response = await axios.put(
-            `${apiBaseUrl}/api/garage/jobCards/${id}`,
-            jobCardPayload,
-            config
-          );
+          const apiCall = async () => {
+            return await axios.put(
+              `${apiBaseUrl}/api/garage/jobCards/${id}`,
+              jobCardPayload,
+              config
+            );
+          };
+
+          response = await withTokenValidation(apiCall, navigate);
         }
       } else {
         // Create new job card - always use FormData
@@ -1576,11 +1602,15 @@ const JobCards = () => {
           timeout: 60000,
         };
 
-        response = await axios.post(
-          `${apiBaseUrl}/api/garage/jobCards/add`,
-          formDataToSend,
-          config
-        );
+        const apiCall = async () => {
+          return await axios.post(
+            `${apiBaseUrl}/api/garage/jobCards/add`,
+            formDataToSend,
+            config
+          );
+        };
+
+        response = await withTokenValidation(apiCall, navigate);
       }
 
 
@@ -1601,29 +1631,36 @@ const JobCards = () => {
       );
     } catch (error) {
       console.error("API Error:", error);
-      let errorMessage = `Failed to ${
-        isEditMode ? "update" : "create"
-      } job card`;
-      if (error.response) {
-        errorMessage = error.response.data.message || errorMessage;
-        if (error.response.status === 400 && error.response.data.errors) {
-          const serverErrors = {};
-          error.response.data.errors.forEach((err) => {
-            serverErrors[err.field] = err.message;
-          });
-          setErrors((prev) => ({ ...prev, ...serverErrors }));
+      
+      // Check if it's a token error first
+      const tokenErrorHandled = handleTokenError(error, navigate);
+      
+      if (!tokenErrorHandled) {
+        // Only show error message if it's not a token error
+        let errorMessage = `Failed to ${
+          isEditMode ? "update" : "create"
+        } job card`;
+        if (error.response) {
+          errorMessage = error.response.data.message || errorMessage;
+          if (error.response.status === 400 && error.response.data.errors) {
+            const serverErrors = {};
+            error.response.data.errors.forEach((err) => {
+              serverErrors[err.field] = err.message;
+            });
+            setErrors((prev) => ({ ...prev, ...serverErrors }));
+          }
+        } else if (error.request) {
+          errorMessage = "Network error - please check your connection";
+        } else if (error.code === "ECONNABORTED") {
+          errorMessage = "Request timeout - please try again";
         }
-      } else if (error.request) {
-        errorMessage = "Network error - please check your connection";
-      } else if (error.code === "ECONNABORTED") {
-        errorMessage = "Request timeout - please try again";
-      }
 
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: "error",
-      });
+        setSnackbar({
+          open: true,
+          message: errorMessage,
+          severity: "error",
+        });
+      }
     } finally {
       setLoading(false);
     }
