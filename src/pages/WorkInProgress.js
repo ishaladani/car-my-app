@@ -1581,9 +1581,9 @@ const WorkInProgress = () => {
                               <Chip
                                 variant="outlined"
                                 label={option.name}
-                                {...getTagProps({ index })}
                                 color="primary"
                                 key={option._id}
+                                onDelete={undefined}
                               />
                             ))
                           }
@@ -1601,6 +1601,7 @@ const WorkInProgress = () => {
                               }
                               InputProps={{
                                 ...params.InputProps,
+                                endAdornment: null, // Remove any end adornment (cancel icon)
                                 startAdornment: (
                                   <>
                                     <InputAdornment position="start">
@@ -1922,8 +1923,8 @@ const WorkInProgress = () => {
                                   }) - Qty: ${option.selectedQuantity || 1} @ ₹${
                                     option.sellingPrice || 0
                                   }`}
-                                  {...getTagProps({ index })}
                                   key={option._id}
+                                  onDelete={undefined}
                                 />
                               ))
                             }
@@ -1960,6 +1961,7 @@ const WorkInProgress = () => {
                                 variant="outlined"
                                 InputProps={{
                                   ...params.InputProps,
+                                  endAdornment: null, // Remove any end adornment (cancel icon)
                                   startAdornment: (
                                     <>
                                       <InputAdornment position="start">

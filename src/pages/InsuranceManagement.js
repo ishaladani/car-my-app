@@ -247,12 +247,22 @@ const InsuranceManagement = () => {
       mb: 4,
       ml: {xs: 0, sm: 35},
       overflow: 'auto',
-      pt: 3
+      pt: {xs: 2, sm: 3},
+      px: {xs: 2, sm: 0}
     }}>
       <CssBaseline />
       
-      <Container maxWidth="lg">
-        <Typography variant="h4" component="h1" fontWeight={600} color="primary" sx={{ mb: 3 }}>
+      <Container maxWidth="lg" sx={{ px: {xs: 1, sm: 3} }}>
+        <Typography 
+          variant={isMobile ? "h5" : "h4"} 
+          component="h1" 
+          fontWeight={600} 
+          color="primary" 
+          sx={{ 
+            mb: {xs: 2, sm: 3},
+            textAlign: {xs: 'center', sm: 'left'}
+          }}
+        >
           Insurance Management System
         </Typography>
 
@@ -273,23 +283,33 @@ const InsuranceManagement = () => {
         </Snackbar>
 
         {/* Tabs */}
-        <Card sx={{ mb: 3, borderRadius: 2, boxShadow: theme.shadows[3] }}>
+        <Card sx={{ 
+          mb: {xs: 2, sm: 3}, 
+          borderRadius: 2, 
+          boxShadow: theme.shadows[3],
+          overflow: 'hidden'
+        }}>
           <Tabs 
             value={activeTab} 
             onChange={handleTabChange}
+            variant={isMobile ? "fullWidth" : "standard"}
             sx={{
               '& .MuiTabs-indicator': {
                 backgroundColor: theme.palette.primary.main,
+                height: 3,
               },
               '& .MuiTab-root': {
                 textTransform: 'none',
                 fontWeight: 500,
-                fontSize: '1rem',
+                fontSize: {xs: '0.875rem', sm: '1rem'},
+                minHeight: {xs: 48, sm: 48},
+                py: {xs: 1, sm: 1.5},
+                px: {xs: 1, sm: 2},
               }
             }}
           >
-            <Tab label="Add Insurance" />
-            <Tab label="Expiring Insurances" />
+            <Tab label={isMobile ? "Add" : "Add Insurance"} />
+            <Tab label={isMobile ? "Expiring" : "Expiring Insurances"} />
           </Tabs>
         </Card>
 
@@ -299,19 +319,33 @@ const InsuranceManagement = () => {
             borderRadius: 2,
             boxShadow: theme.shadows[3]
           }}>
-            <CardContent sx={{ p: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" component="h2" fontWeight={600}>
+            <CardContent sx={{ p: {xs: 2, sm: 4} }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: {xs: 'column', sm: 'row'},
+                justifyContent: 'space-between', 
+                alignItems: {xs: 'stretch', sm: 'center'}, 
+                mb: 3,
+                gap: {xs: 2, sm: 0}
+              }}>
+                <Typography 
+                  variant={isMobile ? "h6" : "h5"} 
+                  component="h2" 
+                  fontWeight={600}
+                  sx={{ textAlign: {xs: 'center', sm: 'left'} }}
+                >
                   Add New Insurance Policy
                 </Typography>
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => setOpenDialog(true)}
+                  fullWidth={isMobile}
                   sx={{ 
                     textTransform: 'none',
                     fontWeight: 600,
-                    borderRadius: 2
+                    borderRadius: 2,
+                    minHeight: {xs: 44, sm: 36}
                   }}
                 >
                   Add Insurance
@@ -332,9 +366,21 @@ const InsuranceManagement = () => {
             borderRadius: 2,
             boxShadow: theme.shadows[3]
           }}>
-            <CardContent sx={{ p: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" component="h2" fontWeight={600}>
+            <CardContent sx={{ p: {xs: 2, sm: 4} }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: {xs: 'column', sm: 'row'},
+                justifyContent: 'space-between', 
+                alignItems: {xs: 'stretch', sm: 'center'}, 
+                mb: 3,
+                gap: {xs: 2, sm: 0}
+              }}>
+                <Typography 
+                  variant={isMobile ? "h6" : "h5"} 
+                  component="h2" 
+                  fontWeight={600}
+                  sx={{ textAlign: {xs: 'center', sm: 'left'} }}
+                >
                   Expiring Insurance Policies
                 </Typography>
                 <Button
@@ -342,10 +388,12 @@ const InsuranceManagement = () => {
                   startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
                   onClick={fetchExpiringInsurances}
                   disabled={loading}
+                  fullWidth={isMobile}
                   sx={{ 
                     textTransform: 'none',
                     fontWeight: 600,
-                    borderRadius: 2
+                    borderRadius: 2,
+                    minHeight: {xs: 44, sm: 36}
                   }}
                 >
                   {loading ? 'Loading...' : 'Refresh'}
@@ -477,8 +525,8 @@ const InsuranceManagement = () => {
             </Box>
           </DialogTitle>
           
-          <DialogContent dividers>
-            <Grid container spacing={3}>
+          <DialogContent dividers sx={{ p: {xs: 2, sm: 3} }}>
+            <Grid container spacing={{xs: 2, sm: 3}}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -487,6 +535,7 @@ const InsuranceManagement = () => {
                   onChange={(e) => handleInputChange('policyNumber', e.target.value)}
                   required
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -498,6 +547,7 @@ const InsuranceManagement = () => {
                   onChange={(e) => handleInputChange('company', e.target.value)}
                   required
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -510,6 +560,7 @@ const InsuranceManagement = () => {
                   placeholder="e.g., Comprehensive, Third Party"
                   required
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -522,6 +573,7 @@ const InsuranceManagement = () => {
                   placeholder="e.g., ABC-123"
                   required
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -534,6 +586,7 @@ const InsuranceManagement = () => {
                   onChange={(e) => handleInputChange('startDate', e.target.value)}
                   InputLabelProps={{ shrink: true }}
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -547,6 +600,7 @@ const InsuranceManagement = () => {
                   InputLabelProps={{ shrink: true }}
                   required
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -559,6 +613,7 @@ const InsuranceManagement = () => {
                   onChange={(e) => handleInputChange('premiumAmount', e.target.value)}
                   placeholder="0.00"
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -569,6 +624,7 @@ const InsuranceManagement = () => {
                   value={insuranceForm.contactPerson}
                   onChange={(e) => handleInputChange('contactPerson', e.target.value)}
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
               
@@ -581,12 +637,21 @@ const InsuranceManagement = () => {
                   onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                   placeholder="e.g., +1-234-567-8900"
                   variant="outlined"
+                  size={isMobile ? "medium" : "medium"}
                 />
               </Grid>
             </Grid>
           </DialogContent>
           
-          <DialogActions sx={{ p: 3, gap: 1 }}>
+          <DialogActions sx={{ 
+            p: {xs: 2, sm: 3}, 
+            gap: 1,
+            flexDirection: {xs: 'column', sm: 'row'},
+            '& .MuiButton-root': {
+              minHeight: {xs: 44, sm: 36},
+              width: {xs: '100%', sm: 'auto'}
+            }
+          }}>
             <Button 
               onClick={() => setOpenDialog(false)}
               disabled={loading}

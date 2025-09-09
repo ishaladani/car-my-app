@@ -2123,8 +2123,8 @@ const AssignEngineer = () => {
                                       }) - Qty: ${option.selectedQuantity || 1} @ ₹${
                                         option.sellingPrice || 0
                                       }`}
-                                      {...getTagProps({ index })}
                                       key={option._id}
+                                      onDelete={undefined}
                                     />
                                   ))
                                 }
@@ -2154,6 +2154,7 @@ const AssignEngineer = () => {
                                     variant="outlined"
                                     InputProps={{
                                       ...params.InputProps,
+                                      endAdornment: null, // Remove any end adornment (cancel icon)
                                       startAdornment: (
                                         <>
                                           <InputAdornment position="start">
