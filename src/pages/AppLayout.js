@@ -122,6 +122,7 @@ const AppLayout = () => {
       console.log("Garage profile response:", response.data);
       if (response.data) {
         const garageData = response.data;
+        console.log("Setting profile data with logo:", garageData.logo);
         setProfileData({
           name: garageData.name || "Garage",
           image: garageData.logo || "",
@@ -234,16 +235,27 @@ const AppLayout = () => {
     loadInitialData();
 
     // Listen for profile updates from other components
-    const handleStorageChange = () => {
-      if (localStorage.getItem("profileUpdated") === "true") {
+    const handleStorageChange = (e) => {
+      if (e.key === "profileUpdated") {
+        console.log("Profile update detected, refreshing...");
         fetchGarageProfile();
         localStorage.removeItem("profileUpdated");
       }
     };
 
+    const handleProfileUpdate = () => {
+      console.log("Profile update event received, refreshing...");
+      fetchGarageProfile();
+      localStorage.removeItem("profileUpdated");
+    };
+
+    // Listen for both storage events and custom events
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+    
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
     };
   }, [garageId, roll, userId]);
 
@@ -254,6 +266,22 @@ const AppLayout = () => {
     }
   }, [roll, userId]);
 
+  // Check for profile updates periodically (fallback mechanism)
+  useEffect(() => {
+    const checkForUpdates = () => {
+      if (localStorage.getItem("profileUpdated") === "true") {
+        console.log("Periodic check: Profile update detected, refreshing...");
+        fetchGarageProfile();
+        localStorage.removeItem("profileUpdated");
+      }
+    };
+
+    // Check every 2 seconds
+    const interval = setInterval(checkForUpdates, 2000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   // Debug current state
   useEffect(() => {
     console.log("Current state debug:");
@@ -262,7 +290,8 @@ const AppLayout = () => {
     console.log("- User permissions:", userPermissions);
     console.log("- Filtered nav items:", filteredNavItems);
     console.log("- Current location:", location.pathname);
-  }, [roll, permissionsLoaded, userPermissions, filteredNavItems, location.pathname]);
+    console.log("- Profile data:", profileData);
+  }, [roll, permissionsLoaded, userPermissions, filteredNavItems, location.pathname, profileData]);
 
   // Drawer Content
   const drawerContent = (

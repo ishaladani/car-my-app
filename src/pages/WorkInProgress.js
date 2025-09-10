@@ -202,7 +202,10 @@ const WorkInProgress = () => {
       } else {
         // For user-selected parts, calculate normally
         const sellingPrice = Number(part.sellingPrice || part.pricePerUnit || 0);
-        const taxRate = Number(part.taxAmount || part.gstPercentage || 0);
+        // Calculate total GST percentage: igst + cgstSgst
+        const igstPercentage = Number(part.igst || 0);
+        const cgstSgstPercentage = Number(part.cgstSgst || 0);
+        const taxRate = igstPercentage + cgstSgstPercentage;
         const pricePerPiece = sellingPrice; // Base price without tax
         const totalPrice = (sellingPrice + (sellingPrice * taxRate / 100)) * selectedQuantity;
 
@@ -272,7 +275,10 @@ const WorkInProgress = () => {
           }
           // Calculate tax amounts using InventoryManagement style
           const sellingPrice = newPart.sellingPrice || newPart.pricePerUnit || 0;
-          const taxPercentage = newPart.taxAmount || newPart.gstPercentage || 0;
+          // Calculate total GST percentage: igst + cgstSgst
+          const igstPercentage = newPart.igst || 0;
+          const cgstSgstPercentage = newPart.cgstSgst || 0;
+          const taxPercentage = igstPercentage + cgstSgstPercentage;
           const quantity = 1;
           const baseAmount = sellingPrice * quantity;
           const gstAmount = (baseAmount * taxPercentage) / 100;
@@ -429,7 +435,10 @@ const WorkInProgress = () => {
 
       // Calculate tax amounts using InventoryManagement style for updated quantity
       const sellingPrice = part.sellingPrice || part.pricePerUnit || 0;
-      const taxPercentage = part.taxAmount || part.gstPercentage || 0;
+      // Calculate total GST percentage: igst + cgstSgst
+      const igstPercentage = part.igst || 0;
+      const cgstSgstPercentage = part.cgstSgst || 0;
+      const taxPercentage = igstPercentage + cgstSgstPercentage;
       const baseAmount = sellingPrice * newQuantity;
       const gstAmount = (baseAmount * taxPercentage) / 100;
       const totalWithGST = baseAmount + gstAmount;
@@ -648,7 +657,10 @@ const WorkInProgress = () => {
       const partsForAPI = partsToUpdate.map(part => {
         const quantity = Number(part.selectedQuantity) || Number(part.quantity) || 1;
         const sellingPrice = Number(part.sellingPrice) || 0;
-        const taxPercentage = Number(part.taxAmount || part.gstPercentage || 0);
+        // Calculate total GST percentage: igst + cgstSgst
+        const igstPercentage = Number(part.igst || 0);
+        const cgstSgstPercentage = Number(part.cgstSgst || 0);
+        const taxPercentage = igstPercentage + cgstSgstPercentage;
         
         // Calculate total price with tax included
         const baseAmount = sellingPrice * quantity;
@@ -1790,7 +1802,10 @@ const WorkInProgress = () => {
                                   </TableHead>
                                   <TableBody>
                                     {assignment.parts.map((part, index) => {
-                                      const taxAmount = part.taxAmount || part.gstPercentage || 0;
+                                      // Calculate total GST percentage: igst + cgstSgst
+                                      const igstPercentage = part.igst || 0;
+                                      const cgstSgstPercentage = part.cgstSgst || 0;
+                                      const taxAmount = igstPercentage + cgstSgstPercentage;
                                       const totalTaxAmount = (part.sellingPrice || 0) * (part.selectedQuantity || 1) * (taxAmount / 100);
                                       
                                      
@@ -1850,7 +1865,10 @@ const WorkInProgress = () => {
                                   </Typography>
                                   <Typography variant="body2">
                                     Total Tax Amount: ₹{assignment.parts.reduce((total, part) => {
-                                      const taxAmount = part.taxAmount || part.gstPercentage || 0;
+                                      // Calculate total GST percentage: igst + cgstSgst
+                                      const igstPercentage = part.igst || 0;
+                                      const cgstSgstPercentage = part.cgstSgst || 0;
+                                      const taxAmount = igstPercentage + cgstSgstPercentage;
                                       const totalTaxAmount = (part.sellingPrice || 0) * (part.selectedQuantity || 1) * (taxAmount / 100);
                                       return total + totalTaxAmount;
                                     }, 0).toFixed(2)}
@@ -1905,9 +1923,9 @@ const WorkInProgress = () => {
                                
                                return `${option.partName} (${
                                  option.partNumber || "N/A"
-                               }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST11232: ${
-                                 option.gstPercentage || option.taxAmount || 0
-                               } | ${statusText}`;
+                               }) - HSN: ${option.hsnNumber || "N/A"} | ₹${option.sellingPrice || 0} | GST: ${
+                                 (option.igst || 0) + (option.cgstSgst || 0)
+                               }% | ${statusText}`;
                              }}
                              value={selectedParts}
                              onChange={(event, newValue) => {
@@ -1946,7 +1964,7 @@ const WorkInProgress = () => {
                                     >
                                       Part : {option.partNumber || "N/A"} | HSN: {option.hsnNumber || "N/A"} | Price: ₹
                                       {option.sellingPrice || 0} | GST:{" "}
-                                      {option.gstPercentage || option.taxAmount || 0}% |
+                                      {(option.igst || 0) + (option.cgstSgst || 0)}% |
                                       {statusText} |
                                       {option.carName} - {option.model}
                                     </Typography>

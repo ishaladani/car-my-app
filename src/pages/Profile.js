@@ -161,7 +161,6 @@ const Profile = () => {
 
   const handleInputChange = (field, value) => {
     if (field.includes(".")) {
-      // Handle nested fields like bankDetails.accountHolderName
       const [parent, child] = field.split(".");
       setEditData((prev) => ({
         ...prev,
@@ -269,6 +268,8 @@ const Profile = () => {
         showSnackbar("Logo updated successfully!", "success");
         setGarageData((prev) => ({ ...prev, image: response.data.logo }));
         localStorage.setItem("garageLogo", response.data.logo);
+        localStorage.setItem("profileUpdated", "true");
+        window.dispatchEvent(new Event('profileUpdated'));
       }
     } catch (error) {
       console.error("Error updating logo:", error);
@@ -288,19 +289,21 @@ const Profile = () => {
     }
 
     setUpdating(true);
+
     try {
       const token = localStorage.getItem("token");
       const headers = {
         "Content-Type": "application/json",
       };
+
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Prepare the complete data payload for the API
+      // Prepare payload matching the new API format
       const updatePayload = {
         name: editData.name,
-        phone: editData.phone || "",
+        contactNumber: editData.phone || "", // Map phone -> contactNumber
         address: editData.address || "",
         email: editData.email || "",
         gstNum: editData.gstNum || "",
@@ -316,15 +319,14 @@ const Profile = () => {
         },
       };
 
-      updatePayload.logo = editData.image || "";
+      // New API endpoint: use localhost:8000 (or adjust if needed)
+      const apiBaseUrl = "https://garage-management-zi5z.onrender.com"; // Change this if your backend is different
+      const updateEndpoint = `${apiBaseUrl}/api/garage/allgarages/${garageId}`;
 
-      
+      console.log("Updating garage profile with payload:", updatePayload);
+      console.log("Using endpoint:", updateEndpoint);
 
-      const response = await axios.put(
-        `https://garage-management-zi5z.onrender.com/api/garage/${garageId}`, // Updated to match your curl command
-        updatePayload,
-        { headers }
-      );
+      const response = await axios.put(updateEndpoint, updatePayload, { headers });
 
       if (response.status === 200 || response.status === 201) {
         const updatedGarageData = { ...editData };
@@ -336,10 +338,16 @@ const Profile = () => {
         setImageChanged(false);
         setEditDialogOpen(false);
 
+        localStorage.setItem("profileUpdated", "true");
+        window.dispatchEvent(new Event('profileUpdated'));
+
         showSnackbar("Profile updated successfully!", "success");
       }
     } catch (error) {
       console.error("Error updating garage data:", error);
+      console.error("Error response:", error.response);
+      console.error("Error status:", error.response?.status);
+      console.error("Error data:", error.response?.data);
 
       if (error.response?.status === 413) {
         showSnackbar(
@@ -348,6 +356,8 @@ const Profile = () => {
         );
       } else if (error.response?.status === 400) {
         showSnackbar("Invalid data format. Please check your inputs.", "error");
+      } else if (error.response?.status === 404) {
+        showSnackbar("API endpoint not found. Please contact support.", "error");
       } else {
         showSnackbar(
           error.response?.data?.message || "Failed to update profile",

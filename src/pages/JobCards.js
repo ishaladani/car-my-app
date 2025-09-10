@@ -80,6 +80,8 @@ import {
   Refresh as RefreshIcon,
   PhotoLibrary,
   FileDownload as DownloadIcon,
+  ZoomIn as ZoomInIcon,
+  ZoomOut as ZoomOutIcon,
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
@@ -166,6 +168,136 @@ const CameraCanvas = styled("canvas")({
   display: "none",
 });
 
+// Image Dialog Component
+const ImageDialog = ({ open, onClose, imageSrc, imageAlt, imageTitle }) => {
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleReset = () => {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e) => {
+    if (zoom > 1) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      });
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging && zoom > 1) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleClose = () => {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth={false}
+      fullWidth
+      PaperProps={{
+        sx: {
+          maxWidth: '95vw',
+          maxHeight: '95vh',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          color: 'white',
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        color: 'white'
+      }}>
+        <Typography variant="h6">{imageTitle || imageAlt}</Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Zoom In">
+            <IconButton onClick={handleZoomIn} color="inherit">
+              <ZoomInIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Zoom Out">
+            <IconButton onClick={handleZoomOut} color="inherit">
+              <ZoomOutIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Reset">
+            <IconButton onClick={handleReset} color="inherit">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Close">
+            <IconButton onClick={handleClose} color="inherit">
+              <CloseIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+      <DialogContent 
+        sx={{ 
+          padding: 0, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          overflow: 'hidden',
+          position: 'relative'
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {imageSrc && (
+          <img
+            src={imageSrc}
+            alt={imageAlt}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+              transition: isDragging ? 'none' : 'transform 0.2s ease',
+              cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+              userSelect: 'none'
+            }}
+            draggable={false}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Camera Photo Upload Component
 const CameraPhotoUpload = ({
   imageType,
@@ -175,6 +307,7 @@ const CameraPhotoUpload = ({
   onRemoveExisting,
   onRemoveNew,
   fileError,
+  onImageClick,
 }) => {
   const theme = useTheme();
   const [showCamera, setShowCamera] = useState(false);
@@ -330,7 +463,9 @@ const CameraPhotoUpload = ({
               objectFit: "cover",
               borderRadius: "8px",
               border: "1px solid #ddd",
+              cursor: "pointer",
             }}
+            onClick={() => onImageClick && onImageClick(existingImage, imageType.label, imageType.label)}
           />
           <IconButton
             size="small"
@@ -366,7 +501,9 @@ const CameraPhotoUpload = ({
               objectFit: "cover",
               borderRadius: "8px",
               border: "2px solid #4caf50",
+              cursor: "pointer",
             }}
+            onClick={() => onImageClick && onImageClick(URL.createObjectURL(newImage), imageType.label, imageType.label)}
           />
           <IconButton
             size="small"
@@ -487,7 +624,9 @@ const CameraPhotoUpload = ({
                     width: "100%",
                     height: "auto",
                     borderRadius: "8px",
+                    cursor: "pointer",
                   }}
+                  onClick={() => onImageClick && onImageClick(capturedPhoto, "Captured Photo", "Captured Photo")}
                 />
               )}
             </CameraContainer>
@@ -693,6 +832,14 @@ const JobCards = () => {
   });
   const [videoFile, setVideoFile] = useState(null);
   const [fileErrors, setFileErrors] = useState({});
+
+  // Image dialog state
+  const [imageDialog, setImageDialog] = useState({
+    open: false,
+    imageSrc: null,
+    imageAlt: '',
+    imageTitle: ''
+  });
 
   // Existing Images URLs (for edit mode)
   const [existingImages, setExistingImages] = useState({
@@ -1376,6 +1523,26 @@ const JobCards = () => {
       open: true,
       message: "Image removed. Upload a new one or keep existing images.",
       severity: "info",
+    });
+  };
+
+  // Handle opening image dialog
+  const handleOpenImageDialog = (imageSrc, imageAlt, imageTitle) => {
+    setImageDialog({
+      open: true,
+      imageSrc,
+      imageAlt,
+      imageTitle
+    });
+  };
+
+  // Handle closing image dialog
+  const handleCloseImageDialog = () => {
+    setImageDialog({
+      open: false,
+      imageSrc: null,
+      imageAlt: '',
+      imageTitle: ''
     });
   };
 
@@ -2140,7 +2307,13 @@ const JobCards = () => {
                                 border: hasNewImage
                                   ? "2px solid #4caf50"
                                   : "1px solid #ddd",
+                                cursor: "pointer",
                               }}
+                              onClick={() => handleOpenImageDialog(
+                                hasNewImage ? URL.createObjectURL(hasNewImage) : hasExistingImage,
+                                imageType.label,
+                                imageType.label
+                              )}
                             />
                             {hasNewImage && (
                               <Typography
@@ -2921,6 +3094,7 @@ const JobCards = () => {
                           }}
                           onRemoveNew={() => removeUploadedImage(imageType.key)}
                           fileError={fileErrors[imageType.key]}
+                          onImageClick={handleOpenImageDialog}
                         />
                       </Grid>
                     ))}
@@ -3109,6 +3283,15 @@ const JobCards = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Image Dialog */}
+      <ImageDialog
+        open={imageDialog.open}
+        onClose={handleCloseImageDialog}
+        imageSrc={imageDialog.imageSrc}
+        imageAlt={imageDialog.imageAlt}
+        imageTitle={imageDialog.imageTitle}
+      />
     </Box>
   );
 };
